@@ -31,13 +31,13 @@ Legacy volume `swp_spwpos-sql-data` được giữ nguyên. Cảnh báo Compose 
 | Planning/Execution | Deadline, capacity/bias, preserved sessions, proposal revision/single-use, conflict scan, review delay, timer và giới hạn một active session |
 | Insights/Notifications/Admin | Workload/risk/scenario không persist, notification retry/dedupe, admin lock/unlock và revoke sessions |
 | Persistence | SQL Server migration/model snapshot, unique/FK constraints, transaction và 7 ca concurrency bằng database test riêng |
-| Deployment local | Windows PowerShell 5.1/7, private .NET SDK 10, Docker health, startup pipeline và SMTP thật |
+| Deployment local | Windows PowerShell 5.1/7, SDK riêng, Docker health, startup pipeline và SMTP thật |
 
 ## Bằng chứng kiểm tra mới nhất
 
 - Locked restore, Release build: 0 warning, 0 error.
 - 58 unit/service/planner + 38 integration = **96 passed, 0 skipped**.
-- Báo cáo TRX: `TestResults/reiko_DWAN_2026-10-04_22_16_40_net10.0.trx` và `TestResults/reiko_DWAN_2026-10-04_22_16_45_net10.0.trx`.
+- Các báo cáo TRX cũ đã được dọn; kết quả kiểm thử hiện tại xem [báo cáo .NET 8](NET8_MIGRATION_2026-10-06.md).
 - 10 kiểm tra script độc lập pass trên Windows PowerShell 5.1 và PowerShell 7; không gửi email hoặc chạm User Secrets thật trong fixture.
 - EF không có pending model changes; vulnerability audit không phát hiện known-vulnerable dependency trong nguồn audit.
 - SQL Server healthy, database SPWPOS giữ 24 bảng và 3 migrations.

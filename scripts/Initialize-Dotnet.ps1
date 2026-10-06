@@ -14,7 +14,9 @@ if ($env:APPDATA -match '^[A-Za-z]:\\') {
         Write-Warning 'Could not check the shared User Secrets location; using the current process location.'
     }
 }
-$sdkCandidates = @((Join-Path $env:LOCALAPPDATA 'SPWPOS\dotnet\dotnet.exe'))
+$sdkCandidates = @(
+    (Join-Path $env:LOCALAPPDATA 'SPWPOS\dotnet8\dotnet.exe')
+)
 $systemDotnet = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($systemDotnet) { $sdkCandidates += $systemDotnet.Source }
 if ($env:DOTNET_ROOT) { $sdkCandidates += Join-Path $env:DOTNET_ROOT 'dotnet.exe' }
@@ -29,7 +31,7 @@ foreach ($sdkCandidate in ($sdkCandidates | Select-Object -Unique)) {
     $env:PATH = "$candidateRoot;$originalTaskPath"
     try {
         $sdkVersion = & $sdkCandidate --version 2>$null
-        if ($LASTEXITCODE -eq 0 -and $sdkVersion -match '^10\.\d+\.\d+$') {
+        if ($LASTEXITCODE -eq 0 -and $sdkVersion -match '^8\.\d+\.\d+$') {
             $SpwposDotnet = $sdkCandidate
             Write-Host "Using .NET SDK $sdkVersion"
             break
@@ -38,5 +40,5 @@ foreach ($sdkCandidate in ($sdkCandidates | Select-Object -Unique)) {
 }
 if (-not $SpwposDotnet) {
     $env:PATH = $originalTaskPath
-    throw 'No compatible .NET 10 SDK found. Install the .NET 10 SDK (not only the runtime), then open a new terminal.'
+    throw 'No compatible .NET 8 SDK found. Install the .NET 8 SDK 8.0.425 or newer in the 8.0 feature band (not only the runtime), then open a new terminal.'
 }

@@ -2,12 +2,14 @@
 
 ## Chạy trên máy Windows
 
-Yêu cầu .NET **SDK** 10, Docker Desktop engine đang chạy và HTTPS development certificate được tin cậy. Workspace hiện dùng SDK riêng trong `%LOCALAPPDATA%\SPWPOS\dotnet`; script tự nhận diện SDK này.
+Yêu cầu .NET **SDK 8.0.425 trở lên trong nhánh 8.0**, Docker Desktop engine đang chạy và HTTPS development certificate được tin cậy. Workspace hiện dùng SDK riêng trong `%LOCALAPPDATA%\SPWPOS\dotnet8`; script tự nhận diện SDK này. Solution dùng `SPWPOS.sln` để tương thích SDK 8.
 
 ```powershell
 cd D:\SWP
 .\scripts\Start-Development.ps1
 ```
+
+Nếu PowerShell chặn script, chạy `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-Development.ps1`. Xem [phân tích và kiểm chứng .NET 8](NET8_MIGRATION_2026-10-06.md).
 
 Nếu certificate đã được cấu hình:
 
@@ -21,7 +23,7 @@ Nếu certificate đã được cấu hình:
 - Gửi OTP tới Gmail thật: xem [cấu hình Gmail SMTP](GMAIL_SMTP.md). Script khởi động giữ cấu hình SMTP đã lưu; mặc định Mailpit chỉ được tạo khi chưa cấu hình SMTP.
 - SQL Server: `tcp:127.0.0.1,1433`, database `SPWPOS`.
 
-Giữ terminal chạy API. Khi thay đổi C# hoặc chạy build/tests cùng configuration, dừng API bằng Ctrl+C trước để Windows không khóa DLL. Frontend nằm trong `src/SPWPOS.Api/wwwroot`, không cần Node/npm hay server frontend riêng. Khi sửa JavaScript/CSS, tải lại trang; tài nguyên đặt `Cache-Control: no-store`.
+Giữ terminal chạy API. Khi thay đổi C# hoặc chạy build/tests cùng configuration, dừng API bằng Ctrl+C trước để Windows không khóa DLL. Frontend React/Tailwind nằm trong `frontend/`, cần Node.js 24.15+ và npm để build. Script Windows tự chuẩn bị Node LTS portable nếu cần. Chạy `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Frontend.ps1 -Watch` trong terminal thứ hai để build lại khi sửa JSX/CSS, rồi tải lại trang. Tài nguyên build nằm trong `src/SPWPOS.Api/wwwroot/app`, được phục vụ cùng API; không cần server frontend riêng.
 
 Script setup giữ password SQL, SMTP và khóa JWT/OTP hiện có, lưu secrets ngoài repository. Chỉ dùng `-RotateSecurityKeys` khi chủ động rotate khóa development; khi đó các phiên/OTP cũ cần tạo lại. Startup không chạy chồng nhau. Không xóa Docker volume để sửa lỗi khởi động.
 

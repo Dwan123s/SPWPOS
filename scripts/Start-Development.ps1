@@ -4,9 +4,10 @@ $taskRoot = Split-Path -Parent $PSScriptRoot
 $startupLease = $null
 Push-Location -LiteralPath $taskRoot
 try {
+    & (Join-Path $PSScriptRoot 'Build-Frontend.ps1') -Install
     $ownedApiPaths = @(
-        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Debug\net10.0\SPWPOS.Api.exe'),
-        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Release\net10.0\SPWPOS.Api.exe')
+        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Debug\net8.0\SPWPOS.Api.exe'),
+        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Release\net8.0\SPWPOS.Api.exe')
     )
     $runningApi = Get-CimInstance Win32_Process -Filter "Name = 'SPWPOS.Api.exe'" |
         Where-Object { $_.ExecutablePath -and $_.ExecutablePath -in $ownedApiPaths }
@@ -37,7 +38,7 @@ try {
     $startupLease = $null
     Write-Host 'SPWPOS UI: https://localhost:7043'
     Write-Host 'Swagger: https://localhost:7043/swagger'
-    & $SpwposDotnet run --project src/SPWPOS.Api --launch-profile https
+    & $SpwposDotnet run --project src/SPWPOS.Api --launch-profile https -p:SkipFrontendBuild=true
     if ($LASTEXITCODE -ne 0) { throw 'API stopped with an error.' }
 } finally {
     if ($startupLease) { $startupLease.Dispose() }

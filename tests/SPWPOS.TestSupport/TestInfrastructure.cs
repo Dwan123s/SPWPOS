@@ -67,14 +67,12 @@ public static class TestInfrastructure
     {
         services.RemoveAll<ApplicationDbContext>();
         services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
-        services.RemoveAll<IDbContextOptionsConfiguration<ApplicationDbContext>>();
         services.AddDbContext<ApplicationDbContext>(o => o.UseSqlite(connection).ReplaceService<IModelCustomizer, SqliteTestModelCustomizer>());
     }
     public static void ReplaceSqlServerPersistence(IServiceCollection services, string connection)
     {
         services.RemoveAll<ApplicationDbContext>();
         services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
-        services.RemoveAll<IDbContextOptionsConfiguration<ApplicationDbContext>>();
         services.AddDbContext<ApplicationDbContext>(o => o.UseSqlServer(connection));
     }
     public static void ReplaceSecurityDependencies(IServiceCollection services, TestClock clock, TestEmailService email)

@@ -9,6 +9,8 @@ END;
 GO
 
 BEGIN TRANSACTION;
+GO
+
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
     WHERE [MigrationId] = N'20261003134858_InitialIdentityMigration'
@@ -22,6 +24,7 @@ BEGIN
         CONSTRAINT [PK_AspNetRoles] PRIMARY KEY ([Id])
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -53,6 +56,7 @@ BEGIN
         CONSTRAINT [PK_AspNetUsers] PRIMARY KEY ([Id])
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -67,6 +71,7 @@ BEGIN
         CONSTRAINT [PK_SecurityRateLimits] PRIMARY KEY ([Id])
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -82,6 +87,7 @@ BEGIN
         CONSTRAINT [FK_AspNetRoleClaims_AspNetRoles_RoleId] FOREIGN KEY ([RoleId]) REFERENCES [AspNetRoles] ([Id]) ON DELETE CASCADE
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -97,6 +103,7 @@ BEGIN
         CONSTRAINT [FK_AspNetUserClaims_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE CASCADE
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -112,6 +119,7 @@ BEGIN
         CONSTRAINT [FK_AspNetUserLogins_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE CASCADE
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -126,6 +134,7 @@ BEGIN
         CONSTRAINT [FK_AspNetUserRoles_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE CASCADE
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -141,6 +150,7 @@ BEGIN
         CONSTRAINT [FK_AspNetUserTokens_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE CASCADE
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -162,6 +172,7 @@ BEGIN
         CONSTRAINT [FK_EmailOtps_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE CASCADE
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -180,6 +191,7 @@ BEGIN
         CONSTRAINT [FK_PasswordResetTickets_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE CASCADE
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -202,6 +214,7 @@ BEGIN
         CONSTRAINT [FK_RefreshTokens_RefreshTokens_ReplacedByTokenId] FOREIGN KEY ([ReplacedByTokenId]) REFERENCES [RefreshTokens] ([Id])
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -221,6 +234,7 @@ BEGIN
         CONSTRAINT [FK_SecurityAuditLogs_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE SET NULL
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -229,6 +243,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_AspNetRoleClaims_RoleId] ON [AspNetRoleClaims] ([RoleId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -237,6 +252,7 @@ IF NOT EXISTS (
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [RoleNameIndex] ON [AspNetRoles] ([NormalizedName]) WHERE [NormalizedName] IS NOT NULL');
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -245,6 +261,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_AspNetUserClaims_UserId] ON [AspNetUserClaims] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -253,6 +270,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_AspNetUserLogins_UserId] ON [AspNetUserLogins] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -261,6 +279,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_AspNetUserRoles_RoleId] ON [AspNetUserRoles] ([RoleId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -269,6 +288,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [EmailIndex] ON [AspNetUsers] ([NormalizedEmail]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -277,6 +297,7 @@ IF NOT EXISTS (
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [UserNameIndex] ON [AspNetUsers] ([NormalizedUserName]) WHERE [NormalizedUserName] IS NOT NULL');
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -285,6 +306,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_EmailOtps_ExpiresAt] ON [EmailOtps] ([ExpiresAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -293,6 +315,7 @@ IF NOT EXISTS (
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [IX_EmailOtps_UserId_Purpose] ON [EmailOtps] ([UserId], [Purpose]) WHERE [IsUsed] = 0');
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -301,6 +324,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_EmailOtps_UserId_Purpose_CreatedAt] ON [EmailOtps] ([UserId], [Purpose], [CreatedAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -309,6 +333,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_PasswordResetTickets_TokenHash] ON [PasswordResetTickets] ([TokenHash]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -317,6 +342,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_PasswordResetTickets_UserId_ExpiresAt] ON [PasswordResetTickets] ([UserId], [ExpiresAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -325,6 +351,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_RefreshTokens_ExpiresAt] ON [RefreshTokens] ([ExpiresAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -333,6 +360,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_RefreshTokens_ReplacedByTokenId] ON [RefreshTokens] ([ReplacedByTokenId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -341,6 +369,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_RefreshTokens_TokenHash] ON [RefreshTokens] ([TokenHash]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -349,6 +378,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_RefreshTokens_UserId_FamilyId_RevokedAt] ON [RefreshTokens] ([UserId], [FamilyId], [RevokedAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -357,6 +387,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_SecurityAuditLogs_CreatedAt] ON [SecurityAuditLogs] ([CreatedAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -365,6 +396,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_SecurityAuditLogs_UserId_CreatedAt] ON [SecurityAuditLogs] ([UserId], [CreatedAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -373,6 +405,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_SecurityRateLimits_LastRequestAt] ON [SecurityRateLimits] ([LastRequestAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -380,13 +413,16 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261003134858_InitialIdentityMigration', N'10.0.12');
+    VALUES (N'20261003134858_InitialIdentityMigration', N'8.0.31');
 END;
+GO
 
 COMMIT;
 GO
 
 BEGIN TRANSACTION;
+GO
+
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
     WHERE [MigrationId] = N'20261003135350_AddPasswordNotificationOutbox'
@@ -403,6 +439,7 @@ BEGIN
         CONSTRAINT [FK_PasswordChangeNotifications_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE CASCADE
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -411,6 +448,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_PasswordChangeNotifications_SentAt_NextAttemptAt] ON [PasswordChangeNotifications] ([SentAt], [NextAttemptAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -419,6 +457,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_PasswordChangeNotifications_UserId] ON [PasswordChangeNotifications] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -426,13 +465,16 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261003135350_AddPasswordNotificationOutbox', N'10.0.12');
+    VALUES (N'20261003135350_AddPasswordNotificationOutbox', N'8.0.31');
 END;
+GO
 
 COMMIT;
 GO
 
 BEGIN TRANSACTION;
+GO
+
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
     WHERE [MigrationId] = N'20261004104534_AddWorkloadSystem'
@@ -451,6 +493,7 @@ BEGIN
         CONSTRAINT [FK_AvailabilityExceptions_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -468,6 +511,7 @@ BEGIN
         CONSTRAINT [FK_FixedEvents_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -489,6 +533,7 @@ BEGIN
         CONSTRAINT [FK_InAppNotifications_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -508,6 +553,7 @@ BEGIN
         CONSTRAINT [FK_PlanProposals_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -524,6 +570,7 @@ BEGIN
         CONSTRAINT [FK_TaskCategories_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -541,6 +588,7 @@ BEGIN
         CONSTRAINT [FK_WeeklyAvailability_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -562,6 +610,7 @@ BEGIN
         CONSTRAINT [FK_WorkPreferences_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -594,6 +643,7 @@ BEGIN
         CONSTRAINT [FK_WorkTasks_WorkTasks_UserId_ParentId] FOREIGN KEY ([UserId], [ParentId]) REFERENCES [WorkTasks] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -612,6 +662,7 @@ BEGIN
         CONSTRAINT [FK_TaskDependencies_WorkTasks_UserId_TaskId] FOREIGN KEY ([UserId], [TaskId]) REFERENCES [WorkTasks] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -636,6 +687,7 @@ BEGIN
         CONSTRAINT [FK_WorkSessions_WorkTasks_UserId_TaskId] FOREIGN KEY ([UserId], [TaskId]) REFERENCES [WorkTasks] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -644,6 +696,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_AvailabilityExceptions_UserId] ON [AvailabilityExceptions] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -652,6 +705,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_AvailabilityExceptions_UserId_Date] ON [AvailabilityExceptions] ([UserId], [Date]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -660,6 +714,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_FixedEvents_UserId] ON [FixedEvents] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -668,6 +723,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_FixedEvents_UserId_Start] ON [FixedEvents] ([UserId], [Start]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -676,6 +732,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_InAppNotifications_UserId] ON [InAppNotifications] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -684,6 +741,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_InAppNotifications_UserId_CreatedAt] ON [InAppNotifications] ([UserId], [CreatedAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -692,6 +750,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_InAppNotifications_UserId_DedupeKey] ON [InAppNotifications] ([UserId], [DedupeKey]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -700,6 +759,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_PlanProposals_ExpiresAt] ON [PlanProposals] ([ExpiresAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -708,6 +768,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_PlanProposals_UserId] ON [PlanProposals] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -716,6 +777,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_TaskCategories_UserId] ON [TaskCategories] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -724,6 +786,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_TaskCategories_UserId_Name] ON [TaskCategories] ([UserId], [Name]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -732,6 +795,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_TaskDependencies_UserId] ON [TaskDependencies] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -740,6 +804,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_TaskDependencies_UserId_PredecessorId] ON [TaskDependencies] ([UserId], [PredecessorId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -748,6 +813,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_TaskDependencies_UserId_TaskId_PredecessorId] ON [TaskDependencies] ([UserId], [TaskId], [PredecessorId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -756,6 +822,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WeeklyAvailability_UserId] ON [WeeklyAvailability] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -764,6 +831,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WeeklyAvailability_UserId_DayOfWeek] ON [WeeklyAvailability] ([UserId], [DayOfWeek]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -772,6 +840,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_WorkPreferences_UserId] ON [WorkPreferences] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -780,6 +849,7 @@ IF NOT EXISTS (
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [IX_WorkSessions_UserId] ON [WorkSessions] ([UserId]) WHERE [Status] IN (1, 2)');
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -788,6 +858,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WorkSessions_UserId_Start] ON [WorkSessions] ([UserId], [Start]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -796,6 +867,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WorkSessions_UserId_TaskId] ON [WorkSessions] ([UserId], [TaskId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -804,6 +876,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WorkTasks_UserId] ON [WorkTasks] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -812,6 +885,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WorkTasks_UserId_CategoryId] ON [WorkTasks] ([UserId], [CategoryId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -820,6 +894,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WorkTasks_UserId_Deadline] ON [WorkTasks] ([UserId], [Deadline]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -828,6 +903,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WorkTasks_UserId_ParentId] ON [WorkTasks] ([UserId], [ParentId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -835,13 +911,16 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261004104534_AddWorkloadSystem', N'10.0.12');
+    VALUES (N'20261004104534_AddWorkloadSystem', N'8.0.31');
 END;
+GO
 
 COMMIT;
 GO
 
 BEGIN TRANSACTION;
+GO
+
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
     WHERE [MigrationId] = N'20261004153305_AlignWithUmlV2'
@@ -849,6 +928,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkTasks] ADD [AdjustedMinutes] int NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -857,6 +937,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkTasks] ADD [AdjustmentFactor] float NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -865,6 +946,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkTasks] ADD [CreationSource] nvarchar(16) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -873,6 +955,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkTasks] ADD [DeletedAt] datetimeoffset NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -881,6 +964,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkTasks] ADD [IsHardDeadline] bit NOT NULL DEFAULT CAST(0 AS bit);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -889,6 +973,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkSessions] ADD [CreatedAt] datetimeoffset NOT NULL DEFAULT '0001-01-01T00:00:00.0000000+00:00';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -897,6 +982,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkSessions] ADD [SkipReason] nvarchar(255) NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -905,6 +991,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkSessions] ADD [SourceItemId] uniqueidentifier NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -913,6 +1000,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkSessions] ADD [UpdatedAt] datetimeoffset NOT NULL DEFAULT '0001-01-01T00:00:00.0000000+00:00';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -921,6 +1009,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkPreferences] ADD [PlanningHorizonDays] int NOT NULL DEFAULT 0;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -929,6 +1018,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkPreferences] ADD [PreferredPeriod] nvarchar(10) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -937,6 +1027,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [TaskDependencies] ADD [CreatedAt] datetimeoffset NOT NULL DEFAULT '0001-01-01T00:00:00.0000000+00:00';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -945,6 +1036,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [PlanProposals] ADD [AppliedAt] datetimeoffset NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -953,6 +1045,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [PlanProposals] ADD [HorizonEnd] datetimeoffset NOT NULL DEFAULT '0001-01-01T00:00:00.0000000+00:00';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -961,6 +1054,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [PlanProposals] ADD [HorizonStart] datetimeoffset NOT NULL DEFAULT '0001-01-01T00:00:00.0000000+00:00';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -969,6 +1063,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [PlanProposals] ADD [Kind] nvarchar(10) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -977,6 +1072,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [PlanProposals] ADD [PreviousPlanId] uniqueidentifier NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -985,6 +1081,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [PlanProposals] ADD [Status] nvarchar(12) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -993,6 +1090,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [PlanProposals] ADD [TriggerEvent] nvarchar(24) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1001,6 +1099,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [InAppNotifications] ADD [PlanId] uniqueidentifier NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1009,6 +1108,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [InAppNotifications] ADD [ScheduledFor] datetimeoffset NOT NULL DEFAULT '0001-01-01T00:00:00.0000000+00:00';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1017,6 +1117,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [InAppNotifications] ADD [SessionId] uniqueidentifier NULL;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1025,6 +1126,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [FixedEvents] ADD [Description] nvarchar(1000) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1033,6 +1135,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [FixedEvents] ADD [EventType] nvarchar(12) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1052,6 +1155,7 @@ BEGIN
         CONSTRAINT [FK_account_status_logs_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1070,6 +1174,7 @@ BEGIN
         CONSTRAINT [FK_capacity_snapshots_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1086,6 +1191,7 @@ BEGIN
         CONSTRAINT [FK_notification_settings_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1102,6 +1208,7 @@ BEGIN
         CONSTRAINT [FK_personal_capacity_profiles_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1126,6 +1233,7 @@ BEGIN
         CONSTRAINT [FK_plan_items_WorkTasks_UserId_TaskId] FOREIGN KEY ([UserId], [TaskId]) REFERENCES [WorkTasks] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1146,6 +1254,7 @@ BEGIN
         CONSTRAINT [FK_plan_warnings_WorkTasks_UserId_TaskId] FOREIGN KEY ([UserId], [TaskId]) REFERENCES [WorkTasks] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1168,6 +1277,7 @@ BEGIN
         CONSTRAINT [FK_risk_assessments_WorkTasks_UserId_TaskId] FOREIGN KEY ([UserId], [TaskId]) REFERENCES [WorkTasks] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1189,6 +1299,7 @@ BEGIN
         CONSTRAINT [FK_session_executions_WorkSessions_UserId_SessionId] FOREIGN KEY ([UserId], [SessionId]) REFERENCES [WorkSessions] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1207,6 +1318,7 @@ BEGIN
         CONSTRAINT [FK_system_job_runs_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1220,6 +1332,7 @@ BEGIN
         CONSTRAINT [PK_task_types] PRIMARY KEY ([Code])
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1235,6 +1348,7 @@ BEGIN
         CONSTRAINT [FK_user_profiles_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1253,6 +1367,7 @@ BEGIN
         CONSTRAINT [FK_plan_item_reasons_plan_items_UserId_ItemId] FOREIGN KEY ([UserId], [ItemId]) REFERENCES [plan_items] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1271,6 +1386,7 @@ BEGIN
         CONSTRAINT [FK_risk_reasons_risk_assessments_UserId_AssessmentId] FOREIGN KEY ([UserId], [AssessmentId]) REFERENCES [risk_assessments] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1289,6 +1405,7 @@ BEGIN
         CONSTRAINT [FK_execution_segments_session_executions_UserId_ExecutionId] FOREIGN KEY ([UserId], [ExecutionId]) REFERENCES [session_executions] ([UserId], [Id]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1310,6 +1427,7 @@ BEGIN
         CONSTRAINT [FK_estimation_observations_task_types_TaskType] FOREIGN KEY ([TaskType]) REFERENCES [task_types] ([Code]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1328,6 +1446,7 @@ BEGIN
         CONSTRAINT [FK_task_type_biases_task_types_TaskType] FOREIGN KEY ([TaskType]) REFERENCES [task_types] ([Code]) ON DELETE NO ACTION
     );
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1346,6 +1465,7 @@ BEGIN
     IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'Code', N'DisplayName', N'IsActive') AND [object_id] = OBJECT_ID(N'[task_types]'))
         SET IDENTITY_INSERT [task_types] OFF;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1354,6 +1474,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WorkTasks_TaskType] ON [WorkTasks] ([TaskType]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1362,6 +1483,7 @@ IF NOT EXISTS (
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [IX_WorkSessions_SourceItemId] ON [WorkSessions] ([SourceItemId]) WHERE [SourceItemId] IS NOT NULL');
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1370,6 +1492,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_WorkSessions_UserId_SourceItemId] ON [WorkSessions] ([UserId], [SourceItemId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1378,6 +1501,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_PlanProposals_UserId_PreviousPlanId] ON [PlanProposals] ([UserId], [PreviousPlanId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1434,6 +1558,7 @@ BEGIN
         AND NOT EXISTS(SELECT 1 FROM WorkTasks child WHERE child.ParentId=t.Id AND child.IsDeleted=0)
       GROUP BY t.UserId,t.Id,t.TaskType,t.EstimatedMinutes,t.CompletedAt,t.UpdatedAt HAVING SUM(s.ActualSeconds)>0;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1442,6 +1567,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_InAppNotifications_UserId_PlanId] ON [InAppNotifications] ([UserId], [PlanId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1450,6 +1576,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_InAppNotifications_UserId_SessionId] ON [InAppNotifications] ([UserId], [SessionId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1458,6 +1585,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_InAppNotifications_UserId_TaskId] ON [InAppNotifications] ([UserId], [TaskId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1466,6 +1594,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_account_status_logs_AdminId] ON [account_status_logs] ([AdminId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1474,6 +1603,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_account_status_logs_UserId] ON [account_status_logs] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1482,6 +1612,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_capacity_snapshots_UserId] ON [capacity_snapshots] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1490,6 +1621,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_capacity_snapshots_UserId_WeekStart] ON [capacity_snapshots] ([UserId], [WeekStart]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1498,6 +1630,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_estimation_observations_TaskId] ON [estimation_observations] ([TaskId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1506,6 +1639,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_estimation_observations_TaskType] ON [estimation_observations] ([TaskType]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1514,6 +1648,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_estimation_observations_UserId] ON [estimation_observations] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1522,6 +1657,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_estimation_observations_UserId_TaskId] ON [estimation_observations] ([UserId], [TaskId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1530,6 +1666,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_estimation_observations_UserId_TaskType] ON [estimation_observations] ([UserId], [TaskType]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1538,6 +1675,7 @@ IF NOT EXISTS (
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [IX_execution_segments_ExecutionId] ON [execution_segments] ([ExecutionId]) WHERE [End] IS NULL');
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1546,6 +1684,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_execution_segments_UserId] ON [execution_segments] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1554,6 +1693,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_execution_segments_UserId_ExecutionId] ON [execution_segments] ([UserId], [ExecutionId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1562,6 +1702,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_item_reasons_UserId] ON [plan_item_reasons] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1570,6 +1711,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_item_reasons_UserId_ItemId] ON [plan_item_reasons] ([UserId], [ItemId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1578,6 +1720,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_items_UserId] ON [plan_items] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1586,6 +1729,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_items_UserId_PlanId] ON [plan_items] ([UserId], [PlanId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1594,6 +1738,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_items_UserId_PreviousSessionId] ON [plan_items] ([UserId], [PreviousSessionId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1602,6 +1747,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_items_UserId_TaskId] ON [plan_items] ([UserId], [TaskId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1610,6 +1756,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_warnings_UserId] ON [plan_warnings] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1618,6 +1765,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_warnings_UserId_PlanId] ON [plan_warnings] ([UserId], [PlanId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1626,6 +1774,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_plan_warnings_UserId_TaskId] ON [plan_warnings] ([UserId], [TaskId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1634,6 +1783,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_risk_assessments_UserId] ON [risk_assessments] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1642,6 +1792,7 @@ IF NOT EXISTS (
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [IX_risk_assessments_UserId_Scope_TaskId] ON [risk_assessments] ([UserId], [Scope], [TaskId]) WHERE [IsCurrent] = 1');
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1650,6 +1801,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_risk_assessments_UserId_TaskId] ON [risk_assessments] ([UserId], [TaskId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1658,6 +1810,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_risk_reasons_UserId] ON [risk_reasons] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1666,6 +1819,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_risk_reasons_UserId_AssessmentId] ON [risk_reasons] ([UserId], [AssessmentId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1674,6 +1828,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE UNIQUE INDEX [IX_session_executions_SessionId] ON [session_executions] ([SessionId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1682,6 +1837,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_session_executions_UserId] ON [session_executions] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1690,6 +1846,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_session_executions_UserId_SessionId] ON [session_executions] ([UserId], [SessionId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1698,6 +1855,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_system_job_runs_Status_StartedAt] ON [system_job_runs] ([Status], [StartedAt]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1706,6 +1864,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_system_job_runs_UserId] ON [system_job_runs] ([UserId]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1714,6 +1873,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE INDEX [IX_task_type_biases_TaskType] ON [task_type_biases] ([TaskType]);
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1722,6 +1882,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [InAppNotifications] ADD CONSTRAINT [FK_InAppNotifications_PlanProposals_UserId_PlanId] FOREIGN KEY ([UserId], [PlanId]) REFERENCES [PlanProposals] ([UserId], [Id]) ON DELETE NO ACTION;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1730,6 +1891,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [InAppNotifications] ADD CONSTRAINT [FK_InAppNotifications_WorkSessions_UserId_SessionId] FOREIGN KEY ([UserId], [SessionId]) REFERENCES [WorkSessions] ([UserId], [Id]) ON DELETE NO ACTION;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1738,6 +1900,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [InAppNotifications] ADD CONSTRAINT [FK_InAppNotifications_WorkTasks_UserId_TaskId] FOREIGN KEY ([UserId], [TaskId]) REFERENCES [WorkTasks] ([UserId], [Id]) ON DELETE NO ACTION;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1746,6 +1909,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [PlanProposals] ADD CONSTRAINT [FK_PlanProposals_PlanProposals_UserId_PreviousPlanId] FOREIGN KEY ([UserId], [PreviousPlanId]) REFERENCES [PlanProposals] ([UserId], [Id]) ON DELETE NO ACTION;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1754,6 +1918,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkSessions] ADD CONSTRAINT [FK_WorkSessions_plan_items_UserId_SourceItemId] FOREIGN KEY ([UserId], [SourceItemId]) REFERENCES [plan_items] ([UserId], [Id]) ON DELETE NO ACTION;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1762,6 +1927,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [WorkTasks] ADD CONSTRAINT [FK_WorkTasks_task_types_TaskType] FOREIGN KEY ([TaskType]) REFERENCES [task_types] ([Code]) ON DELETE NO ACTION;
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1769,13 +1935,16 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261004153305_AlignWithUmlV2', N'10.0.12');
+    VALUES (N'20261004153305_AlignWithUmlV2', N'8.0.31');
 END;
+GO
 
 COMMIT;
 GO
 
 BEGIN TRANSACTION;
+GO
+
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
     WHERE [MigrationId] = N'20261004154949_AddProfileDetails'
@@ -1783,6 +1952,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [user_profiles] ADD [AvatarUrl] nvarchar(max) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1791,6 +1961,7 @@ IF NOT EXISTS (
 BEGIN
     ALTER TABLE [user_profiles] ADD [Bio] nvarchar(1000) NOT NULL DEFAULT N'';
 END;
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -1798,8 +1969,9 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20261004154949_AddProfileDetails', N'10.0.12');
+    VALUES (N'20261004154949_AddProfileDetails', N'8.0.31');
 END;
+GO
 
 COMMIT;
 GO

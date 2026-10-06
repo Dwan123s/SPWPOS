@@ -28,7 +28,7 @@ var trustedProxies = builder.Configuration.GetSection("Security:TrustedProxyAddr
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    o.ForwardLimit = 1; o.KnownProxies.Clear(); o.KnownIPNetworks.Clear();
+    o.ForwardLimit = 1; o.KnownProxies.Clear(); o.KnownNetworks.Clear();
     foreach (var proxy in trustedProxies) o.KnownProxies.Add(IPAddress.Parse(proxy));
 });
 var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];

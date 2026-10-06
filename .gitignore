@@ -4,6 +4,9 @@
 .idea/
 TestResults/
 artifacts/
+**/node_modules/
+src/SPWPOS.Api/wwwroot/app/
+src/SPWPOS.Api/wwwroot/index.html
 .env
 .env.*
 !.env.example

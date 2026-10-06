@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createSessionRefresh} from '../../src/SPWPOS.Api/wwwroot/assets/session-refresh.js';
+import {createSessionRefresh} from '../../frontend/src/session-refresh.js';
 
 function sharedLocks(){let queue=Promise.resolve();return {request(name,operation){assert.equal(name,'spwpos-session-refresh');const result=queue.then(operation);queue=result.catch(()=>{});return result;}};}
 const unauthorized=()=>Object.assign(new Error('expired'),{status:401});

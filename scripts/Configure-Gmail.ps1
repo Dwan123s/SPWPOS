@@ -63,8 +63,8 @@ Write-Host 'Start: .\scripts\Start-Development.ps1 -SkipCertificateTrust'
 if ($RestartApi) {
     # Stop only API apphosts built from this checkout, never other projects.
     $ownedApiPaths = @(
-        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Debug\net10.0\SPWPOS.Api.exe'),
-        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Release\net10.0\SPWPOS.Api.exe')
+        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Debug\net8.0\SPWPOS.Api.exe'),
+        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Release\net8.0\SPWPOS.Api.exe')
     )
     Get-CimInstance Win32_Process -Filter "Name = 'SPWPOS.Api.exe'" |
         Where-Object { $_.ExecutablePath -and $_.ExecutablePath -in $ownedApiPaths } |

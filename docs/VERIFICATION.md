@@ -1,5 +1,7 @@
 # Kết quả xác minh — 04/10/2026 (hệ thống đầy đủ)
 
+Cập nhật **06/10/2026 — chuyển .NET 8**: SDK 8.0.425/runtime 8.0.31; Release build 0 warnings/errors; **68 unit + 47 integration = 115 backend tests passed, 0 skipped**, gồm 8 SQL Server cases. Thêm 9 frontend tests và 10 kiểm tra script pass. Locked restore, EF model consistency và NuGet audit pass (0 vulnerable entries). Localhost đã chạy apphost net8.0, homepage/Swagger HTTP 200. Xem [phân tích và báo cáo chuyển đổi](NET8_MIGRATION_2026-10-06.md). Các con số phía dưới là lịch sử trước chuyển đổi.
+
 Cập nhật **05/10/2026** sau bản sửa từ đánh giá hệ thống: Release build 0 warnings/errors; **68 unit + 39 HTTP integration + 6 frontend module tests = 113 passed**, 0 failed. **8 ca SQL Server bị skip** vì chưa cấu hình `SPWPOS_TEST_SQLSERVER`; kết quả 106 tests với SQL Server phía dưới là lịch sử, không phải toàn bộ đã chạy lại lần này. Tất cả JavaScript modules qua syntax check. Xem [chi tiết bản sửa và phạm vi kiểm chứng](FIX_2026-10-05.md).
 
 Backend và UI đã đối chiếu báo cáo 72 use case và bộ UML v2. Migration `AlignWithUmlV2` đã áp dụng thành công trên SQL Server local; giữ dữ liệu Identity/workspace cũ. Xem [ánh xạ chi tiết](UML_ALIGNMENT.md).
@@ -7,8 +9,8 @@ Backend và UI đã đối chiếu báo cáo 72 use case và bộ UML v2. Migrat
 | Kiểm tra mới nhất | Kết quả |
 |---|---|
 | Release build | Pass, 0 warnings / 0 errors |
-| Unit/service/planner | **60 passed**, báo cáo `TestResults/reiko_DWAN_2026-10-04_22_47_35_net10.0.trx` |
-| HTTP + SQL Server integration | **46 passed, 0 skipped**, báo cáo `TestResults/reiko_DWAN_2026-10-04_22_47_38_net10.0.trx` |
+| Unit/service/planner | **60 passed** ở lần kiểm tra lịch sử; báo cáo cũ đã dọn |
+| HTTP + SQL Server integration | **46 passed, 0 skipped** ở lần kiểm tra lịch sử; báo cáo cũ đã dọn |
 | Tổng test | **106 passed** |
 | SQL Server thực | 7 concurrency + 1 migration với dữ liệu schema cũ; database test riêng |
 | EF model snapshot | Không có pending model changes |
@@ -34,7 +36,7 @@ Chạy toàn bộ checks bằng `scripts/Test-BeforeMerge.ps1 -RequireSqlServer`
 
 Gmail SMTP/startup setup bổ sung: `tests/scripts/SmtpConfiguration.Tests.ps1` đã pass 10 ca độc lập trên Windows PowerShell 5.1 và PowerShell 7: giữ external SMTP, mặc định Mailpit khi thiếu, explicit reset Mailpit, ghi Gmail STARTTLS/identity qua stdin, reject App Password ngắn/email sai, giữ credential database dù SQL env cũ, giữ keys khi restart, explicit key rotation và reject startup chạy chồng. Fixture không truy cập User Secrets thật hoặc gửi email. Test Gmail SMTP thực được chạy riêng bằng cấu hình đã lưu, không in credential/OTP.
 
-Môi trường: Windows x64, .NET SDK 10.0.401 được cài tại `%LOCALAPPDATA%\SPWPOS\dotnet`, runtime .NET/ASP.NET Core 10.0.12.
+Môi trường ở lần kiểm tra lịch sử: Windows x64, SDK/runtime trước chuyển đổi. Cấu hình hiện tại và kết quả xác minh mới ở [báo cáo .NET 8](NET8_MIGRATION_2026-10-06.md).
 
 | Kiểm tra | Kết quả |
 |---|---|
@@ -63,7 +65,7 @@ Test reports và vulnerability JSON nằm trong `TestResults/` (gitignored); đ�
 
 ## Sửa startup — 04/10/2026
 
-Đã chạy setup bằng **Windows PowerShell 5.1.26100.9444**: SDK 10.0.401 được chọn trước SDK tools; RNG instance và User Secrets JSON stdin hoạt động; `dotnet tool restore`, locked restore và build đều pass (0 warnings/errors). `Start-Development.ps1` cung cấp một lệnh chạy toàn bộ pipeline và dừng ngay nếu một bước lỗi. Docker Desktop vẫn báo engine stopped; startup preflight kiểm tra engine với timeout 20 giây thay vì tiếp tục migration với connection/password chưa được chuẩn bị. Tài liệu đã cập nhật cho cả PowerShell 5.1 và 7.
+Đã chạy setup bằng **Windows PowerShell 5.1.26100.9444**: SDK riêng được chọn trước SDK tools; RNG instance và User Secrets JSON stdin hoạt động; `dotnet tool restore`, locked restore và build đều pass (0 warnings/errors). `Start-Development.ps1` cung cấp một lệnh chạy toàn bộ pipeline và dừng ngay nếu một bước lỗi. Docker Desktop lúc đó báo engine stopped; startup preflight kiểm tra engine với timeout 20 giây thay vì tiếp tục migration với connection/password chưa được chuẩn bị. Tài liệu đã cập nhật cho cả PowerShell 5.1 và 7.
 
 ## Khởi động thực tế sau khi cài WSL — 04/10/2026
 
@@ -71,5 +73,5 @@ WSL và Docker engine đã chạy. Tài khoản hiện tại được cấp Modi
 
 SQL development hiện dùng volume `spwpos-sql-data`; volume cũ `swp_spwpos-sql-data` được giữ nguyên. SQL Server và Mailpit healthy. Startup bằng Windows PowerShell 5.1 thành công, áp dụng cả hai migrations và chạy API HTTPS. Chứng chỉ development đã được trust. Swagger HTTP 200, OpenAPI có 13 paths; `/api/auth/me` không token trả HTTP 401 với `UNAUTHORIZED`; Mailpit HTTP 200.
 
-SQL Server concurrency suite: **5 passed, 0 failed, 0 skipped**. Đã sửa assertion migration để kiểm tra tất cả migrations đã áp dụng thay vì giả định chỉ có một migration. Report: `TestResults/reiko_DWAN_2026-10-04_17_31_08_net10.0.trx`. Các kết quả SQL skipped/Docker stopped/certificate chưa trust phía trên là trạng thái trước lần khởi động này.
+SQL Server concurrency suite: **5 passed, 0 failed, 0 skipped** ở lần kiểm tra lịch sử. Đã sửa assertion migration để kiểm tra tất cả migrations đã áp dụng thay vì giả định chỉ có một migration. Báo cáo TRX cũ đã dọn. Các kết quả SQL skipped/Docker stopped/certificate chưa trust phía trên là trạng thái trước lần khởi động này.
 
