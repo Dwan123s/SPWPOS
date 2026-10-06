@@ -58,6 +58,17 @@ Script build React/Tailwind, chuẩn bị cấu hình development, khởi độn
 
 Nếu certificate đã được thiết lập, thêm `-SkipCertificateTrust` vào lệnh khởi động. Cấu hình SMTP hiện có được giữ khi restart; xem [hướng dẫn Gmail SMTP](docs/GMAIL_SMTP.md) để gửi email thật.
 
+SQL Server development dùng `127.0.0.1,11433` trên Windows; container vẫn dùng cổng `1433`. Cổng host riêng tránh xung đột với SQL Server đã cài trên máy. Script cập nhật connection string và giữ nguyên credential cùng volume dữ liệu hiện có.
+
+Nếu cổng `11433` bị chiếm hoặc Windows chặn bind, chọn cổng host khác trong terminal trước khi khởi động:
+
+```powershell
+$env:SPWPOS_SQL_PORT = '15433'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-Development.ps1
+```
+
+Đặt cùng giá trị `SPWPOS_SQL_PORT` ở mỗi lần khởi động khi dùng cổng tùy chỉnh; script dùng giá trị này cho cả Docker Compose và connection string của API.
+
 ### Phát triển frontend
 
 Mở terminal thứ hai khi API đang chạy:

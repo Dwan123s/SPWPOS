@@ -6,7 +6,7 @@ services:
       MSSQL_PID: Developer
       MSSQL_SA_PASSWORD: ${SPWPOS_SQL_PASSWORD:?Set SPWPOS_SQL_PASSWORD or run scripts/Initialize-Development.ps1}
     ports:
-      - "127.0.0.1:1433:1433"
+      - "127.0.0.1:${SPWPOS_SQL_PORT:-11433}:1433"
     volumes:
       - spwpos-sql-data:/var/opt/mssql
     healthcheck:

@@ -2,6 +2,13 @@ param([switch]$StartContainers, [switch]$UseMailpit, [switch]$RotateSecurityKeys
 $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path -Parent $PSScriptRoot
 $apiProject = Join-Path $taskRoot 'src\SPWPOS.Api\SPWPOS.Api.csproj'
+# Use a separate host port so a Windows SQL Server installation can keep 1433.
+$sqlPortText = if ($env:SPWPOS_SQL_PORT) { $env:SPWPOS_SQL_PORT } else { '11433' }
+$sqlPort = 0
+if (-not [int]::TryParse($sqlPortText, [ref]$sqlPort) -or $sqlPort -lt 1 -or $sqlPort -gt 65535) {
+    throw 'SPWPOS_SQL_PORT must be an integer between 1 and 65535. Setup stopped before changing secrets or containers.'
+}
+$env:SPWPOS_SQL_PORT = $sqlPort.ToString()
 . (Join-Path $PSScriptRoot 'Initialize-Dotnet.ps1')
 $taskDotnet = $SpwposDotnet
 function New-Secret {
@@ -67,7 +74,7 @@ foreach ($keyName in @('JwtSettings:SigningKey', 'OtpSettings:SecretKey')) {
     }
     $savedKey = $null
 }
-$env:ConnectionStrings__DefaultConnection = "Server=tcp:127.0.0.1,1433;Database=SPWPOS;User Id=sa;Password=$env:SPWPOS_SQL_PASSWORD;Encrypt=True;TrustServerCertificate=True"
+$env:ConnectionStrings__DefaultConnection = "Server=tcp:127.0.0.1,$sqlPort;Database=SPWPOS;User Id=sa;Password=$env:SPWPOS_SQL_PASSWORD;Encrypt=True;TrustServerCertificate=True"
 $developmentSecrets = @{
     'JwtSettings:SigningKey' = $securityKeys['JwtSettings:SigningKey']
     'OtpSettings:SecretKey' = $securityKeys['OtpSettings:SecretKey']
@@ -98,8 +105,9 @@ if ($StartContainers) {
         if ($LASTEXITCODE -ne 0) { throw 'Could not create the development SQL data volume.' }
     }
     & docker compose --project-directory $taskRoot up -d --wait
-    if ($LASTEXITCODE -ne 0) { throw 'Containers did not start. Check Docker Desktop.' }
+    if ($LASTEXITCODE -ne 0) { throw "Containers did not start. Check the Docker error above. If SQL port $sqlPort is unavailable, set SPWPOS_SQL_PORT to a free host port and retry." }
 }
+Write-Host "Development SQL Server: 127.0.0.1,$sqlPort"
 Write-Host 'Development secrets saved; no secret values printed. Existing SMTP configuration is preserved.'
 if ($env:EmailSettings__Host) { $smtpHost = $env:EmailSettings__Host }
 if ($smtpHost -in @('localhost', '127.0.0.1', '::1')) {

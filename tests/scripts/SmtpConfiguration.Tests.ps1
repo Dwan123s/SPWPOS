@@ -6,7 +6,7 @@ if (-not ([IO.Path]::GetFullPath($fixtureRoot)).StartsWith($expectedParent, [Str
     throw 'Fixture path is outside the intended artifact directory.'
 }
 $savedEnvironment = @{}
-foreach ($key in @('SPWPOS_SQL_PASSWORD', 'ConnectionStrings__DefaultConnection', 'ASPNETCORE_ENVIRONMENT')) {
+foreach ($key in @('SPWPOS_SQL_PORT', 'SPWPOS_SQL_PASSWORD', 'ConnectionStrings__DefaultConnection', 'ASPNETCORE_ENVIRONMENT')) {
     $savedEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
 }
 $global:SpwposSmtpFixtureLines = @()
@@ -53,6 +53,8 @@ try {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot "scripts\$name") -Destination (Join-Path $fixtureRoot "scripts\$name")
     }
     Set-Content -LiteralPath (Join-Path $fixtureRoot 'scripts\Initialize-Dotnet.ps1') -Value '$SpwposDotnet = ''Invoke-FixtureDotnet''' -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $fixtureRoot 'scripts\Build-Frontend.ps1') -Value 'param([switch]$Install)' -Encoding UTF8
+    $env:SPWPOS_SQL_PORT = $null
     $env:SPWPOS_SQL_PASSWORD = [guid]::NewGuid().ToString('N')
 
     $global:SpwposSmtpFixtureLines = @('EmailSettings:Host = smtp.gmail.com')
