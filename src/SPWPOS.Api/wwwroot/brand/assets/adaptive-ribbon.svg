@@ -1,0 +1,35 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" fill="none" aria-label="PLANORA Adaptive Ribbon Motif">
+  <defs>
+    <linearGradient id="ar-grad1" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.85" />
+      <stop offset="35%" stop-color="#3B82F6" stop-opacity="0.80" />
+      <stop offset="70%" stop-color="#8B5CF6" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#00E5FF" stop-opacity="0.70" />
+    </linearGradient>
+    <linearGradient id="ar-grad2" x1="100%" y1="50%" x2="0%" y2="50%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.4" />
+      <stop offset="50%" stop-color="#818CF8" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#C084FC" stop-opacity="0.2" />
+    </linearGradient>
+    <filter id="ar-glow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Fluid Ribbon Glow -->
+  <path d="M -50 200 C 150 80 350 320 600 200 C 850 80 1050 320 1250 200" stroke="url(#ar-grad2)" stroke-width="48" stroke-linecap="round" filter="url(#ar-glow)" />
+
+  <!-- Primary Precision Ribbon -->
+  <path d="M -50 200 C 150 80 350 320 600 200 C 850 80 1050 320 1250 200" stroke="url(#ar-grad1)" stroke-width="12" stroke-linecap="round" />
+
+  <!-- Secondary Echoing Ribbon -->
+  <path d="M -50 240 C 180 140 380 350 630 220 C 880 90 1080 310 1250 220" stroke="url(#ar-grad2)" stroke-width="6" stroke-linecap="round" stroke-dasharray="12 16" />
+
+  <!-- Planning Nodes Along the Flow -->
+  <circle cx="150" cy="140" r="6" fill="#00E5FF" />
+  <circle cx="350" cy="260" r="6" fill="#3B82F6" />
+  <circle cx="600" cy="200" r="7" fill="#ffffff" stroke="#3B82F6" stroke-width="3" />
+  <circle cx="850" cy="140" r="6" fill="#8B5CF6" />
+  <circle cx="1050" cy="260" r="6" fill="#00E5FF" />
+</svg>

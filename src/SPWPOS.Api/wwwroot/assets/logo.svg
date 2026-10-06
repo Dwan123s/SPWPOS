@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- PLANORA Official Brand Logo -->
+  <defs>
+    <linearGradient id="p-main" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#088ea6" />
+      <stop offset="100%" stop-color="#08788c" />
+    </linearGradient>
+    <linearGradient id="p-swoosh" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00c8e6" />
+      <stop offset="100%" stop-color="#009ebd" />
+    </linearGradient>
+  </defs>
+
+  <!-- Letter P - Upper Stem & Loop -->
+  <!-- Upper stem -->
+  <rect x="25" y="18" width="8" height="46" fill="#088ea6" />
+  
+  <!-- Outer Arch of P -->
+  <path d="M25 18H56C71 18 80 28 80 41C80 50 74 58 65 63L61 56C68 52 72 46 72 41C72 32 65 26 56 26H33V64H25V18Z" fill="#088ea6" />
+
+  <!-- Lower Stem of P with Geometric Notch -->
+  <rect x="25" y="70" width="8" height="4" fill="#065968" />
+  <!-- Hollow U-frame foot -->
+  <path d="M25 74H32.5V83H36.5V74H42V89H25V74Z" fill="#088ea6" />
+
+  <!-- Central Calendar -->
+  <g id="calendar">
+    <!-- Calendar Body -->
+    <rect x="34" y="32" width="34" height="29" rx="2" fill="#088ea6" />
+    
+    <!-- Binder Rings / Clips -->
+    <rect x="41" y="27.5" width="3.2" height="8" rx="1.6" fill="#ffffff" stroke="#088ea6" stroke-width="1.2" />
+    <rect x="58" y="27.5" width="3.2" height="8" rx="1.6" fill="#ffffff" stroke="#088ea6" stroke-width="1.2" />
+    
+    <!-- Calendar Days Grid (6 White Cells) -->
+    <!-- Row 1 -->
+    <rect x="36.5" y="39.5" width="8.5" height="9" fill="#ffffff" />
+    <rect x="47" y="39.5" width="8.5" height="9" fill="#ffffff" />
+    <circle cx="51.25" cy="44" r="2" fill="#088ea6" />
+    <rect x="57.5" y="39.5" width="8.5" height="9" fill="#ffffff" />
+    <circle cx="61.75" cy="44" r="2" fill="#088ea6" />
+
+    <!-- Row 2 -->
+    <rect x="36.5" y="50" width="8.5" height="9" fill="#ffffff" />
+    <circle cx="40.75" cy="54.5" r="2" fill="#088ea6" />
+    <rect x="47" y="50" width="8.5" height="9" fill="#ffffff" />
+    <circle cx="51.25" cy="54.5" r="2" fill="#088ea6" />
+    <rect x="57.5" y="50" width="8.5" height="9" fill="#ffffff" />
+    <circle cx="61.75" cy="54.5" r="2" fill="#088ea6" />
+  </g>
+
+  <!-- Secondary Crescent Swoosh (Lower Accent) -->
+  <path d="M49 74C62 75 73 68 80 52C76 63 65 71 49 74Z" fill="#00b4d8" />
+
+  <!-- Primary Rising Arrow Swoosh with Clean White Outline -->
+  <g stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" style="paint-order: stroke fill;">
+    <!-- Arrow Head -->
+    <path d="M71 40.5L85 32L83 47L79 43.5L75 49L69 44.5L74 40Z" fill="#00b4d8" />
+    <!-- Curved Tail -->
+    <path d="M25 64C41 64 58 65 72 52L76 45L72 42C59 55 42 57 25 57Z" fill="#00b4d8" />
+  </g>
+</svg>

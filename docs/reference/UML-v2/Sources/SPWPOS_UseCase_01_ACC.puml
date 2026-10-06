@@ -1,0 +1,49 @@
+@startuml
+left to right direction
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+}
+skinparam ArrowFontSize 10
+skinparam nodesep 18
+skinparam ranksep 45
+
+title SPWPOS - Use Case Diagram: Account & Profile (UC01-UC08)
+actor "User" as User
+rectangle "SPWPOS System - Account & Profile" {
+  usecase "UC01\nRegister Account" as UC01
+  usecase "UC02\nLogin" as UC02
+  usecase "UC03\nLogout" as UC03
+  usecase "UC04\nRequest Password Reset" as UC04
+  usecase "UC05\nReset Password" as UC05
+  usecase "UC06\nChange Password" as UC06
+  usecase "UC07\nView Profile" as UC07
+  usecase "UC08\nUpdate Profile" as UC08
+}
+User --> UC01
+User --> UC02
+User --> UC03
+User --> UC04
+User --> UC05
+User --> UC06
+User --> UC07
+User --> UC08
+UC04 ..> UC02 : <<extend>>\n{forgot password}
+legend bottom
+  <<include>> : base use case ALWAYS performs the included use case (arrow points to included).
+  <<extend>>  : extending use case is OPTIONAL / conditional (arrow points to base; {condition} shown).
+  Solid line : association (actor takes part).  Grey dashed use case : defined in another subsystem.
+  Every User use case presupposes a logged-in session (UC02) except UC01, UC02, UC04, UC05; this is a
+  precondition, not an <<include>>.
+endlegend
+@enduml

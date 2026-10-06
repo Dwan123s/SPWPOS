@@ -1,0 +1,363 @@
+@startuml
+hide circle
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 55
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  HeaderBackgroundColor #E6EEF8
+}
+skinparam package {
+  BorderColor #888888
+  BackgroundColor #FAFAFA
+  FontStyle bold
+}
+skinparam ArrowColor #444444
+skinparam ArrowFontSize 9
+
+title SPWPOS - Database ER Diagram v2 (crow's foot: || exactly one, |o zero or one, o{ zero or many; * = NOT NULL)
+package "Account" #F3F3FB {
+  entity "users" as users {
+    * user_id : UUID <<PK>>
+    --
+    * email : VARCHAR(255) <<UQ>>
+    * password_hash : VARCHAR(255)
+    * role : VARCHAR(10)
+    * account_status : VARCHAR(10)
+    locked_at : TIMESTAMP
+    last_login_at : TIMESTAMP
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+  entity "user_profiles" as user_profiles {
+    * user_id : UUID <<PK,FK>>
+    --
+    * display_name : VARCHAR(100)
+    * timezone : VARCHAR(64)
+    * updated_at : TIMESTAMP
+  }
+  entity "password_reset_tokens" as password_reset_tokens {
+    * token_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * token_hash : VARCHAR(255) <<UQ>>
+    * expires_at : TIMESTAMP
+    used_at : TIMESTAMP
+    * created_at : TIMESTAMP
+  }
+  entity "account_status_logs" as account_status_logs {
+    * log_id : UUID <<PK>>
+    --
+    * target_user_id : UUID <<FK>>
+    * admin_id : UUID <<FK>>
+    * action : VARCHAR(10)
+    reason : VARCHAR(500)
+    * created_at : TIMESTAMP
+  }
+}
+package "Time & Settings" #F1FAF1 {
+  entity "weekly_availability" as weekly_availability {
+    * availability_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * day_of_week : SMALLINT
+    * start_time : TIME
+    * end_time : TIME
+  }
+  entity "availability_exceptions" as availability_exceptions {
+    * exception_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * exception_date : DATE
+    * is_all_day : BOOLEAN
+    start_time : TIME
+    end_time : TIME
+    * exception_type : VARCHAR(12)
+    note : VARCHAR(255)
+  }
+  entity "fixed_events" as fixed_events {
+    * fixed_event_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * title : VARCHAR(200)
+    description : VARCHAR(1000)
+    * start_at : TIMESTAMP
+    * end_at : TIMESTAMP
+    * event_type : VARCHAR(12)
+  }
+  entity "work_preferences" as work_preferences {
+    * user_id : UUID <<PK,FK>>
+    --
+    * min_session_min : INT
+    * max_session_min : INT
+    * preferred_period : VARCHAR(10)
+    * planning_horizon_days : INT
+  }
+  entity "notification_settings" as notification_settings {
+    * user_id : UUID <<PK,FK>>
+    --
+    * in_app_enabled : BOOLEAN
+    * deadline_lead_hours : INT
+    * session_reminder_lead_min : INT
+    * workload_warning_level : VARCHAR(10)
+  }
+}
+package "Task" #FFF8E8 {
+  entity "task_types" as task_types {
+    * task_type_code : VARCHAR(30) <<PK>>
+    --
+    * display_name : VARCHAR(60)
+    * is_active : BOOLEAN
+  }
+  entity "task_categories" as task_categories {
+    * category_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * name : VARCHAR(80)
+  }
+  entity "tasks" as tasks {
+    * task_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    category_id : UUID <<FK>>
+    parent_task_id : UUID <<FK>>
+    * task_type_code : VARCHAR(30) <<FK>>
+    * name : VARCHAR(200)
+    description : VARCHAR(2000)
+    * deadline : TIMESTAMP
+    * is_hard_deadline : BOOLEAN
+    * priority : SMALLINT
+    * status : VARCHAR(12)
+    * progress_percent : SMALLINT
+    * estimated_duration_min : INT
+    adjusted_duration_min : INT
+    adjustment_factor : DECIMAL(5,3)
+    * splittable : BOOLEAN
+    min_session_duration_min : INT
+    * creation_source : VARCHAR(16)
+    completed_at : TIMESTAMP
+    deleted_at : TIMESTAMP
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+  entity "task_dependencies" as task_dependencies {
+    * predecessor_task_id : UUID <<PK,FK>>
+    * successor_task_id : UUID <<PK,FK>>
+    --
+    * created_at : TIMESTAMP
+  }
+}
+package "Planning (proposal -> applied)" #FDF0F0 {
+  entity "work_plans" as work_plans {
+    * plan_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    previous_plan_id : UUID <<FK>>
+    * plan_kind : VARCHAR(10)
+    * trigger_event : VARCHAR(20)
+    * status : VARCHAR(12)
+    * horizon_start : TIMESTAMP
+    * horizon_end : TIMESTAMP
+    * generated_at : TIMESTAMP
+    applied_at : TIMESTAMP
+  }
+  entity "plan_items" as plan_items {
+    * item_id : UUID <<PK>>
+    --
+    * plan_id : UUID <<FK>>
+    * task_id : UUID <<FK>>
+    previous_session_id : UUID <<FK>>
+    * action : VARCHAR(12)
+    start_at : TIMESTAMP
+    end_at : TIMESTAMP
+    planned_duration_min : INT
+  }
+  entity "plan_item_reasons" as plan_item_reasons {
+    * reason_id : UUID <<PK>>
+    --
+    * item_id : UUID <<FK>>
+    * reason_code : VARCHAR(40)
+    detail_json : TEXT
+  }
+  entity "plan_warnings" as plan_warnings {
+    * warning_id : UUID <<PK>>
+    --
+    * plan_id : UUID <<FK>>
+    task_id : UUID <<FK>>
+    * warning_code : VARCHAR(30)
+    detail : VARCHAR(500)
+  }
+  entity "work_sessions" as work_sessions {
+    * session_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * task_id : UUID <<FK>>
+    source_item_id : UUID <<FK,UQ>>
+    * start_at : TIMESTAMP
+    * end_at : TIMESTAMP
+    * planned_duration_min : INT
+    * status : VARCHAR(12)
+    * is_locked : BOOLEAN
+    skip_reason : VARCHAR(255)
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+}
+package "Execution" #FDF0F0 {
+  entity "session_executions" as session_executions {
+    * execution_id : UUID <<PK>>
+    --
+    * session_id : UUID <<FK,UQ>>
+    * started_at : TIMESTAMP
+    ended_at : TIMESTAMP
+    timer_duration_min : INT
+    actual_duration_min : INT
+    * is_user_adjusted : BOOLEAN
+  }
+  entity "execution_segments" as execution_segments {
+    * segment_id : UUID <<PK>>
+    --
+    * execution_id : UUID <<FK>>
+    * segment_start : TIMESTAMP
+    segment_end : TIMESTAMP
+  }
+}
+package "Intelligence & Personalization" #EEF8FA {
+  entity "estimation_observations" as estimation_observations {
+    * observation_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    task_id : UUID <<FK,UQ>>
+    * task_type_code : VARCHAR(30) <<FK>>
+    * estimated_min : INT
+    * actual_min : INT
+    * observed_at : TIMESTAMP
+  }
+  entity "personal_capacity_profiles" as personal_capacity_profiles {
+    * user_id : UUID <<PK,FK>>
+    --
+    * global_estimation_bias : DECIMAL(5,3)
+    * capacity_factor : DECIMAL(4,3)
+    * observation_count : INT
+    * updated_at : TIMESTAMP
+  }
+  entity "task_type_biases" as task_type_biases {
+    * user_id : UUID <<PK,FK>>
+    * task_type_code : VARCHAR(30) <<PK,FK>>
+    --
+    * bias_factor : DECIMAL(5,3)
+    * avg_error_ratio : DECIMAL(5,3)
+    * sample_count : INT
+    * updated_at : TIMESTAMP
+  }
+  entity "capacity_snapshots" as capacity_snapshots {
+    * snapshot_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * week_start : DATE
+    * available_min : INT
+    * completed_planned_min : INT
+    * capacity_factor : DECIMAL(4,3)
+  }
+  entity "risk_assessments" as risk_assessments {
+    * assessment_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    task_id : UUID <<FK>>
+    * scope : VARCHAR(10)
+    * risk_level : VARCHAR(10)
+    * score : DECIMAL(6,3)
+    load_ratio : DECIMAL(6,3)
+    * is_current : BOOLEAN
+    * computed_at : TIMESTAMP
+  }
+  entity "risk_reasons" as risk_reasons {
+    * reason_id : UUID <<PK>>
+    --
+    * assessment_id : UUID <<FK>>
+    * reason_code : VARCHAR(40)
+    detail_json : TEXT
+  }
+}
+package "Notification & Operations" #F7F2FA {
+  entity "notifications" as notifications {
+    * notification_id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    task_id : UUID <<FK>>
+    session_id : UUID <<FK>>
+    plan_id : UUID <<FK>>
+    * notification_type : VARCHAR(20)
+    * title : VARCHAR(200)
+    * body : VARCHAR(1000)
+    * dedupe_key : VARCHAR(120)
+    * scheduled_for : TIMESTAMP
+    * created_at : TIMESTAMP
+    read_at : TIMESTAMP
+  }
+  entity "system_job_runs" as system_job_runs {
+    * job_run_id : UUID <<PK>>
+    --
+    * job_type : VARCHAR(24)
+    user_id : UUID <<FK>>
+    * status : VARCHAR(10)
+    error_message : VARCHAR(1000)
+    * started_at : TIMESTAMP
+    finished_at : TIMESTAMP
+  }
+}
+users ||--|| user_profiles : user_id
+users ||--o{ password_reset_tokens : user_id
+users ||--o{ account_status_logs : target_user_id
+users ||--o{ account_status_logs : admin_id
+users ||--o{ weekly_availability : user_id
+users ||--o{ availability_exceptions : user_id
+users ||--o{ fixed_events : user_id
+users ||--o| work_preferences : user_id
+users ||--o| notification_settings : user_id
+users ||--o{ task_categories : user_id
+users ||--o{ tasks : user_id
+task_categories |o--o{ tasks : category_id
+tasks |o--o{ tasks : parent_task_id
+task_types ||--o{ tasks : task_type_code
+tasks ||--o{ task_dependencies : predecessor_task_id
+tasks ||--o{ task_dependencies : successor_task_id
+users ||--o{ work_plans : user_id
+work_plans |o--o{ work_plans : previous_plan_id
+work_plans ||--o{ plan_items : plan_id
+tasks ||--o{ plan_items : task_id
+work_sessions |o--o{ plan_items : previous_session_id
+plan_items ||--o{ plan_item_reasons : item_id
+work_plans ||--o{ plan_warnings : plan_id
+tasks |o--o{ plan_warnings : task_id
+users ||--o{ work_sessions : user_id
+tasks ||--o{ work_sessions : task_id
+plan_items |o--o| work_sessions : source_item_id
+work_sessions ||--o| session_executions : session_id
+session_executions ||--o{ execution_segments : execution_id
+users ||--o{ estimation_observations : user_id
+tasks |o--o| estimation_observations : task_id
+task_types ||--o{ estimation_observations : task_type_code
+users ||--o| personal_capacity_profiles : user_id
+users ||--o{ task_type_biases : user_id
+task_types ||--o{ task_type_biases : task_type_code
+users ||--o{ capacity_snapshots : user_id
+users ||--o{ risk_assessments : user_id
+tasks |o--o{ risk_assessments : task_id
+risk_assessments ||--o{ risk_reasons : assessment_id
+users ||--o{ notifications : user_id
+tasks |o--o{ notifications : task_id
+work_sessions |o--o{ notifications : session_id
+work_plans |o--o{ notifications : plan_id
+users |o--o{ system_job_runs : user_id
+legend bottom
+  PK primary key, FK foreign key, UQ unique.  work_plans/plan_items are PROPOSALS; work_sessions holds only APPLIED calendar sessions.
+  Not persisted by design: what-if scenarios, ad-hoc conflict checks, AI suggestions before the user confirms.
+endlegend
+@enduml

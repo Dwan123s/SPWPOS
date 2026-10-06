@@ -1,0 +1,81 @@
+@baseUrl = https://localhost:7043
+@email = person@example.com
+@password = Rainy morning with coffee 42!
+@newPassword = An entirely new passphrase 83!
+@verificationOtp = REPLACE_FROM_EMAIL
+@forgotOtp = REPLACE_FROM_EMAIL
+@changeOtp = REPLACE_FROM_EMAIL
+@accessToken = REPLACE_FROM_LOGIN
+@refreshToken = REPLACE_FROM_LOGIN
+@resetToken = REPLACE_FROM_VERIFY_FORGOT
+
+### 1. Register (no automatic login)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{"email":"{{email}}","password":"{{password}}","confirmPassword":"{{password}}","firstName":"Nguyen","lastName":"Van A"}
+
+### 2. Verify email; copy OTP from Mailpit/your mailbox
+POST {{baseUrl}}/api/auth/verify-email
+Content-Type: application/json
+
+{"email":"{{email}}","otp":"{{verificationOtp}}"}
+
+### 3. Resend; wait at least 60 seconds, always generic public response
+POST {{baseUrl}}/api/auth/resend-verification-otp
+Content-Type: application/json
+
+{"email":"{{email}}"}
+
+### 4. Login; copy data.accessToken and data.refreshToken
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{"email":"{{email}}","password":"{{password}}"}
+
+### 5. Current user
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+### 6. Rotate refresh token; replace BOTH token variables after success
+POST {{baseUrl}}/api/auth/refresh-token
+Content-Type: application/json
+
+{"refreshToken":"{{refreshToken}}"}
+
+### 7. Request change-password OTP
+POST {{baseUrl}}/api/auth/change-password/request-otp
+Authorization: Bearer {{accessToken}}
+
+### 8. Change password with current password + OTP; all sessions revoked
+POST {{baseUrl}}/api/auth/change-password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"currentPassword":"{{password}}","otp":"{{changeOtp}}","newPassword":"{{newPassword}}","confirmNewPassword":"{{newPassword}}"}
+
+### 9. Forgot password
+POST {{baseUrl}}/api/auth/forgot-password
+Content-Type: application/json
+
+{"email":"{{email}}"}
+
+### 10. Verify forgot OTP; copy data.resetToken
+POST {{baseUrl}}/api/auth/verify-forgot-password-otp
+Content-Type: application/json
+
+{"email":"{{email}}","otp":"{{forgotOtp}}"}
+
+### 11. Reset password; reset ticket is consumed
+POST {{baseUrl}}/api/auth/reset-password
+Content-Type: application/json
+
+{"resetToken":"{{resetToken}}","newPassword":"{{newPassword}}","confirmNewPassword":"{{newPassword}}"}
+
+### 12. Logout current session
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### 13. Logout all devices
+POST {{baseUrl}}/api/auth/logout-all
+Authorization: Bearer {{accessToken}}

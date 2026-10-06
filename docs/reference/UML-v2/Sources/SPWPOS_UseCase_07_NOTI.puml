@@ -1,0 +1,53 @@
+@startuml
+left to right direction
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+}
+skinparam ArrowFontSize 10
+skinparam nodesep 18
+skinparam ranksep 45
+
+title SPWPOS - Use Case Diagram: Notification (UC65-UC68)
+actor "User" as User
+actor "Notification Service\n<<secondary>>" as NS
+rectangle "SPWPOS System - Notification" {
+  usecase "UC65\nReceive Deadline Notification" as UC65
+  usecase "UC66\nReceive Upcoming Work\nSession Reminder" as UC66
+  usecase "UC67\nReceive Workload Warning" as UC67
+  usecase "UC68\nReceive Schedule Change Notification" as UC68
+}
+rectangle "Referenced from other subsystems" #F4F4F4 {
+  usecase "UC44\nDetect Scheduling Conflict" as UC44 #E8E8E8;line.dashed;line:666666
+  usecase "UC47\nApply Reschedule Proposal" as UC47 #E8E8E8;line.dashed;line:666666
+  usecase "UC62\nView Overload Risk" as UC62 #E8E8E8;line.dashed;line:666666
+}
+User --> UC65
+User --> UC66
+User --> UC67
+User --> UC68
+UC65 -- NS
+UC66 -- NS
+UC67 -- NS
+UC68 -- NS
+UC67 ..> UC62 : <<extend>>\n{risk > threshold}
+UC67 ..> UC44 : <<extend>>\n{important conflict}
+UC68 ..> UC47 : <<extend>>\n{schedule changed}
+legend bottom
+  <<include>> : base use case ALWAYS performs the included use case (arrow points to included).
+  <<extend>>  : extending use case is OPTIONAL / conditional (arrow points to base; {condition} shown).
+  Solid line : association (actor takes part).  Grey dashed use case : defined in another subsystem.
+  Every User use case presupposes a logged-in session (UC02) except UC01, UC02, UC04, UC05; this is a
+  precondition, not an <<include>>.
+endlegend
+@enduml

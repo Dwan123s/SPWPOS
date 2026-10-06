@@ -1,0 +1,286 @@
+/* PLANORA workspace materials, shared with the liquid-glass login. */
+:root{
+ --glass-blue:#0866dc;
+ --glass-blue-dark:#0753bc;
+ --glass-ink:#122941;
+ --glass-muted:#526a81;
+ --glass-edge:#ffffffed;
+ --glass-line:#ccdeee;
+ --glass-surface:#f9fcfff2;
+ --glass-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 #d7e9fa80,0 12px 36px #244f8110,0 2px 8px #244f8108;
+ --glass-button:linear-gradient(165deg,#166fdd 0%,#0866dc 46%,#0753bc 100%);
+}
+/* Hide the page's vertical strip as requested; wheel, touch and keyboard still scroll. */
+html{scrollbar-width:none}
+html::-webkit-scrollbar{display:none;width:0;height:0}
+
+/* A single backdrop lets the glass stay subtle across long pages. */
+.glass-workspace{
+ --accent:var(--glass-blue);--cyan:var(--glass-blue);--purple:var(--glass-blue);
+ --cyan-dark:var(--glass-blue-dark);--accent-soft:#e9f2ff;--cyan-tint:#edf6ff;
+ --line:var(--glass-line);--ink:var(--glass-ink);--muted:var(--glass-muted);--radius:24px;
+ position:relative;isolation:isolate;grid-template-columns:238px minmax(0,1fr);
+ gap:20px;padding:16px;min-height:100dvh;color:var(--glass-ink);
+ background:radial-gradient(ellipse at 2% 12%,#d6f5ff 0%,transparent 38%),radial-gradient(ellipse at 94% 74%,#dceaff 0%,transparent 45%),linear-gradient(135deg,#f8fcff,#eef6ff 65%,#fbfdff);
+}
+.glass-workspace::before{content:"";position:fixed;z-index:-1;pointer-events:none;top:14%;right:8%;width:min(38vw,520px);aspect-ratio:1;border-radius:42% 58% 61% 39%;transform:rotate(-18deg);background:linear-gradient(145deg,#ffffff80,#65c9ff1f 48%,#8eafff26);border:1px solid #ffffff99;box-shadow:inset 0 2px 18px #ffffff80}
+.glass-workspace .main{min-width:0}
+.glass-workspace :is(.sidebar,.topbar,.card,.focus-card,.profile-hero-card){background:var(--glass-surface);border:1px solid var(--glass-edge);box-shadow:var(--glass-shadow)}
+.glass-workspace .sidebar{top:16px;height:calc(100dvh - 32px);border-radius:26px;padding:22px 16px 18px;scrollbar-width:none}
+.glass-workspace .sidebar::-webkit-scrollbar{display:none;width:0;height:0}
+.glass-workspace .sidebar>.brand-lockup{width:100%;padding:0 4px;margin:0 0 2px}
+.glass-workspace .workspace-label{margin:24px 8px 16px;border-color:#ccdeee99;color:#486581}
+.glass-workspace .workspace-dot{background:#2597df;box-shadow:0 0 0 4px #d3edff}
+.glass-workspace .quick-search{border-color:#c5d8ea;border-radius:13px;background:#ffffff9e;box-shadow:inset 0 1px 0 #fff;padding:11px 10px;color:var(--glass-muted)}
+.glass-workspace .quick-search:hover{background:#fff;border-color:#97b9df}
+.glass-workspace .quick-search kbd{border-color:#d1e0ee;border-radius:5px;color:#56718b;background:#ffffffb3}
+.glass-workspace .nav-label{padding-left:12px;color:#5d748b;letter-spacing:1.4px;font-size:10px}
+.glass-workspace .nav{gap:5px}
+.glass-workspace .nav button{border:1px solid transparent;border-radius:13px;min-height:43px;color:#45617b;transition:background .18s,border-color .18s,box-shadow .18s}
+.glass-workspace .nav button .icon{color:#62809d}
+.glass-workspace .nav button:hover{background:#ffffffa6;border-color:#ffffffb3;color:var(--glass-ink)}
+.glass-workspace .nav button.active{background:linear-gradient(145deg,#ffffffed,#e3efffd9);border-color:#fff;color:#0759c8;box-shadow:inset 0 1px 0 #fff,0 4px 14px #286cbe0d;font-weight:600}
+.glass-workspace .nav button.active .icon{color:var(--glass-blue)}
+.glass-workspace .nav button .notification-number{background:#d8eaff;color:#0753bc;border:1px solid #c4dcfa;border-radius:999px}
+.glass-workspace .side-note{border:1px solid #ffffffcc;border-radius:18px;background:linear-gradient(145deg,#ffffffb3,#eaf6ffb3);box-shadow:inset 0 1px 0 #fff}
+.glass-workspace .side-note-icon{background:#e0efff;border:1px solid #fff;border-radius:10px;color:#0866dc}
+.glass-workspace .side-note strong{color:#365573}
+.glass-workspace .user-mini{border-color:#ccdeee99}
+.glass-workspace .avatar{background:linear-gradient(145deg,#e7f4ff,#cfe4fc);color:#0759c8;border:1px solid #ffffffb3;box-shadow:0 2px 8px #2b639110}
+.glass-workspace .user-link strong{max-width:120px;color:var(--glass-ink)}
+.glass-workspace .topbar{position:sticky;top:16px;z-index:20;height:68px;padding:0 24px;border-radius:22px}
+.glass-workspace .topbar-right{gap:14px}
+.glass-workspace .bell{background:#ffffff80;border:1px solid #ffffffb3;border-radius:12px;color:#456887;width:36px;height:36px}
+.glass-workspace .bell:hover{background:#e9f2ff}
+.glass-workspace .bell .dot{background:#0866dc;width:6px;height:6px}
+.glass-workspace .breadcrumb{color:#5d748b}
+.glass-workspace .breadcrumb strong{color:#365573}
+.glass-workspace .content{padding:30px 12px 20px}
+.glass-workspace .page-header{margin-bottom:26px}
+.glass-workspace .page-header h1{font-weight:700;letter-spacing:-1.1px;color:#122941}
+.glass-workspace .page-header p{color:var(--glass-muted);line-height:1.75}
+.glass-workspace .eyebrow{color:#0759c8}
+.glass-workspace .workspace-footer{border-color:#ccdeee99;color:#536d87}
+
+/* Keep controls crisp on the translucent panels. */
+:is(.glass-workspace,#modal) .btn{border-radius:999px;border-color:#c4d8eb;background:#ffffffb3;color:#365573;box-shadow:inset 0 1px 0 #fff;transition:background .18s,border-color .18s,box-shadow .18s}
+:is(.glass-workspace,#modal) .btn:hover:not(:disabled){background:#fff;border-color:#9dbdde}
+:is(.glass-workspace,#modal) .btn.primary{background:var(--glass-button);border-color:#ffffff80;color:#fff;box-shadow:inset 0 1px 0 #ffffff73,inset 0 -1px 0 #003b9533,0 5px 16px #0866dc26}
+:is(.glass-workspace,#modal) .btn.primary:hover:not(:disabled){background:linear-gradient(165deg,#1267d5,#075acc 60%,#064dad);border-color:#ffffff80;box-shadow:inset 0 1px 0 #ffffff80,0 7px 20px #0866dc33}
+:is(.glass-workspace,#modal) .btn.secondary{background:linear-gradient(145deg,#ffffffb3,#e7f2ffb3);border-color:#aacbf0;color:#0759c8}
+:is(.glass-workspace,#modal) .btn.ghost{background:transparent;border-color:transparent;box-shadow:none;color:#456581}
+:is(.glass-workspace,#modal) .btn.ghost:hover:not(:disabled){background:#ffffffb3;border-color:#ffffffcc;color:#0759c8}
+:is(.glass-workspace,#modal) .btn.icon-only{border-radius:12px}
+:is(.glass-workspace,#modal) .btn.danger{background:#fff0f0e6;border-color:#f1c5c5;color:#a22d38;box-shadow:inset 0 1px 0 #fff}
+:is(.glass-workspace,#modal) .btn.danger:hover:not(:disabled){background:#ffe5e5;border-color:#eab0b0;color:#8d2630}
+:is(.glass-workspace,#modal) :is(.field input,.field textarea,.field select,.filter){background:#ffffffd9;border-color:#bed3e7;border-radius:13px;color:#122941;box-shadow:inset 0 1px 3px #5b83ab0a,0 1px 0 #fff}
+:is(.glass-workspace,#modal) :is(.field input,.field textarea,.field select,.filter):focus{background:#fff;border-color:#0866dc;outline:2px solid #0866dc;outline-offset:2px;box-shadow:0 0 0 3px #0866dc12}
+:is(.glass-workspace,#modal) :is(input,textarea)::placeholder{color:#647c94;opacity:1}
+:is(.glass-workspace,#modal) select option{background:#fff;color:#122941}
+:is(.glass-workspace,#modal) .field{color:#365573}
+:is(.glass-workspace,#modal) .checkbox input{accent-color:#0866dc}
+:is(.glass-workspace,#modal) input:disabled{background:#eef4fad9;color:#61768a}
+:is(.glass-workspace,#modal) .text-btn{color:#0759c8}
+:is(.glass-workspace,#modal) .badge{border:1px solid #d0dfec;background:#f0f6fccc;color:#486581;border-radius:999px;padding:3px 8px}
+:is(.glass-workspace,#modal) :is(.badge.purple,.badge.green){background:#e9f3ffe6;border-color:#c9dffa;color:#0759c8}
+:is(.glass-workspace,#modal) .badge.amber{background:#fff5dfe6;border-color:#f1dfb6;color:#86580e}
+:is(.glass-workspace,#modal) .badge.red{background:#fff0f0e6;border-color:#f1c5c5;color:#a22d38}
+:is(.glass-workspace,#modal) .progress{height:6px;background:#dce9f6;border-radius:999px}
+:is(.glass-workspace,#modal) .progress::-webkit-progress-bar{background:#dce9f6;border-radius:999px}
+:is(.glass-workspace,#modal) .progress::-webkit-progress-value{background:linear-gradient(90deg,#0866dc,#259ee9);border-radius:999px}
+:is(.glass-workspace,#modal) .progress::-moz-progress-bar{background:#0866dc;border-radius:999px}
+.glass-workspace :is(.warning,.info){border-radius:16px;box-shadow:inset 0 1px 0 #ffffffb3}
+.glass-workspace .warning{background:#fff6e7ed;border-color:#ecd9ad;color:#80561b}
+.glass-workspace .info{background:#edf6ffed;border-color:#bfd8f2;color:#245578}
+.glass-workspace .count-pill{border:1px solid #d3e4f3;background:#f3f8ffd9;border-radius:8px;color:#466580}
+
+/* Dashboard, cards and execution sessions. */
+.glass-workspace .card{border-radius:24px}
+.glass-workspace .card-header h2{color:#193b5a;font-weight:600}
+.glass-workspace :is(.stat-label,.stat-note,.task-meta,.session-time,.reason){color:#526a81}
+.glass-workspace :is(.stat-value,.day-count,.reflection-metrics strong){color:#153a5e}
+.glass-workspace .stat-icon{border:1px solid #fff;border-radius:12px;background:linear-gradient(145deg,#fff,#e2efff);color:#0866dc;box-shadow:0 3px 10px #2b63910a}
+.glass-workspace .stat-icon.amber{background:#fff5e5;color:#946019}
+.glass-workspace .focus-card{border-radius:24px;background:linear-gradient(125deg,#e7f4fff2,#ffffffed);box-shadow:var(--glass-shadow),0 10px 36px #0866dc0a}
+.glass-workspace .focus-card::after{border-color:#b9dbff3d;width:200px;height:200px;right:-72px;top:-90px;border-width:28px}
+.glass-workspace .focus-card h2{color:#153a5e;font-weight:600}
+.glass-workspace :is(.focus-card p,.focus-status,.focus-duration){color:#456581}
+.glass-workspace .focus-status .badge{border-color:#fff;background:#ffffffa6;color:#0759c8}
+.glass-workspace :is(.focus-timer,.timer){color:#0759c8}
+.glass-workspace .summary-icon{background:#e7f2ff;border:1px solid #fff;border-radius:11px;color:#0866dc}
+.glass-workspace .priority-task{border-color:#d4e3f099}
+.glass-workspace .task-status-marker{border-color:#adc7df;background:#ffffff80}
+.glass-workspace .task-status-marker.in-progress{border-color:#0866dc;background:#0866dc;box-shadow:inset 0 0 0 4px #f9fcff}
+.glass-workspace .title-button{color:#173852}
+.glass-workspace .title-button:hover{color:#0759c8}
+.glass-workspace .priority-task-deadline{color:#486581}
+.glass-workspace .priority-task-deadline.overdue,.glass-workspace .priority-task-deadline.overdue small{color:#a15b2c}
+.glass-workspace .session-card{border:1px solid #d2e2f2;border-left:3px solid #388ce2;border-radius:16px;background:linear-gradient(135deg,#ffffffd9,#edf6ffb3);box-shadow:inset 0 1px 0 #fff}
+.glass-workspace .session-card.completed{background:#eef7ffd9;border-left-color:#7faacc}
+.glass-workspace .session-card.fixed{background:#f4f8fcd9;border-left-color:#829ab3}
+.glass-workspace .agenda-time span{border-color:#bad1e7}
+
+/* Tabs and dense data surfaces retain clear separators. */
+.glass-workspace .task-tabs{gap:8px;border:1px solid #ffffffcc;border-radius:18px;background:#ffffffa6;padding:5px;margin-bottom:20px;width:max-content;max-width:100%;box-shadow:inset 0 1px 0 #fff}
+.glass-workspace .task-tabs button{border:1px solid transparent;border-radius:13px;min-height:38px;padding:8px 14px;color:#526a81}
+.glass-workspace .task-tabs button.active{border-color:#fff;background:linear-gradient(145deg,#fff,#e5f0ff);color:#0759c8;box-shadow:0 3px 10px #286cbe0d}
+.glass-workspace .task-tabs span{background:#dfeeff;color:#39668f;border-radius:6px}
+.glass-workspace .task-filters{border-color:#ccdeee99;background:#f8fcff66;border-radius:24px 24px 0 0}
+.glass-workspace .task-row{border-color:#d4e3f099;transition:background .15s}
+.glass-workspace .task-row:not(.task-heading):hover{background:#ffffff99}
+.glass-workspace .task-heading{color:#4f6c87}
+.glass-workspace .task-name{color:#173852}
+.glass-workspace .task-list-footer{border-color:#ccdeee99;color:#526a81}
+.glass-workspace .date-filters summary{background:#ffffffb3;border-color:#bed3e7;border-radius:12px;color:#456581}
+.glass-workspace .date-filters>div{border-color:#fff;border-radius:18px;background:#f9fcfff5;box-shadow:0 16px 40px #244f8126,inset 0 1px 0 #fff}
+.glass-workspace table th{background:#eff6ff80;color:#4e6984;border-color:#ccdeee;font-weight:600}
+.glass-workspace table td{border-color:#d4e3f099;color:#284a67}
+.glass-workspace table tbody tr:hover{background:#f8fcff99}
+.glass-workspace :is(.list-line,.bias-item,.notification){border-color:#d4e3f099}
+.glass-workspace .notification h3{color:#173852}
+.glass-workspace .notification.read h3{color:#526a81}
+.glass-workspace .notification-dot{background:#0866dc;box-shadow:0 0 0 4px #e3f0ff}
+.glass-workspace .notification.read .notification-dot{background:#a7bdd1;box-shadow:none}
+
+/* Calendar and planning. */
+.glass-workspace .calendar-workspace{border-radius:24px}
+.glass-workspace .calendar-toolbar{background:#ffffff66;border-radius:24px 24px 0 0}
+.glass-workspace .calendar-scroll{border-color:#ccdeee99}
+.glass-workspace .week-day{background:#ffffff73;border-color:#ccdeee99}
+.glass-workspace .week-day.today{background:#eaf4ffc9;border-color:#ccdeee}
+.glass-workspace .week-day-header{border-color:#ccdeee99;color:#526a81}
+.glass-workspace .week-day-header strong{color:#365573}
+.glass-workspace .week-day.today .week-day-header strong{background:var(--glass-button);color:#fff;box-shadow:inset 0 1px 0 #ffffff80,0 4px 10px #0866dc26}
+.glass-workspace .calendar-block{border-color:#c7dcf2;border-left-color:#388ce2;border-radius:13px;background:linear-gradient(145deg,#ffffffed,#e8f3ffcc);color:#245578;box-shadow:inset 0 1px 0 #fff}
+.glass-workspace .calendar-block:hover{background:#e4f1ff;border-color:#93bce8}
+.glass-workspace .calendar-block.completed{background:#f1f8ffd9;border-left-color:#7faacc;color:#486581}
+.glass-workspace .calendar-block.fixed{background:#f4f8fcd9;border-color:#d4e3f0;border-left-color:#829ab3;color:#486581}
+.glass-workspace .calendar-block.active-session{background:#ddebfff2;border-color:#a8c9f0;border-left-color:#0866dc;color:#0759c8;box-shadow:0 3px 10px #0866dc12,inset 0 1px 0 #fff}
+.glass-workspace .calendar-block.inactive{background:#eff4f8;border-left-color:#afbfce;color:#526a81}
+.glass-workspace .block-meta{color:#526a81}
+.glass-workspace .view-switch{border-color:#d5e5f3;border-radius:999px;padding:4px;background:#eaf3ff99}
+.glass-workspace .view-switch button{border-radius:999px;padding:6px 14px;color:#526a81}
+.glass-workspace .view-switch button.active{background:#ffffffed;color:#0759c8;box-shadow:0 2px 8px #286cbe14,inset 0 1px 0 #fff}
+.glass-workspace .legend-scheduled{background:#388ce2}
+.glass-workspace .legend-active{background:#0866dc}
+.glass-workspace .legend-fixed{background:#829ab3}
+.glass-workspace .agenda-day{border-color:#ccdeee99}
+.glass-workspace .agenda-day-label.today strong{color:#0759c8}
+.glass-workspace .calendar-hint{border-color:#ccdeee99;background:#ffffff4d;color:#526a81}
+.glass-workspace .calendar-bottom{color:#526a81}
+.glass-workspace .availability-row{border-bottom:1px solid #d4e3f099}
+.glass-workspace .availability-row:last-child{border-bottom:0}
+
+/* Analysis and account management. */
+.glass-workspace .chart rect{fill:#0866dc}
+.glass-workspace .chart rect.actual{fill:#69b5ed}
+.glass-workspace .chart text{fill:#526a81}
+.glass-workspace .chart line{stroke:#ccdeee}
+.glass-workspace .capacity-visual svg circle:first-child{stroke:#dce9f6}
+.glass-workspace .capacity-visual svg circle:last-child{stroke:#0866dc}
+.glass-workspace .capacity-visual strong{color:#153a5e}
+.glass-workspace .profile-hero-card{border-radius:24px;background:linear-gradient(125deg,#e5f4fff2,#ffffffed);color:#122941;box-shadow:var(--glass-shadow)}
+.glass-workspace .profile-hero-bg{background:#9bd9ff1f;border:1px solid #ffffff80}
+.glass-workspace .profile-hero-name-row h2{color:#153a5e}
+.glass-workspace .profile-hero-email{color:#456581;overflow-wrap:anywhere}
+.glass-workspace .profile-hero-bio{color:#526a81}
+.glass-workspace .profile-hero-info .badge{background:#ffffffa6;border-color:#fff;color:#0759c8}
+.glass-workspace .verified-tag{background:#e1f1ff;border:1px solid #c5e1fa;color:#0759c8;border-radius:999px;padding:3px 8px;white-space:nowrap}
+.glass-workspace .settings-tabs-bar{gap:6px;border:1px solid #ffffffcc;border-radius:18px;background:#ffffffa6;padding:5px;margin-bottom:22px;box-shadow:inset 0 1px 0 #fff}
+.glass-workspace .settings-tab-btn{border:1px solid transparent;border-radius:13px;color:#526a81;padding:10px 14px}
+.glass-workspace .settings-tab-btn:hover{background:#ffffff99;color:#0759c8}
+.glass-workspace .settings-tab-btn.active{background:linear-gradient(145deg,#fff,#e5f0ff);border-color:#fff;color:#0759c8;box-shadow:0 3px 10px #286cbe0d}
+.glass-workspace .tab-count{background:#dfeeff;color:#39668f}
+.glass-workspace :is(.category-card-item,.avatar-modern-section,.checkbox-switch-card){background:#ffffff80;border-color:#d2e2f2;border-radius:18px;box-shadow:inset 0 1px 0 #fff}
+.glass-workspace .category-card-item:hover{background:#fff;border-color:#aacbf0;box-shadow:0 4px 16px #286cbe0d}
+.glass-workspace .category-card-info strong,.glass-workspace .switch-content strong{color:#173852}
+.glass-workspace .category-card-info small,.glass-workspace .switch-content p{color:#526a81}
+.glass-workspace .security-steps-banner{background:#eaf4ffcc;border-color:#bfd8f2;border-radius:18px;box-shadow:inset 0 1px 0 #fff}
+.glass-workspace .step-num{background:var(--glass-button);box-shadow:inset 0 1px 0 #ffffff80,0 3px 8px #0866dc26}
+.glass-workspace .checkbox-switch-card input[type="checkbox"]{accent-color:#0866dc}
+.glass-workspace .card.danger-card{background:#fff5f5f2;border-color:#f1c5c5}
+
+/* Dialogs sit above the workspace; their backdrop stays easy to distinguish. */
+#modal{background:#f9fcfff5;border:1px solid #fff;border-radius:26px;color:#122941;box-shadow:inset 0 1px 0 #fff,0 32px 100px #163b6533}
+#modal::backdrop{background:#15395766;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#modal .modal-head h2{color:#153a5e}
+#modal .modal-head p{color:#526a81}
+#modal :is(.list-line,.form-section,.search-result){border-color:#ccdeee}
+#modal .search-result:hover{border-radius:12px;background:#eaf4ff}
+#modal :is(.detail-list dt,.reason,.muted,.search-result small){color:#526a81}
+#modal .search-result strong{color:#173852}
+#modal .avatar-cropper-controls{background:#eff6ff;border-color:#d2e2f2;border-radius:16px}
+#modal .avatar-cropper-zoom-slider{accent-color:#0866dc}
+.toast{background:#f4f9fff5;border:1px solid #fff;border-left:4px solid #0866dc;color:#153a5e;border-radius:18px;box-shadow:inset 0 1px 0 #fff,0 12px 36px #244f8126}
+.toast.success{background:#f4f9fff5;border-left-color:#0866dc;color:#153a5e}
+.toast.error{background:#fff5f5f5;border-color:#fff;border-left-color:#ae3940;color:#8f2834}
+
+/* Registration and account recovery use the same material as login. */
+.auth-facebook.is-account{background:radial-gradient(ellipse at 8% 18%,#d6f5ff 0%,transparent 42%),radial-gradient(ellipse at 90% 72%,#dceaff 0%,transparent 46%),linear-gradient(135deg,#f8fcff,#eef6ff 65%,#fbfdff)}
+.auth-facebook.is-account .auth-story{background:transparent;border-right:1px solid #ffffffb3}
+.auth-facebook.is-account .auth-card{padding:28px;background:var(--glass-surface);border:1px solid var(--glass-edge);border-radius:30px;box-shadow:var(--glass-shadow)}
+.auth-facebook.is-account .auth-card .field input{background:#ffffffd9;border-color:#bed3e7;box-shadow:inset 0 1px 3px #5b83ab0a,0 1px 0 #fff}
+.auth-facebook.is-account .auth-card .field input:focus{background:#fff;border-color:#0866dc;box-shadow:0 0 0 3px #0866dc14}
+.auth-facebook.is-account .auth-submit{background:var(--glass-button);border:1px solid #ffffff80;box-shadow:inset 0 1px 0 #ffffff73,0 5px 16px #0866dc26}
+.auth-facebook.is-account .auth-submit:hover:not(:disabled){background:linear-gradient(165deg,#1267d5,#075acc 60%,#064dad)}
+.auth-facebook.is-account .fb-back-btn{background:#ffffffb3;border:1px solid #fff;border-radius:12px;color:#456581}
+.auth-facebook.is-account .text-btn{color:#0759c8}
+.auth-facebook.is-account .auth-site-footer{background:#ffffffb3;border-color:#ffffffb3}
+
+/* Blur only the large panels; dense rows don't need extra rendering layers. */
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+ .glass-workspace :is(.sidebar,.topbar){background:#ffffffb3;backdrop-filter:blur(24px) saturate(165%);-webkit-backdrop-filter:blur(24px) saturate(165%)}
+ .glass-workspace .card{background:#ffffffb8;backdrop-filter:blur(14px) saturate(125%);-webkit-backdrop-filter:blur(14px) saturate(125%)}
+ .glass-workspace :is(.focus-card,.profile-hero-card){background:linear-gradient(125deg,#e7f4ffcc,#ffffffb8);backdrop-filter:blur(14px) saturate(125%);-webkit-backdrop-filter:blur(14px) saturate(125%)}
+ #modal{background:#f9fcffed;backdrop-filter:blur(24px) saturate(140%);-webkit-backdrop-filter:blur(24px) saturate(140%)}
+ .toast{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+ .auth-facebook.is-account .auth-card{background:#ffffffb3;backdrop-filter:blur(24px) saturate(165%);-webkit-backdrop-filter:blur(24px) saturate(165%)}
+}
+@media(max-width:1200px){
+ .glass-workspace{grid-template-columns:216px minmax(0,1fr);gap:16px;padding:14px}
+ .glass-workspace .sidebar{top:14px;height:calc(100dvh - 28px);padding-left:13px;padding-right:13px}
+ .glass-workspace .topbar{top:14px;padding:0 20px}
+ .glass-workspace .content{padding:26px 6px 18px}
+}
+@media(max-width:800px){
+ .glass-workspace{grid-template-columns:minmax(0,1fr);gap:0;padding:12px;min-height:100dvh}
+ .glass-workspace::before{width:min(70vw,320px);right:0;top:18%;transform:none}
+ .glass-workspace .sidebar{position:fixed;left:12px;top:12px;width:min(278px,calc(100vw - 32px));height:calc(100dvh - 24px);border-radius:24px;padding:24px 18px 18px;transform:translateX(calc(-100% - 14px));background:#f4f9fff5}
+ .glass-workspace .sidebar.open{transform:none;visibility:visible;box-shadow:0 18px 60px #163b6540}
+ .glass-workspace .sidebar-overlay{background:#15395759;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+ .glass-workspace .topbar{top:12px;height:60px;border-radius:18px;padding:0 14px}
+ .glass-workspace .topbar .actions{gap:8px}
+ .glass-workspace .content{padding:25px 4px 18px}
+ .glass-workspace .page-header{gap:16px;margin-bottom:22px}
+ .glass-workspace .card,.glass-workspace .focus-card,.glass-workspace .profile-hero-card{border-radius:21px}
+ .glass-workspace .task-filters,.glass-workspace .calendar-toolbar{border-radius:21px 21px 0 0}
+ .glass-workspace .task-tabs{width:100%;gap:3px;border-radius:16px}
+ .glass-workspace .task-tabs button{padding:8px 10px;font-size:12px}
+ .glass-workspace .date-filters>div{background:transparent;box-shadow:none}
+ .glass-workspace .settings-tabs-bar{gap:4px;flex-wrap:nowrap;overflow-x:auto;border-radius:16px}
+ .glass-workspace .settings-tab-btn{padding:10px 12px;font-size:12px;flex-shrink:0}
+ .glass-workspace .profile-hero-email{line-height:1.8}
+ .glass-workspace .verified-tag{display:inline-block;margin-top:4px}
+ .glass-workspace .workspace-footer{padding-top:16px;margin-top:26px}
+ #modal{border-radius:22px}
+ .auth-facebook.is-account .auth-story{border:0}
+ .auth-facebook.is-account .auth-card{padding:24px;border-radius:26px}
+}
+@media(max-width:400px){
+ .glass-workspace{padding:10px}
+ .glass-workspace .topbar{top:10px;padding:0 10px}
+ .glass-workspace .content{padding-left:2px;padding-right:2px}
+ .glass-workspace .card-header{flex-wrap:wrap}
+ .glass-workspace .task-tabs button{padding:8px;font-size:11px}
+ .glass-workspace .task-tabs span{font-size:10px}
+ .glass-workspace .stats-grid{gap:10px}
+ .glass-workspace .stats-grid .card{padding:14px}
+ .glass-workspace .availability-row{grid-template-columns:58px minmax(0,1fr) minmax(0,1fr) 27px}
+ .glass-workspace .availability-row input{padding-left:3px;padding-right:3px}
+ .glass-workspace .calendar-context{padding-left:14px;padding-right:14px}
+ .glass-workspace .focus-card{padding:21px}
+ .auth-facebook.is-account .auth-card{padding:20px 18px;border-radius:24px}
+}
+@media(prefers-reduced-motion:reduce){
+ .glass-workspace *,#modal *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+}

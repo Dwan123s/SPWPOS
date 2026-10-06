@@ -1,0 +1,83 @@
+@startuml
+left to right direction
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+}
+skinparam ArrowFontSize 10
+skinparam nodesep 18
+skinparam ranksep 45
+
+title SPWPOS - Use Case Diagram: Task Management (UC09-UC26)
+actor "User" as User
+actor "External AI Service\n<<secondary>>" as AI
+rectangle "SPWPOS System - Task Management" {
+  usecase "UC09\nCreate Task" as UC09
+  usecase "UC10\nView Task List" as UC10
+  usecase "UC11\nView Task Details" as UC11
+  usecase "UC12\nUpdate Task" as UC12
+  usecase "UC13\nDelete Task" as UC13
+  usecase "UC14\nSearch Tasks" as UC14
+  usecase "UC15\nFilter Tasks" as UC15
+  usecase "UC16\nChange Task Status" as UC16
+  usecase "UC17\nCreate Task Category" as UC17
+  usecase "UC18\nUpdate Task Category" as UC18
+  usecase "UC19\nDelete Task Category" as UC19
+  usecase "UC20\nCreate Subtask" as UC20
+  usecase "UC21\nUpdate Subtask" as UC21
+  usecase "UC22\nDelete Subtask" as UC22
+  usecase "UC23\nAdd Task Dependency" as UC23
+  usecase "UC24\nRemove Task Dependency" as UC24
+  usecase "UC25\nCapture Task\nUsing Natural Language" as UC25
+  usecase "UC26\nBreak Down Complex Task" as UC26
+}
+rectangle "Referenced from other subsystems" #F4F4F4 {
+  usecase "UC45\nGenerate Reschedule Proposal" as UC45 #E8E8E8;line.dashed;line:666666
+  usecase "UC58\nGet Personalized Duration Estimate" as UC58 #E8E8E8;line.dashed;line:666666
+}
+User --> UC09
+User --> UC10
+User --> UC11
+User --> UC12
+User --> UC13
+User --> UC14
+User --> UC15
+User --> UC16
+User --> UC17
+User --> UC18
+User --> UC19
+User --> UC20
+User --> UC21
+User --> UC22
+User --> UC23
+User --> UC24
+User --> UC25
+User --> UC26
+UC25 -- AI
+UC26 -- AI
+UC09 ..> UC58 : <<include>>
+UC11 ..> UC10 : <<extend>>\n{select a task}
+UC14 ..> UC10 : <<extend>>\n{enter keyword}
+UC15 ..> UC10 : <<extend>>\n{apply filter}
+UC25 ..> UC09 : <<extend>>\n{input by sentence}
+UC26 ..> UC20 : <<extend>>\n{task is large}
+UC45 ..> UC09 : <<extend>>\n{new task}
+UC45 ..> UC12 : <<extend>>\n{deadline/duration changed}
+legend bottom
+  <<include>> : base use case ALWAYS performs the included use case (arrow points to included).
+  <<extend>>  : extending use case is OPTIONAL / conditional (arrow points to base; {condition} shown).
+  Solid line : association (actor takes part).  Grey dashed use case : defined in another subsystem.
+  Every User use case presupposes a logged-in session (UC02) except UC01, UC02, UC04, UC05; this is a
+  precondition, not an <<include>>.
+endlegend
+@enduml

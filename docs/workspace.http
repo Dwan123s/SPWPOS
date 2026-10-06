@@ -1,0 +1,101 @@
+@baseUrl = https://localhost:7043
+@accessToken = REPLACE_FROM_LOGIN
+@taskId = REPLACE_FROM_CREATE
+@planId = REPLACE_FROM_GENERATE
+@sessionId = REPLACE_FROM_GENERATE
+
+### Detailed decisions (proposal has not changed the calendar)
+GET {{baseUrl}}/api/plans/{{planId}}/items
+Authorization: Bearer {{accessToken}}
+
+### Discard a proposed plan; it cannot be applied afterward
+POST {{baseUrl}}/api/plans/{{planId}}/discard
+Authorization: Bearer {{accessToken}}
+
+### Timer segments and corrected actual duration
+GET {{baseUrl}}/api/sessions/{{sessionId}}/execution
+Authorization: Bearer {{accessToken}}
+
+### Notification preferences
+PUT {{baseUrl}}/api/notifications/settings
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"inAppEnabled":true,"deadlineLeadHours":24,"sessionReminderLeadMinutes":10,"workloadWarningLevel":"HIGH"}
+
+### Work preferences (UML v2, horizon up to 30 days)
+PUT {{baseUrl}}/api/time/preferences
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"timeZoneId":"Asia/Ho_Chi_Minh","minimumSessionMinutes":25,"maximumSessionMinutes":120,"breakMinutes":10,"preferredStartMinute":480,"preferredEndMinute":1080,"planningHorizonDays":14,"preferredPeriod":"MORNING"}
+
+### Admin only: durable background jobs
+GET {{baseUrl}}/api/admin/jobs
+Authorization: Bearer {{accessToken}}
+
+### Workspace
+GET {{baseUrl}}/api/workspace
+Authorization: Bearer {{accessToken}}
+
+### Weekly availability: Mon-Fri, local timezone
+PUT {{baseUrl}}/api/time/availability
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"slots":[{"dayOfWeek":1,"startMinute":480,"endMinute":1080},{"dayOfWeek":2,"startMinute":480,"endMinute":1080},{"dayOfWeek":3,"startMinute":480,"endMinute":1080},{"dayOfWeek":4,"startMinute":480,"endMinute":1080},{"dayOfWeek":5,"startMinute":480,"endMinute":1080}]}
+
+### Create; replace deadline with a future date
+POST {{baseUrl}}/api/tasks
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"name":"Hoàn thiện báo cáo","description":"Báo cáo dự án SPWPOS","deadline":"2026-10-09T16:00:00Z","estimatedMinutes":120,"priority":3,"taskType":"Writing","splittable":true,"minimumSessionMinutes":25}
+
+### Natural language suggestion; no persistence
+POST {{baseUrl}}/api/tasks/capture
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"text":"Viết báo cáo trước thứ Sáu, khoảng 3 tiếng","useAi":false}
+
+### Generate proposal; replace start with current/future UTC instant
+POST {{baseUrl}}/api/plans
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"start":"2026-10-05T01:00:00Z","horizonDays":7}
+
+### Apply proposal, once
+POST {{baseUrl}}/api/plans/{{planId}}/apply
+Authorization: Bearer {{accessToken}}
+
+### Start (at most 15 minutes early)
+POST {{baseUrl}}/api/sessions/{{sessionId}}/start
+Authorization: Bearer {{accessToken}}
+
+### Pause
+POST {{baseUrl}}/api/sessions/{{sessionId}}/pause
+Authorization: Bearer {{accessToken}}
+
+### Resume
+POST {{baseUrl}}/api/sessions/{{sessionId}}/resume
+Authorization: Bearer {{accessToken}}
+
+### Complete session, then update task progress separately
+POST {{baseUrl}}/api/sessions/{{sessionId}}/complete
+Authorization: Bearer {{accessToken}}
+
+### Complete task
+PATCH {{baseUrl}}/api/tasks/{{taskId}}/progress
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"progress":100}
+
+### Read-only what-if
+POST {{baseUrl}}/api/plans/scenario
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"plan":{"start":"2026-10-05T01:00:00Z","horizonDays":7},"newTask":{"name":"Chuẩn bị thuyết trình","description":"","deadline":"2026-10-09T16:00:00Z","estimatedMinutes":180,"priority":3,"taskType":"Writing","splittable":true,"minimumSessionMinutes":25}}

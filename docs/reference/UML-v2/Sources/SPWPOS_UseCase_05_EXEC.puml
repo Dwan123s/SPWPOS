@@ -1,0 +1,57 @@
+@startuml
+left to right direction
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+}
+skinparam ArrowFontSize 10
+skinparam nodesep 18
+skinparam ranksep 45
+
+title SPWPOS - Use Case Diagram: Execution & Feedback (UC50-UC57)
+actor "User" as User
+rectangle "SPWPOS System - Execution & Feedback" {
+  usecase "UC50\nStart Work Session" as UC50
+  usecase "UC51\nPause Work Session" as UC51
+  usecase "UC52\nResume Work Session" as UC52
+  usecase "UC53\nComplete Work Session" as UC53
+  usecase "UC54\nSkip Work Session" as UC54
+  usecase "UC55\nUpdate Task Progress" as UC55
+  usecase "UC56\nRecord Actual Work Duration" as UC56
+  usecase "UC57\nReview Planned vs Actual Performance" as UC57
+}
+rectangle "Referenced from other subsystems" #F4F4F4 {
+  usecase "UC45\nGenerate Reschedule Proposal" as UC45 #E8E8E8;line.dashed;line:666666
+  usecase "UC64\nView Personal Productivity Insights" as UC64 #E8E8E8;line.dashed;line:666666
+}
+User --> UC50
+User --> UC51
+User --> UC52
+User --> UC53
+User --> UC54
+User --> UC55
+User --> UC56
+User --> UC57
+UC53 ..> UC56 : <<include>>
+UC64 ..> UC57 : <<include>>
+UC45 ..> UC53 : <<extend>>\n{finished early / over}
+UC45 ..> UC54 : <<extend>>\n{session skipped or missed}
+UC55 ..> UC53 : <<extend>>\n{user updates progress}
+legend bottom
+  <<include>> : base use case ALWAYS performs the included use case (arrow points to included).
+  <<extend>>  : extending use case is OPTIONAL / conditional (arrow points to base; {condition} shown).
+  Solid line : association (actor takes part).  Grey dashed use case : defined in another subsystem.
+  Every User use case presupposes a logged-in session (UC02) except UC01, UC02, UC04, UC05; this is a
+  precondition, not an <<include>>.
+endlegend
+@enduml

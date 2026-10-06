@@ -1,0 +1,29 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 80" fill="none" aria-label="PLANORA">
+  <defs>
+    <linearGradient id="wordmark-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#071A3D" />
+      <stop offset="100%" stop-color="#0F2B5C" />
+    </linearGradient>
+  </defs>
+
+  <!-- P -->
+  <path d="M 20 16 H 54 C 67 16 75 24 75 34 C 75 44 67 52 54 52 H 30 V 64 H 20 V 16 Z M 30 25 V 43 H 53 C 61 43 65 39 65 34 C 65 29 61 25 53 25 H 30 Z" fill="#071A3D" />
+
+  <!-- L -->
+  <path d="M 94 16 H 104 V 55 H 140 V 64 H 94 V 16 Z" fill="#071A3D" />
+
+  <!-- A (No Crossbar, Futuristic Triangle) -->
+  <path d="M 188 16 L 216 64 H 204.5 L 188 33 L 171.5 64 H 160 L 188 16 Z" fill="#071A3D" />
+
+  <!-- N -->
+  <path d="M 236 16 H 246.5 L 279.5 53.5 V 16 H 290 V 64 H 279.5 L 246.5 26.5 V 64 H 236 V 16 Z" fill="#071A3D" />
+
+  <!-- O (Geometric Extended Squircle) -->
+  <path d="M 328 16 H 348 C 360 16 366 22 366 34 V 46 C 366 58 360 64 348 64 H 328 C 316 64 310 58 310 46 V 34 C 310 22 316 16 328 16 Z M 328 25 C 322 25 319.5 28 319.5 35 V 45 C 319.5 52 322 55 328 55 H 348 C 354 55 356.5 52 356.5 45 V 35 C 356.5 28 354 25 348 25 H 328 Z" fill="#071A3D" />
+
+  <!-- R -->
+  <path d="M 386 16 H 420 C 433 16 440 23 440 33 C 440 41 434 47 424 49 L 442 64 H 428.5 L 413 51 H 396 V 64 H 386 V 16 Z M 396 25 V 42.5 H 419 C 426 42.5 430 39 430 33.5 C 430 28 426 25 419 25 H 396 Z" fill="#071A3D" />
+
+  <!-- A (Final A) -->
+  <path d="M 488 16 L 516 64 H 504.5 L 488 33 L 471.5 64 H 460 L 488 16 Z" fill="#071A3D" />
+</svg>

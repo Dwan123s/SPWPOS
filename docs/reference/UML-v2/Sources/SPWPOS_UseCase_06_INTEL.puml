@@ -1,0 +1,64 @@
+@startuml
+left to right direction
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+}
+skinparam ArrowFontSize 10
+skinparam nodesep 18
+skinparam ranksep 45
+
+title SPWPOS - Use Case Diagram: Intelligence & Personalization (UC58-UC64)
+actor "User" as User
+rectangle "SPWPOS System - Intelligence & Personalization" {
+  usecase "UC58\nGet Personalized Duration Estimate" as UC58
+  usecase "UC59\nReview Estimation Bias" as UC59
+  usecase "UC60\nReview Effective Capacity" as UC60
+  usecase "UC61\nView Workload Analysis" as UC61
+  usecase "UC62\nView Overload Risk" as UC62
+  usecase "UC63\nView Task Completion Risk" as UC63
+  usecase "UC64\nView Personal Productivity Insights" as UC64
+}
+rectangle "Referenced from other subsystems" #F4F4F4 {
+  usecase "UC09\nCreate Task" as UC09 #E8E8E8;line.dashed;line:666666
+  usecase "UC36\nGenerate Work Plan" as UC36 #E8E8E8;line.dashed;line:666666
+  usecase "UC49\nRun What-if Scenario" as UC49 #E8E8E8;line.dashed;line:666666
+  usecase "UC57\nReview Planned vs Actual Performance" as UC57 #E8E8E8;line.dashed;line:666666
+  usecase "UC67\nReceive Workload Warning" as UC67 #E8E8E8;line.dashed;line:666666
+}
+User --> UC58
+User --> UC59
+User --> UC60
+User --> UC61
+User --> UC62
+User --> UC63
+User --> UC64
+UC09 ..> UC58 : <<include>>
+UC36 ..> UC58 : <<include>>
+UC61 ..> UC58 : <<include>>
+UC61 ..> UC60 : <<include>>
+UC49 ..> UC61 : <<include>>
+UC62 ..> UC61 : <<include>>
+UC63 ..> UC61 : <<include>>
+UC64 ..> UC59 : <<include>>
+UC64 ..> UC60 : <<include>>
+UC64 ..> UC57 : <<include>>
+UC67 ..> UC62 : <<extend>>\n{risk > threshold}
+legend bottom
+  <<include>> : base use case ALWAYS performs the included use case (arrow points to included).
+  <<extend>>  : extending use case is OPTIONAL / conditional (arrow points to base; {condition} shown).
+  Solid line : association (actor takes part).  Grey dashed use case : defined in another subsystem.
+  Every User use case presupposes a logged-in session (UC02) except UC01, UC02, UC04, UC05; this is a
+  precondition, not an <<include>>.
+endlegend
+@enduml

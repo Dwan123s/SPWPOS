@@ -1,0 +1,42 @@
+@startuml
+left to right direction
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+}
+skinparam ArrowFontSize 10
+skinparam nodesep 18
+skinparam ranksep 45
+
+title SPWPOS - Use Case Diagram: Administration (UC69-UC72)
+actor "Administrator" as Admin
+rectangle "SPWPOS System - Administration" {
+  usecase "UC69\nSearch User Accounts" as UC69
+  usecase "UC70\nLock User Account" as UC70
+  usecase "UC71\nUnlock User Account" as UC71
+  usecase "UC72\nView System Status" as UC72
+}
+Admin --> UC69
+Admin --> UC70
+Admin --> UC71
+Admin --> UC72
+UC70 ..> UC69 : <<extend>>\n{from result}
+UC71 ..> UC69 : <<extend>>\n{from result}
+legend bottom
+  <<include>> : base use case ALWAYS performs the included use case (arrow points to included).
+  <<extend>>  : extending use case is OPTIONAL / conditional (arrow points to base; {condition} shown).
+  Solid line : association (actor takes part).  Grey dashed use case : defined in another subsystem.
+  Every User use case presupposes a logged-in session (UC02) except UC01, UC02, UC04, UC05; this is a
+  precondition, not an <<include>>.
+endlegend
+@enduml

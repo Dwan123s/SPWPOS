@@ -1,0 +1,58 @@
+@startuml
+left to right direction
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+}
+skinparam ArrowFontSize 10
+skinparam nodesep 18
+skinparam ranksep 45
+
+title SPWPOS - Use Case Overview (system context, 72 use cases in 8 subsystems)
+actor "User" as User
+actor "Administrator" as Admin
+actor "External AI Service\n<<secondary>>" as AI
+actor "Notification Service\n<<secondary>>" as NS
+rectangle "SPWPOS System" {
+  rectangle "**Account & Profile**\nUC01-UC08 (8 use cases)" as P_ACC #FFFFFF
+  rectangle "**Task Management**\nUC09-UC26 (18 use cases)" as P_TASK #FFFFFF
+  rectangle "**Time Management**\nUC27-UC35 (9 use cases)" as P_TIME #FFFFFF
+  rectangle "**Planning & Scheduling**\nUC36-UC49 (14 use cases)" as P_PLAN #FFFFFF
+  rectangle "**Execution & Feedback**\nUC50-UC57 (8 use cases)" as P_EXEC #FFFFFF
+  rectangle "**Intelligence & Personalization**\nUC58-UC64 (7 use cases)" as P_INTEL #FFFFFF
+  rectangle "**Notification**\nUC65-UC68 (4 use cases)" as P_NOTI #FFFFFF
+  rectangle "**Administration**\nUC69-UC72 (4 use cases)" as P_ADMIN #FFFFFF
+}
+User --> P_ACC
+User --> P_TASK
+User --> P_TIME
+User --> P_PLAN
+User --> P_EXEC
+User --> P_INTEL
+User --> P_NOTI
+Admin --> P_ADMIN
+P_TASK -- AI : UC25, UC26
+P_NOTI -- NS : UC65-UC68
+P_INTEL ..> P_EXEC : <<include>>\nUC64->UC57
+P_NOTI ..> P_INTEL : <<extend>>\nUC67->UC62
+P_NOTI ..> P_PLAN : <<extend>>\nUC67->UC44, UC68->UC47
+P_PLAN ..> P_EXEC : <<extend>>\nUC45->UC53, UC45->UC54
+P_PLAN ..> P_INTEL : <<include>>\nUC36->UC58, UC49->UC61
+P_PLAN ..> P_TASK : <<extend>>\nUC45->UC09, UC45->UC12
+P_PLAN ..> P_TIME : <<extend>>\nUC45->UC28, UC45->UC32
+P_TASK ..> P_INTEL : <<include>>\nUC09->UC58
+legend bottom
+  Dependency arrows summarise cross-subsystem <<include>> / <<extend>> relationships between individual use cases
+  (full detail in the eight subsystem diagrams and the complete diagram).
+endlegend
+@enduml

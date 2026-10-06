@@ -1,0 +1,94 @@
+@startuml
+left to right direction
+skinparam dpi 110
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #FCFCFC
+  BorderColor #555555
+}
+skinparam ArrowFontSize 10
+skinparam nodesep 18
+skinparam ranksep 45
+
+title SPWPOS - Use Case Diagram: Planning & Scheduling (UC36-UC49)
+actor "User" as User
+rectangle "SPWPOS System - Planning & Scheduling" {
+  usecase "UC36\nGenerate Work Plan" as UC36
+  usecase "UC37\nReview Proposed Plan" as UC37
+  usecase "UC38\nApply Proposed Plan" as UC38
+  usecase "UC39\nMove Work Session" as UC39
+  usecase "UC40\nChange Work\nSession Duration" as UC40
+  usecase "UC41\nLock Work Session" as UC41
+  usecase "UC42\nUnlock Work Session" as UC42
+  usecase "UC43\nSplit Work Session" as UC43
+  usecase "UC44\nDetect Scheduling Conflict" as UC44
+  usecase "UC45\nGenerate Reschedule Proposal" as UC45
+  usecase "UC46\nReview Reschedule Proposal" as UC46
+  usecase "UC47\nApply Reschedule Proposal" as UC47
+  usecase "UC48\nExplain Scheduling Decision" as UC48
+  usecase "UC49\nRun What-if Scenario" as UC49
+}
+rectangle "Referenced from other subsystems" #F4F4F4 {
+  usecase "UC09\nCreate Task" as UC09 #E8E8E8;line.dashed;line:666666
+  usecase "UC12\nUpdate Task" as UC12 #E8E8E8;line.dashed;line:666666
+  usecase "UC28\nAdd Availability Exception" as UC28 #E8E8E8;line.dashed;line:666666
+  usecase "UC32\nUpdate Fixed Event" as UC32 #E8E8E8;line.dashed;line:666666
+  usecase "UC53\nComplete Work Session" as UC53 #E8E8E8;line.dashed;line:666666
+  usecase "UC54\nSkip Work Session" as UC54 #E8E8E8;line.dashed;line:666666
+  usecase "UC58\nGet Personalized Duration Estimate" as UC58 #E8E8E8;line.dashed;line:666666
+  usecase "UC61\nView Workload Analysis" as UC61 #E8E8E8;line.dashed;line:666666
+  usecase "UC67\nReceive Workload Warning" as UC67 #E8E8E8;line.dashed;line:666666
+  usecase "UC68\nReceive Schedule Change Notification" as UC68 #E8E8E8;line.dashed;line:666666
+}
+User --> UC36
+User --> UC37
+User --> UC38
+User --> UC39
+User --> UC40
+User --> UC41
+User --> UC42
+User --> UC43
+User --> UC44
+User --> UC45
+User --> UC46
+User --> UC47
+User --> UC48
+User --> UC49
+UC09 ..> UC58 : <<include>>
+UC36 ..> UC58 : <<include>>
+UC61 ..> UC58 : <<include>>
+UC36 ..> UC44 : <<include>>
+UC39 ..> UC44 : <<include>>
+UC40 ..> UC44 : <<include>>
+UC43 ..> UC44 : <<include>>
+UC45 ..> UC44 : <<include>>
+UC49 ..> UC44 : <<include>>
+UC49 ..> UC61 : <<include>>
+UC38 ..> UC37 : <<extend>>\n{user accepts}
+UC47 ..> UC46 : <<extend>>\n{user accepts}
+UC48 ..> UC37 : <<extend>>\n{user asks why}
+UC48 ..> UC46 : <<extend>>\n{user asks why}
+UC45 ..> UC09 : <<extend>>\n{new task}
+UC45 ..> UC12 : <<extend>>\n{deadline/duration changed}
+UC45 ..> UC53 : <<extend>>\n{finished early / over}
+UC45 ..> UC54 : <<extend>>\n{session skipped or missed}
+UC45 ..> UC28 : <<extend>>\n{availability changed}
+UC45 ..> UC32 : <<extend>>\n{event changed}
+UC67 ..> UC44 : <<extend>>\n{important conflict}
+UC68 ..> UC47 : <<extend>>\n{schedule changed}
+legend bottom
+  <<include>> : base use case ALWAYS performs the included use case (arrow points to included).
+  <<extend>>  : extending use case is OPTIONAL / conditional (arrow points to base; {condition} shown).
+  Solid line : association (actor takes part).  Grey dashed use case : defined in another subsystem.
+  Every User use case presupposes a logged-in session (UC02) except UC01, UC02, UC04, UC05; this is a
+  precondition, not an <<include>>.
+endlegend
+@enduml
