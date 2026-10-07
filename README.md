@@ -2,6 +2,15 @@
   <img src="src/SPWPOS.Api/wwwroot/assets/planora-brand.png" alt="PLANORA" width="420" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/Dwan123s/SPWPOS/actions/workflows/ci.yml">
+    <img src="https://github.com/Dwan123s/SPWPOS/actions/workflows/ci.yml/badge.svg?branch=main&amp;event=push" alt="Continuous Integration" />
+  </a>
+  <a href="https://github.com/Dwan123s/SPWPOS/releases">
+    <img src="https://img.shields.io/badge/release-unreleased-blue" alt="Release: unreleased" />
+  </a>
+</p>
+
 # PLANORA — SPWPOS
 
 **Smart Personal Workload Planning and Optimization System** — ứng dụng quản lý công việc và lập kế hoạch cá nhân dựa trên thời gian rảnh, deadline và năng lực thực tế.
