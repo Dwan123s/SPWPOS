@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+jobs:
+  frontend:
+    name: Frontend tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "^24.15.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --no-fund
+      - name: React component tests
+        run: npx vitest run --reporter=default --reporter=junit --outputFile.junit=../TestResults/frontend/vitest.xml
+      - name: Browser session-refresh tests
+        run: |
+          mkdir -p ../TestResults/frontend
+          node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../TestResults/frontend/session-refresh.xml ../tests/browser/session-refresh.test.mjs
+      - name: Production build
+        run: npm run build
+      - name: Dependency vulnerability check
+        run: npm audit --audit-level=high
+      - name: Upload frontend test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: frontend-test-results
+          path: TestResults/frontend
+          if-no-files-found: ignore
+          retention-days: 14
+
+  backend:
+    name: Backend and SQL Server tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+          cache: true
+          cache-dependency-path: |
+            src/**/packages.lock.json
+            tests/**/packages.lock.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "^24.15.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # The API project includes these generated files during its build.
+      - name: Build the frontend served by the API
+        working-directory: frontend
+        run: |
+          npm ci --no-fund
+          npm run build
+      - name: Restore locked backend dependencies and EF tools
+        run: |
+          dotnet tool restore
+          dotnet restore SPWPOS.sln --locked-mode
+      - name: Release build
+        run: dotnet build SPWPOS.sln -c Release --no-restore -p:SkipFrontendBuild=true
+      - name: Start isolated SQL Server
+        shell: bash
+        run: |
+          SQL_PASSWORD="$(openssl rand -base64 32)aA9!"
+          echo "::add-mask::$SQL_PASSWORD"
+          printf 'SPWPOS_TEST_SQLSERVER=Server=tcp:127.0.0.1,1433;Database=master;User Id=sa;Password=%s;Encrypt=True;TrustServerCertificate=True\n' "$SQL_PASSWORD" >> "$GITHUB_ENV"
+          docker run -d --name spwpos-test-sql -p 127.0.0.1:1433:1433 \
+            -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$SQL_PASSWORD" \
+            mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+          for attempt in $(seq 1 60); do
+            if docker exec -e SQLCMDPASSWORD="$SQL_PASSWORD" spwpos-test-sql \
+              /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q 'SELECT 1' -b -o /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'SQL Server did not become ready within 120 seconds.' >&2
+          exit 1
+      - name: Unit and integration tests, including SQL Server concurrency and migrations
+        run: |
+          test -n "$SPWPOS_TEST_SQLSERVER"
+          dotnet test SPWPOS.sln -c Release --no-build --no-restore --logger trx --results-directory TestResults/backend
+      - name: Check migration snapshot matches the model
+        run: dotnet ef migrations has-pending-model-changes --project src/SPWPOS.Infrastructure --configuration Release --no-build
+      - name: Dependency vulnerability check
+        run: |
+          mkdir -p TestResults/backend
+          dotnet list SPWPOS.sln package --vulnerable --include-transitive --format json > TestResults/backend/package-audit.json
+          python3 - <<'PY'
+          import json
+          with open('TestResults/backend/package-audit.json') as handle:
+              audit = json.load(handle)
+          found = [(p['path'], f['framework'], d['id'])
+                   for p in audit.get('projects', []) for f in p.get('frameworks', [])
+                   for key in ('topLevelPackages', 'transitivePackages') for d in f.get(key, [])
+                   if d.get('vulnerabilities')]
+          if found:
+              raise SystemExit('Vulnerable packages: ' + repr(found))
+          PY
+      - name: Collect SQL Server logs
+        if: always()
+        run: |
+          mkdir -p TestResults/backend
+          if docker inspect spwpos-test-sql >/dev/null 2>&1; then
+            docker logs spwpos-test-sql > TestResults/backend/sql-server.log 2>&1
+          fi
+      - name: Upload backend test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: backend-test-results
+          path: TestResults/backend
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Remove test SQL Server
+        if: always()
+        run: docker rm -f spwpos-test-sql >/dev/null 2>&1 || true
+
+  windows-scripts:
+    name: Windows development script tests
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: SQL port configuration regression tests
+        shell: powershell
+        run: .\tests\scripts\SqlPortConfiguration.Tests.ps1
+      - name: SMTP configuration regression tests
+        shell: powershell
+        run: .\tests\scripts\SmtpConfiguration.Tests.ps1

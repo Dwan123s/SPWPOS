@@ -109,6 +109,18 @@ Backend tổ chức theo các lớp `Api → Infrastructure → Application → 
 
 ## Kiểm thử
 
+GitHub Actions chạy workflow [CI](.github/workflows/ci.yml) khi push, mở/cập nhật
+pull request, hoặc chạy thủ công từ tab **Actions → CI → Run workflow**.
+Ba job độc lập kiểm tra:
+
+- Frontend: Vitest/React Testing Library, browser session-refresh tests, production build và npm audit.
+- Backend: locked restore, Release build, unit/integration tests với SQL Server riêng cho mỗi run, migration snapshot và NuGet audit.
+- Windows scripts: regression tests cho cấu hình cổng SQL Server và SMTP trên Windows PowerShell.
+
+SQL Server dùng credential ngẫu nhiên, không cần cấu hình repository secrets.
+Báo cáo JUnit/TRX, NuGet audit và log SQL Server nằm trong artifacts của run,
+được giữ 14 ngày. Run mới trên cùng branch sẽ hủy run cũ đang chạy.
+
 Dừng API trước khi build hoặc chạy bộ kiểm tra. Từ thư mục repository:
 
 ```powershell
