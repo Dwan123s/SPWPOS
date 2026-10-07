@@ -1,0 +1,53 @@
+.auth-facebook.login-composition
+  .auth-card
+  .password-field[data-rejected]
+  input,
+.auth-facebook.login-composition
+  .auth-card
+  .password-field[data-rejected]
+  input:focus {
+  padding-right: 84px;
+  border-color: #ce425d;
+  background: #fff9fa;
+  box-shadow: 0 0 0 3px #ce425d14;
+}
+.auth-facebook.login-composition
+  .password-field[data-rejected]
+  .login-input-icon {
+  color: #bc334a;
+}
+.password-error-indicator {
+  position: absolute;
+  top: 50%;
+  right: 52px;
+  display: flex;
+  color: #bc334a;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.password-error-indicator .icon {
+  width: 19px;
+  height: 19px;
+}
+.password-login-error {
+  color: #bc334a;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  animation: password-error-appear 180ms ease-out;
+}
+@keyframes password-error-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .password-login-error {
+    animation: none;
+  }
+}

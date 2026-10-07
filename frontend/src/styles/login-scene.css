@@ -1,5 +1,6 @@
 /* Position wrappers own geometry and continuous motion; pictures retain artwork. */
 .auth-facebook.login-composition {
+  overflow-anchor: none;
   --login-motion-amplitude: 1;
   --login-ink: #071b3d;
   --login-muted: #677b9f;
@@ -211,6 +212,25 @@
   filter: drop-shadow(-8px 10px 8px var(--login-sprite-contact-shadow))
     drop-shadow(0 16px 20px var(--login-sprite-ambient-shadow));
 }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .login-scene-art
+    > :is(
+      .login-sprite--calendar,
+      .login-sprite--checklist,
+      .login-sprite--clock
+    ) {
+    pointer-events: auto;
+    transition: scale 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .login-scene-art
+    > :is(
+      .login-sprite--calendar,
+      .login-sprite--checklist,
+      .login-sprite--clock
+    ):hover {
+    scale: 1.045;
+  }
+}
 .login-sprite--ribbon-front {
   z-index: 50;
   /* Matching geometry and pixels preserve one continuous ribbon while this
@@ -355,8 +375,62 @@
 .auth-facebook.login-composition .auth-card::before {
   background: transparent;
 }
+.auth-panel-viewport,
+.auth-panel-content {
+  display: flow-root;
+}
+.auth-panel-viewport[data-transitioning] {
+  overflow: clip;
+}
+/* A soft light crosses the glass as its content changes, behind the controls. */
+.auth-facebook.login-composition
+  .auth-card:has(.auth-panel-viewport[data-transitioning])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 42%,
+    #a6eeff20 47%,
+    #ffffff80 50%,
+    #a6eeff20 53%,
+    transparent 58%
+  );
+  background-size: 260% 100%;
+  animation: auth-glass-shift 600ms ease-in-out both;
+}
+@keyframes auth-glass-shift {
+  0% {
+    background-position: 100% 0;
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 0% 0;
+    opacity: 0;
+  }
+}
 .auth-facebook.login-composition .fb-header-row {
   margin-bottom: 32px;
+}
+.auth-facebook.login-composition:not([data-auth-mode="login"]) .fb-header-row {
+  margin-bottom: 14px;
+}
+.auth-facebook.login-composition .fb-subtitle {
+  margin: 0 0 24px;
+  color: var(--login-muted);
+}
+.auth-facebook.login-composition .fb-back-btn {
+  flex-shrink: 0;
+  background: #ffffffb3;
+  border: 1px solid var(--login-white);
+  border-radius: 12px;
+  color: var(--login-blue);
 }
 .login-title-intro {
   display: block;
@@ -421,12 +495,15 @@
 }
 .auth-facebook.login-composition .auth-card .field input {
   min-height: 64px;
-  padding: 16px 20px 16px 60px;
+  padding: 16px 20px;
   border: 1px solid var(--login-line);
   border-radius: 18px;
   background: #ffffffb3;
   font-size: 16px;
   color: var(--login-ink);
+}
+.auth-facebook.login-composition .auth-card .login-input-icon ~ input {
+  padding-left: 60px;
 }
 .auth-facebook.login-composition .auth-card .password-field input {
   padding-right: 54px;
@@ -468,6 +545,13 @@
 }
 .auth-facebook.login-composition .auth-register {
   margin: 0;
+}
+.auth-facebook.login-composition .auth-return {
+  margin-top: 24px;
+}
+.auth-facebook.login-composition :is(.auth-return, .auth-resend) .text-btn {
+  color: var(--login-blue);
+  font-size: 14px;
 }
 .auth-facebook.login-composition .auth-create-account {
   min-height: 56px;
@@ -789,6 +873,8 @@
   --bob-rotation: 0.6deg;
 }
 .login-ribbon-shine {
+  /* The moving beam must not inherit the global icon outline. */
+  stroke: none;
   position: absolute;
   inset: 0;
   width: 100%;

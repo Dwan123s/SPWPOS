@@ -39,7 +39,11 @@ export function App({ initialize = true }) {
       onChange={onChange}
       className="min-h-dvh text-slate-900 antialiased"
     >
-      <Fragment key={snapshot.screenKey}>
+      <Fragment
+        key={
+          snapshot.screenKey.startsWith("auth-") ? "auth" : snapshot.screenKey
+        }
+      >
         {snapshot.screen || (
           <div className="initial-loading flex min-h-dvh flex-col items-center justify-center gap-4">
             <img src="/assets/planora-mark.png" alt="PLANORA" />

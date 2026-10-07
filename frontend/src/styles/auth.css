@@ -4,7 +4,7 @@
   flex-direction: column;
   min-height: 100dvh;
   background: #fff;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: inherit;
   font-size: 14px;
   color: #152334;
 }
@@ -42,10 +42,9 @@
   z-index: 1;
   max-width: 390px;
   margin: 0;
-  font:
-    700 clamp(42px, 4.15vw, 78px)/1.1 Arial,
-    Helvetica,
-    sans-serif;
+  font-size: clamp(42px, 4.15vw, 78px);
+  font-weight: 700;
+  line-height: 1.1;
   letter-spacing: -2.4px;
   color: #101820;
 }
@@ -83,10 +82,9 @@
 }
 .auth-facebook .fb-header-row h2 {
   margin: 0;
-  font:
-    600 22px/1.35 Arial,
-    Helvetica,
-    sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.35;
   letter-spacing: 0;
   color: #101820;
 }
@@ -118,10 +116,9 @@
   border: 1px solid #cfd5dc;
   border-radius: 18px;
   background: #fff;
-  font:
-    400 17px/1.4 Arial,
-    Helvetica,
-    sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.4;
   color: #152334;
   box-shadow: none;
 }

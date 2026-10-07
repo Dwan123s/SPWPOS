@@ -10,18 +10,21 @@ namespace SPWPOS.Infrastructure.Authentication;
 
 public sealed class Argon2PasswordHasher(IOptions<PasswordSettings> options) : IPasswordHasher<ApplicationUser>
 {
+    // Keep legacy credentials usable for login and cost rehashing. New passwords
+    // are restricted to 32 characters by the DTOs and Identity policy validator.
+    private const int MaximumSupportedLength = 128;
     private readonly PasswordSettings settings = options.Value;
     public string HashPassword(ApplicationUser user, string password)
     {
         ArgumentNullException.ThrowIfNull(password);
-        if (password.Length > settings.MaxLength) throw new ArgumentException("Password exceeds maximum length.", nameof(password));
+        if (password.Length > MaximumSupportedLength) throw new ArgumentException("Password exceeds maximum length.", nameof(password));
         var salt = RandomNumberGenerator.GetBytes(16);
         var hash = Derive(password, salt, settings.MemoryKiB, settings.Iterations);
         return $"$argon2id$v=19$m={settings.MemoryKiB},t={settings.Iterations},p=1${B64(salt)}${B64(hash)}";
     }
     public PasswordVerificationResult VerifyHashedPassword(ApplicationUser user, string hashedPassword, string providedPassword)
     {
-        if (providedPassword.Length > settings.MaxLength || hashedPassword.Length > 256) return PasswordVerificationResult.Failed;
+        if (providedPassword.Length > MaximumSupportedLength || hashedPassword.Length > 256) return PasswordVerificationResult.Failed;
         try
         {
             var parts = hashedPassword.Split('$');

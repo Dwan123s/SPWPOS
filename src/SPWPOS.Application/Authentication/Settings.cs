@@ -19,8 +19,8 @@ public sealed class OtpSettings
 }
 public sealed class PasswordSettings
 {
-    public int MinLength { get; set; } = 10;
-    public int MaxLength { get; set; } = 128;
+    public int MinLength { get; set; } = 8;
+    public int MaxLength { get; set; } = 32;
     public int MemoryKiB { get; set; } = 32768;
     public int Iterations { get; set; } = 3;
     // libsodium uses p=1. This value is validated on startup.

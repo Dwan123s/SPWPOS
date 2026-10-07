@@ -49,6 +49,36 @@ public sealed class AdditionalFlowTests
         await h.AuthAsync(a => a.ResetPasswordAsync(new(ticket.ResetToken, ServiceHarness.NewPassword, ServiceHarness.NewPassword), ServiceHarness.Context, Ct));
     }
     [Fact]
+    public async Task Reset_rejects_current_password_without_consuming_ticket_or_revoking_session()
+    {
+        await using var h = await ServiceHarness.CreateAsync(); var original = await h.RegisterAsync(); await h.LoginAsync();
+        await h.AuthAsync(a => a.ForgotPasswordAsync(new(ServiceHarness.Address), ServiceHarness.Context, Ct));
+        var ticket = await h.AuthAsync(a => a.VerifyForgotPasswordOtpAsync(new(ServiceHarness.Address, h.Email.Inbox[(ServiceHarness.Address, OtpPurpose.ForgotPassword)]), ServiceHarness.Context, Ct));
+        var error = await Assert.ThrowsAsync<AuthException>(() => h.AuthAsync(a => a.ResetPasswordAsync(new(ticket.ResetToken, ServiceHarness.Password, ServiceHarness.Password), ServiceHarness.Context, Ct)));
+        Assert.Equal("PASSWORD_POLICY_FAILED", error.Code);
+        Assert.Null(await h.DbAsync(db => db.PasswordResetTickets.Select(x => x.UsedAt).SingleAsync(Ct)));
+        Assert.Null(await h.DbAsync(db => db.RefreshTokens.Select(x => x.RevokedAt).SingleAsync(Ct)));
+        Assert.Equal(original.PasswordHash, await h.DbAsync(db => db.Users.Select(x => x.PasswordHash).SingleAsync(Ct)));
+        Assert.Equal(0, h.Email.Notifications);
+        await h.AuthAsync(a => a.ResetPasswordAsync(new(ticket.ResetToken, ServiceHarness.NewPassword, ServiceHarness.NewPassword), ServiceHarness.Context, Ct));
+        await h.LoginAsync(ServiceHarness.NewPassword);
+    }
+
+    [Fact]
+    public async Task Change_rejects_invalid_password_without_consuming_otp()
+    {
+        await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync(); await h.LoginAsync();
+        await h.AuthAsync(a => a.RequestChangePasswordOtpAsync(user.Id, ServiceHarness.Context, Ct));
+        var otp = h.Email.Inbox[(ServiceHarness.Address, OtpPurpose.ChangePassword)];
+        const string invalid = "SafePERSON1!";
+        var error = await Assert.ThrowsAsync<AuthException>(() => h.AuthAsync(a => a.ChangePasswordAsync(user.Id, new(ServiceHarness.Password, otp, invalid, invalid), ServiceHarness.Context, Ct)));
+        Assert.Equal("PASSWORD_POLICY_FAILED", error.Code);
+        Assert.Null(await h.DbAsync(db => db.EmailOtps.Where(x => x.Purpose == OtpPurpose.ChangePassword).Select(x => x.UsedAt).SingleAsync(Ct)));
+        Assert.Null(await h.DbAsync(db => db.RefreshTokens.Select(x => x.RevokedAt).SingleAsync(Ct)));
+        await h.AuthAsync(a => a.ChangePasswordAsync(user.Id, new(ServiceHarness.Password, otp, ServiceHarness.NewPassword, ServiceHarness.NewPassword), ServiceHarness.Context, Ct));
+        await h.LoginAsync(ServiceHarness.NewPassword);
+    }
+    [Fact]
     public async Task Public_resend_cooldown_does_not_rotate_or_consume_existing_code()
     {
         await using var h = await ServiceHarness.CreateAsync(); await h.RegisterAsync(false);

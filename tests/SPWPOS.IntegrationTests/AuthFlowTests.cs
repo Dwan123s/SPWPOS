@@ -32,6 +32,89 @@ public sealed class AuthFlowTests
         return (json.GetProperty("data").GetProperty("accessToken").GetString()!, json.GetProperty("data").GetProperty("refreshToken").GetString()!);
     }
     private static void Authorize(HttpClient client, string access) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", access);
+    [Theory]
+    [InlineData("Abcdef1!")]
+    [InlineData("Ab1!aaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public async Task Registration_accepts_password_length_boundaries(string password)
+    {
+        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        await PostAsync(client, "register", new { email = ServiceHarness.Address, password, confirmPassword = password, firstName = "N", lastName = "A" });
+        await PostAsync(client, "verify-email", new { email = ServiceHarness.Address, otp = factory.Email.Inbox[(ServiceHarness.Address, OtpPurpose.EmailVerification)] });
+        await LoginAsync(client, password);
+    }
+
+    [Theory]
+    [InlineData("Abcde1!")]
+    [InlineData("Ab1!aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("abcdefgh1!")]
+    [InlineData("ABCDEFGH1!")]
+    [InlineData("Abcdefgh!")]
+    [InlineData("Abcdefgh1")]
+    [InlineData("Abcdef1 ")]
+    [InlineData("SafePASSWORD1!")]
+    [InlineData("SafeWebSiteName1!")]
+    [InlineData("SafePlAnOrA1!")]
+    [InlineData("SafePERSON1!")]
+    public async Task Registration_rejects_invalid_password_via_direct_api(string password)
+    {
+        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        await PostAsync(client, "register", new { email = ServiceHarness.Address, password, confirmPassword = password, firstName = "N", lastName = "A" }, HttpStatusCode.BadRequest);
+        Assert.Empty(factory.Email.Inbox);
+    }
+
+    private static async Task<string> ResetTicketAsync(ApiFactory factory, HttpClient client)
+    {
+        await PostAsync(client, "forgot-password", new { email = ServiceHarness.Address });
+        var ticket = await PostAsync(client, "verify-forgot-password-otp", new { email = ServiceHarness.Address, otp = factory.Email.Inbox[(ServiceHarness.Address, OtpPurpose.ForgotPassword)] });
+        return ticket.GetProperty("data").GetProperty("resetToken").GetString()!;
+    }
+
+    [Theory]
+    [InlineData("Abcdef1!")]
+    [InlineData("Ab1!aaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public async Task Reset_accepts_eight_and_thirty_two_character_passwords_via_direct_api(string password)
+    {
+        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        await RegisterLoginAsync(factory, client);
+        string resetToken = await ResetTicketAsync(factory, client);
+        await PostAsync(client, "reset-password", new { resetToken, newPassword = password, confirmNewPassword = password });
+        await LoginAsync(client, password);
+        await PostAsync(client, "login", new { email = ServiceHarness.Address, password = ServiceHarness.Password }, HttpStatusCode.Unauthorized);
+    }
+
+    [Theory]
+    [InlineData("Abcde1!", "VALIDATION_ERROR")]
+    [InlineData("Ab1!aaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "VALIDATION_ERROR")]
+    [InlineData("Abcdefgh!", "PASSWORD_POLICY_FAILED")]
+    [InlineData("SafePERSON1!", "PASSWORD_POLICY_FAILED")]
+    [InlineData("SafePASSWORD1!", "PASSWORD_POLICY_FAILED")]
+    [InlineData("SafeWebSiteName1!", "PASSWORD_POLICY_FAILED")]
+    [InlineData("SafePlAnOrA1!", "PASSWORD_POLICY_FAILED")]
+    [InlineData(ServiceHarness.Password, "PASSWORD_POLICY_FAILED")]
+    public async Task Reset_enforces_policy_without_frontend_and_allows_retry_after_rejection(string password, string code)
+    {
+        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        await RegisterLoginAsync(factory, client);
+        string resetToken = await ResetTicketAsync(factory, client);
+        var error = await PostAsync(client, "reset-password", new { resetToken, newPassword = password, confirmNewPassword = password }, HttpStatusCode.BadRequest);
+        Assert.Equal(code, error.GetProperty("error").GetProperty("code").GetString());
+        await LoginAsync(client, ServiceHarness.Password);
+        await PostAsync(client, "reset-password", new { resetToken, newPassword = ServiceHarness.NewPassword, confirmNewPassword = ServiceHarness.NewPassword });
+        await LoginAsync(client, ServiceHarness.NewPassword);
+    }
+
+    [Theory]
+    [InlineData("Abcdef1!")]
+    [InlineData("Ab1!aaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public async Task Change_accepts_eight_and_thirty_two_character_passwords_via_direct_api(string password)
+    {
+        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        var session = await RegisterLoginAsync(factory, client); Authorize(client, session.Access);
+        await PostAsync(client, "change-password/request-otp", new { });
+        await PostAsync(client, "change-password", new { currentPassword = ServiceHarness.Password, otp = factory.Email.Inbox[(ServiceHarness.Address, OtpPurpose.ChangePassword)], newPassword = password, confirmNewPassword = password });
+        client.DefaultRequestHeaders.Authorization = null;
+        await LoginAsync(client, password);
+    }
     [Fact]
     public async Task Register_verify_login_and_access_me()
     {

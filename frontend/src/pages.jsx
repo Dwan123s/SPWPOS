@@ -1,5 +1,6 @@
 import { Select, Slot, nodeList } from "./react-ui.jsx";
 import { avatarPreview, avatarRemove } from "./interactive.jsx";
+import { PasswordChecklist } from "./password-checklist.jsx";
 import {
   state,
   button,
@@ -14,6 +15,7 @@ import {
   minutes,
   stat,
   field,
+  PasswordField,
   empty,
   modal,
   loadLabel,
@@ -770,16 +772,16 @@ export function settingsPage() {
                 "newPassword",
                 "password",
                 "",
-                'required minlength="10" maxlength="128" autocomplete="new-password"',
+                'required minlength="8" maxlength="32" aria-describedby="password-requirements" autocomplete="new-password"',
               )}{" "}
-              {field(
-                "Nhập lại mật khẩu mới",
-                "confirmNewPassword",
-                "password",
-                "",
-                'required minlength="10" maxlength="128" autocomplete="new-password"',
-              )}
+              <PasswordField
+                label="Nhập lại mật khẩu mới"
+                name="confirmNewPassword"
+                confirmFor="newPassword"
+                extra='required minlength="8" maxlength="32" autocomplete="new-password"'
+              />
             </div>
+            <PasswordChecklist passwordName="newPassword" />
             <div className="form-error" />
             <div className="form-actions right-align">
               <button type="submit" className="btn primary">

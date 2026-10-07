@@ -22,8 +22,8 @@ public static class DependencyInjection
         {
             o.User.RequireUniqueEmail = true;
             o.User.AllowedUserNameCharacters = "";
-            o.Password.RequiredLength = 10; o.Password.RequireDigit = false;
-            o.Password.RequireNonAlphanumeric = false; o.Password.RequireUppercase = false; o.Password.RequireLowercase = false;
+            o.Password.RequiredLength = 8; o.Password.RequireDigit = true;
+            o.Password.RequireNonAlphanumeric = true; o.Password.RequireUppercase = true; o.Password.RequireLowercase = true;
             o.Lockout.AllowedForNewUsers = true; o.Lockout.MaxFailedAccessAttempts = 5;
             o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             o.SignIn.RequireConfirmedEmail = true;
@@ -58,7 +58,7 @@ public static class DependencyInjection
             .Validate(x => StrongKey(x.SecretKey) && x.Length is >= 6 and <= 8 && x.ExpirationMinutes is >= 1 and <= 5
                 && x.MaxAttempts is >= 1 and <= 5 && x.ResendCooldownSeconds >= 60, "OTP settings are invalid.").ValidateOnStart();
         services.AddOptions<PasswordSettings>().BindConfiguration("PasswordSettings")
-            .Validate(x => x.MinLength is >= 10 and <= 64 && x.MaxLength == 128 && x.MemoryKiB is >= 19456 and <= 262144
+            .Validate(x => x.MinLength == 8 && x.MaxLength == 32 && x.MemoryKiB is >= 19456 and <= 262144
                 && x.Iterations is >= 3 and <= 10 && x.Parallelism == 1, "Password settings are invalid.").ValidateOnStart();
         services.AddOptions<EmailSettings>().BindConfiguration("EmailSettings")
             .Validate(x => !string.IsNullOrWhiteSpace(x.Host) && System.Net.Mail.MailAddress.TryCreate(x.SenderEmail, out _)

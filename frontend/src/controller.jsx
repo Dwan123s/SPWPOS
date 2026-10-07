@@ -31,6 +31,7 @@ import {
   minuteValue,
 } from "./ui.jsx";
 import { api, submit } from "./api.js";
+import { validateNewPassword } from "./password-policy.js";
 import {
   authSetup,
   renderAuth,
@@ -849,6 +850,14 @@ async function formAction(form, data) {
       await refreshAfter("Đã cập nhật thông tin hồ sơ.");
       break;
     case "password":
+      validateNewPassword(
+        String(data.get("newPassword") || ""),
+        state.user?.email || "",
+        String(data.get("currentPassword") || ""),
+      );
+      if (data.get("newPassword") !== data.get("confirmNewPassword")) {
+        throw new Error("Mật khẩu xác nhận không khớp.");
+      }
       await api("/api/auth/change-password", "POST", Object.fromEntries(data));
       await api("/api/browser-session/logout", "POST");
       expiry();

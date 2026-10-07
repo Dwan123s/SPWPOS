@@ -225,7 +225,7 @@ public sealed class AuthService(
                 user.AccessFailedCount++;
                 if (user.AccessFailedCount >= 5)
                 {
-                    user.LockoutEnd = clock.GetUtcNow().AddMinutes(15); user.AccessFailedCount = 0;
+                    user.LockoutEnd = clock.GetUtcNow().AddMinutes(2); user.AccessFailedCount = 0;
                     audit.Record(user.Id, SecurityEventType.ACCOUNT_LOCKED, false, context);
                 }
                 await UpdateUserAsync(user);
@@ -233,8 +233,6 @@ public sealed class AuthService(
             }
             if (request.NewPassword != request.ConfirmNewPassword) throw Validation();
             await ValidatePasswordAsync(user, request.NewPassword);
-            if (hasher.VerifyHashedPassword(user, user.PasswordHash!, request.NewPassword) != PasswordVerificationResult.Failed)
-                throw new AuthException("PASSWORD_POLICY_FAILED", "New password must differ from your current password.");
             await otps.VerifyOtpAsync(user.Id, OtpPurpose.ChangePassword, request.Otp, ct);
             await ReplacePasswordAsync(user, request.NewPassword, ct);
             audit.Record(user.Id, SecurityEventType.CHANGE_PASSWORD_SUCCESS, true, context);
@@ -297,8 +295,10 @@ public sealed class AuthService(
         foreach (var validator in users.PasswordValidators)
         {
             var result = await validator.ValidateAsync(users, user, password);
-            if (!result.Succeeded) throw new AuthException("PASSWORD_POLICY_FAILED", "Use a password of 10–128 characters that is not commonly used.");
+            if (!result.Succeeded) throw new AuthException("PASSWORD_POLICY_FAILED", string.Join(" ", result.Errors.Select(x => x.Description)));
         }
+        if (user.PasswordHash is not null && hasher.VerifyHashedPassword(user, user.PasswordHash, password) != PasswordVerificationResult.Failed)
+            throw new AuthException("PASSWORD_POLICY_FAILED", "New password must differ from your current password.");
     }
     private async Task NotifyPasswordChangedAsync(Guid userId, CancellationToken ct)
     {

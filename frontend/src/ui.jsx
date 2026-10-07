@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { attrs } from "./react-ui.jsx";
 import { notify, showModal, hideModal } from "./store.js";
+import {
+  INVALID_LOGIN_MESSAGE,
+  useLoginPasswordFeedback,
+} from "./password-login-feedback.js";
 export const state = {
   workspace: null,
   insights: null,
@@ -27,6 +31,7 @@ const paths = {
   plus: "M12 5v14 M5 12h14",
   arrow: "M5 12h14 M13 6l6 6-6 6",
   close: "M6 6l12 12 M18 6L6 18",
+  alertCircle: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v6 M12 16h.01",
   check: "M5 12l4 4L19 6",
   clock: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v5l4 2",
   play: "M7 4l13 8-13 8z",
@@ -263,11 +268,45 @@ export function PasswordField({
   extra = "",
   hiddenLabel = false,
   leadingIcon,
+  confirmFor,
+  loginFeedback = false,
 }) {
   const [visible, setVisible] = useState(false);
+  const input = useRef(null);
+  const rejected = useLoginPasswordFeedback(input, loginFeedback);
+  const [match, setMatch] = useState(null);
+  useEffect(() => {
+    if (!confirmFor) return;
+    const form = input.current?.closest("form");
+    if (!form) return;
+    const sync = () => {
+      const confirmation = input.current.value;
+      const password = form.elements.namedItem(confirmFor)?.value || "";
+      setMatch(
+        confirmation ? (confirmation === password ? "matched" : "mismatch") : null,
+      );
+    };
+    sync();
+    form.addEventListener("input", sync);
+    form.addEventListener("change", sync);
+    return () => {
+      form.removeEventListener("input", sync);
+      form.removeEventListener("change", sync);
+    };
+  }, [confirmFor]);
+  const inputAttributes = attrs(extra);
+  const feedbackId = `${name}-match`;
+  const errorId = `${name}-login-error`;
   return (
-    <label className="field password-field">
-      <span className={hiddenLabel ? "auth-visually-hidden" : undefined}>
+    <label
+      className="field password-field"
+      data-match={match || undefined}
+      data-rejected={rejected || undefined}
+    >
+      <span
+        id={confirmFor || loginFeedback ? `${name}-label` : undefined}
+        className={hiddenLabel ? "auth-visually-hidden" : undefined}
+      >
         {label}
       </span>
       <div className="input-with-action">
@@ -277,11 +316,37 @@ export function PasswordField({
           </span>
         )}
         <input
+          ref={input}
           type={visible ? "text" : "password"}
           name={name}
           defaultValue={value}
-          {...attrs(extra)}
+          {...inputAttributes}
+          aria-labelledby={
+            confirmFor || loginFeedback
+              ? `${name}-label`
+              : inputAttributes["aria-labelledby"]
+          }
+          aria-invalid={rejected || match === "mismatch" ? true : undefined}
+          aria-describedby={
+            [
+              inputAttributes["aria-describedby"],
+              match ? feedbackId : "",
+              rejected ? errorId : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
         />
+        {rejected && (
+          <span className="password-error-indicator" aria-hidden="true">
+            {icon("alertCircle")}
+          </span>
+        )}
+        {match && (
+          <span className="password-confirm-indicator" aria-hidden="true">
+            {icon(match === "matched" ? "check" : "close")}
+          </span>
+        )}
         <button
           type="button"
           className="btn-toggle-pwd"
@@ -291,6 +356,25 @@ export function PasswordField({
           {icon(visible ? "eyeOff" : "eye")}
         </button>
       </div>
+      {rejected && (
+        <span id={errorId} className="password-login-error" role="alert">
+          {INVALID_LOGIN_MESSAGE}
+        </span>
+      )}
+      {confirmFor && (
+        <span
+          id={feedbackId}
+          className="password-confirm-message"
+          role="status"
+          aria-live="polite"
+        >
+          {match === "matched"
+            ? "Mật khẩu khớp"
+            : match === "mismatch"
+              ? "Mật khẩu chưa khớp"
+              : ""}
+        </span>
+      )}
     </label>
   );
 }

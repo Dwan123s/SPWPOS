@@ -15,30 +15,48 @@ if ($env:APPDATA -match '^[A-Za-z]:\\') {
     }
 }
 $sdkCandidates = @(
-    (Join-Path $env:LOCALAPPDATA 'SPWPOS\dotnet8\dotnet.exe')
+    (Join-Path $env:LOCALAPPDATA 'SPWPOS\dotnet8\dotnet.exe'),
+    (Join-Path $env:USERPROFILE '.dotnet\dotnet.exe')
 )
-$systemDotnet = Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($systemDotnet) { $sdkCandidates += $systemDotnet.Source }
+$systemDotnet = @(Get-Command dotnet -All -CommandType Application -ErrorAction SilentlyContinue)
+$sdkCandidates += @($systemDotnet | ForEach-Object { $_.Source })
 if ($env:DOTNET_ROOT) { $sdkCandidates += Join-Path $env:DOTNET_ROOT 'dotnet.exe' }
+if ($env:DOTNET_ROOT_X64) { $sdkCandidates += Join-Path $env:DOTNET_ROOT_X64 'dotnet.exe' }
+if ($env:ProgramFiles) { $sdkCandidates += Join-Path $env:ProgramFiles 'dotnet\dotnet.exe' }
 $originalTaskPath = $env:PATH
+$originalTaskDotnetRoot = $env:DOTNET_ROOT
+$originalTaskDotnetRootX64 = $env:DOTNET_ROOT_X64
 $SpwposDotnet = $null
-foreach ($sdkCandidate in ($sdkCandidates | Select-Object -Unique)) {
-    if (-not (Test-Path -LiteralPath $sdkCandidate)) { continue }
-    $candidateRoot = Split-Path -Parent $sdkCandidate
-    # Set these BEFORE invoking SDK tools: their child processes also resolve dotnet.
-    $env:DOTNET_ROOT = $candidateRoot
-    $env:DOTNET_ROOT_X64 = $candidateRoot
-    $env:PATH = "$candidateRoot;$originalTaskPath"
-    try {
-        $sdkVersion = & $sdkCandidate --version 2>$null
-        if ($LASTEXITCODE -eq 0 -and $sdkVersion -match '^8\.\d+\.\d+$') {
-            $SpwposDotnet = $sdkCandidate
-            Write-Host "Using .NET SDK $sdkVersion"
-            break
-        }
-    } catch { continue }
+Push-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
+try {
+    foreach ($sdkCandidate in ($sdkCandidates | Select-Object -Unique)) {
+        if (-not (Test-Path -LiteralPath $sdkCandidate -PathType Leaf)) { continue }
+        $candidateRoot = Split-Path -Parent $sdkCandidate
+        # Child processes must use the same SDK root as this process.
+        $env:DOTNET_ROOT = $candidateRoot
+        $env:DOTNET_ROOT_X64 = $candidateRoot
+        $env:PATH = "$candidateRoot;$originalTaskPath"
+        try {
+            # Windows PowerShell 5.1 can turn native stderr into a terminating
+            # error. Capture it so an incompatible installation can be skipped.
+            $sdkOutput = @(& $sdkCandidate --version 2>&1)
+            if ($LASTEXITCODE -eq 0 -and $sdkOutput.Count -eq 1 -and
+                "$($sdkOutput[0])" -match '^8\.\d+\.\d+$') {
+                $sdkVersion = "$($sdkOutput[0])"
+                $SpwposDotnet = $sdkCandidate
+                Write-Host "Using .NET SDK $sdkVersion ($SpwposDotnet)"
+                break
+            }
+        } catch { continue }
+    }
+} finally {
+    Pop-Location
+    if (-not $SpwposDotnet) {
+        $env:PATH = $originalTaskPath
+        $env:DOTNET_ROOT = $originalTaskDotnetRoot
+        $env:DOTNET_ROOT_X64 = $originalTaskDotnetRootX64
+    }
 }
 if (-not $SpwposDotnet) {
-    $env:PATH = $originalTaskPath
     throw 'No compatible .NET 8 SDK found. Install the .NET 8 SDK 8.0.425 or newer in the 8.0 feature band (not only the runtime), then open a new terminal.'
 }

@@ -7,6 +7,8 @@
 @import "./glass.css" layer(components);
 @import "./responsive.css" layer(components);
 @import "./login-scene.css" layer(components);
+@import "./password-checklist.css" layer(components);
+@import "./login-feedback.css" layer(components);
 
 @theme {
   --color-planora-50: #effbff;

@@ -2,13 +2,16 @@ import { authView } from "./auth-view.jsx";
 import { $, state, field, toast, PasswordField, icon } from "./ui.jsx";
 import { api, submit } from "./api.js";
 import { setScreen } from "./store.js";
+import { transitionAuthPanel } from "./auth-panel-motion.js";
+import { validateNewPassword } from "./password-policy.js";
+import { PasswordChecklist } from "./password-checklist.jsx";
+import { notifyLoginPasswordRejected } from "./password-login-feedback.js";
 let currentMode = "login",
   onLogin = () => {};
 export function authSetup(callback) {
   onLogin = callback;
 }
 export function renderAuth(mode = "login") {
-  currentMode = mode;
   const titles = {
     login: [
       "Đăng nhập vào PLANORA",
@@ -86,6 +89,7 @@ export function renderAuth(mode = "login") {
             label="Mật khẩu"
             hiddenLabel
             leadingIcon="lock"
+            loginFeedback
             name="password"
             extra={
               'required maxlength="128" autocomplete="current-password" placeholder="Mật khẩu"'
@@ -99,7 +103,7 @@ export function renderAuth(mode = "login") {
           "email",
           "email",
           state.authEmail,
-          'required maxlength="254" autocomplete="email" placeholder="ban@example.com"',
+          'required maxlength="254" autocomplete="email" placeholder="Nhập Email của bạn"',
         )
       )}
       {["register", "reset"].includes(mode) && (
@@ -109,15 +113,15 @@ export function renderAuth(mode = "login") {
             "password",
             "password",
             "",
-            'required minlength="10" maxlength="128" autocomplete="new-password" placeholder="Mật khẩu (tối thiểu 10 ký tự)"',
+            'required minlength="8" maxlength="32" aria-describedby="password-requirements" autocomplete="new-password" placeholder="Mật khẩu (8–32 ký tự)"',
           )}
-          {field(
-            "Nhập lại mật khẩu",
-            "confirmPassword",
-            "password",
-            "",
-            'required minlength="10" maxlength="128" autocomplete="new-password" placeholder="Nhập lại mật khẩu"',
-          )}
+          <PasswordField
+            label="Nhập lại mật khẩu"
+            name="confirmPassword"
+            confirmFor="password"
+            extra='required minlength="8" maxlength="32" autocomplete="new-password" placeholder="Nhập lại mật khẩu"'
+          />
+          <PasswordChecklist />
         </>
       )}
       {["verify", "forgotOtp"].includes(mode) && (
@@ -134,11 +138,14 @@ export function renderAuth(mode = "login") {
     </>
   );
   const [title, description] = titles[mode] || titles.login;
-  setScreen(
-    authView(mode, title, description, fields, buttons),
-    `auth-${mode}`,
-  );
-  $("#app input")?.focus();
+  transitionAuthPanel(() => {
+    currentMode = mode;
+    setScreen(
+      authView(mode, title, description, fields, buttons),
+      `auth-${mode}`,
+    );
+    $("#app input")?.focus({ preventScroll: true });
+  }, mode);
 }
 export async function handleAuthAction(action) {
   if (!action.startsWith("auth-")) return false;
@@ -165,6 +172,12 @@ export async function handleAuthSubmit(form) {
       const email = String(data.get("email") || state.authEmail);
       state.authEmail = email;
       const password = String(data.get("password") || "");
+      if (["register", "reset"].includes(currentMode)) {
+        validateNewPassword(password, email);
+        if (password !== String(data.get("confirmPassword") || "")) {
+          throw new Error("Mật khẩu xác nhận không khớp.");
+        }
+      }
       switch (currentMode) {
         case "login":
           await api(
@@ -226,6 +239,9 @@ export async function handleAuthSubmit(form) {
       }
     });
   } catch (e) {
+    if (form.dataset.mode === "login" && e.code === "INVALID_CREDENTIALS") {
+      notifyLoginPasswordRejected(form);
+    }
     if (e.code === "EMAIL_NOT_VERIFIED") {
       renderAuth("verify");
       toast("Xác minh email trước khi đăng nhập.");

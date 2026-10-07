@@ -2,7 +2,7 @@
 
 ## Credential storage
 
-- Password: Argon2id/libsodium, 32 MiB / 3 iterations / p=1, salt RNG 16 byte riêng, PHC lưu cost/version. Không encryption reversible, MD5/SHA1/SHA256 password; không trim/truncate. 10–128 UTF-16 code units, blocklist nhỏ, không bắt composition.
+- Password: Argon2id/libsodium, 32 MiB / 3 iterations / p=1, salt RNG 16 byte riêng, PHC lưu cost/version. Không encryption reversible, MD5/SHA1/SHA256 password; không trim/truncate. Mật khẩu mới có 8–32 UTF-16 code units, gồm số ASCII, chữ thường, chữ hoa và ký tự đặc biệt không phải khoảng trắng. Chặn username/email và phần trước @, `password`, `websitename`, `PLANORA` không phân biệt hoa thường; giữ blocklist. Reset và change đều kiểm tra hash để chặn dùng lại mật khẩu hiện tại; không lưu lịch sử mật khẩu. Login/rehash vẫn hỗ trợ credential cũ tới 128 ký tự.
 - OTP: secure numeric RNG, HMAC-SHA256 bằng secret ngoài DB, bind issuance id/user/purpose. 5 phút, tối đa 5 attempts, single-use, invalidate khi resend. Constant-time compare hash. OTP không tồn tại trong API response, audit, console hoặc database plaintext.
 - Refresh/reset credential: 64 random bytes, URL-safe, chỉ lưu SHA256. SHA256 được dùng ở đây vì token có entropy cao; không dùng cho password. Reset ticket bound UserId + ForgotPassword và TTL 10 phút.
 - JWT key và OTP key riêng, Base64 ≥32 random bytes; không commit key/password SMTP/SQL. User Secrets chỉ development. Production dùng environment/secret manager có ACL.

@@ -32,6 +32,10 @@ call; the original prompt set is saved in `prompts.json`, and the foreground and
 background ribbon additions are documented in `depth-prompts.json`. The motion
 orb prompt and its material reference are saved in `atmosphere-prompts.json`.
 
+The clock was regenerated with exactly twelve hour markers. Its correction prompt
+is saved in `clock-correction-prompt.json`; the PNG retains the original canvas
+size and transparency, and its lossless WebP copy matches the visible pixels.
+
 ### Calendar and checklist frame variants
 
 Each has three transparent frames: the unchanged original plus two generated
@@ -53,6 +57,20 @@ the original frame for reduced motion. The original stays opaque below incoming
 frames to avoid dimming the shared white surfaces during a fade.
 
 ## Composition and animation
+
+All authentication steps share this animated composition: login, registration,
+email verification, password recovery, recovery OTP and password reset. Only the
+form changes between steps. The artwork and motion control remain mounted, so
+the entrance does not restart and the manual pause setting survives navigation.
+Forms remount per step to clear passwords, OTPs and validation feedback.
+
+Panel changes use a 140ms blurred slide out, followed by a 460ms glass-card
+height transition and staggered field reveals. Returning to login reverses the
+slide direction; a soft light sweeps across the glass during the change. The
+artwork remains live. Departing controls become inert, and a newer navigation
+cancels pending work to prevent stale forms appearing. Reduced motion or manual
+pause switches panels immediately. Scroll anchoring is disabled for this layout
+to prevent viewport jumps as the card grows.
 
 The five main sculpture layers, from back to front, are rear ribbon → calendar →
 checklist → clock → foreground ribbon cradle. Their wrappers expose `data-depth`
@@ -126,6 +144,11 @@ of “phù hợp với bạn” for 1.2 seconds every five seconds. Decorative, 
 accessibility text overlays carry the highlight; the solid blue copy stays visible.
 Mobile motion amplitudes are halved
 without restarting the animation phase on resize.
+
+With a fine pointer and hover support, the calendar, checklist and clock grow to
+104.5% over 320ms on hover and smoothly return when the pointer leaves. Scaling
+the sprite wrapper keeps crossfading frames aligned and composes with floating
+motion. Reduced-motion preferences disable this hover effect.
 
 The footer provides a pause/resume button. Motion also pauses on form interaction
 and while the document is hidden. Changing the system reduced-motion preference

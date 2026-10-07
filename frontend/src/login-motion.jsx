@@ -71,9 +71,9 @@ function revealLogin(root, reduced) {
     ...prepare(".login-sprite--ribbon-back", 380),
     ...prepare(".login-sprite--ribbon-front", 380),
     ...prepare(".login-sprite--calendar", 440),
-    ...prepare(".login-sprite--checklist", 500),
-    ...prepare(".login-sprite--clock", 560),
-    ...prepare(".login-sprite--workspace-photo", 620),
+    ...prepare(".login-sprite--checklist", 700),
+    ...prepare(".login-sprite--clock", 900),
+    ...prepare(".login-sprite--workspace-photo", 1200),
     ...prepare('.login-scene-art > [data-sprite="bubble"]', 660),
     ...prepare(".login-motion-orbs > .login-sprite", 150, 1600, 0.84),
     ...prepare(

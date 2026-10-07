@@ -44,6 +44,7 @@ Frontend viết bằng JSX trong `frontend/`, build thành tài nguyên tĩnh v�
 ### Yêu cầu
 
 - .NET **SDK 8.0.425 trở lên trong nhánh 8.0**.
+- Script tìm SDK trong thư mục riêng của dự án, `%USERPROFILE%\.dotnet` và các đường dẫn trên PATH; có thể cài đồng thời các phiên bản .NET khác.
 - Docker Desktop với Linux containers; engine đang chạy.
 - Windows PowerShell 5.1 hoặc PowerShell 7.
 - Git để clone repository.
@@ -87,6 +88,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Frontend
 ```
 
 Vite build lại khi sửa JSX/CSS. Tải lại `https://localhost:7043/` để xem thay đổi; không cần server frontend riêng. Nếu đã cài Node 24.15+, có thể chạy `npm ci`, `npm run build`, `npm test` trong `frontend/`.
+
+Khi sửa backend C# (ví dụ DTO hoặc quy tắc mật khẩu), dừng API đang chạy và chạy lại `Start-Development.ps1 -SkipCertificateTrust` để build và nạp code mới. Tải lại trang chỉ cập nhật frontend; API đang chạy vẫn dùng assembly đã nạp trước đó.
 
 `dotnet publish src/SPWPOS.Api -c Release` tự build và đóng gói frontend. Bản triển khai chỉ cần ASP.NET Core runtime và cấu hình backend.
 

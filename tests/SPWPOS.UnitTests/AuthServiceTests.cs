@@ -1,13 +1,30 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using SPWPOS.Application.Authentication;
 using SPWPOS.Application.Authentication.DTOs;
 using SPWPOS.Domain.Enums;
 using SPWPOS.TestSupport;
+using SPWPOS.Infrastructure.Authentication;
 namespace SPWPOS.UnitTests;
 
 public sealed class AuthServiceTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
+    [Fact]
+    public async Task Legacy_long_password_can_login_rehash_and_change_to_new_policy()
+    {
+        await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync();
+        string legacyPassword = new('界', 64);
+        var oldHasher = new Argon2PasswordHasher(Options.Create(new PasswordSettings { MemoryKiB = 19456 }));
+        var hash = oldHasher.HashPassword(user, legacyPassword);
+        await h.DbAsync(async db => { var account = await db.Users.SingleAsync(Ct); account.PasswordHash = hash; await db.SaveChangesAsync(Ct); });
+        await h.LoginAsync(legacyPassword);
+        Assert.StartsWith("$argon2id$v=19$m=32768,", (await h.DbAsync(db => db.Users.Select(x => x.PasswordHash).SingleAsync(Ct)))!);
+        await h.AuthAsync(a => a.RequestChangePasswordOtpAsync(user.Id, ServiceHarness.Context, Ct));
+        var otp = h.Email.Inbox[(ServiceHarness.Address, OtpPurpose.ChangePassword)];
+        await h.AuthAsync(a => a.ChangePasswordAsync(user.Id, new(legacyPassword, otp, ServiceHarness.NewPassword, ServiceHarness.NewPassword), ServiceHarness.Context, Ct));
+        await h.LoginAsync(ServiceHarness.NewPassword);
+    }
     [Fact]
     public async Task Unverified_user_cannot_login()
     {
