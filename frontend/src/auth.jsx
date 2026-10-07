@@ -1,5 +1,5 @@
 import { authView } from "./auth-view.jsx";
-import { $, state, field, toast, PasswordField } from "./ui.jsx";
+import { $, state, field, toast, PasswordField, icon } from "./ui.jsx";
 import { api, submit } from "./api.js";
 import { setScreen } from "./store.js";
 let currentMode = "login",
@@ -67,19 +67,25 @@ export function renderAuth(mode = "login") {
         <>
           <label className="field">
             <span className="auth-visually-hidden">Email</span>
-            <input
-              type="email"
-              name="email"
-              defaultValue={state.authEmail}
-              required
-              maxLength={254}
-              autoComplete="email"
-              placeholder="Địa chỉ email"
-            />
+            <div className="input-with-action login-input-shell">
+              <span className="login-input-icon" aria-hidden="true">
+                {icon("mail")}
+              </span>
+              <input
+                type="email"
+                name="email"
+                defaultValue={state.authEmail}
+                required
+                maxLength={254}
+                autoComplete="email"
+                placeholder="Địa chỉ email"
+              />
+            </div>
           </label>
           <PasswordField
             label="Mật khẩu"
             hiddenLabel
+            leadingIcon="lock"
             name="password"
             extra={
               'required maxlength="128" autocomplete="current-password" placeholder="Mật khẩu"'

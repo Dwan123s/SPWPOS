@@ -1,0 +1,1027 @@
+/* Position wrappers own geometry and continuous motion; pictures retain artwork. */
+.auth-facebook.login-composition {
+  --login-motion-amplitude: 1;
+  --login-ink: #071b3d;
+  --login-muted: #677b9f;
+  --login-blue: #0068ff;
+  --login-cyan: #36b7ff;
+  --login-line: #bbd5f5;
+  --login-white: #fff;
+  --login-glass: #ffffff73;
+  --login-shadow: #2468b824;
+  --login-sprite-contact-shadow: #1877e766;
+  --login-sprite-ambient-shadow: #2692ff40;
+  --login-ground-shadow: #1686f566;
+  --login-ground-shadow-edge: #4da8ff30;
+  background:
+    radial-gradient(ellipse at 26% 30%, #d5f6ff 0%, transparent 46%),
+    radial-gradient(ellipse at 83% 50%, #b6ddff70 0%, transparent 50%),
+    linear-gradient(125deg, #f2fbff, #e6f4ff 62%, #edf8ff);
+  color: var(--login-ink);
+}
+.auth-facebook.login-composition .auth-content {
+  grid-template-columns: minmax(0, 62%) minmax(0, 38%);
+  min-height: max(680px, calc(100dvh - 88px));
+}
+.login-foreground {
+  position: relative;
+  isolation: isolate;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: inherit;
+  min-height: inherit;
+  width: 100%;
+  transform-origin: 50% 50%;
+}
+.auth-facebook.login-composition .auth-content::before {
+  width: 27vw;
+  top: -25%;
+  left: 41%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 55% 58%, #71caff70, #ffffff65 70%);
+  transform: none;
+}
+.auth-facebook.login-composition .auth-content::after {
+  width: 29vw;
+  right: -16%;
+  bottom: -11%;
+  background: linear-gradient(145deg, #ffffff95, #54c2ff35);
+}
+.auth-facebook.login-composition .auth-story {
+  justify-content: center;
+  padding: 120px 0 30px;
+  border: 0;
+  min-width: 0;
+}
+.auth-facebook.login-composition .auth-story > .brand-lockup {
+  position: absolute;
+  top: 34px;
+  left: 5.6%;
+  width: clamp(170px, 12.5vw, 230px);
+  margin: 0;
+  z-index: 10;
+}
+.login-scene {
+  --login-ribbon-left: 36%;
+  --login-ribbon-top: 3%;
+  --login-ribbon-width: 62%;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1030 / 650;
+  isolation: isolate;
+}
+.login-background-scene {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 62%;
+  aspect-ratio: 1030 / 650;
+  transform: translateY(calc(-50% + 45px));
+  z-index: -1;
+  pointer-events: none;
+}
+.login-scene-halo {
+  position: absolute;
+  width: 38%;
+  aspect-ratio: 1;
+  top: 0;
+  left: 4%;
+  border-radius: 50%;
+  border: 1px solid var(--login-white);
+  background: radial-gradient(circle at 35% 25%, #ffffffb0, #9bdcff55 70%);
+  box-shadow: inset 0 2px 12px var(--login-white);
+  z-index: -1;
+}
+.login-scene-art {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.login-sprite {
+  position: absolute;
+}
+.login-sprite picture {
+  display: block;
+}
+.login-sprite-frame + .login-sprite-frame {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+.login-sprite-frame + .login-sprite-frame img {
+  height: 100%;
+}
+.login-sprite img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.login-background-ribbons {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.login-sprite--ribbon-background {
+  --ribbon-angle: -19deg;
+  left: -29%;
+  top: 3%;
+  width: 148%;
+  opacity: 0.2;
+  transform: rotate(var(--ribbon-angle));
+  filter: blur(1px);
+}
+.login-motion-orbs {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.login-sprite--orb-motion-upper-left {
+  --orb-blur-angle: 35deg;
+  left: -3vw;
+  top: 13%;
+  width: clamp(170px, 13vw, 260px);
+  opacity: 0.8;
+}
+.login-sprite--orb-motion-upper-right {
+  --orb-blur-angle: -50deg;
+  left: 81%;
+  top: -6vw;
+  width: clamp(190px, 14vw, 280px);
+  opacity: 0.65;
+}
+.login-sprite--orb-motion-lower-right {
+  --orb-blur-angle: 35deg;
+  right: -5vw;
+  bottom: -45px;
+  width: clamp(190px, 16vw, 320px);
+  opacity: 0.8;
+}
+.login-orb-filters {
+  position: absolute;
+}
+.login-motion-orbs picture {
+  display: block;
+  transform: rotate(var(--orb-blur-angle));
+  filter: url(#login-orb-directional-blur);
+}
+.login-motion-orbs img {
+  /* Rotate the blur axis while keeping the original sphere and lighting upright. */
+  transform: rotate(calc(-1 * var(--orb-blur-angle)));
+}
+.login-sprite--ribbon-back,
+.login-sprite--ribbon-front {
+  left: var(--login-ribbon-left);
+  top: var(--login-ribbon-top);
+  width: var(--login-ribbon-width);
+  aspect-ratio: 1;
+}
+.login-sprite--ribbon-back {
+  z-index: 10;
+  filter: drop-shadow(4px 16px 16px var(--login-sprite-ambient-shadow));
+}
+.login-sprite--ribbon-back img,
+.login-sprite--ribbon-front img,
+.login-sprite--ribbon-back picture,
+.login-sprite--ribbon-front picture {
+  height: 100%;
+}
+.login-sprite--calendar {
+  left: calc(38% - 20px);
+  top: -2.5%;
+  width: 47%;
+  z-index: 20;
+  filter: drop-shadow(6px 10px 8px var(--login-sprite-contact-shadow))
+    drop-shadow(0 18px 22px var(--login-sprite-ambient-shadow));
+}
+.login-sprite--checklist {
+  left: 69%;
+  top: 16.5%;
+  width: 31%;
+  z-index: 30;
+  filter: drop-shadow(-10px 12px 8px var(--login-sprite-contact-shadow))
+    drop-shadow(0 18px 20px var(--login-sprite-ambient-shadow));
+}
+.login-sprite--clock {
+  left: 63%;
+  top: 46%;
+  width: 31%;
+  z-index: 40;
+  filter: drop-shadow(-8px 10px 8px var(--login-sprite-contact-shadow))
+    drop-shadow(0 16px 20px var(--login-sprite-ambient-shadow));
+}
+.login-sprite--ribbon-front {
+  z-index: 50;
+  /* Matching geometry and pixels preserve one continuous ribbon while this
+     lower sweep crosses in front of the clock. */
+  clip-path: polygon(0 57%, 30% 57%, 60% 66%, 100% 76%, 100% 100%, 0 100%);
+  filter: drop-shadow(0 -5px 7px var(--login-sprite-contact-shadow));
+}
+.login-sprite--workspace-photo {
+  left: 39%;
+  top: 51%;
+  width: 26%;
+  z-index: 60;
+  filter: drop-shadow(4px 8px 8px var(--login-sprite-contact-shadow))
+    drop-shadow(0 14px 18px var(--login-sprite-ambient-shadow));
+}
+.login-sprite--bubble-top {
+  left: 38%;
+  top: 0;
+  width: 4%;
+  z-index: 30;
+}
+.login-sprite--bubble-left {
+  left: 38%;
+  top: 15%;
+  width: 5%;
+  z-index: 10;
+}
+.login-sprite--bubble-right {
+  left: 94%;
+  top: 55%;
+  width: 5%;
+  z-index: 45;
+}
+.login-sprite--bubble-bottom {
+  left: 61%;
+  top: 87%;
+  width: 6%;
+  z-index: 45;
+}
+.login-sprite--bubble-lower-left {
+  left: 38%;
+  top: 92%;
+  width: 7%;
+  z-index: 45;
+}
+.login-scene-shadow {
+  position: absolute;
+  left: 46%;
+  top: 96%;
+  width: 53%;
+  height: 6%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse,
+    var(--login-ground-shadow),
+    var(--login-ground-shadow-edge) 46%,
+    transparent 76%
+  );
+  filter: blur(6px);
+}
+.login-headline-panel {
+  position: absolute;
+  top: 19%;
+  left: 6%;
+  width: 51%;
+  padding: 3.1% 4.5% 2.8%;
+  z-index: 25;
+  transform-origin: 50% 50%;
+  transform: perspective(700px) rotateY(32deg) rotateZ(4deg);
+}
+.login-headline-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--login-white);
+  border-radius: 66px 38px 62px 64px;
+  background: linear-gradient(135deg, #ffffffe6, #edfaff9e 65%, #9edbff38);
+  box-shadow:
+    inset 0 2px 5px var(--login-white),
+    0 20px 50px var(--login-shadow);
+  backdrop-filter: blur(8px);
+  z-index: -1;
+}
+.auth-facebook.login-composition .login-headline-panel h1 {
+  max-width: none;
+  font-size: clamp(32px, 4.15vw, 76px);
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+  color: var(--login-ink);
+}
+.auth-facebook.login-composition .login-headline-line {
+  display: block;
+  color: var(--login-ink);
+}
+.auth-facebook.login-composition .login-headline-accent {
+  position: relative;
+  color: var(--login-blue);
+}
+.auth-facebook.login-composition .login-headline-ray {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: transparent;
+  background: linear-gradient(
+    110deg,
+    transparent 47%,
+    #a5eaff99 49%,
+    #ffffffe6 50%,
+    #a5eaff99 51%,
+    transparent 53%
+  );
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  background-repeat: no-repeat;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.login-headline-dash {
+  width: 12%;
+  height: 5px;
+  margin-top: 4%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--login-blue), var(--login-cyan));
+  transform-origin: left center;
+}
+.auth-facebook.login-composition .auth-area {
+  padding: 100px 6vw 70px 6px;
+  min-width: 0;
+}
+.auth-facebook.login-composition .auth-card {
+  width: 100%;
+  max-width: 570px;
+  padding: clamp(28px, 3vw, 52px);
+  border-radius: 38px;
+  border: 1px solid var(--login-white);
+  background: #ffffff8a;
+  box-shadow:
+    inset 0 2px 1px var(--login-white),
+    0 25px 65px var(--login-shadow);
+  backdrop-filter: blur(22px) saturate(130%);
+}
+.auth-facebook.login-composition .auth-card::before {
+  background: transparent;
+}
+.auth-facebook.login-composition .fb-header-row {
+  margin-bottom: 32px;
+}
+.login-title-intro {
+  display: block;
+  color: var(--login-muted);
+  font-size: 17px;
+  font-weight: 600;
+}
+.login-title-brand {
+  display: block;
+  color: var(--login-ink);
+  font-size: clamp(30px, 2.4vw, 42px);
+  font-weight: 700;
+  line-height: 1.15;
+}
+.login-card-decoration {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.login-card-ribbon {
+  --ribbon-angle: -34deg;
+  position: absolute;
+  width: 380px;
+  right: -100px;
+  bottom: -14px;
+  opacity: 0.7;
+  transform: rotate(var(--ribbon-angle));
+  filter: drop-shadow(0 8px 10px #3298ed24);
+}
+.login-card-ribbon img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.login-card-bubble {
+  position: absolute;
+  width: 98px;
+  top: -32px;
+  right: 7%;
+}
+.login-card-bubble-small {
+  position: absolute;
+  width: 30px;
+  top: 80px;
+  right: 7%;
+}
+.login-input-icon {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--login-muted);
+  pointer-events: none;
+  display: flex;
+}
+.login-input-icon .icon {
+  width: 22px;
+  height: 22px;
+}
+.auth-facebook.login-composition .auth-card .field {
+  margin-bottom: 14px;
+}
+.auth-facebook.login-composition .auth-card .field input {
+  min-height: 64px;
+  padding: 16px 20px 16px 60px;
+  border: 1px solid var(--login-line);
+  border-radius: 18px;
+  background: #ffffffb3;
+  font-size: 16px;
+  color: var(--login-ink);
+}
+.auth-facebook.login-composition .auth-card .password-field input {
+  padding-right: 54px;
+}
+.auth-facebook.login-composition .auth-card .field input::placeholder {
+  color: var(--login-muted);
+}
+.auth-facebook.login-composition .auth-submit {
+  min-height: 56px;
+  margin-top: 24px;
+  gap: 14px;
+  border-radius: 22px;
+  background: linear-gradient(
+    110deg,
+    var(--login-cyan),
+    var(--login-blue) 48%,
+    #0053c9
+  );
+  font-size: 17px;
+  box-shadow:
+    inset 0 1px 1px #ffffff70,
+    0 10px 22px #0068ff25;
+}
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 28px 0 24px;
+  color: var(--login-muted);
+  font-size: 14px;
+}
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--login-line);
+  opacity: 0.6;
+}
+.auth-facebook.login-composition .auth-register {
+  margin: 0;
+}
+.auth-facebook.login-composition .auth-create-account {
+  min-height: 56px;
+  border-radius: 22px;
+  border-color: #7cafff;
+  background: #ffffff60;
+  color: var(--login-blue);
+  font-weight: 600;
+  gap: 12px;
+  font-size: 16px;
+}
+.auth-facebook.login-composition .auth-create-account .icon {
+  width: 24px;
+  height: 24px;
+}
+.auth-facebook.login-composition .auth-forgot {
+  margin-top: 24px;
+  margin-bottom: 0;
+}
+.auth-facebook.login-composition .auth-forgot .text-btn {
+  color: var(--login-blue);
+  font-size: 13px;
+}
+.auth-facebook.login-composition .auth-site-footer {
+  background: #ffffffc4;
+  border-color: var(--login-white);
+}
+.auth-facebook.login-composition .auth-footer-inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  width: calc(100% - 9vw);
+  min-height: 88px;
+  padding: 20px 0;
+}
+.auth-facebook.login-composition .auth-footer-language {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.login-motion-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--login-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.login-motion-toggle .icon {
+  width: 14px;
+  height: 14px;
+}
+.login-motion-toggle:hover {
+  background: #e5f4ff;
+  border-color: var(--login-line);
+}
+.login-motion-control[hidden] {
+  display: none;
+}
+.auth-facebook.login-composition .auth-submit .icon {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.auth-facebook.login-composition .auth-submit:is(:hover, :focus-visible) .icon {
+  transform: translateX(3px);
+}
+/* One closed cycle with zero velocity at each turning point. Negative delays
+   give independent phases without idle segments, resets, or fade animations. */
+.login-composition .login-entrance-pending {
+  opacity: 0;
+}
+/* The distant glass shapes expand while foreground sprites recede. Keep this
+   on individual background shapes to preserve the sculpture's stacking. */
+@keyframes login-background-expand {
+  from {
+    scale: calc(1 - 0.18 * var(--login-motion-amplitude));
+  }
+  to {
+    scale: 1;
+  }
+}
+.auth-facebook.login-composition[data-depth-entrance="entering"]
+  .auth-content::before,
+.auth-facebook.login-composition[data-depth-entrance="entering"]
+  .auth-content::after,
+.auth-facebook.login-composition[data-depth-entrance="entering"]
+  .login-scene-halo {
+  animation: login-background-expand 1600ms
+    var(--login-entrance-scale-easing, cubic-bezier(0.785, 0.135, 0.15, 0.86))
+    both;
+}
+@keyframes login-bob {
+  0%,
+  100% {
+    translate: calc(-1 * var(--bob-x, 0px) * var(--login-motion-amplitude))
+      calc(-1 * var(--bob-y, 3px) * var(--login-motion-amplitude));
+    rotate: calc(
+      -1 * var(--bob-rotation, 0.9deg) * var(--login-motion-amplitude)
+    );
+  }
+  50% {
+    translate: calc(var(--bob-x, 0px) * var(--login-motion-amplitude))
+      calc(var(--bob-y, 3px) * var(--login-motion-amplitude));
+    rotate: calc(var(--bob-rotation, 0.9deg) * var(--login-motion-amplitude));
+  }
+}
+/* Stretch and shear the cached ribbon artwork, preserving its lighting and
+   shadows. Both portions of the main ribbon share this exact deformation. */
+@keyframes login-ribbon-flex {
+  0%,
+  100% {
+    transform: rotate(var(--ribbon-angle, 0deg)) skew(-1.2deg, 0.6deg)
+      scale(1.015, 0.99);
+  }
+  33% {
+    transform: rotate(var(--ribbon-angle, 0deg)) skew(1.5deg, -0.8deg)
+      scale(0.99, 1.02);
+  }
+  67% {
+    transform: rotate(var(--ribbon-angle, 0deg)) skew(-0.4deg, 1deg)
+      scale(1.005, 0.985);
+  }
+}
+/* A 1.2-second highlight crosses both blue lines, then rests until the next
+   five-second cycle. The solid blue lettering always remains underneath. */
+@keyframes login-light-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  24%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+/* Keep the original fully opaque underneath: crossfading two translucent full
+   sprites would dim their common surfaces and shadows between frames. */
+@keyframes login-frame-two {
+  0%,
+  20%,
+  62%,
+  100% {
+    opacity: 0;
+  }
+  28%,
+  54% {
+    opacity: 1;
+  }
+}
+@keyframes login-frame-three {
+  0%,
+  46%,
+  82%,
+  100% {
+    opacity: 0;
+  }
+  54%,
+  74% {
+    opacity: 1;
+  }
+}
+.login-composition[data-entrance-state="complete"]:is(
+    [data-motion-state="running"],
+    [data-motion-state="paused"]
+  )
+  .login-sprite-frame[data-frame="1"] {
+  animation: login-frame-two 12s cubic-bezier(0.37, 0, 0.63, 1)
+    var(--frame-delay, 0s) infinite both;
+  animation-play-state: var(--login-motion-play-state, running);
+}
+.login-composition[data-entrance-state="complete"]:is(
+    [data-motion-state="running"],
+    [data-motion-state="paused"]
+  )
+  .login-sprite-frame[data-frame="2"] {
+  animation: login-frame-three 12s cubic-bezier(0.37, 0, 0.63, 1)
+    var(--frame-delay, 0s) infinite both;
+  animation-play-state: var(--login-motion-play-state, running);
+}
+.login-sprite--checklist {
+  --frame-delay: 3s;
+}
+.login-composition:is(
+    [data-motion-state="running"],
+    [data-motion-state="paused"]
+  )
+  :is(
+    .login-scene-art > .login-sprite,
+    .login-motion-orbs > .login-sprite,
+    .login-sprite--ribbon-background,
+    .login-card-ribbon,
+    .login-card-bubble,
+    .login-card-bubble-small
+  ) {
+  animation: login-bob var(--bob-duration, 9s) cubic-bezier(0.37, 0, 0.63, 1)
+    var(--bob-phase, 0s) infinite;
+  animation-play-state: var(--login-motion-play-state, running);
+  will-change: translate, rotate;
+}
+.auth-facebook.login-composition:is(
+    [data-motion-state="running"],
+    [data-motion-state="paused"]
+  )
+  :is(
+    .login-sprite--ribbon-back,
+    .login-sprite--ribbon-front,
+    .login-sprite--ribbon-background,
+    .login-card-ribbon
+  ) {
+  animation:
+    login-bob var(--bob-duration, 9s) cubic-bezier(0.37, 0, 0.63, 1)
+      var(--bob-phase, 0s) infinite,
+    login-ribbon-flex var(--ribbon-duration, 16s) ease-in-out
+      var(--ribbon-phase, -3s) infinite;
+  animation-play-state: var(--login-motion-play-state, running);
+  will-change: translate, rotate, transform;
+}
+.login-composition:is(
+    [data-motion-state="running"],
+    [data-motion-state="paused"]
+  )
+  .login-headline-ray {
+  animation: login-light-sweep 5s linear infinite;
+  animation-play-state: var(--login-motion-play-state, running);
+}
+.login-composition[data-motion-state="paused"] {
+  --login-motion-play-state: paused;
+}
+.login-sprite--ribbon-back,
+.login-sprite--ribbon-front {
+  --bob-phase: -1.8s;
+  --bob-rotation: 0.8deg;
+}
+.login-sprite--calendar {
+  --bob-y: 4px;
+  --bob-phase: -0.9s;
+  --bob-rotation: 1.2deg;
+}
+.login-sprite--checklist {
+  --bob-y: 4.5px;
+  --bob-phase: -3s;
+  --bob-rotation: 1.5deg;
+}
+.login-sprite--clock {
+  --bob-y: 3.5px;
+  --bob-phase: -5.4s;
+  --bob-rotation: 1.3deg;
+}
+.login-sprite--workspace-photo {
+  --bob-y: 2.5px;
+  --bob-phase: -6.9s;
+  --bob-rotation: 1.1deg;
+}
+.login-sprite--bubble-top {
+  --bob-phase: -0.4s;
+}
+.login-sprite--bubble-left {
+  --bob-phase: -2.3s;
+}
+.login-sprite--bubble-right {
+  --bob-phase: -4.1s;
+}
+.login-sprite--bubble-bottom {
+  --bob-phase: -5.8s;
+}
+.login-sprite--bubble-lower-left {
+  --bob-phase: -7.6s;
+}
+.login-sprite--ribbon-background {
+  --bob-y: 5px;
+  --bob-duration: 22s;
+  --bob-phase: -7s;
+  --bob-rotation: 0.5deg;
+  --ribbon-duration: 24s;
+  --ribbon-phase: -8s;
+}
+.login-card-ribbon {
+  --bob-y: 1.5px;
+  --bob-duration: 13s;
+  --bob-phase: -4s;
+  --bob-rotation: 0.7deg;
+  --ribbon-duration: 19s;
+  --ribbon-phase: -6s;
+}
+.login-card-bubble {
+  --bob-y: 2.5px;
+  --bob-phase: -2s;
+}
+.login-card-bubble-small {
+  --bob-y: 2px;
+  --bob-phase: -6s;
+}
+.login-sprite--orb-motion-upper-left {
+  --bob-x: 10px;
+  --bob-y: 7px;
+  --bob-duration: 11s;
+  --bob-phase: -1s;
+  --bob-rotation: 0.6deg;
+}
+.login-sprite--orb-motion-upper-right {
+  --bob-x: 8px;
+  --bob-y: -9.5px;
+  --bob-duration: 11s;
+  --bob-phase: -4.7s;
+  --bob-rotation: 0.6deg;
+}
+.login-sprite--orb-motion-lower-right {
+  --bob-x: 11px;
+  --bob-y: 7.5px;
+  --bob-duration: 11s;
+  --bob-phase: -8.3s;
+  --bob-rotation: 0.6deg;
+}
+.login-ribbon-shine {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 3px #80eaffb3);
+}
+.login-ribbon-shine-band {
+  transform-box: view-box;
+  transform: translateX(-110%);
+}
+@keyframes login-ribbon-shine {
+  0% {
+    transform: translateX(-110%);
+  }
+  55%,
+  100% {
+    transform: translateX(110%);
+  }
+}
+.login-composition:is(
+    [data-motion-state="running"],
+    [data-motion-state="paused"]
+  )[data-entrance-state="complete"]
+  .login-ribbon-shine-band {
+  animation: login-ribbon-shine 8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+  animation-play-state: var(--login-motion-play-state, running);
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-composition .login-ribbon-shine {
+    display: none;
+  }
+  .login-composition .auth-content::before,
+  .login-composition .auth-content::after,
+  .login-composition .login-scene-halo,
+  .login-composition .login-sprite-frame,
+  .login-composition .login-ribbon-shine-band,
+  .login-composition .login-sprite,
+  .login-composition .login-card-ribbon,
+  .login-composition .login-card-bubble,
+  .login-composition .login-card-bubble-small,
+  .login-composition .login-headline-ray {
+    animation: none !important;
+    will-change: auto;
+  }
+  .login-composition .login-motion-control {
+    display: none;
+  }
+  .auth-facebook.login-composition .auth-submit .icon,
+  .auth-facebook.login-composition
+    .auth-submit:is(:hover, :focus-visible)
+    .icon {
+    transition: none;
+    transform: none;
+  }
+}
+.auth-facebook.login-composition .login-footer-brand {
+  width: 140px;
+}
+.login-footer-tagline {
+  justify-self: end;
+  color: var(--login-muted);
+  font-size: 12px;
+}
+
+@media (min-width: 801px) and (max-width: 1200px) {
+  .login-background-scene {
+    width: 58%;
+  }
+  .auth-facebook.login-composition .auth-content {
+    grid-template-columns: minmax(0, 58%) minmax(0, 42%);
+  }
+  .auth-facebook.login-composition .auth-area {
+    padding: 100px 28px 60px 10px;
+  }
+  .auth-facebook.login-composition .auth-card {
+    padding: 30px 24px;
+  }
+  .auth-facebook.login-composition .login-headline-panel h1 {
+    font-size: 3.8vw;
+  }
+  .login-headline-panel {
+    padding: 5% 4.5%;
+  }
+}
+@media (max-width: 800px) {
+  .login-foreground {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .login-background-scene {
+    top: 106px;
+    left: 50%;
+    width: min(calc(100% - 32px), 640px);
+    transform: translateX(-50%);
+  }
+  .auth-facebook.login-composition {
+    --login-motion-amplitude: 0.5;
+  }
+  .login-sprite--ribbon-background {
+    --ribbon-angle: -35deg;
+    left: -55%;
+    top: 18%;
+    width: 190%;
+  }
+  .login-sprite--orb-motion-upper-left {
+    left: -36px;
+    top: 28%;
+    width: 130px;
+  }
+  .login-sprite--orb-motion-upper-right {
+    left: auto;
+    right: -42px;
+    top: -26px;
+    width: 145px;
+  }
+  .login-sprite--orb-motion-lower-right {
+    right: -48px;
+    bottom: -10px;
+    width: 170px;
+  }
+  .login-card-ribbon {
+    width: 240px;
+    right: -58px;
+    bottom: -8px;
+    opacity: 0.55;
+  }
+  .auth-facebook.login-composition .auth-content {
+    display: flex;
+    min-height: 0;
+  }
+  .auth-facebook.login-composition .auth-content::before {
+    width: 70vw;
+    top: -10%;
+    left: 48%;
+  }
+  .auth-facebook.login-composition .auth-content::after {
+    width: 80vw;
+  }
+  .auth-facebook.login-composition .auth-story {
+    padding: 94px 16px 0;
+  }
+  .auth-facebook.login-composition .auth-story > .brand-lockup {
+    width: 180px;
+    top: 24px;
+    left: 24px;
+  }
+  .login-scene {
+    width: min(100%, 640px);
+    margin: 12px auto 0;
+  }
+  .auth-facebook.login-composition .login-headline-panel h1 {
+    font-size: clamp(24px, 4.6vw, 40px);
+    text-align: left;
+  }
+  .login-headline-panel::before {
+    border-radius: 34px;
+  }
+  .auth-facebook.login-composition .auth-area {
+    padding: 44px 24px 40px;
+  }
+  .auth-facebook.login-composition .auth-card {
+    max-width: 480px;
+    padding: 32px 28px;
+    border-radius: 30px;
+  }
+  .auth-facebook.login-composition .auth-footer-inner {
+    width: calc(100% - 48px);
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+  }
+  .login-footer-tagline {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+}
+@media (max-width: 480px) {
+  .login-background-scene {
+    top: 102px;
+  }
+  .auth-facebook.login-composition .auth-story {
+    padding-top: 90px;
+  }
+  .auth-facebook.login-composition .login-headline-panel h1 {
+    font-size: clamp(19px, 5.1vw, 25px);
+    letter-spacing: -0.045em;
+  }
+  .login-headline-panel {
+    left: 4%;
+    width: 56%;
+    padding: 5% 4%;
+    transform: perspective(260px) rotateY(28deg) rotateZ(3deg);
+  }
+  .login-headline-panel::before {
+    border-radius: 26px;
+  }
+  .login-headline-dash {
+    height: 3px;
+  }
+  .auth-facebook.login-composition .auth-area {
+    padding: 36px 16px 32px;
+  }
+  .auth-facebook.login-composition .auth-card {
+    padding: 28px 22px;
+  }
+  .login-card-bubble {
+    width: 64px;
+    top: -22px;
+  }
+  .login-card-bubble-small {
+    width: 22px;
+    top: 52px;
+  }
+  .auth-facebook.login-composition .auth-card .field input {
+    min-height: 58px;
+  }
+  .auth-facebook.login-composition .auth-footer-inner {
+    width: calc(100% - 32px);
+  }
+}
+@media (max-height: 600px) and (max-width: 800px) {
+  .login-scene,
+  .login-background-scene {
+    display: none;
+  }
+  .auth-facebook.login-composition .auth-story {
+    min-height: 74px;
+    padding: 0;
+  }
+  .auth-facebook.login-composition .auth-area {
+    padding-top: 24px;
+  }
+}

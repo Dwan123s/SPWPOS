@@ -1,0 +1,12 @@
+[
+  {
+    "name": "ribbon-front",
+    "prompt": "Use case: stylized-concept. Asset: ONE isolated alpha-transparent foreground ribbon sprite for the PLANORA 3D login artwork. Image 1 is the composition/style reference; image 2 is the blue ribbon material reference. Create ONLY a glossy cyan / royal-blue ribbon cradle viewed from slightly above and front-on. It is a wide elegant shallow U-shaped curved satin band, with both ends curving upwards at the sides and a bowed central front band lower down, forming a scoop that holds the bottom of a round clock. IMPORTANT: the center ABOVE the U band is empty transparent space, not filled; no clock. The front band should be broad but shallow, approximately 15 percent of an imagined clock diameter; it crosses in front of ONLY the bottom rim of the clock, leaving the entire dial readable. Perspective makes a premium 3D curved lip: bright ice-cyan beveled top edge, blue glossy front face, royal-blue darker inner fold and subtle shading beneath. Side tips swept back, no giant upper loop. Whole shape roughly three times wider than tall, fully visible, centered with small transparent margin. Match the soft upper-left lighting and smooth sculptural materials in the references. No other objects, no text, no logos, no glow cloud, no floor, no baked-in checkerboard. True transparent background.",
+    "file": "ribbon-front.png"
+  },
+  {
+    "name": "ribbon-background",
+    "prompt": "Use case: stylized-concept. Asset: ONE isolated alpha-transparent background ribbon sprite for the PLANORA login page. Image 1 is the composition/style reference; image 2 is a material reference only. Create a long flowing elegant S-shaped ribbon of translucent frosted ice-blue glass and very pale cyan satin, sweeping diagonally then curling gently at one end. Much fainter and less saturated than the main blue ribbon, with thin pearly-white edge highlights and subtle 3D curvature. Broad smooth band with open transparent areas around and inside its curve. A background ornament that will sit far behind the headline and login card, with calm premium depth. Fully in frame, landscape composition, roughly 3:1 overall silhouette. No objects, no clock, no calendar, no spheres, no text, no logos, no floor shadows, no glow cloud, no baked-in checkerboard. True alpha-transparent background.",
+    "file": "ribbon-background.png"
+  }
+]

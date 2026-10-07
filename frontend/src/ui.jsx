@@ -34,6 +34,11 @@ const paths = {
   edit: "M15 4l5 5 M4 20l2-6L17 3l4 4-11 11z",
   trash: "M4 7h16 M8 4h8 M6 7l1 14h10l1-14 M10 11v6 M14 11v6",
   lock: "M6 10h12v11H6z M8 10V6a4 4 0 0 1 8 0v4",
+  mail: "M3 5h18v14H3z M3 5l9 8 9-8",
+  userPlus:
+    "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M2 21v-3a7 7 0 0 1 14 0v3 M19 8v8 M15 12h8",
+  globe:
+    "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M3 12h18 M5 7h14 M5 17h14 M12 3c-5 5-5 13 0 18 M12 3c5 5 5 13 0 18",
   logout: "M9 4H4v16h5 M10 12h11 M17 8l4 4-4 4",
   users:
     "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M2 21v-3a7 7 0 0 1 14 0v3 M17 4a4 4 0 0 1 0 7 M18 14a5 5 0 0 1 4 5v2",
@@ -257,6 +262,7 @@ export function PasswordField({
   value = "",
   extra = "",
   hiddenLabel = false,
+  leadingIcon,
 }) {
   const [visible, setVisible] = useState(false);
   return (
@@ -265,6 +271,11 @@ export function PasswordField({
         {label}
       </span>
       <div className="input-with-action">
+        {leadingIcon && (
+          <span className="login-input-icon" aria-hidden="true">
+            {icon(leadingIcon)}
+          </span>
+        )}
         <input
           type={visible ? "text" : "password"}
           name={name}

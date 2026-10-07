@@ -1,0 +1,9 @@
+[
+  {
+    "name": "orb-motion",
+    "tool": "built-in image generation",
+    "reference": "src/SPWPOS.Api/wwwroot/assets/login-sprites/bubble.png",
+    "prompt": "Use case: stylized-concept\nAsset type: separate transparent 3D motion orb sprite for a premium pale cyan login page.\nInput image: style reference only, match the glossy blue orb material and lighting.\nPrimary request: ONE small spherical glassy cyan-blue orb flying quickly to the RIGHT away from the scene, with a long soft directional motion blur trailing toward the LEFT. Make the leading orb round and recognizable, its rear edge softened into a tapered semi-transparent cyan and ice-blue streak about three orb diameters long. The streak should be smooth photographic motion blur, not comic speed lines, not smoke or a ribbon. Preserve polished white studio highlights and blue/cyan shading on the sphere.\nComposition: wide horizontal sprite, orb at right, trailing blur at left, full object and entire fading trail contained with transparent padding on all sides. Real transparent alpha background including semitransparent blur. No ground or shadow plane, no text, UI, extra orbs, borders, logos or watermark.",
+    "file": "orb-motion.png"
+  }
+]

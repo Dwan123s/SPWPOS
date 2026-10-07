@@ -1,0 +1,36 @@
+{
+  "generator": "Built-in image_gen",
+  "reference": "User-supplied PLANORA login composition",
+  "assets": [
+    {
+      "name": "calendar",
+      "prompt": "Use case: stylized-concept. Asset type: ONE isolated transparent PNG sprite for a layered website login hero. Input image: style and object reference only, not a screenshot to reproduce. Match the provided reference's polished soft 3D illustration, icy white surfaces, cyan and royal-blue glossy edges, soft upper-left studio illumination. The ENTIRE requested object must be complete with formerly occluded portions reconstructed, centered, fully in frame, generous transparent padding, crisp clean silhouette. True alpha transparent background; no checkerboard baked into pixels, no floor, no backdrop, no text, no logos, no UI. Output ONLY this single object, not other objects or a sprite sheet. A complete upright white desk calendar board, matching the reference central calendar, tilted slightly clockwise in three-quarter perspective. Three glossy blue metal binding loops along the top, a seven-column grid of rounded pale-blue squares, several saturated blue and cyan cells with tiny white or blue dots, no dates or lettering. Exclude clock, checklist, ribbon, spheres, photo. Keep the entire bottom and right edge visible.",
+      "file": "calendar.png"
+    },
+    {
+      "name": "checklist",
+      "prompt": "Use case: stylized-concept. Asset type: ONE isolated transparent PNG sprite for a layered website login hero. Input image: style and object reference only, not a screenshot to reproduce. Match the provided reference's polished soft 3D illustration, icy white surfaces, cyan and royal-blue glossy edges, soft upper-left studio illumination. The ENTIRE requested object must be complete with formerly occluded portions reconstructed, centered, fully in frame, generous transparent padding, crisp clean silhouette. True alpha transparent background; no checkerboard baked into pixels, no floor, no backdrop, no text, no logos, no UI. Output ONLY this single object, not other objects or a sprite sheet. A complete rounded white checklist card matching the reference, viewed almost front-on with slight three-quarter depth, rotated clockwise about 12 degrees. Three stacked blue circular check buttons with white checkmarks down the left, three raised pale-blue pill bars to their right. All four corners visible. Exclude calendar, clock, ribbon, spheres, text.",
+      "file": "checklist.png"
+    },
+    {
+      "name": "clock",
+      "prompt": "Use case: stylized-concept. Asset type: ONE isolated transparent PNG sprite for a layered website login hero. Input image: style and object reference only, not a screenshot to reproduce. Match the provided reference's polished soft 3D illustration, icy white surfaces, cyan and royal-blue glossy edges, soft upper-left studio illumination. The ENTIRE requested object must be complete with formerly occluded portions reconstructed, centered, fully in frame, generous transparent padding, crisp clean silhouette. True alpha transparent background; no checkerboard baked into pixels, no floor, no backdrop, no text, no logos, no UI. Output ONLY this single object, not other objects or a sprite sheet. One complete round blue desk clock matching the reference lower-right clock, front face slightly angled, glossy blue/cyan rim, pale icy-blue dial, twelve simple blue raised hour tick marks, blue hands showing about 10:08 and a cyan center pivot. Entire circular silhouette visible, no base, no numbers, no surrounding objects.",
+      "file": "clock.png"
+    },
+    {
+      "name": "ribbon",
+      "prompt": "Use case: stylized-concept. Asset type: ONE isolated transparent PNG sprite for a layered website login hero. Input image: style and object reference only, not a screenshot to reproduce. Match the provided reference's polished soft 3D illustration, icy white surfaces, cyan and royal-blue glossy edges, soft upper-left studio illumination. The ENTIRE requested object must be complete with formerly occluded portions reconstructed, centered, fully in frame, generous transparent padding, crisp clean silhouette. True alpha transparent background; no checkerboard baked into pixels, no floor, no backdrop, no text, no logos, no UI. Output ONLY this single object, not other objects or a sprite sheet. One complete wide flowing blue satin ribbon making a loose open S-shaped spiral around an empty central space, matching the blue ribbon winding behind the reference calendar and under its clock. Upper curl arches to the upper right, lower swoosh sweeps from the lower left to the lower right. Glossy cyan outer surfaces, rich royal-blue inner surfaces. Transparent empty center. Exclude calendar, cards, clock, spheres, photo, UI. No knot, bow, lettering.",
+      "file": "ribbon.png"
+    },
+    {
+      "name": "workspace-photo",
+      "prompt": "Use case: stylized-concept. Asset type: ONE isolated transparent PNG sprite for a layered website login hero. Input image: style and object reference only, not a screenshot to reproduce. Match the provided reference's polished soft 3D illustration, icy white surfaces, cyan and royal-blue glossy edges, soft upper-left studio illumination. The ENTIRE requested object must be complete with formerly occluded portions reconstructed, centered, fully in frame, generous transparent padding, crisp clean silhouette. True alpha transparent background; no checkerboard baked into pixels, no floor, no backdrop, no text, no logos, no UI. Output ONLY this single object, not other objects or a sprite sheet. One circular framed lifestyle photograph medallion matching the reference lower-left desk photo. Inside the circle: warm sunlight across a cream desk, an open spiral notebook and a blue pen in front, small leafy green plant in a white pot upper right, part of a coffee cup left. Thin softly beveled white/icy-blue circular rim. Front-facing round medallion, complete circle, transparent outside the circle. No other objects outside circle.",
+      "file": "workspace-photo.png"
+    },
+    {
+      "name": "bubble",
+      "prompt": "Use case: stylized-concept. Asset type: ONE isolated transparent PNG sprite for a layered website login hero. Input image: style and object reference only, not a screenshot to reproduce. Match the provided reference's polished soft 3D illustration, icy white surfaces, cyan and royal-blue glossy edges, soft upper-left studio illumination. The ENTIRE requested object must be complete with formerly occluded portions reconstructed, centered, fully in frame, generous transparent padding, crisp clean silhouette. True alpha transparent background; no checkerboard baked into pixels, no floor, no backdrop, no text, no logos, no UI. Output ONLY this single object, not other objects or a sprite sheet. One small round glossy blue/cyan sphere matching the floating decorative balls in the reference. Pale cyan highlight at upper left, luminous cyan center transitioning to rich blue lower right, soft 3D volumetric material, sharp clean circular silhouette with a delicate rim highlight. Complete single sphere only, no floor shadow, no surrounding objects.",
+      "file": "bubble.png"
+    }
+  ]
+}
