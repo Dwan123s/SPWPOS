@@ -1,6 +1,8 @@
 import { Select, Slot, nodeList } from "./react-ui.jsx";
 import { avatarPreview, avatarRemove } from "./interactive.jsx";
-import { PasswordChecklist } from "./password-checklist.jsx";
+import { AccountPassword } from "./account-password.jsx";
+import { Loading } from "./loading.jsx";
+import { GoogleAccountCard } from "./google-signin.jsx";
 import {
   state,
   button,
@@ -15,7 +17,6 @@ import {
   minutes,
   stat,
   field,
-  PasswordField,
   empty,
   modal,
   loadLabel,
@@ -719,77 +720,8 @@ export function settingsPage() {
       )}
       {currentTab === "security" ? (
         <section className="card settings-content-card">
-          <div className="card-header">
-            <div>
-              <h2>Đổi mật khẩu tài khoản</h2>
-              <p>
-                Yêu cầu mã xác thực OTP gửi về Email để bảo vệ tài khoản của
-                bạn.
-              </p>
-            </div>
-          </div>
-          <div className="security-steps-banner">
-            <div className="step-box">
-              <span className="step-num">1</span>
-              <div>
-                <strong>Bước 1: Yêu cầu mã OTP</strong>
-                <p>
-                  {"Mã xác minh 6 chữ số sẽ được gửi tới Email: "}
-                  <b>{p.email || ""}</b>
-                </p>
-              </div>
-              {button(
-                "Gửi mã OTP",
-                "change-otp",
-                "secondary small",
-                "",
-                "shield",
-              )}
-            </div>
-          </div>
-          <form data-form="password">
-            <div className="form-grid">
-              <div className="wide">
-                {field(
-                  "Mật khẩu hiện tại",
-                  "currentPassword",
-                  "password",
-                  "",
-                  'required maxlength="128" autocomplete="current-password"',
-                )}
-              </div>
-              <div className="wide">
-                {field(
-                  "Mã OTP xác nhận từ Email",
-                  "otp",
-                  "text",
-                  "",
-                  'required pattern="[0-9]{6,8}" maxlength="8" inputmode="numeric" autocomplete="one-time-code" placeholder="Nhập 6 chữ số OTP"',
-                )}
-              </div>
-              {field(
-                "Mật khẩu mới",
-                "newPassword",
-                "password",
-                "",
-                'required minlength="8" maxlength="32" aria-describedby="password-requirements" autocomplete="new-password"',
-              )}{" "}
-              <PasswordField
-                label="Nhập lại mật khẩu mới"
-                name="confirmNewPassword"
-                confirmFor="newPassword"
-                extra='required minlength="8" maxlength="32" autocomplete="new-password"'
-              />
-            </div>
-            <PasswordChecklist passwordName="newPassword" />
-            <div className="form-error" />
-            <div className="form-actions right-align">
-              <button type="submit" className="btn primary">
-                {icon("lock")}
-                {" Đổi mật khẩu ngay"}
-              </button>
-            </div>
-          </form>
+          <GoogleAccountCard />
+          <AccountPassword email={p.email || ""} />
         </section>
       ) : (
         ""
@@ -938,7 +870,7 @@ export function adminPage() {
           )}
         </div>
         <Slot id="system-status" className="admin-grid" as="div">
-          <p className="muted">Đang tải…</p>
+          <Loading label="Đang tải trạng thái hệ thống…" />
         </Slot>
       </section>
       <section className="card">
@@ -958,13 +890,13 @@ export function adminPage() {
           </button>
         </form>
         <Slot className="table-scroll" id="admin-users" as="div">
-          Đang tải…
+          <Loading label="Đang tải danh sách người dùng…" />
         </Slot>
       </section>
       <section className="card spaced">
         <h2>Lịch sử xử lý hệ thống</h2>
         <Slot className="table-scroll" id="admin-jobs" as="div">
-          Đang tải…
+          <Loading label="Đang tải lịch sử xử lý…" />
         </Slot>
       </section>
     </>

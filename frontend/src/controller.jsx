@@ -31,6 +31,7 @@ import {
   minuteValue,
 } from "./ui.jsx";
 import { api, submit } from "./api.js";
+import { NotesPage } from "./notes.jsx";
 import { validateNewPassword } from "./password-policy.js";
 import {
   authSetup,
@@ -70,6 +71,7 @@ import {
   adminStatus,
 } from "./pages.jsx";
 const routes = {
+  notes: ["Ghi chú & agent", "Ghi điều cần làm, phân tích và tạo lịch phù hợp với bạn.", "edit"],
   today: [
     "Hôm nay",
     "Một góc nhìn rõ ràng về công việc và thời gian của bạn.",
@@ -167,6 +169,7 @@ function render() {
     state.route = "today";
   const [title, description] = routes[state.route];
   const renderers = {
+    notes: () => <NotesPage onWorkspaceChanged={() => load(false)} />,
     today: todayPage,
     tasks: tasksPage,
     calendar: calendarPage,
@@ -858,10 +861,21 @@ async function formAction(form, data) {
       if (data.get("newPassword") !== data.get("confirmNewPassword")) {
         throw new Error("Mật khẩu xác nhận không khớp.");
       }
-      await api("/api/auth/change-password", "POST", Object.fromEntries(data));
+      await api(
+        form.dataset.passwordMode === "setup"
+          ? "/api/auth/set-password"
+          : "/api/auth/change-password",
+        "POST",
+        Object.fromEntries(data),
+      );
       await api("/api/browser-session/logout", "POST");
       expiry();
-      toast("Mật khẩu đã đổi. Hãy đăng nhập lại.", "success");
+      toast(
+        form.dataset.passwordMode === "setup"
+          ? "Đã thiết lập mật khẩu. Bạn có thể đăng nhập bằng email hoặc Google."
+          : "Mật khẩu đã đổi. Hãy đăng nhập lại.",
+        "success",
+      );
       break;
     case "scenario": {
       state.scenarioTask = {
@@ -959,7 +973,7 @@ export function startController() {
       !document.hidden &&
       !document.querySelector("#modal")?.open &&
       !working &&
-      !["time", "settings", "scenario", "admin", "tasks"].includes(state.route)
+      !["time", "settings", "scenario", "admin", "tasks", "notes"].includes(state.route)
     )
       load().catch((e) => {
         if (state.workspace) toast(e.message, "error");

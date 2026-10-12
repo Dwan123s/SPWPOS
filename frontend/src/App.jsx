@@ -15,6 +15,8 @@ import {
   onSubmit,
 } from "./controller.jsx";
 import { setupShell } from "./shell.jsx";
+import { Loading } from "./loading.jsx";
+import { revealModal } from "./workspace-motion.jsx";
 export function App({ initialize = true }) {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot),
     dialog = useRef(null);
@@ -31,6 +33,11 @@ export function App({ initialize = true }) {
     if (snapshot.modal && !dialog.current.open) dialog.current.showModal();
     if (!snapshot.modal && dialog.current.open) dialog.current.close();
   }, [snapshot.modal]);
+  useEffect(() => {
+    if (!snapshot.modal) return;
+    const animation = revealModal(dialog.current.querySelector(".modal-body"));
+    return () => animation?.cancel();
+  }, [snapshot.modalKey, !!snapshot.modal]);
   return (
     <div
       onClick={onClick}
@@ -44,12 +51,7 @@ export function App({ initialize = true }) {
           snapshot.screenKey.startsWith("auth-") ? "auth" : snapshot.screenKey
         }
       >
-        {snapshot.screen || (
-          <div className="initial-loading flex min-h-dvh flex-col items-center justify-center gap-4">
-            <img src="/assets/planora-mark.png" alt="PLANORA" />
-            <p>Đang mở không gian làm việc…</p>
-          </div>
-        )}
+        {snapshot.screen || <Loading fullscreen />}
       </Fragment>
       <div id="toasts" aria-live="polite">
         {snapshot.toasts.map((toast) => (

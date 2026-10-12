@@ -549,8 +549,8 @@ export function timePage() {
 export function planModal(plan, simulation = false) {
   state.plan = plan;
   modal(
-    "Xem trước kế hoạch",
-    `${dateFmt(plan.start)} → ${dateFmt(plan.end)} · ${plan.sessions.length} phiên · chưa thay đổi lịch.`,
+    plan.isApplied ? "Kế hoạch đã áp dụng" : "Xem trước kế hoạch",
+    `${dateFmt(plan.start)} → ${dateFmt(plan.end)} · ${plan.sessions.length} phiên · ${plan.isApplied ? "đã cập nhật lịch" : "chưa thay đổi lịch"}.`,
     <>
       {nodeList(
         plan.warnings.map((w) => (

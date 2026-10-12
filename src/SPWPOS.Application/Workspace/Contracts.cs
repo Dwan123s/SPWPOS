@@ -79,6 +79,12 @@ public sealed record SystemStatusView(bool DatabaseHealthy, int Users, int Tasks
 
 public interface IWorkspaceService
 {
+    Task<NoteView[]> GetNotesAsync(Guid userId, CancellationToken ct);
+    Task<NoteView> SaveNoteAsync(Guid userId, Guid? id, NoteInput input, CancellationToken ct);
+    Task DeleteNoteAsync(Guid userId, Guid id, Guid version, CancellationToken ct);
+    Task<NoteView> AnalyzeNoteAsync(Guid userId, Guid id, NoteAnalysisInput input, CancellationToken ct);
+    Task<NoteView> ImportNoteAsync(Guid userId, Guid id, NoteImportInput input, CancellationToken ct);
+    Task<NoteScheduleResult> ScheduleNoteAsync(Guid userId, Guid id, NoteScheduleInput input, CancellationToken ct);
     Task<WorkspaceView> GetAsync(Guid userId, CancellationToken ct);
     Task UpdateProfileAsync(Guid userId, ProfileInput input, CancellationToken ct);
     Task<Guid> SaveTaskAsync(Guid userId, Guid? id, TaskInput input, CancellationToken ct);
@@ -120,6 +126,7 @@ public interface IWorkspaceService
 }
 public interface ITaskInterpreter
 {
+    Task<NoteAnalysis> AnalyzeNoteAsync(string text, bool useAi, string timeZoneId, DateTimeOffset now, CancellationToken ct);
     Task<TaskSuggestion> CaptureAsync(CaptureInput input, string timeZoneId, DateTimeOffset now, CancellationToken ct);
     Task<BreakdownView> BreakdownAsync(TaskInput task, bool useAi, CancellationToken ct);
 }

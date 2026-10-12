@@ -7,6 +7,8 @@ public interface IAuthService
     Task VerifyEmailAsync(OtpRequest request, RequestContext context, CancellationToken ct);
     Task ResendVerificationOtpAsync(EmailRequest request, RequestContext context, CancellationToken ct);
     Task<TokenResponse> LoginAsync(LoginRequest request, RequestContext context, CancellationToken ct);
+    Task<TokenResponse> GoogleLoginAsync(GoogleIdentity identity, RequestContext context, CancellationToken ct);
+    Task LinkGoogleAsync(Guid userId, GoogleIdentity identity, RequestContext context, CancellationToken ct);
     Task<TokenResponse> RefreshTokenAsync(RefreshRequest request, RequestContext context, CancellationToken ct);
     Task LogoutAsync(Guid userId, Guid familyId, RequestContext context, CancellationToken ct);
     Task LogoutAllAsync(Guid userId, RequestContext context, CancellationToken ct);
@@ -15,5 +17,7 @@ public interface IAuthService
     Task ResetPasswordAsync(ResetPasswordRequest request, RequestContext context, CancellationToken ct);
     Task RequestChangePasswordOtpAsync(Guid userId, RequestContext context, CancellationToken ct);
     Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, RequestContext context, CancellationToken ct);
+    Task SetPasswordAsync(Guid userId, SetPasswordRequest request, RequestContext context, CancellationToken ct);
+    Task<LoginMethodsResponse> GetLoginMethodsAsync(Guid userId, CancellationToken ct);
     Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId, CancellationToken ct);
 }

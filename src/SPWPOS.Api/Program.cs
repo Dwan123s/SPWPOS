@@ -92,7 +92,7 @@ builder.Services.AddRateLimiter(o =>
     o.GlobalLimiter = PartitionedRateLimiter.CreateChained(
         PartitionedRateLimiter.Create<HttpContext, string>(c =>
             HttpMethods.IsPost(c.Request.Method) && c.Request.Path.Value is
-                "/api/auth/register" or "/api/auth/login" or "/api/browser-session/login" or "/api/auth/reset-password" or "/api/auth/change-password"
+                "/api/auth/register" or "/api/auth/login" or "/api/browser-session/login" or "/api/auth/reset-password" or "/api/auth/change-password" or "/api/auth/set-password"
             ? RateLimitPartition.GetConcurrencyLimiter("password-computation", _ => new ConcurrencyLimiterOptions
                 { PermitLimit = Math.Max(2, Math.Min(Environment.ProcessorCount, 8)), QueueLimit = 0 })
             : RateLimitPartition.GetNoLimiter("other-requests")),
@@ -116,6 +116,7 @@ builder.Services.AddSwaggerGen(o =>
     o.TagActionsBy(api => api.ActionDescriptor.EndpointMetadata.OfType<Microsoft.AspNetCore.Http.TagsAttribute>().FirstOrDefault()?.Tags.ToList() ?? ["Authentication"]);
 });
 var app = builder.Build();
+var firebaseSettings = builder.Configuration.GetSection("Firebase").Get<FirebaseSettings>() ?? new();
 if (args.Contains("--check-smtp", StringComparer.Ordinal))
 {
     try
@@ -165,7 +166,13 @@ app.Use(async (context, next) =>
             { await ApiProblems.WriteAsync(context, 403, "CSRF_REJECTED", "Request origin could not be verified.", context.RequestAborted); return; }
         }
     }
-    else if (!context.Request.Path.StartsWithSegments("/swagger")) context.Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    else if (!context.Request.Path.StartsWithSegments("/swagger"))
+    {
+        var googleScripts = firebaseSettings.Enabled ? " https://apis.google.com" : "";
+        var googleConnections = firebaseSettings.Enabled ? $" https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://{firebaseSettings.AuthDomain}" : "";
+        var googleFrames = firebaseSettings.Enabled ? $"https://{firebaseSettings.AuthDomain}" : "'none'";
+        context.Response.Headers.ContentSecurityPolicy = $"default-src 'self'; script-src 'self'{googleScripts}; style-src 'self'; img-src 'self' data:; connect-src 'self'{googleConnections}; frame-src {googleFrames}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+    }
     await next();
 });
 if (!app.Environment.IsDevelopment()) app.UseHsts();

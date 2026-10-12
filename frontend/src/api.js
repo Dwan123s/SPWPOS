@@ -29,6 +29,7 @@ export async function api(
     retry &&
     !path.startsWith("/api/browser-session/refresh") &&
     !path.startsWith("/api/browser-session/login") &&
+    !path.startsWith("/api/browser-session/firebase/login") &&
     !publicAuth
   ) {
     try {

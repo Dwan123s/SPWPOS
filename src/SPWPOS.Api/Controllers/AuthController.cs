@@ -78,6 +78,15 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken ct)
     { await auth.ChangePasswordAsync(UserId, request, Context, ct); return Ok(Message("Password changed successfully. Please login again.")); }
 
+    [Authorize, HttpGet("login-methods"), Tags("Account")]
+    public async Task<IActionResult> LoginMethods(CancellationToken ct)
+        => Ok(ApiResponse<LoginMethodsResponse>.Ok(await auth.GetLoginMethodsAsync(UserId, ct)));
+
+    [Authorize, HttpPost("set-password"), Tags("Account")]
+    [EndpointSummary("Set the first password using email OTP, then revoke every session.")]
+    public async Task<IActionResult> SetPassword(SetPasswordRequest request, CancellationToken ct)
+    { await auth.SetPasswordAsync(UserId, request, Context, ct); return Ok(Message("Đã thiết lập mật khẩu. Hãy đăng nhập lại.")); }
+
     [Authorize, HttpGet("me"), Tags("Account")]
     [EndpointSummary("Return the current account without security fields.")]
     [ProducesResponseType(typeof(ApiResponse<CurrentUserResponse>), 200)]

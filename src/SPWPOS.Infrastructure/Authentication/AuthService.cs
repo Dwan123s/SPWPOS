@@ -12,7 +12,7 @@ using SPWPOS.Infrastructure.Security;
 using SPWPOS.Infrastructure.Email;
 namespace SPWPOS.Infrastructure.Authentication;
 
-public sealed class AuthService(
+public sealed partial class AuthService(
     ApplicationDbContext db, UserManager<ApplicationUser> users, ILookupNormalizer normalizer,
     IPasswordHasher<ApplicationUser> hasher, PasswordTiming timing, IOtpService otps,
     IJwtTokenService tokens, IEmailService email, ISecurityAuditService audit, AccountRateLimiter limiter,
@@ -110,7 +110,12 @@ public sealed class AuthService(
                 throw Credentials();
             }
             if (user.LockoutEnd > clock.GetUtcNow()) throw new AuthException("ACCOUNT_LOCKED", "Account is temporarily locked. Please try again later.", 423);
-            var verification = hasher.VerifyHashedPassword(user, user.PasswordHash!, request.Password);
+            if (user.PasswordHash is null)
+            {
+                hasher.VerifyHashedPassword(user, timing.DummyHash, request.Password);
+                throw Credentials();
+            }
+            var verification = hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
             if (verification == PasswordVerificationResult.Failed)
             {
                 user.AccessFailedCount++;
@@ -220,7 +225,7 @@ public sealed class AuthService(
             EnsureAvailable(user);
             await LimitAsync(user.Email!, "change-password", 10, 1, null, ct);
             if (user.LockoutEnd > clock.GetUtcNow()) throw new AuthException("ACCOUNT_LOCKED", "Account is temporarily locked.", 423);
-            if (hasher.VerifyHashedPassword(user, user.PasswordHash!, request.CurrentPassword) == PasswordVerificationResult.Failed)
+            if (user.PasswordHash is null || hasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword) == PasswordVerificationResult.Failed)
             {
                 user.AccessFailedCount++;
                 if (user.AccessFailedCount >= 5)
@@ -239,6 +244,30 @@ public sealed class AuthService(
             return user.Id;
         }, ct);
         await NotifyPasswordChangedAsync(recipient, ct);
+    }
+    public async Task SetPasswordAsync(Guid userId, SetPasswordRequest request, RequestContext context, CancellationToken ct)
+    {
+        var recipient = await ExecuteUserAsync(userId, context, SecurityEventType.CHANGE_PASSWORD_FAILED, async user =>
+        {
+            EnsureAvailable(user);
+            await LimitAsync(user.Email!, "change-password", 10, 1, null, ct);
+            if (user.LockoutEnd > clock.GetUtcNow()) throw new AuthException("ACCOUNT_LOCKED", "Tài khoản đang tạm khóa.", 423);
+            if (user.PasswordHash is not null)
+                throw new AuthException("PASSWORD_ALREADY_SET", "Tài khoản đã có mật khẩu. Hãy dùng phần đổi mật khẩu.", 409);
+            if (request.NewPassword != request.ConfirmNewPassword) throw Validation();
+            await ValidatePasswordAsync(user, request.NewPassword);
+            await otps.VerifyOtpAsync(user.Id, OtpPurpose.ChangePassword, request.Otp, ct);
+            await ReplacePasswordAsync(user, request.NewPassword, ct);
+            audit.Record(user.Id, SecurityEventType.CHANGE_PASSWORD_SUCCESS, true, context);
+            return user.Id;
+        }, ct);
+        await NotifyPasswordChangedAsync(recipient, ct);
+    }
+    public async Task<LoginMethodsResponse> GetLoginMethodsAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == userId, ct) ?? throw Unauthorized();
+        EnsureAvailable(user);
+        return new(user.PasswordHash is not null, await db.UserLogins.AsNoTracking().AnyAsync(x => x.UserId == userId && x.LoginProvider == GoogleProvider, ct));
     }
     public async Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId, CancellationToken ct)
     {

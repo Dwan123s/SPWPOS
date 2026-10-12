@@ -1,0 +1,190 @@
+/* Compact navigation, with only the menu scrolling on shorter screens. */
+.glass-workspace .sidebar {
+  padding: 16px 12px 12px;
+  border-radius: 22px;
+  overflow: hidden;
+  gap: 0;
+}
+.glass-workspace .sidebar-top {
+  flex-shrink: 0;
+  padding: 0 2px 12px;
+}
+.glass-workspace .sidebar-brand-header {
+  justify-content: space-between;
+  margin: 0 2px 12px;
+  min-height: 40px;
+}
+.glass-workspace .sidebar-brand-header .brand-lockup {
+  flex: 0 1 136px;
+  width: 136px;
+  padding: 0;
+}
+.glass-workspace .quick-search {
+  margin: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  gap: 8px;
+  font-size: 11px;
+  box-shadow: inset 0 1px 0 #fff;
+}
+.glass-workspace .quick-search kbd {
+  font-size: 9px;
+  padding: 1px 4px;
+}
+.glass-workspace .nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #abc9e5 transparent;
+  padding: 2px;
+  gap: 16px;
+}
+.glass-workspace .nav-group {
+  display: grid;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.glass-workspace .nav-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  padding: 0 10px;
+  min-height: 18px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #6f88a0;
+}
+.glass-workspace .nav-label::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: #cfdfed99;
+}
+.glass-workspace .nav .nav-link {
+  min-height: 36px;
+  padding: 8px 10px;
+  gap: 10px;
+  border-radius: 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.glass-workspace .nav .nav-link .icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.glass-workspace .nav-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.glass-workspace .nav .notification-number {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 18px;
+  flex-shrink: 0;
+}
+.glass-workspace .sidebar-bottom {
+  flex-shrink: 0;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #cbdff080;
+}
+.glass-workspace .user-mini {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #ffffffc9;
+  border-radius: 12px;
+  background: #ffffff80;
+}
+.glass-workspace .user-mini .user-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 2px 4px;
+  border-radius: 8px;
+}
+.glass-workspace .user-mini .user-link:hover {
+  background: #ffffffb3;
+}
+.glass-workspace .user-mini .avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 11px;
+}
+.glass-workspace .user-mini-info {
+  display: block;
+  min-width: 0;
+  flex: 1;
+}
+.glass-workspace .user-mini .user-link strong,
+.glass-workspace .user-mini .user-link small {
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.glass-workspace .user-mini .user-link strong {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.glass-workspace .user-mini .user-link small {
+  font-size: 9px;
+  margin-top: 1px;
+}
+.glass-workspace .user-mini .sidebar-logout {
+  min-width: 32px;
+  width: 32px;
+  min-height: 34px;
+  padding: 7px;
+  align-self: center;
+  border-radius: 8px;
+}
+@media (min-width: 1201px) {
+  .glass-workspace {
+    grid-template-columns: 224px minmax(0, 1fr);
+  }
+}
+@media (max-width: 800px) {
+  .glass-workspace .sidebar {
+    padding: 14px 12px 12px;
+  }
+  .glass-workspace .sidebar-top {
+    padding-bottom: 12px;
+  }
+  .glass-workspace .sidebar-brand-header {
+    margin-bottom: 8px;
+  }
+  .glass-workspace .quick-search,
+  .glass-workspace .nav .nav-link {
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .glass-workspace .nav {
+    gap: 12px;
+  }
+  .glass-workspace .user-mini {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+  .glass-workspace .user-mini .user-link,
+  .glass-workspace .user-mini .sidebar-logout {
+    min-height: 44px;
+  }
+  .glass-workspace .user-mini .sidebar-logout {
+    min-width: 44px;
+    width: 44px;
+    padding: 10px;
+  }
+}

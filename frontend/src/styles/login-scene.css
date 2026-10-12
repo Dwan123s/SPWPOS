@@ -2,10 +2,10 @@
 .auth-facebook.login-composition {
   overflow-anchor: none;
   --login-motion-amplitude: 1;
-  --login-ink: #071b3d;
+  --login-ink: var(--planora-ink);
   --login-muted: #677b9f;
-  --login-blue: #0068ff;
-  --login-cyan: #36b7ff;
+  --login-blue: var(--planora-blue);
+  --login-cyan: var(--planora-cyan);
   --login-line: #bbd5f5;
   --login-white: #fff;
   --login-glass: #ffffff73;

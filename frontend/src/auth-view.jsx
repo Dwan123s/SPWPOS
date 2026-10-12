@@ -2,8 +2,9 @@ import { brand } from "./brand.jsx";
 import { icon } from "./ui.jsx";
 import { LoginBackground, LoginScene } from "./login-scene.jsx";
 import { LoginMotionControl } from "./login-motion.jsx";
+import { GoogleSignIn } from "./google-signin.jsx";
 
-export function authView(mode, title, description, fields, buttons) {
+export function authView(mode, title, description, fields, buttons, onGoogleLogin) {
   const login = mode === "login";
   return (
     <div
@@ -86,6 +87,7 @@ export function authView(mode, title, description, fields, buttons) {
                       <div className="login-divider">
                         <span>Hoặc</span>
                       </div>
+                      <GoogleSignIn onSuccess={onGoogleLogin} />
                       <div className="auth-register">
                         <button
                           type="button"

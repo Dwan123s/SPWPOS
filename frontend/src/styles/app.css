@@ -131,16 +131,6 @@ svg {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.initial-loading {
-  height: 100vh;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 20px;
-}
-.initial-loading img {
-  width: 52px;
-}
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 1.5px;

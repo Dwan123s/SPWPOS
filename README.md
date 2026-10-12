@@ -20,10 +20,11 @@ PLANORA kết hợp quản lý công việc, đề xuất lịch, theo dõi phi�
 ## Tính năng
 
 - **Quản lý công việc:** nhóm công việc, task/subtask, phụ thuộc, ưu tiên, deadline và tiến độ.
+- **Ghi chú & agent:** lưu note, phân tích nhiều công việc, tự tạo và áp dụng lịch hoặc xem trước để chỉnh sửa.
 - **Lập kế hoạch:** thiết lập giờ rảnh, sự kiện cố định và thời gian nghỉ; xem trước, áp dụng hoặc lập lại lịch.
 - **Theo dõi thực hiện:** bắt đầu, tạm dừng, tiếp tục và kết thúc phiên; ghi nhận thời gian thực tế.
 - **Phân tích workload:** so sánh estimate/actual, đánh giá năng lực, cảnh báo rủi ro deadline và mô phỏng kịch bản.
-- **Tài khoản và thông báo:** xác minh email bằng OTP, quản lý phiên đăng nhập, khôi phục mật khẩu và nhắc lịch.
+- **Tài khoản và thông báo:** đăng nhập Google qua Firebase, xác minh email bằng OTP, quản lý phiên đăng nhập, khôi phục mật khẩu và nhắc lịch.
 - **Quản trị:** quản lý trạng thái tài khoản, thu hồi phiên và xem tình trạng hệ thống.
 
 ## Công nghệ
@@ -33,7 +34,7 @@ PLANORA kết hợp quản lý công việc, đề xuất lịch, theo dõi phi�
 | Backend | .NET 8, ASP.NET Core Web API, Entity Framework Core |
 | Database | SQL Server |
 | Frontend | React 19, Tailwind CSS 4, Vite 8; responsive, liquid glass |
-| Authentication | ASP.NET Core Identity, JWT, cookie HttpOnly, Argon2id |
+| Authentication | ASP.NET Core Identity, Firebase Authentication (Google), JWT, cookie HttpOnly, Argon2id |
 | Email | MailKit; Mailpit cho development |
 | Kiểm thử | xUnit, HTTP integration tests, SQL Server concurrency tests, Vitest, React Testing Library |
 
@@ -67,6 +68,8 @@ Script build React/Tailwind, chuẩn bị cấu hình development, khởi độn
 | Mailpit — hộp thư OTP development | http://localhost:8025/ |
 
 Nếu certificate đã được thiết lập, thêm `-SkipCertificateTrust` vào lệnh khởi động. Cấu hình SMTP hiện có được giữ khi restart; xem [hướng dẫn Gmail SMTP](docs/GMAIL_SMTP.md) để gửi email thật.
+
+Để bật nút Google, làm theo [hướng dẫn thiết lập Firebase Authentication](docs/FIREBASE_GOOGLE_LOGIN.md). Firebase Admin xác minh token tại server; ứng dụng vẫn dùng database và phiên cookie hiện tại.
 
 SQL Server development dùng `127.0.0.1,11433` trên Windows; container vẫn dùng cổng `1433`. Cổng host riêng tránh xung đột với SQL Server đã cài trên máy. Script cập nhật connection string và giữ nguyên credential cùng volume dữ liệu hiện có.
 
@@ -154,6 +157,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-BeforeMer
 ## Tài liệu
 
 - [Hướng dẫn sử dụng và cấu hình hệ thống](docs/SYSTEM_GUIDE.md)
+- [Ghi chú và agent tự xếp lịch](docs/NOTES_AGENT_GUIDE.md)
 - [Cấu hình Gmail SMTP](docs/GMAIL_SMTP.md)
 - [Use cases](docs/USE_CASE_COVERAGE.md) và [mô hình dữ liệu UML](docs/UML_ALIGNMENT.md)
 - [Thiết kế bảo mật](docs/SECURITY.md)

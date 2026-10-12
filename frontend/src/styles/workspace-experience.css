@@ -1,0 +1,463 @@
+/* Shared login materials and motion language, sized for productive screens. */
+:root {
+  --planora-ink: #071b3d;
+  --planora-muted: #526b8a;
+  --planora-blue: #0068ff;
+  --planora-cyan: #36b7ff;
+  --planora-edge: #ffffffed;
+  --planora-line: #c6dcf3;
+  --planora-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --planora-ambient-ease: cubic-bezier(0.37, 0, 0.63, 1);
+  --planora-panel: linear-gradient(145deg, #fffffff0, #f4faffd9);
+  --planora-shadow:
+    inset 0 1px 0 #fff, 0 12px 34px #2468b812, 0 2px 8px #2468b808;
+  --glass-blue: var(--planora-blue);
+  --glass-blue-dark: #0057d7;
+  --glass-ink: var(--planora-ink);
+  --glass-muted: var(--planora-muted);
+  --glass-line: var(--planora-line);
+  --glass-shadow: var(--planora-shadow);
+  --glass-button: linear-gradient(150deg, #288eff, #0068ff 58%, #0056dc);
+}
+.glass-workspace {
+  background:
+    radial-gradient(ellipse at 26% 10%, #d5f6ff, transparent 46%),
+    radial-gradient(ellipse at 90% 58%, #b6ddff70, transparent 50%),
+    linear-gradient(125deg, #f2fbff, #e6f4ff 62%, #edf8ff);
+}
+.glass-workspace::before {
+  content: none;
+}
+.workspace-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.workspace-halo {
+  position: absolute;
+  width: min(60vw, 800px);
+  aspect-ratio: 1;
+  border: 1px solid #ffffffb3;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #ffffff80, #76cfff12 65%);
+  box-shadow: inset 0 2px 60px #ffffff66;
+  animation: workspace-drift 20s var(--planora-ambient-ease) infinite;
+}
+.workspace-halo--one {
+  left: -20%;
+  top: -32%;
+}
+.workspace-halo--two {
+  right: -22%;
+  bottom: -40%;
+  width: min(75vw, 960px);
+  animation-delay: -10s;
+}
+.workspace-orb {
+  position: absolute;
+  width: 80px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid #ffffffb3;
+  background: radial-gradient(
+    circle at 30% 25%,
+    #fff,
+    #cff4ff85 30%,
+    #63bfff70 65%,
+    #4a9cec30
+  );
+  box-shadow:
+    inset -5px -8px 14px #299ce12b,
+    0 12px 28px #2681bd0c;
+  animation: workspace-drift 14s var(--planora-ambient-ease) infinite;
+}
+.workspace-orb--one {
+  right: 3%;
+  top: 15%;
+}
+.workspace-orb--two {
+  left: 40%;
+  bottom: 6%;
+  width: 38px;
+  animation-delay: -7s;
+}
+.glass-workspace[data-motion-state="paused"] .workspace-atmosphere *,
+.glass-workspace[data-motion-state="reduced"] .workspace-atmosphere * {
+  animation-play-state: paused;
+}
+.glass-workspace :is(.sidebar, .topbar) {
+  background: linear-gradient(145deg, #ffffffdc, #f3f9ffb8);
+  border-color: var(--planora-edge);
+  box-shadow: var(--planora-shadow);
+}
+.glass-workspace .topbar {
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+.glass-workspace .page-header {
+  position: relative;
+  padding: 24px;
+  border: 1px solid var(--planora-edge);
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at 95% 10%, #8fd6ff40, transparent 60%),
+    linear-gradient(120deg, #ffffffb8, #f1f9ff80);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 6px 24px #2468b808;
+}
+.glass-workspace .page-header h1 {
+  color: var(--planora-ink);
+  letter-spacing: -0.9px;
+}
+.glass-workspace .eyebrow {
+  color: #0059d9;
+  letter-spacing: 1.3px;
+}
+.glass-workspace :is(.card, .focus-card, .profile-hero-card) {
+  background: var(--planora-panel);
+  border-color: var(--planora-edge);
+  box-shadow: var(--planora-shadow);
+}
+.glass-workspace :is(.focus-card, .profile-hero-card) {
+  background:
+    radial-gradient(ellipse at 100% 0%, #83cfff38, transparent 65%),
+    linear-gradient(125deg, #e2f2ffd9, #ffffffed);
+}
+.glass-workspace .focus-card::after {
+  width: 240px;
+  height: 120px;
+  right: -70px;
+  top: -48px;
+  border: 16px solid #67bfff20;
+  box-shadow:
+    0 0 0 1px #ffffff8c,
+    inset 0 0 0 1px #ffffff8c;
+  transform: rotate(-25deg);
+}
+.glass-workspace :is(.card, .note-task-draft):focus-within {
+  border-color: #a4ceff;
+  box-shadow:
+    var(--planora-shadow),
+    0 0 0 2px #0068ff0c;
+}
+.glass-workspace .stats-grid .card {
+  background: linear-gradient(140deg, #fffffff2, #eaf5ffd9);
+}
+.glass-workspace
+  :is(
+    .stat-value,
+    .day-count,
+    .reflection-metrics strong,
+    .card-header h2,
+    .focus-card h2
+  ) {
+  color: var(--planora-ink);
+}
+.glass-workspace :is(.stat-icon, .summary-icon, .side-note-icon) {
+  background: linear-gradient(145deg, #fff, #dbf0ff);
+  color: var(--planora-blue);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 4px 12px #167ce418;
+}
+.glass-workspace .stat-icon.amber {
+  background: #fff4dd;
+  color: #92620d;
+}
+.glass-workspace .nav button.active {
+  background: linear-gradient(120deg, #e0efff, #f3faff);
+  border-color: #fff;
+  color: #0059d9;
+  box-shadow:
+    inset 3px 0 0 var(--planora-blue),
+    0 4px 14px #286cbe0d;
+}
+.glass-workspace :is(.quick-search, .side-note) {
+  background: linear-gradient(135deg, #ffffffc4, #e9f6ffa6);
+}
+:is(.glass-workspace, #modal) .btn {
+  border-radius: 14px;
+  transition:
+    background 180ms,
+    border-color 180ms,
+    box-shadow 180ms,
+    translate 180ms var(--planora-ease),
+    scale 180ms var(--planora-ease);
+}
+:is(.glass-workspace, #modal) .btn.primary {
+  background: var(--glass-button);
+  box-shadow:
+    inset 0 1px 0 #ffffff80,
+    inset 0 -1px 0 #003b9533,
+    0 6px 18px #0068ff26;
+}
+.glass-workspace :is(.workspace-motion-toggle, .bell, .avatar-button) {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid #ffffffcc;
+  background: #ffffff9c;
+}
+.glass-workspace .workspace-motion-toggle[aria-pressed="true"] {
+  background: #e2efff;
+  color: #0059d9;
+  border-color: #b4d7ff;
+}
+.glass-workspace .workspace-motion-toggle:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+:is(.glass-workspace, #modal)
+  :is(button, a, input, textarea, select):focus-visible {
+  outline: 2px solid var(--planora-blue);
+  outline-offset: 3px;
+}
+:is(.glass-workspace, #modal)
+  :is(.field input, .field textarea, .field select, .filter) {
+  background: #ffffffd9;
+  border-color: #bdd6f1;
+  border-radius: 14px;
+  transition:
+    border-color 180ms,
+    background 180ms,
+    box-shadow 180ms;
+}
+:is(.glass-workspace, #modal)
+  :is(.field input, .field textarea, .field select, .filter):focus {
+  background: #fff;
+  border-color: var(--planora-blue);
+  box-shadow: 0 0 0 4px #0068ff10;
+}
+:is(.glass-workspace, #modal) .badge.green {
+  background: #e6f6ef;
+  color: #166744;
+  border-color: #bde5d2;
+}
+.glass-workspace :is(.task-tabs, .settings-tabs-bar, .view-switch) {
+  background: #ffffffa3;
+  border: 1px solid var(--planora-edge);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 4px 18px #2468b808;
+}
+.glass-workspace .task-tabs {
+  padding: 5px;
+  border-radius: 18px;
+  gap: 5px;
+}
+.glass-workspace .task-tabs button {
+  border-radius: 13px;
+  border-bottom: 0;
+  padding: 10px 16px;
+}
+.glass-workspace
+  :is(.task-tabs button, .settings-tab-btn, .view-switch button).active {
+  background: linear-gradient(145deg, #e0efff, #eff8ff);
+  color: #0059d9;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 7px #0068ff10;
+}
+.glass-workspace
+  :is(
+    .task-row,
+    .priority-task,
+    .notification,
+    .agenda-entry,
+    .category-card-item,
+    .note-list-item,
+    .calendar-block,
+    .session-card
+  ) {
+  transition:
+    border-color 180ms,
+    background 180ms,
+    box-shadow 180ms;
+}
+.glass-workspace .task-heading {
+  background: #e8f4ff8c;
+  color: #486687;
+  border-radius: 12px;
+}
+.glass-workspace :is(.task-row, .priority-task) {
+  padding-inline: 12px;
+}
+.glass-workspace .task-row:not(.task-heading):focus-within,
+.glass-workspace .priority-task:focus-within {
+  background: #eaf5ff99;
+  border-radius: 12px;
+}
+.glass-workspace
+  :is(
+    .note-list-item,
+    .note-task-draft,
+    .category-card-item,
+    .checkbox-switch-card
+  ) {
+  background: linear-gradient(140deg, #ffffffc9, #f1f9ff99);
+  border-color: #c8def5;
+  box-shadow: inset 0 1px 0 #fff;
+}
+.glass-workspace .note-list-item.active {
+  background: linear-gradient(130deg, #e1efff, #edf8ff);
+  border-color: #8cbfff;
+  box-shadow: inset 3px 0 0 var(--planora-blue);
+}
+.glass-workspace .calendar-toolbar {
+  background: #ffffff94;
+}
+.glass-workspace .week-day.today {
+  background: #e2f1ffc4;
+}
+.glass-workspace .calendar-block.active-session {
+  background: linear-gradient(140deg, #d8eaff, #e8f7ff);
+  border-left-color: var(--planora-blue);
+}
+.glass-workspace .calendar-hint {
+  background: #eaf6ffb3;
+}
+:is(.glass-workspace, #modal) th {
+  background: #e9f4ffb3;
+  color: #3e5f82;
+  border-bottom-color: #c6dcf3;
+}
+:is(.glass-workspace, #modal) td {
+  border-bottom-color: #d5e6f5;
+}
+.glass-workspace .empty {
+  background: radial-gradient(ellipse at 50% 0%, #d5efff94, transparent 65%);
+  border: 1px dashed #b7d5f4;
+  border-radius: 18px;
+  margin-block: 12px;
+}
+.glass-workspace .empty svg {
+  color: var(--planora-blue);
+}
+#modal {
+  background: linear-gradient(145deg, #fcfefffa, #eef8fff5);
+  border-color: var(--planora-edge);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 32px 100px #164b7a40;
+}
+#modal::backdrop {
+  background: #0c2b5066;
+}
+.toast {
+  animation: workspace-toast-enter 300ms var(--planora-ease) both;
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.glass-workspace, #modal) .btn:hover:not(:disabled) {
+    translate: 0 -2px;
+  }
+  :is(.glass-workspace, #modal) .btn:active:not(:disabled) {
+    translate: 0 0;
+    scale: 0.98;
+  }
+  .glass-workspace
+    :is(.task-row:not(.task-heading), .priority-task, .notification):hover {
+    background: #eaf5ff99;
+    border-radius: 12px;
+  }
+  .glass-workspace
+    :is(
+      .note-list-item,
+      .category-card-item,
+      .calendar-block,
+      .session-card
+    ):hover {
+    border-color: #99c6f5;
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 5px 15px #2468b814;
+  }
+}
+@keyframes workspace-drift {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 12px -18px;
+  }
+}
+@keyframes workspace-toast-enter {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (max-width: 800px) {
+  .glass-workspace .page-header {
+    padding: 20px;
+    border-radius: 20px;
+  }
+  .glass-workspace :is(.workspace-motion-toggle, .bell, .avatar-button) {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+  .workspace-orb--one {
+    right: -25px;
+    width: 64px;
+  }
+  .workspace-halo {
+    width: 90vw;
+  }
+  .glass-workspace .sidebar {
+    background: linear-gradient(145deg, #f9fdfffa, #eaf5fffa);
+  }
+}
+@media (min-width: 801px) {
+  .glass-workspace .mobile-menu {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  .glass-workspace .page-header {
+    padding: 18px 16px;
+  }
+  .glass-workspace .task-tabs {
+    flex-wrap: wrap;
+  }
+  .glass-workspace .task-tabs button {
+    flex: 1 1 calc(50% - 5px);
+  }
+  .glass-workspace :is(.task-row, .priority-task) {
+    padding-inline: 4px;
+  }
+  .glass-workspace .topbar-right {
+    gap: 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-atmosphere *,
+  .toast {
+    animation: none !important;
+  }
+  :is(.glass-workspace, #modal)
+    :is(.btn, .field input, .field textarea, .field select, .filter) {
+    transition: none;
+    translate: none;
+    scale: none;
+  }
+}
+@media print {
+  .workspace-atmosphere,
+  .workspace-motion-toggle {
+    display: none;
+  }
+  .glass-workspace,
+  .glass-workspace :is(.card, .page-header, .focus-card) {
+    background: #fff;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+}

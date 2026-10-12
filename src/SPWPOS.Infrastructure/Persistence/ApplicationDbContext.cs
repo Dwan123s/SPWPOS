@@ -14,6 +14,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<SecurityRateLimit> SecurityRateLimits => Set<SecurityRateLimit>();
     public DbSet<PasswordChangeNotification> PasswordChangeNotifications => Set<PasswordChangeNotification>();
     public DbSet<WorkTask> WorkTasks => Set<WorkTask>();
+    public DbSet<PlanningNote> PlanningNotes => Set<PlanningNote>();
     public DbSet<TaskCategory> TaskCategories => Set<TaskCategory>();
     public DbSet<TaskDependency> TaskDependencies => Set<TaskDependency>();
     public DbSet<WeeklyAvailability> WeeklyAvailability => Set<WeeklyAvailability>();

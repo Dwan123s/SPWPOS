@@ -16,5 +16,7 @@ src/SPWPOS.Api/wwwroot/index.html
 *.key
 *.pem
 *.p12
+*firebase-adminsdk*.json
+firebase-service-account*.json
 appsettings.Local.json
 appsettings.*.Local.json

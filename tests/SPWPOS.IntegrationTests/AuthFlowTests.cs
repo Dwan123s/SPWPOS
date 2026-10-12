@@ -243,7 +243,9 @@ public sealed class AuthFlowTests
         using var response = await client.GetAsync("/swagger/v1/swagger.json", Ct); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct)).RootElement;
         var paths = json.GetProperty("paths");
-        Assert.Equal(13, paths.EnumerateObject().Count(x => x.Name.StartsWith("/api/auth/", StringComparison.Ordinal)));
+        Assert.Equal(15, paths.EnumerateObject().Count(x => x.Name.StartsWith("/api/auth/", StringComparison.Ordinal)));
+        Assert.True(paths.TryGetProperty("/api/auth/login-methods", out _));
+        Assert.True(paths.TryGetProperty("/api/auth/set-password", out _));
         Assert.True(paths.TryGetProperty("/api/tasks", out _));
         Assert.True(paths.TryGetProperty("/api/plans", out _));
         Assert.True(paths.TryGetProperty("/api/workspace", out _));

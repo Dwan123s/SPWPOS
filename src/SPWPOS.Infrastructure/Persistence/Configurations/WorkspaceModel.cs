@@ -13,6 +13,11 @@ public static class WorkspaceModel
     }
     public static void Configure(ModelBuilder b)
     {
+        var note = Owned<PlanningNote>(b);
+        note.Property(x => x.Title).HasMaxLength(120);
+        note.Property(x => x.Content).HasMaxLength(8000);
+        note.Property(x => x.Version).IsConcurrencyToken();
+        note.HasIndex(x => new { x.UserId, x.UpdatedAt });
         var task = Owned<WorkTask>(b);
         task.Property(x => x.Name).HasMaxLength(200); task.Property(x => x.Description).HasMaxLength(4000);
         task.Property(x => x.TaskType).HasMaxLength(60); task.HasIndex(x => new { x.UserId, x.Deadline });

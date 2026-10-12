@@ -61,7 +61,8 @@ public static class TestInfrastructure
         ["EmailSettings:EnableSsl"] = "true",
         ["AllowedHosts"] = "localhost",
         ["AdminBootstrap:Email"] = "",
-        ["AiSettings:Enabled"] = "false"
+        ["AiSettings:Enabled"] = "false",
+        ["Firebase:Enabled"] = "false"
     };
     public static void ReplacePersistence(IServiceCollection services, SqliteConnection connection)
     {

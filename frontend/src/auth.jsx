@@ -141,7 +141,7 @@ export function renderAuth(mode = "login") {
   transitionAuthPanel(() => {
     currentMode = mode;
     setScreen(
-      authView(mode, title, description, fields, buttons),
+      authView(mode, title, description, fields, buttons, onLogin),
       `auth-${mode}`,
     );
     $("#app input")?.focus({ preventScroll: true });

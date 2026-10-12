@@ -16,9 +16,11 @@ public sealed class BrowserSessionController(IAuthService auth, IJwtTokenService
     private RequestContext Context => new(HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Headers.UserAgent.ToString());
     private static CookieOptions Options(DateTimeOffset expires, string path) => new() { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict, Path = path, Expires = expires, IsEssential = true };
     private void Set(TokenResponse response)
+        => SetSessionCookies(Response, response);
+    internal static void SetSessionCookies(HttpResponse output, TokenResponse response)
     {
-        Response.Cookies.Append(AccessCookie, response.AccessToken, Options(response.ExpiresAt, "/"));
-        Response.Cookies.Append(RefreshCookie, response.RefreshToken, Options(DateTimeOffset.UtcNow.AddDays(7), "/api/browser-session"));
+        output.Cookies.Append(AccessCookie, response.AccessToken, Options(response.ExpiresAt, "/"));
+        output.Cookies.Append(RefreshCookie, response.RefreshToken, Options(DateTimeOffset.UtcNow.AddDays(7), "/api/browser-session"));
     }
     private void Clear()
     {

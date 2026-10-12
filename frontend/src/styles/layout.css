@@ -2663,11 +2663,6 @@ dialog::backdrop {
 .brand.auth-mobile-brand {
   display: none;
 }
-.initial-loading img {
-  width: 76px;
-  height: 76px;
-  object-fit: contain;
-}
 @media (max-width: 800px) {
   .brand.auth-mobile-brand {
     display: block;

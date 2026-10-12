@@ -33,6 +33,9 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<PasswordTiming>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddSingleton<IFirebaseTokenVerifier, FirebaseTokenVerifier>();
+        services.AddOptions<FirebaseSettings>().BindConfiguration("Firebase")
+            .Validate(x => x.Valid, "Firebase settings are invalid.").ValidateOnStart();
         services.AddScoped<IOtpService, OtpService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<EmailService>();

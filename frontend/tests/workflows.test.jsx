@@ -54,6 +54,7 @@ beforeEach(() => {
       if (url === "/api/browser-session/me")
         data = { user: profile, roles: ["Admin"] };
       if (url === "/api/workspace") data = currentWorkspace;
+      if (url === "/api/auth/login-methods") data = { hasPassword: true, googleLinked: false };
       if (url === "/api/intelligence") data = insights;
       if (url === "/api/plans/conflicts") data = [];
       if (url === "/api/tasks" && options.method === "POST") {
@@ -377,6 +378,30 @@ it("keeps the animated auth page and pause setting through registration and veri
       .getAttribute("aria-pressed"),
   ).toBe("true");
 });
+it("sets a first password for a Google account from Security and returns to login", async () => {
+  const regularFetch = fetch.getMockImplementation();
+  fetch.mockImplementation(async (url, options) => {
+    if (url === "/api/auth/login-methods") return { ok: true, status: 200, json: async () => ({ data: { hasPassword: false, googleLinked: true } }) };
+    return regularFetch(url, options);
+  });
+  mount();
+  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await navigate("settings", "Tài khoản & nhóm");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Bảo mật" }));
+  await screen.findByRole("heading", { name: "Thiết lập đăng nhập bằng mật khẩu" });
+  expect(screen.queryByLabelText("Mật khẩu hiện tại")).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Gửi mã OTP" }));
+  await user.type(screen.getByLabelText("Mã OTP xác nhận từ Email"), "123456");
+  await user.type(screen.getByLabelText("Mật khẩu mới", { exact: true }), "ValidSecret123!");
+  await user.type(screen.getByLabelText("Nhập lại mật khẩu mới"), "ValidSecret123!");
+  await user.click(screen.getByRole("button", { name: "Thiết lập mật khẩu", exact: true }));
+  await screen.findByRole("heading", { name: "Đăng nhập vào PLANORA" });
+  expect(calls.find((c) => c.url === "/api/auth/set-password").body).toEqual({ otp: "123456", newPassword: "ValidSecret123!", confirmNewPassword: "ValidSecret123!" });
+  expect(calls.some((c) => c.url === "/api/auth/change-password/request-otp")).toBe(true);
+  expect(calls.some((c) => c.url === "/api/browser-session/logout")).toBe(true);
+  expect(calls.some((c) => c.url === "/api/auth/change-password")).toBe(false);
+});
 it("navigates all workspace screens and renders the admin data", async () => {
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
@@ -493,7 +518,11 @@ it("reviews a captured task with safe text notes before saving", async () => {
   await screen.findByText("Chuẩn bị báo cáo React");
 });
 it("opens and closes the mobile drawer with inert content and restored focus", async () => {
-  window.matchMedia = vi.fn(() => ({ matches: true }));
+  window.matchMedia = vi.fn((query) => ({
+    matches: query === "(max-width: 800px)",
+    addEventListener() {},
+    removeEventListener() {},
+  }));
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   const user = userEvent.setup();

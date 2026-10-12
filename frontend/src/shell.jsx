@@ -1,6 +1,10 @@
 import { Slot, attrs, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
 import { brand } from "./brand.jsx";
+import {
+  WorkspaceAtmosphere,
+  WorkspaceMotionControl,
+} from "./workspace-motion.jsx";
 import { $, state, icon, button, userAvatar, dateFmt, modal } from "./ui.jsx";
 export function workspaceShell(routes, title, description, body) {
   const p = state.workspace.profile || {},
@@ -14,13 +18,14 @@ export function workspaceShell(routes, title, description, body) {
         .map((key) => (
           <button
             type="button"
-            className={state.route === key ? "active" : ""}
+            className={`nav-link${state.route === key ? " active" : ""}`}
             data-action="nav"
             data-id={key}
+            title={routes[key][0]}
             {...attrs(state.route === key ? 'aria-current="page"' : "")}
           >
             {icon(routes[key][2])}
-            <span>{routes[key][0]}</span>
+            <span className="nav-text">{routes[key][0]}</span>
             {key === "notifications" && unread ? (
               <span className="notification-number">{unread}</span>
             ) : (
@@ -52,6 +57,7 @@ export function workspaceShell(routes, title, description, body) {
         Đến nội dung chính
       </a>
       <div className="shell glass-workspace">
+        <WorkspaceAtmosphere />
         <button
           type="button"
           className="sidebar-overlay"
@@ -61,62 +67,74 @@ export function workspaceShell(routes, title, description, body) {
           hidden={true}
         />
         <aside className="sidebar" id="workspace-menu">
-          <div className="sidebar-brand-header">
-            {brand("#today", "", "PLANORA — Hôm nay")}
-            <button
-              type="button"
-              className="btn ghost icon-only sidebar-close"
-              data-action="close-menu"
-              aria-label="Đóng menu"
-            >
-              {icon("close")}
+          <div className="sidebar-top">
+            <div className="sidebar-brand-header">
+              {brand("#today", "", "PLANORA — Hôm nay")}
+              <button
+                type="button"
+                className="btn ghost icon-only sidebar-close"
+                data-action="close-menu"
+                aria-label="Đóng menu"
+              >
+                {icon("close")}
+              </button>
+            </div>
+            <button type="button" className="quick-search" data-action="search">
+              {icon("search")}
+              <span>Tìm công việc</span>
+              <kbd>Ctrl K</kbd>
             </button>
           </div>
-          <div className="workspace-label">
-            {icon("folder")}
-            <span>Không gian cá nhân</span>
-            <span className="workspace-dot" />
-          </div>
-          <button type="button" className="quick-search" data-action="search">
-            {icon("search")}
-            <span>Tìm công việc</span>
-            <kbd>Ctrl K</kbd>
-          </button>
           <nav className="nav" aria-label="Điều hướng chính">
-            <div className="nav-label">LÀM VIỆC</div>
-            {nav(["today", "tasks", "calendar"])}
-            <div className="nav-label">LÊN KẾ HOẠCH</div>
-            {nav(["time", "insights", "scenario"])}
-            <div className="nav-label">QUẢN LÝ</div>
-            {nav(["notifications", "settings", "admin"])}
+            <section className="nav-group" aria-label="Làm việc">
+              <div className="nav-label">Làm việc</div>
+              {nav(["today", "notes", "tasks", "calendar"])}
+            </section>
+            <section className="nav-group" aria-label="Lên kế hoạch">
+              <div className="nav-label">Lên kế hoạch</div>
+              {nav(["time", "insights", "scenario"])}
+            </section>
+            <section className="nav-group" aria-label="Quản lý">
+              <div className="nav-label">Quản lý</div>
+              {nav(["notifications", "settings", "admin"])}
+            </section>
           </nav>
           <div className="sidebar-bottom">
-            <div className="side-note">
-              <span className="side-note-icon">{icon("spark")}</span>
-              <strong>Dành chỗ cho việc quan trọng</strong>
-              <p>Một kế hoạch vừa sức bắt đầu từ thời gian bạn có.</p>
-              {button("Xem giờ rảnh", "nav", "small ghost", "time", "arrow")}
-            </div>
             <div className="user-mini">
-              {userAvatar(p)}
               <button
                 className="user-link"
                 type="button"
                 data-action="nav"
                 data-id="settings"
+                title={
+                  p.displayName ||
+                  `${p.firstName || ""} ${p.lastName || ""}`.trim() ||
+                  "Tài khoản"
+                }
               >
-                <strong>
-                  {p.displayName ||
-                    `${p.firstName || ""} ${p.lastName || ""}`.trim() ||
-                    "Tài khoản"}
-                </strong>
-                <small>
-                  {state.roles.includes("Admin")
-                    ? "Quản trị viên"
-                    : "Không gian của bạn"}
-                </small>
+                {userAvatar(p)}
+                <span className="user-mini-info">
+                  <strong>
+                    {p.displayName ||
+                      `${p.firstName || ""} ${p.lastName || ""}`.trim() ||
+                      "Tài khoản"}
+                  </strong>
+                  <small>
+                    {state.roles.includes("Admin")
+                      ? "Quản trị viên"
+                      : "Không gian của bạn"}
+                  </small>
+                </span>
               </button>
-              {button("", "logout", "ghost icon-only", "", "logout")}
+              <button
+                className="btn ghost icon-only sidebar-logout"
+                type="button"
+                data-action="logout"
+                aria-label="Đăng xuất"
+                title="Đăng xuất"
+              >
+                {icon("logout")}
+              </button>
             </div>
           </div>
         </aside>
@@ -140,6 +158,7 @@ export function workspaceShell(routes, title, description, body) {
               </div>
             </div>
             <div className="topbar-right">
+              <WorkspaceMotionControl />
               <span className="top-date">
                 {dateFmt(Date.now(), {
                   weekday: "long",

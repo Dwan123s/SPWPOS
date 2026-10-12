@@ -40,3 +40,10 @@ public sealed class ChangePasswordRequest(string currentPassword, string otp, st
     [Required, StringLength(32, MinimumLength = 8)] public string NewPassword { get; init; } = newPassword;
     [Required, Compare(nameof(NewPassword))] public string ConfirmNewPassword { get; init; } = confirmNewPassword;
 }
+public sealed class SetPasswordRequest(string otp, string newPassword, string confirmNewPassword)
+{
+    [Required, RegularExpression("^[0-9]{6,8}$")] public string Otp { get; init; } = otp;
+    [Required, StringLength(32, MinimumLength = 8)] public string NewPassword { get; init; } = newPassword;
+    [Required, Compare(nameof(NewPassword))] public string ConfirmNewPassword { get; init; } = confirmNewPassword;
+}
+public sealed record LoginMethodsResponse(bool HasPassword, bool GoogleLinked);
