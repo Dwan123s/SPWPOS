@@ -71,7 +71,7 @@ Nếu certificate đã được thiết lập, thêm `-SkipCertificateTrust` và
 
 Để bật nút Google, làm theo [hướng dẫn thiết lập Firebase Authentication](docs/FIREBASE_GOOGLE_LOGIN.md). Firebase Admin xác minh token tại server; ứng dụng vẫn dùng database và phiên cookie hiện tại.
 
-SQL Server development dùng `127.0.0.1,11433` trên Windows; container vẫn dùng cổng `1433`. Cổng host riêng tránh xung đột với SQL Server đã cài trên máy. Script cập nhật connection string và giữ nguyên credential cùng volume dữ liệu hiện có.
+SQL Server development dùng `127.0.0.1,11433` trên Windows; container vẫn dùng port `1433`. Cổng host riêng tránh xung đột với SQL Server đã cài trên máy. Script cập nhật connection string và giữ nguyên credential cùng volume dữ liệu hiện có.
 
 Nếu cổng `11433` bị chiếm hoặc Windows chặn bind, chọn cổng host khác trong terminal trước khi khởi động:
 
