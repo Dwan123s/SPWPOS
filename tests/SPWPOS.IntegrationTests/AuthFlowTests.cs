@@ -22,7 +22,7 @@ public sealed class AuthFlowTests
     }
     internal static async Task<(string Access, string Refresh)> RegisterLoginAsync(ApiFactory factory, HttpClient client)
     {
-        await PostAsync(client, "register", new { email = ServiceHarness.Address, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "Nguyen", lastName = "Van A" });
+        await PostAsync(client, "register", new { userName = ServiceHarness.UserName, email = ServiceHarness.Address, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "Nguyen", lastName = "Van A" });
         await PostAsync(client, "verify-email", new { email = ServiceHarness.Address, otp = factory.Email.Inbox[(ServiceHarness.Address, OtpPurpose.EmailVerification)] });
         return await LoginAsync(client, ServiceHarness.Password);
     }
@@ -38,7 +38,7 @@ public sealed class AuthFlowTests
     public async Task Registration_accepts_password_length_boundaries(string password)
     {
         await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
-        await PostAsync(client, "register", new { email = ServiceHarness.Address, password, confirmPassword = password, firstName = "N", lastName = "A" });
+        await PostAsync(client, "register", new { userName = ServiceHarness.UserName, email = ServiceHarness.Address, password, confirmPassword = password, firstName = "N", lastName = "A" });
         await PostAsync(client, "verify-email", new { email = ServiceHarness.Address, otp = factory.Email.Inbox[(ServiceHarness.Address, OtpPurpose.EmailVerification)] });
         await LoginAsync(client, password);
     }
@@ -58,7 +58,7 @@ public sealed class AuthFlowTests
     public async Task Registration_rejects_invalid_password_via_direct_api(string password)
     {
         await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
-        await PostAsync(client, "register", new { email = ServiceHarness.Address, password, confirmPassword = password, firstName = "N", lastName = "A" }, HttpStatusCode.BadRequest);
+        await PostAsync(client, "register", new { userName = ServiceHarness.UserName, email = ServiceHarness.Address, password, confirmPassword = password, firstName = "N", lastName = "A" }, HttpStatusCode.BadRequest);
         Assert.Empty(factory.Email.Inbox);
     }
 
@@ -119,7 +119,7 @@ public sealed class AuthFlowTests
     public async Task Register_verify_login_and_access_me()
     {
         await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
-        var registered = await PostAsync(client, "register", new { email = ServiceHarness.Address, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "Nguyen", lastName = "Van A" });
+        var registered = await PostAsync(client, "register", new { userName = ServiceHarness.UserName, email = ServiceHarness.Address, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "Nguyen", lastName = "Van A" });
         Assert.True(registered.GetProperty("success").GetBoolean());
         Assert.DoesNotContain("otp", registered.ToString(), StringComparison.OrdinalIgnoreCase);
         var denied = await PostAsync(client, "login", new { email = ServiceHarness.Address, password = ServiceHarness.Password }, HttpStatusCode.Forbidden);

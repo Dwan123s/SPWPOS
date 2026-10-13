@@ -6,6 +6,14 @@ namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService
 {
+    public NoteAgentCapabilities GetNoteAgentCapabilities() => interpreter.Capabilities;
+    private static NoteScheduleResult AgentResult(NoteView note, PlanView plan) => new(note, plan, [
+        new("READ_NOTE", "Đã đọc ghi chú và múi giờ tài khoản."),
+        new("ANALYZE", $"Đã nhận diện {note.Analysis?.Tasks.Length ?? 0} công việc bằng {(note.Analysis?.Source is "OpenAI" or "Gemini" ? note.Analysis.Source : "bộ phân tích trên server")}."),
+        new("CREATE_TASKS", $"Đã lưu {note.CreatedTaskIds.Length} công việc; thử lại không tạo trùng."),
+        new("PLAN", $"Đã xếp {plan.Sessions.Count(x => !x.Preserved)} phiên mới và giữ {plan.Sessions.Count(x => x.Preserved)} phiên hiện có."),
+        new("APPLY", plan.IsApplied ? "Đã kiểm tra ràng buộc và áp dụng lịch." : "Lịch chưa được áp dụng.")
+    ]);
     private static readonly JsonSerializerOptions NoteJson = new(JsonSerializerDefaults.Web);
     private static NoteView NoteViewOf(PlanningNote note) => new(note.Id, note.Title, note.Content, note.Version,
         note.CreatedAt, note.UpdatedAt,
@@ -52,9 +60,12 @@ public sealed partial class WorkspaceService
         CheckNoteVersion(snapshot, input.Version); CheckNoteEditable(snapshot);
         var zone = (await State(uid, ct)).Preference.TimeZoneId;
         // Provider calls happen outside the account transaction; verify the note again before saving.
-        var analysis = input.UseAi
-            ? await RunJob(uid, "AI_REQUEST", () => interpreter.AnalyzeNoteAsync(snapshot.Content, true, zone, Now, ct), ct, x => x.Source == "OpenAI")
-            : await interpreter.AnalyzeNoteAsync(snapshot.Content, false, zone, Now, ct);
+        var analysis = await RunJob(uid, "AI_REQUEST", async () =>
+        {
+            var result = await interpreter.AnalyzeNoteAsync(snapshot.Content, true, zone, Now, ct);
+            Require(result.Source is "OpenAI" or "Gemini", "NOTE_AI_UNAVAILABLE", "Ghi chú cần được phân tích bằng AI. Vui lòng thử lại.", 503);
+            return result;
+        }, ct);
         var allowedTypes = await db.TaskTypes.Where(x => x.IsActive).Select(x => x.Code).ToArrayAsync(ct);
         analysis = analysis with { Tasks = analysis.Tasks.Select(x => x with
             { TaskType = allowedTypes.Contains(NormalizeTaskType(x.TaskType)) ? NormalizeTaskType(x.TaskType) : "OTHER",
@@ -75,6 +86,8 @@ public sealed partial class WorkspaceService
         if (note.CreatedTaskIdsJson != "[]") return NoteViewOf(note);
         CheckNoteVersion(note, input.Version);
         Require(note.AnalysisJson.Length > 0, "NOTE_NOT_ANALYZED", "Phân tích ghi chú trước khi tạo công việc.");
+        var analysis = JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson)!;
+        Require(analysis.Source is "OpenAI" or "Gemini", "NOTE_AI_REQUIRED", "Phân tích lại ghi chú bằng AI trước khi tạo công việc.", 409);
         Require(input.Tasks is { Length: >= 1 and <= 12 }, "VALIDATION_ERROR", "Chọn từ 1 đến 12 công việc.");
         var activeCount = await Mine<WorkTask>(uid).CountAsync(x => !x.IsDeleted && x.Status != WorkTaskStatus.Completed && x.Status != WorkTaskStatus.Cancelled, ct);
         Require(activeCount + input.Tasks.Length <= 500, "TASK_LIMIT", "Tối đa 500 công việc đang hoạt động.");
@@ -90,7 +103,6 @@ public sealed partial class WorkspaceService
             var task = NewTask(uid, taskInput, Now); db.WorkTasks.Add(task); ids.Add(task.Id);
             accepted.Add(taskInput with { TaskType = task.TaskType });
         }
-        var analysis = JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson)!;
         note.AnalysisJson = JsonSerializer.Serialize(analysis with { Tasks = accepted.ToArray() }, NoteJson);
         note.CreatedTaskIdsJson = JsonSerializer.Serialize(ids, NoteJson);
         note.Version = Guid.NewGuid(); note.UpdatedAt = Now;
@@ -104,14 +116,16 @@ public sealed partial class WorkspaceService
         if (note.PlanId is { } previousId)
         {
             var previous = await GetPlanAsync(uid, previousId, ct);
-            if (previous.IsApplied) return new(note, previous);
+            if (previous.IsApplied) return AgentResult(note, previous);
         }
         var state = await State(uid, ct);
         Require(state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable), "NO_AVAILABILITY",
             "Thiết lập giờ rảnh trước khi agent tự xếp lịch.");
         if (note.CreatedTaskIds.Length == 0)
         {
-            note = await AnalyzeNoteAsync(uid, id, new(input.Version, input.UseAi), ct);
+            note = await AnalyzeNoteAsync(uid, id, new(input.Version, true), ct);
+            Require(!note.Analysis!.NeedsReview, "NOTE_NEEDS_REVIEW",
+                "Ghi chú có ngày không hợp lệ hoặc điều kiện giờ rảnh/phụ thuộc chưa được thiết lập. Xem kết quả phân tích, cập nhật Thời gian & tùy chọn hoặc Công việc rồi sửa ghi chú trước khi tự xếp lịch.");
             Require(note.Analysis!.Tasks.Length > 0, "NOTE_NO_TASKS", "Chưa tìm thấy công việc. Bổ sung việc cần làm trong ghi chú.");
             note = await ImportNoteAsync(uid, id, new(note.Version, note.Analysis.Tasks), ct);
         }
@@ -125,6 +139,6 @@ public sealed partial class WorkspaceService
         }, ct, false);
         // The normal apply path validates revision, conflicts, deadlines and ownership.
         await ApplyPlanAsync(uid, plan.Id, ct);
-        return new(note, await GetPlanAsync(uid, plan.Id, ct));
+        return AgentResult(note, await GetPlanAsync(uid, plan.Id, ct));
     }
 }

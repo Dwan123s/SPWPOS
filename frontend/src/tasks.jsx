@@ -399,15 +399,34 @@ export function taskInput(data) {
     minimumSessionMinutes: Number(data.get("minimumSessionMinutes") || 25),
   };
 }
-export function openDetail(id) {
+export function openDetail(id, afterSession = false) {
   const t = taskById(id);
   if (!t) return;
   const children = state.workspace.tasks.filter((x) => x.parentId === id);
   const deps = t.dependencies.map(taskById).filter(Boolean);
   modal(
     t.name,
-    "Chi tiết công việc",
+    afterSession
+      ? "Lượt làm vừa kết thúc. Cập nhật phần công việc bạn đã hoàn thành."
+      : "Chi tiết công việc",
     <>
+      {afterSession && (
+        <div className="info post-session-help section-gap">
+          <h3>Bạn đã làm xong cả công việc chưa?</h3>
+          <p>
+            Xong phiên chỉ kết thúc lượt làm và dừng đồng hồ. Nếu còn việc, cập
+            nhật tiến độ bên dưới để tiếp tục vào lần sau.
+          </p>
+          {!["Completed", "Cancelled"].includes(t.status) &&
+            button(
+              "Đã hoàn thành cả công việc",
+              "task-finish",
+              "primary small",
+              id,
+              "check",
+            )}
+        </div>
+      )}
       <div className="actions">
         {badge(
           statusLabels[t.status],
@@ -583,7 +602,7 @@ export async function breakdownModal(id) {
   state.breakdown = result;
   modal(
     "Chia nhỏ công việc",
-    `Gợi ý từ ${result.source === "OpenAI" ? "AI" : "quy tắc mẫu"} · chỉ lưu những mục bạn chọn.`,
+    `Gợi ý từ ${["OpenAI", "Gemini"].includes(result.source) ? result.source : "quy tắc mẫu"} · chỉ lưu những mục bạn chọn.`,
     <>
       <form data-form="breakdown" data-id={id}>
         <div className="info">

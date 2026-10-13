@@ -132,21 +132,7 @@ export function LoginScene() {
   return (
     <div className="login-scene">
       <div className="login-scene-shadow" aria-hidden="true" />
-      <div className="login-scene-art" aria-hidden="true">
-        <Sprite name="ribbon" className="ribbon-back" depth={1} />
-        <Sprite name="calendar" depth={2} />
-        <Sprite name="checklist" depth={3} />
-        <Sprite name="clock" depth={4} />
-        <Sprite name="ribbon" className="ribbon-front" depth={5} />
-        <Sprite name="workspace-photo" />
-        {["top", "left", "right", "bottom", "lower-left"].map((position) => (
-          <Sprite
-            key={position}
-            name="bubble"
-            className={`bubble-${position}`}
-          />
-        ))}
-      </div>
+      <LoginArtwork />
       <div className="login-headline-panel">
         <h1>
           <span className="login-headline-line">Khám phá</span>{" "}
@@ -166,6 +152,22 @@ export function LoginScene() {
         </h1>
         <div className="login-headline-dash" aria-hidden="true" />
       </div>
+    </div>
+  );
+}
+
+export function LoginArtwork() {
+  return (
+    <div className="login-scene-art" aria-hidden="true">
+      <Sprite name="ribbon" className="ribbon-back" depth={1} />
+      <Sprite name="calendar" depth={2} />
+      <Sprite name="checklist" depth={3} />
+      <Sprite name="clock" depth={4} />
+      <Sprite name="ribbon" className="ribbon-front" depth={5} />
+      <Sprite name="workspace-photo" />
+      {["top", "left", "right", "bottom", "lower-left"].map((position) => (
+        <Sprite key={position} name="bubble" className={`bubble-${position}`} />
+      ))}
     </div>
   );
 }

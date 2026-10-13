@@ -16,6 +16,7 @@ export const state = {
   plan: null,
   scenario: null,
   authEmail: "",
+  authIdentifier: "",
   resetToken: null,
 };
 export const $ = (selector, root = document) => root.querySelector(selector);
@@ -283,7 +284,11 @@ export function PasswordField({
       const confirmation = input.current.value;
       const password = form.elements.namedItem(confirmFor)?.value || "";
       setMatch(
-        confirmation ? (confirmation === password ? "matched" : "mismatch") : null,
+        confirmation
+          ? confirmation === password
+            ? "matched"
+            : "mismatch"
+          : null,
       );
     };
     sync();

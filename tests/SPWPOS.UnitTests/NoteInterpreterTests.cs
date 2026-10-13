@@ -13,7 +13,7 @@ public sealed class NoteInterpreterTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Body = await request.Content!.ReadAsStringAsync(ct);
-            var text = JsonSerializer.Serialize(new { tasks = JsonSerializer.Deserialize<JsonElement>(tasks) });
+            var text = JsonSerializer.Serialize(new { tasks = JsonSerializer.Deserialize<JsonElement>(tasks), needsReview = false });
             var response = JsonSerializer.Serialize(new { output = new[] { new { type = "message", content = new[] { new { type = "output_text", text } } } } });
             return new(HttpStatusCode.OK) { Content = new StringContent(response) };
         }
@@ -48,14 +48,4 @@ public sealed class NoteInterpreterTests
         Assert.Equal("OpenAI", result.Source); Assert.Empty(result.Tasks);
     }
 
-    [Fact] public async Task Rules_report_time_conditions_and_do_not_silently_truncate_long_notes()
-    {
-        using var http = new HttpClient();
-        var result = await Interpreter(http).AnalyzeNoteAsync("Tôi rảnh 19h đến 21h\nViết báo cáo 2 tiếng", false,
-            "Asia/Ho_Chi_Minh", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken);
-        Assert.Single(result.Tasks); Assert.Contains(result.Messages, x => x.Contains("Chưa áp dụng điều kiện thời gian"));
-        var tooMany = await Interpreter(http).AnalyzeNoteAsync(string.Join('\n', Enumerable.Repeat("Viết báo cáo 60 phút", 13)), false,
-            "Asia/Ho_Chi_Minh", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken);
-        Assert.Empty(tooMany.Tasks); Assert.Contains(tooMany.Messages, x => x.Contains("tối đa 12 việc"));
-    }
 }

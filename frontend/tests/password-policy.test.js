@@ -50,4 +50,30 @@ describe("new password policy", () => {
       validateNewPassword("SafeAxB+1!", "a.b+@example.test"),
     ).not.toThrow();
   });
+  it("rejects a password containing the separate registration username", () => {
+    expect(() =>
+      validateNewPassword(
+        "SafeLAN.NGUYEN1!",
+        "member@example.test",
+        undefined,
+        "lan.nguyen",
+      ),
+    ).toThrow();
+    expect(() =>
+      validateNewPassword(
+        "SafeMember1!",
+        "member@example.test",
+        undefined,
+        "lan.nguyen",
+      ),
+    ).toThrow();
+    expect(() =>
+      validateNewPassword(
+        "SafeSunrise1!",
+        "member@example.test",
+        undefined,
+        "lan.nguyen",
+      ),
+    ).not.toThrow();
+  });
 });

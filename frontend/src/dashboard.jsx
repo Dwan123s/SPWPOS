@@ -1,343 +1,724 @@
+import { useState, Fragment } from "react";
 import { SessionTimer } from "./react-ui.jsx";
-import { nodeList } from "./react-ui.jsx";
 import {
   state,
   button,
-  badge,
   icon,
-  riskLabels,
   dateFmt,
   timeFmt,
-  dayKey,
   minutes,
-  stat,
-  empty,
-  loadLabel,
+  riskLabels,
 } from "./ui.jsx";
-import { sessionCard } from "./calendar.jsx";
-export function todayPage() {
-  const w = state.workspace,
-    i = state.insights || {
-      remainingMinutes: null,
-      effectiveCapacityMinutes: null,
-      capacityFactor: null,
-      riskLevel: "Unknown",
-      loadRatio: null,
-      plannedMinutes: null,
-      actualMinutes: null,
-    };
-  const day = dayKey(Date.now()),
-    sessions = w.sessions
-      .filter(
-        (s) =>
-          ["Running", "Paused"].includes(s.status) || dayKey(s.start) === day,
-      )
-      .sort((a, b) => new Date(a.start) - new Date(b.start));
-  const active = w.tasks.filter(
-      (t) => !["Completed", "Cancelled"].includes(t.status),
-    ),
-    due = [...active]
-      .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
-      .slice(0, 5);
-  const completed = w.tasks.filter((t) => t.status === "Completed").length,
-    done = sessions.filter((s) => s.status === "Completed").length,
-    scheduled = sessions
-      .filter((s) => !["Skipped", "Missed"].includes(s.status))
-      .reduce(
-        (sum, s) =>
-          sum + Math.round((new Date(s.end) - new Date(s.start)) / 60000),
-        0,
-      );
-  const next =
-    sessions.find((s) => ["Running", "Paused"].includes(s.status)) ||
-    sessions.find(
-      (s) => s.status === "Scheduled" && new Date(s.end) > Date.now(),
-    ) ||
-    sessions.find((s) => s.status === "Scheduled");
-  const running = next && ["Running", "Paused"].includes(next.status);
-  const focus = next ? (
-    <>
-      <div className="focus-status">
-        {badge(running ? "PHIÊN TẬP TRUNG" : "TIẾP THEO TRONG NGÀY", "purple")}
-        <span>
-          {timeFmt(next.start)}
-          {" — "}
-          {timeFmt(next.end)}
-        </span>
-      </div>
-      <h2>{next.taskName}</h2>
-      <p>
-        {running
-          ? "Giữ nhịp tập trung. Thời gian thực tế được ghi nhận trong phiên."
-          : "Dành một khoảng thời gian trọn vẹn cho công việc này."}
-      </p>
-      <div className="focus-controls">
-        {running ? (
-          <SessionTimer id={next.id} className="focus-timer" />
-        ) : (
-          <span className="focus-duration">
-            {icon("clock")}
-            {minutes(
-              Math.round((new Date(next.end) - new Date(next.start)) / 60000),
-            )}
-            {" tập trung"}
-          </span>
-        )}
-        <div className="actions">
-          {button(
-            next.status === "Running"
-              ? "Tạm dừng"
-              : next.status === "Paused"
-                ? "Tiếp tục"
-                : "Bắt đầu phiên",
-            next.status === "Running"
-              ? "session-pause"
-              : next.status === "Paused"
-                ? "session-resume"
-                : "session-start",
-            "primary",
-            next.id,
-            next.status === "Running" ? "pause" : "play",
-          )}
-          {running
-            ? button(
-                "Xong phiên",
-                "session-complete",
-                "secondary",
-                next.id,
-                "check",
-              )
-            : button("Chi tiết", "session-detail", "ghost", next.id, "arrow")}
-        </div>
-      </div>
-    </>
-  ) : (
-    <>
-      <div className="focus-status">
-        {badge("BẮT ĐẦU TỪ MỘT KẾ HOẠCH", "purple")}
-        {icon("spark")}
-      </div>
-      <h2>Dành chỗ cho điều quan trọng.</h2>
-      <p>
-        {w.availability.length
-          ? "Biến danh sách công việc thành những khoảng thời gian cụ thể. Bạn xem lại đề xuất trước khi áp dụng."
-          : "Cho PLANORA biết khi nào bạn rảnh để tạo một kế hoạch vừa sức."}
-      </p>
-      <div className="focus-controls">
-        <span className="focus-duration">
-          {icon("calendar")}Theo nhịp làm việc của bạn
-        </span>
-        {button(
-          w.availability.length ? "Lập kế hoạch" : "Thiết lập giờ rảnh",
-          w.availability.length ? "generate-plan" : "nav",
-          "primary",
-          w.availability.length ? "" : "time",
-          "arrow",
-        )}
-      </div>
-    </>
+import { dashboardModel } from "./dashboard-model.js";
+import { NextStep } from "./tutorial.jsx";
+
+const clock = (value) =>
+  `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+function ToolButton({
+  label,
+  action = "nav",
+  id = "",
+  symbol = "arrow",
+  text,
+}) {
+  return (
+    <button
+      type="button"
+      className={`console-icon-button${text ? " console-text-button" : ""}`}
+      data-action={action}
+      data-id={id}
+      aria-label={label}
+      title={label}
+    >
+      {icon(symbol)}
+      {text && <span>{text}</span>}
+    </button>
+  );
+}
+export function CapacityRibbon() {
+  const model = dashboardModel(state.workspace, state.insights);
+  const used = model.scheduledMinutes + model.focusMinutes + model.restMinutes;
+  const ceiling = Math.max(
+    used,
+    model.capacityMinutes || model.availableMinutes,
+    1,
   );
   return (
-    <>
-      <div className="daily-overview">
-        <section className="focus-card">{focus}</section>
-        <section className="day-summary card">
-          <div className="summary-heading">
-            <span className="summary-icon">{icon("today")}</span>
-            <span>Nhịp làm việc hôm nay</span>
+    <section className="capacity-ribbon" aria-label="Phân bổ thời gian hôm nay">
+      <div className="capacity-ribbon-track">
+        {[
+          {
+            name: "Đã xếp lịch",
+            value: model.scheduledMinutes,
+            tone: "scheduled",
+          },
+          { name: "Tập trung", value: model.focusMinutes, tone: "focus" },
+          { name: "Đệm nghỉ", value: model.restMinutes, tone: "rest" },
+        ].map((segment) => (
+          <div
+            key={segment.tone}
+            className={`capacity-segment capacity-segment--${segment.tone}`}
+            style={{ flexGrow: Math.max(segment.value / ceiling, 0.14) }}
+            title={`${minutes(segment.value)} ${segment.name.toLowerCase()}`}
+          >
+            <strong>{minutes(segment.value)}</strong>
+            <span>{segment.name}</span>
           </div>
-          <div className="day-count">
-            {done}
-            <span>
-              {"/ "}
-              {sessions.length}
-              {" phiên hoàn thành"}
-            </span>
-          </div>
-          <progress
-            className="progress"
-            value={done}
-            max={Math.max(1, sessions.length)}
-            aria-label="Số phiên đã hoàn thành hôm nay"
-          />
-          <div className="summary-bottom">
-            <span>
-              {icon("clock")}
-              {minutes(scheduled)}
-              {" đã lên lịch"}
-            </span>
-            {button("Lịch tuần", "nav", "small ghost", "calendar", "arrow")}
-          </div>
-        </section>
+        ))}
+        <div
+          className={`capacity-ceiling ${model.capacityMinutes !== null && used > model.capacityMinutes ? "is-overloaded" : ""}`}
+        >
+          <strong>{minutes(model.capacityMinutes)}</strong>
+          <span>Khả năng hôm nay</span>
+        </div>
       </div>
-      <div className="stats-grid">
-        {stat(
-          "Công việc đang mở",
-          active.length,
-          "Công việc chưa hoàn thành",
-          "tasks",
+    </section>
+  );
+}
+function FocusCockpit({ model }) {
+  const focus = model.focus;
+  const active = focus && ["Running", "Paused"].includes(focus.status);
+  const planned = focus
+    ? Math.max(
+        0,
+        Math.round((new Date(focus.end) - new Date(focus.start)) / 60000),
+      )
+    : 0;
+  return (
+    <section
+      className={`focus-cockpit ${active ? "is-active" : ""}`}
+      aria-label="Phiên tập trung"
+    >
+      <div className="cockpit-timer">
+        <span>{active ? "THỜI GIAN ĐÃ GHI NHẬN" : "PHIÊN TẬP TRUNG"}</span>
+        {active ? (
+          <SessionTimer id={focus.id} className="cockpit-time" compact />
+        ) : (
+          <strong className="cockpit-time">{clock(planned)}</strong>
         )}
-        {stat(
-          "Workload còn lại",
-          minutes(i.remainingMinutes),
-          "Tổng thời gian ước lượng đã điều chỉnh",
-          "clock",
-          "blue",
-        )}
-        {stat(
-          "Khả năng trong 7 ngày",
-          minutes(i.effectiveCapacityMinutes),
-          i.capacityFactor === null
-            ? "Chưa lấy được dữ liệu phân tích"
-            : `${Math.round(i.capacityFactor * 100)}% thời gian rảnh có thể thực hiện`,
-          "calendar",
-          "green",
-        )}
-        {stat(
-          "Mức workload",
-          riskLabels[i.riskLevel] || i.riskLevel,
-          loadLabel(i),
-          "insights",
-          "amber",
+        <small>
+          {focus
+            ? `${timeFmt(focus.start)} — ${timeFmt(focus.end)}`
+            : "Sẵn sàng cho kế hoạch mới"}
+        </small>
+      </div>
+      <div className="cockpit-content">
+        <span className="console-kicker">
+          {focus?.status === "Paused"
+            ? "ĐANG TẠM DỪNG"
+            : active
+              ? "ĐANG TẬP TRUNG"
+              : "TIẾP THEO TRONG NGÀY"}
+        </span>
+        <h2>{focus?.taskName || "Dành thời gian cho điều quan trọng"}</h2>
+        {focus ? (
+          <div className="cockpit-actions">
+            {button(
+              focus.status === "Running"
+                ? "Tạm dừng"
+                : focus.status === "Paused"
+                  ? "Tiếp tục"
+                  : "Bắt đầu phiên",
+              focus.status === "Running"
+                ? "session-pause"
+                : focus.status === "Paused"
+                  ? "session-resume"
+                  : "session-start",
+              "small secondary",
+              focus.id,
+              focus.status === "Running" ? "pause" : "play",
+            )}
+            {button("Chi tiết", "session-detail", "small ghost", focus.id)}
+            {active &&
+              button(
+                "Xong phiên",
+                "session-complete",
+                "small primary",
+                focus.id,
+                "check",
+              )}
+          </div>
+        ) : (
+          <div className="cockpit-actions">
+            {button(
+              state.workspace.availability.length
+                ? "Lập kế hoạch"
+                : "Thiết lập giờ rảnh",
+              state.workspace.availability.length ? "generate-plan" : "nav",
+              "small primary",
+              state.workspace.availability.length ? "" : "time",
+              "plus",
+            )}
+          </div>
         )}
       </div>
-      <div className="two-columns dashboard-columns">
-        <div className="stack">
-          <section className="card priority-card">
-            <div className="card-header">
-              <div>
-                <div className="section-kicker">BƯỚC TIẾP THEO</div>
-                <h2>
-                  {"Công việc cần chú ý "}
-                  <span className="count-pill">{due.length}</span>
-                </h2>
-                <p>Những deadline gần nhất trong danh sách của bạn.</p>
-              </div>
-              {button("Tất cả", "nav", "small ghost", "tasks", "arrow")}
-            </div>
-            {nodeList(
-              due.map((t) => (
-                <div className="priority-task">
-                  <span
-                    className={`task-status-marker ${t.status === "InProgress" ? "in-progress" : ""}`}
-                    aria-hidden="true"
-                  />
-                  <div className="priority-task-main">
-                    <button
-                      type="button"
-                      className="title-button"
-                      data-action="task-detail"
-                      data-id={t.id}
-                    >
-                      {t.name}
-                    </button>
-                    <div className="task-meta">
-                      <span>
-                        {w.categories?.find((c) => c.id === t.categoryId)
-                          ?.name || "Chưa phân nhóm"}
+    </section>
+  );
+}
+function DayRunway({ model }) {
+  const [view, setView] = useState("agenda");
+  const preference = state.workspace.preference;
+  const first = Math.min(
+    preference.preferredStartMinute ?? 480,
+    ...model.timeline.map((item) => item.span[0]),
+  );
+  const last = Math.max(
+    preference.preferredEndMinute ?? 1080,
+    ...model.timeline.map((item) => item.span[1]),
+  );
+  const start = Math.floor(first / 60) * 60;
+  const end = Math.min(1440, Math.ceil(last / 60) * 60);
+  const height = Math.max(360, ((end - start) / 60) * 48);
+  const scale = height / Math.max(60, end - start);
+  const ticks = Array.from(
+    { length: (end - start) / 60 + 1 },
+    (_, index) => start + index * 60,
+  );
+  const lanes = [];
+  const timeline = model.timeline.map((item) => {
+    let lane = lanes.findIndex((end) => end <= item.span[0]);
+    if (lane === -1) lane = lanes.length;
+    lanes[lane] = item.span[1];
+    return { ...item, lane };
+  });
+  const laneCount = Math.max(1, lanes.length);
+  return (
+    <section className="runway-card daily-schedule" aria-label="Lịch hôm nay">
+      <div className="runway-toolbar">
+        <span>
+          {icon("calendar")} {dateFmt(Date.now(), { weekday: "long" })}
+        </span>
+        <span>{model.daySessions.length} phiên</span>
+        <ToolButton
+          label="Mở lịch làm việc"
+          id="calendar"
+          symbol="calendar"
+          text="Mở lịch"
+        />
+      </div>
+      <div
+        className="daily-schedule-views"
+        role="group"
+        aria-label="Cách xem lịch hôm nay"
+      >
+        <button
+          type="button"
+          aria-pressed={view === "agenda"}
+          onClick={() => setView("agenda")}
+        >
+          Danh sách phiên
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === "timeline"}
+          onClick={() => setView("timeline")}
+        >
+          Dòng thời gian
+        </button>
+      </div>
+      {view === "agenda" && (
+        <div className="daily-agenda">
+          {timeline.map((item) => {
+            const rest = model.breaks.find(
+              (rest) => rest.span[0] === item.span[1],
+            );
+            const status =
+              {
+                Scheduled: "Chờ làm",
+                Running: "Đang làm",
+                Paused: "Tạm dừng",
+                Completed: "Đã xong",
+                Skipped: "Bỏ qua",
+                Missed: "Lỡ phiên",
+              }[item.status] || "Lịch bận";
+            return (
+              <Fragment key={`${item.kind}-${item.id}`}>
+                <div
+                  className={`daily-agenda-row ${["Running", "Paused"].includes(item.status) ? "is-active" : ""} ${item.status === "Completed" ? "is-completed" : ""}`}
+                >
+                  <div className="daily-agenda-time">
+                    <strong>{timeFmt(item.start)}</strong>
+                    <span>{timeFmt(item.end)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="daily-agenda-session"
+                    data-action={
+                      item.kind === "session" ? "session-detail" : "nav"
+                    }
+                    data-id={item.kind === "session" ? item.id : "calendar"}
+                  >
+                    <div className="daily-agenda-session-top">
+                      <span
+                        className={`daily-agenda-status status-${item.status || "event"}`}
+                      >
+                        {icon(
+                          item.status === "Completed"
+                            ? "check"
+                            : item.kind === "event"
+                              ? "calendar"
+                              : "clock",
+                        )}
+                        {status}
                       </span>
-                      <span>·</span>
-                      <span>
-                        {minutes(t.remainingMinutes)}
-                        {" còn lại"}
+                      <span className="daily-agenda-duration">
+                        {minutes(item.span[1] - item.span[0])}
                       </span>
                     </div>
-                  </div>
-                  <div
-                    className={`priority-task-deadline ${new Date(t.deadline) < Date.now() ? "overdue" : ""}`}
-                  >
-                    {dateFmt(t.deadline)}
+                    <strong className="daily-agenda-title">
+                      {item.taskName || item.name}
+                    </strong>
+                    <div className="daily-agenda-session-bottom">
+                      <span>
+                        {item.isLocked
+                          ? "Đã khóa lịch"
+                          : item.kind === "session"
+                            ? "Mở để bắt đầu hoặc xem chi tiết"
+                            : "Sự kiện cố định"}
+                      </span>
+                      {icon("arrow")}
+                    </div>
+                  </button>
+                </div>
+                {rest && (
+                  <div className="daily-agenda-rest">
+                    {icon("pause")}
+                    <span>Nghỉ {rest.span[1] - rest.span[0]} phút</span>
                     <small>
-                      {new Date(t.deadline) < Date.now()
-                        ? "Quá hạn"
-                        : timeFmt(t.deadline)}
+                      {clock(rest.span[0])}–{clock(rest.span[1])}
                     </small>
                   </div>
-                  {badge(
-                    ["", "Thấp", "Vừa", "Cao", "Khẩn"][t.priority],
-                    t.priority >= 3 ? "amber" : "",
+                )}
+              </Fragment>
+            );
+          })}
+          {!timeline.length && (
+            <div className="daily-agenda-empty">
+              <span>{icon("calendar")}</span>
+              <h3>Hôm nay còn trống</h3>
+              <p>Tạo lịch để biết việc nào cần làm và lúc nào bắt đầu.</p>
+              {button(
+                "Tạo lịch",
+                "generate-plan",
+                "small secondary",
+                "",
+                "calendar",
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {view === "timeline" && (
+        <>
+          <div className="runway-grid" style={{ height }}>
+            <div className="runway-hours">
+              {ticks.map((minute) => (
+                <span key={minute} style={{ top: (minute - start) * scale }}>
+                  {clock(minute)}
+                </span>
+              ))}
+            </div>
+            <div className="runway-lanes">
+              {ticks.map((minute) => (
+                <div
+                  key={minute}
+                  className="runway-line"
+                  style={{ top: (minute - start) * scale }}
+                />
+              ))}
+              {model.breaks.map((rest) => (
+                <div
+                  key={rest.span[0]}
+                  className="runway-break"
+                  style={{
+                    top: (rest.span[0] - start) * scale,
+                    height: Math.max(2, (rest.span[1] - rest.span[0]) * scale),
+                  }}
+                >
+                  <span title={`Nghỉ ${rest.span[1] - rest.span[0]} phút`}>
+                    {rest.span[1] - rest.span[0]}p
+                  </span>
+                </div>
+              ))}
+              {timeline.map((item) => {
+                const task = state.workspace.tasks.find(
+                  (task) => task.id === item.taskId,
+                );
+                const cyan =
+                  task?.taskType === "PROGRAMMING" ||
+                  ["Running", "Paused"].includes(item.status);
+                return (
+                  <button
+                    key={`${item.kind}-${item.id}`}
+                    type="button"
+                    className={`runway-block ${item.span[1] - item.span[0] < 45 ? "is-short" : ""} ${item.kind === "event" ? "runway-block--event" : cyan ? "runway-block--cyan" : "runway-block--blue"} ${item.status === "Completed" ? "is-completed" : ""}`}
+                    data-action={
+                      item.kind === "session" ? "session-detail" : "nav"
+                    }
+                    data-id={item.kind === "session" ? item.id : "calendar"}
+                    aria-label={`${item.taskName || item.name}, ${timeFmt(item.start)} đến ${timeFmt(item.end)}, ${minutes(item.span[1] - item.span[0])}`}
+                    style={{
+                      top: (item.span[0] - start) * scale + 2,
+                      height: Math.max(
+                        3,
+                        (item.span[1] - item.span[0]) * scale - 4,
+                      ),
+                      left: `${(item.lane / laneCount) * 100}%`,
+                      width: `${100 / laneCount}%`,
+                    }}
+                    title={`${item.taskName || item.name} · ${timeFmt(item.start)} — ${timeFmt(item.end)}`}
+                  >
+                    <span className="runway-block-title">
+                      {item.status === "Completed" && icon("check")}
+                      {item.taskName || item.name}
+                    </span>
+                    {item.span[1] - item.span[0] >= 45 && (
+                      <small>
+                        {timeFmt(item.start)} — {timeFmt(item.end)} ·{" "}
+                        {minutes(item.span[1] - item.span[0])}
+                        {item.isLocked ? " · Đã khóa" : ""}
+                      </small>
+                    )}
+                  </button>
+                );
+              })}
+              {!timeline.length && (
+                <div className="runway-empty">
+                  <span>{icon("calendar")}</span>
+                  <h3>Hôm nay còn trống</h3>
+                  <p>Biến công việc thành những khoảng thời gian cụ thể.</p>
+                  {button(
+                    "Lập kế hoạch",
+                    "generate-plan",
+                    "small secondary",
+                    "",
+                    "spark",
                   )}
                 </div>
-              )),
-            ) ||
-              empty(
-                "Một khoảng trống để bắt đầu",
-                "Thêm công việc đầu tiên và dành thời gian cho nó.",
-              )}
-            <div className="card-bottom">
-              {button(
-                "Ghi nhanh một ý tưởng",
-                "capture",
-                "ghost small",
-                "",
-                "plus",
               )}
             </div>
-          </section>
-          <section className="card reflection-card">
-            <div className="card-header">
-              <div>
-                <div className="section-kicker">HIỂU NHỊP CỦA BẠN</div>
-                <h2>Từ kế hoạch đến thực tế</h2>
-              </div>
-              {button("Phân tích", "nav", "small ghost", "insights", "arrow")}
-            </div>
-            <div className="reflection-metrics">
-              <div>
-                <span>Dự kiến / thực tế</span>
-                <strong>
-                  {minutes(i.plannedMinutes)}{" "}
-                  <small>
-                    {"/ "}
-                    {minutes(i.actualMinutes)}
-                  </small>
-                </strong>
-              </div>
-              <div>
-                <span>Công việc hoàn thành</span>
-                <strong>
-                  {completed}
-                  <small>{" công việc"}</small>
-                </strong>
-              </div>
-            </div>
-            <p className="reason">
-              Mỗi phiên được ghi nhận giúp kế hoạch tiếp theo phù hợp hơn với
-              bạn.
-            </p>
-          </section>
+          </div>
+          <div className="runway-legend">
+            <span>
+              <i className="legend-cyan" />
+              Tập trung
+            </span>
+            <span>
+              <i className="legend-blue" />
+              Phiên làm việc
+            </span>
+            <span>
+              <i className="legend-rest" />
+              Đệm nghỉ
+            </span>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+function EstimationGauge({ model }) {
+  return (
+    <section className="intelligence-card estimation-card">
+      <div className="console-card-heading">
+        <h3>Độ khớp ước lượng</h3>
+        <ToolButton
+          label="Xem phân tích ước lượng"
+          id="insights"
+          symbol="insights"
+        />
+      </div>
+      <div className="estimation-gauge">
+        <svg viewBox="0 0 220 115" aria-hidden="true">
+          <path className="gauge-track" d="M25 95 A85 85 0 0 1 195 95" />
+          <path
+            className="gauge-value"
+            d="M25 95 A85 85 0 0 1 195 95"
+            pathLength="100"
+            strokeDasharray={`${model.accuracy ?? 0} 100`}
+          />
+        </svg>
+        <div>
+          <strong>
+            {model.accuracy === null ? "—" : `${model.accuracy}%`}
+          </strong>
+          <span>
+            {model.accuracy === null
+              ? "Chưa có phiên ghi nhận"
+              : "Dự kiến so với thực tế"}
+          </span>
         </div>
-        <section className="card agenda-card">
-          <div className="card-header">
-            <div>
-              <div className="section-kicker">DÒNG THỜI GIAN</div>
-              <h2>
-                {"Lịch hôm nay "}
-                <span className="count-pill">{sessions.length}</span>
-              </h2>
+      </div>
+      <div className="gauge-caption">
+        <span>
+          {model.ratio
+            ? `${model.ratio.ratio.toFixed(2)}× hệ số`
+            : "Chưa đủ dữ liệu"}
+        </span>
+        <span>{model.ratio?.samples || 0} mẫu</span>
+      </div>
+    </section>
+  );
+}
+function CapacityHorizon({ model }) {
+  const maximum = Math.max(
+    60,
+    ...model.days.flatMap((day) => [day.capacity || 0, day.planned]),
+  );
+  return (
+    <section className="intelligence-card horizon-card">
+      <div className="console-card-heading">
+        <h3>Khả năng trong 7 ngày</h3>
+        <ToolButton label="Thiết lập thời gian rảnh" id="time" symbol="clock" />
+      </div>
+      <p>Lịch đã xếp và khả năng thực hiện</p>
+      <div
+        className="horizon-chart"
+        role="img"
+        aria-label="Lịch đã xếp và khả năng thực hiện trong bảy ngày tới"
+      >
+        {model.days.map((day, index) => (
+          <div
+            className="horizon-day"
+            key={day.key}
+            title={`${dateFmt(`${day.key}T12:00:00Z`)}: ${minutes(day.planned)} đã xếp; ${minutes(day.capacity)} khả năng`}
+          >
+            <div className="horizon-bar-space">
+              <div
+                className="horizon-capacity"
+                style={{
+                  height: `${((day.capacity || 0) / maximum) * 100}%`,
+                }}
+              />
+              <div
+                className={`horizon-planned ${index % 2 ? "is-blue" : ""}`}
+                style={{ height: `${(day.planned / maximum) * 100}%` }}
+              />
             </div>
-            {button("Mở lịch", "nav", "small ghost", "calendar", "calendar")}
+            <span>
+              {index === 0
+                ? "H.nay"
+                : new Intl.DateTimeFormat("vi-VN", {
+                    weekday: "short",
+                    timeZone: "UTC",
+                  }).format(new Date(`${day.key}T12:00:00Z`))}
+            </span>
           </div>
-          <div className="today-agenda">
-            {nodeList(
-              sessions.map((s) => (
-                <div className="agenda-entry">
-                  <div className="agenda-time">
-                    {timeFmt(s.start)}
-                    <span />
-                  </div>
-                  <div>{sessionCard(s)}</div>
+        ))}
+      </div>
+      <div className="horizon-legend">
+        <span>
+          <i className="legend-cyan" />
+          Đã xếp
+        </span>
+        <span>
+          <i className="legend-rest" />
+          Khả năng
+        </span>
+      </div>
+    </section>
+  );
+}
+function Deadlines({ model }) {
+  const deadlines = model.due.filter((task) => task.isHardDeadline).slice(0, 4);
+  return (
+    <section className="intelligence-card deadlines-card">
+      <div className="console-card-heading">
+        <h3>Deadline cần giữ</h3>
+        <ToolButton label="Xem tất cả công việc" id="tasks" symbol="tasks" />
+      </div>
+      <p>Những mốc không thể bỏ lỡ</p>
+      {deadlines.length ? (
+        <div className="deadline-list">
+          {deadlines.map((task) => (
+            <button
+              type="button"
+              key={task.id}
+              data-action="task-detail"
+              data-id={task.id}
+              className={`deadline-line ${new Date(task.deadline) < Date.now() ? "is-overdue" : ""}`}
+            >
+              <span className="deadline-day">
+                <strong>{dateFmt(task.deadline, { month: undefined })}</strong>
+                <small>
+                  {dateFmt(task.deadline, { day: undefined, month: "short" })}
+                </small>
+              </span>
+              <span className="deadline-info">
+                <strong>{task.name}</strong>
+                <small>
+                  {timeFmt(task.deadline)} · {minutes(task.remainingMinutes)}{" "}
+                  còn lại
+                </small>
+              </span>
+              {icon("arrow")}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="console-empty">Chưa có deadline cố định.</div>
+      )}
+    </section>
+  );
+}
+export function todayPage() {
+  const model = dashboardModel(state.workspace, state.insights);
+  const insights = state.insights;
+  return (
+    <>
+      <NextStep />
+      <div className="planning-dashboard">
+        <section
+          className="console-column backlog-column"
+          aria-label="Danh sách công việc"
+        >
+          <div className="console-column-heading">
+            <div>
+              <h2>Công việc & ý tưởng</h2>
+            </div>
+            <ToolButton
+              label="Thêm công việc"
+              action="new-task"
+              symbol="plus"
+              text="Thêm việc"
+            />
+          </div>
+          <div className="backlog-panel">
+            <div className="backlog-toolbar">
+              <span>
+                <strong>{model.queue.length}</strong> công việc đang mở
+              </span>
+              <ToolButton
+                label="Mở danh sách công việc"
+                id="tasks"
+                symbol="tasks"
+                text="Xem tất cả"
+              />
+            </div>
+            <div className="backlog-queue">
+              {model.queue.length ? (
+                model.queue.slice(0, 12).map((task) => (
+                  <button
+                    type="button"
+                    className="queue-card"
+                    key={task.id}
+                    data-action="task-detail"
+                    data-id={task.id}
+                  >
+                    <div className="queue-card-top">
+                      <span
+                        className={`queue-status ${task.status === "InProgress" ? "is-in-progress" : ""}`}
+                      />
+                      <strong>{task.name}</strong>
+                      {icon("arrow")}
+                    </div>
+                    <div className="queue-chips">
+                      <span>{minutes(task.remainingMinutes)}</span>
+                      <span
+                        className={`queue-priority priority-${task.priority}`}
+                      >
+                        {["", "Thấp", "Vừa", "Cao", "Khẩn"][task.priority]}
+                      </span>
+                      {task.dependencies?.length > 0 && <span>Phụ thuộc</span>}
+                    </div>
+                    <div className="queue-card-bottom">
+                      <span>
+                        {state.workspace.categories.find(
+                          (category) => category.id === task.categoryId,
+                        )?.name || "Chưa phân nhóm"}
+                      </span>
+                      <span>{dateFmt(task.deadline)}</span>
+                    </div>
+                    <div
+                      className="queue-progress"
+                      aria-label={`${task.progress}% hoàn thành`}
+                    >
+                      <span
+                        style={{
+                          width: `${Math.max(0, Math.min(100, task.progress))}%`,
+                        }}
+                      />
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="console-empty">
+                  <h3>Một khoảng trống để bắt đầu</h3>
+                  <p>Thêm công việc đầu tiên để xây dựng kế hoạch của bạn.</p>
+                  {button(
+                    "Thêm công việc",
+                    "new-task",
+                    "small secondary",
+                    "",
+                    "plus",
+                  )}
                 </div>
-              )),
-            ) ||
-              empty(
-                "Hôm nay còn trống",
-                "Tạo kế hoạch để dành thời gian cho công việc.",
-                "generate-plan",
-                "Lập kế hoạch",
               )}
+            </div>
+            <button
+              type="button"
+              className="queue-capture"
+              data-action="capture"
+            >
+              {icon("spark")}Ghi nhanh một ý tưởng<span>+</span>
+            </button>
           </div>
+          <button
+            type="button"
+            className="console-note-link"
+            data-action="nav"
+            data-id="notes"
+          >
+            {icon("edit")}
+            <span>
+              <strong>Ghi chú & AI</strong>
+              <small>Nhập việc cần làm, để AI giúp tạo lịch</small>
+            </span>
+            {icon("arrow")}
+          </button>
         </section>
+        <section
+          className="console-column runway-column"
+          aria-label="Lịch và phiên tập trung"
+        >
+          <div className="console-column-heading">
+            <div>
+              <h2>Lịch hôm nay & tập trung</h2>
+            </div>
+            <ToolButton
+              label="Lập kế hoạch"
+              action="generate-plan"
+              symbol="calendar"
+              text="Tạo lịch"
+            />
+          </div>
+          <FocusCockpit model={model} />
+          <DayRunway model={model} />
+        </section>
+        <aside
+          className="console-column intelligence-column"
+          aria-label="Phân tích khối lượng công việc"
+        >
+          <div className="console-column-heading">
+            <div>
+              <h2>Phân tích & khả năng</h2>
+            </div>
+          </div>
+          <EstimationGauge model={model} />
+          <CapacityHorizon model={model} />
+          <Deadlines model={model} />
+          <div className="console-workload">
+            <span
+              className={`workload-dot ${insights?.riskLevel === "Overload" || insights?.riskLevel === "High" ? "is-high" : ""}`}
+            />
+            <span>
+              {insights
+                ? `Khối lượng việc ${riskLabels[insights.riskLevel] || insights.riskLevel}`
+                : "Chưa xác định"}
+            </span>
+            <strong>{minutes(insights?.remainingMinutes)} còn lại</strong>
+          </div>
+        </aside>
       </div>
     </>
   );

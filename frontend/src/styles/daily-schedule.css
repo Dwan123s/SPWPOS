@@ -1,0 +1,203 @@
+.planning-console .daily-schedule {
+  padding: 18px;
+}
+.daily-schedule .runway-toolbar {
+  font-size: 12px;
+  padding-bottom: 12px;
+}
+.daily-schedule-views {
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+  background: #e5f0fb;
+  border: 1px solid #cde1f5;
+  border-radius: 12px;
+  margin-bottom: 18px;
+}
+.daily-schedule-views button {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  color: #496b8b;
+  cursor: pointer;
+  border-radius: 9px;
+  padding: 8px 5px;
+}
+.daily-schedule-views button[aria-pressed="true"] {
+  background: #fff;
+  color: #075dcc;
+  border-color: #c5ddf6;
+  box-shadow: 0 2px 5px #175fa510;
+  font-weight: 600;
+}
+.daily-agenda-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 14px;
+}
+.daily-agenda-time {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  padding-top: 14px;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: #284a70;
+}
+.daily-agenda-time span {
+  color: #68829f;
+  font-size: 10px;
+}
+.daily-agenda-session {
+  position: relative;
+  text-align: left;
+  padding: 14px 15px;
+  font: inherit;
+  min-width: 0;
+  cursor: pointer;
+  border: 1px solid #b9d6f3;
+  border-left: 4px solid #2980eb;
+  background: linear-gradient(125deg, #ffffffeb, #ebf4ffcb);
+  border-radius: 14px;
+  color: #183b63;
+  box-shadow: 0 4px 12px #387abd0a;
+}
+.daily-agenda-session:hover {
+  border-color: #1670d8;
+  box-shadow: 0 4px 14px #1978d51a;
+}
+.daily-agenda-session-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.daily-agenda-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #436489;
+}
+.daily-agenda-status .icon {
+  width: 12px;
+  height: 12px;
+}
+.daily-agenda-duration {
+  border-radius: 7px;
+  padding: 4px 7px;
+  background: #e4f0ff;
+  color: #225fb2;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.daily-agenda-title {
+  display: block;
+  margin: 10px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.daily-agenda-session-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: #6482a1;
+}
+.daily-agenda-session-bottom .icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.is-active .daily-agenda-session {
+  border-color: #66c6dc;
+  border-left-color: #07b5d4;
+  background: linear-gradient(120deg, #e4fbff, #e5f2ff);
+}
+.is-active .daily-agenda-status {
+  color: #067991;
+  font-weight: 600;
+}
+.is-completed .daily-agenda-session {
+  border-left-color: #40a58b;
+  background: #f0fbf8dc;
+}
+.is-completed .daily-agenda-status {
+  color: #267660;
+}
+.daily-agenda-rest {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 14px 62px;
+  padding: 6px 10px;
+  border: 1px dashed #c9dbe9;
+  border-radius: 9px;
+  color: #6a839c;
+  font-size: 10px;
+}
+.daily-agenda-rest .icon {
+  width: 12px;
+  height: 12px;
+}
+.daily-agenda-rest small {
+  margin-left: auto;
+  font-size: 9px;
+}
+.daily-agenda-empty {
+  text-align: center;
+  padding: 45px 12px;
+  color: #567a98;
+}
+.daily-agenda-empty > span {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: #e1f0fc;
+}
+.daily-agenda-empty h3 {
+  margin: 16px 0 8px;
+  font-size: 16px;
+}
+.daily-agenda-empty p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.daily-schedule .runway-block {
+  container: runway-block / size;
+}
+.daily-schedule .runway-block.is-short {
+  padding: 0;
+  border-width: 1px;
+}
+@container runway-block (max-height: 24px) {
+  .runway-block-title,
+  .runway-block small {
+    display: none;
+  }
+}
+@media (max-width: 800px) {
+  .planning-console .daily-schedule {
+    padding: 14px;
+  }
+  .daily-agenda-row {
+    gap: 10px;
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .daily-agenda-rest {
+    margin-left: 50px;
+  }
+  .daily-agenda-session {
+    padding: 12px;
+  }
+}

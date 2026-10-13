@@ -22,18 +22,26 @@ public sealed partial class AuthService(
     public const string GenericEmailMessage = "If an account with this email exists, a verification code has been sent.";
     public async Task RegisterAsync(RegisterRequest request, RequestContext context, CancellationToken ct)
     {
+        var userName = request.UserName?.Trim() ?? "";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(userName, @"\A[A-Za-z0-9][A-Za-z0-9._-]{2,31}\z",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)))
+            throw new AuthException("INVALID_USERNAME", "Tên đăng nhập cần 3–32 ký tự, bắt đầu bằng chữ hoặc số, chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.");
         await ExecuteAsync(Normalize(request.Email), context, SecurityEventType.REGISTER, async () =>
         {
             await LimitAsync(request.Email, "register", 5, 15, null, ct);
             var existing = await FindEmailAsync(request.Email, ct);
             if (existing is not null) return true; // same public response, no duplicate account
+            var normalizedUserName = normalizer.NormalizeName(userName)!;
+            await AccountTransaction.LockUserNameAsync(db, normalizedUserName, ct);
+            if (await db.Users.AnyAsync(x => x.NormalizedUserName == normalizedUserName, ct))
+                throw new AuthException("USERNAME_TAKEN", "Tên đăng nhập đã được sử dụng. Hãy chọn tên khác.", 409);
             if (request.Password != request.ConfirmPassword) throw Validation();
             var now = clock.GetUtcNow();
             var user = new ApplicationUser
             {
                 Id = Guid.NewGuid(),
                 Email = request.Email.Trim(),
-                UserName = request.Email.Trim(),
+                UserName = userName,
                 FirstName = request.FirstName.Trim(),
                 LastName = request.LastName.Trim(),
                 CreatedAt = now,
@@ -99,11 +107,17 @@ public sealed partial class AuthService(
             logger.LogWarning("Public OTP request could not complete ({FailureType})", ex.GetType().Name);
         }
     }
-    public Task<TokenResponse> LoginAsync(LoginRequest request, RequestContext context, CancellationToken ct) =>
-        ExecuteAsync(Normalize(request.Email), context, SecurityEventType.LOGIN_FAILED, async () =>
+    public async Task<TokenResponse> LoginAsync(LoginRequest request, RequestContext context, CancellationToken ct)
+    {
+        var identifier = request.Email.Trim();
+        var normalizedIdentifier = identifier.Contains('@') ? Normalize(identifier) : normalizer.NormalizeName(identifier)!;
+        var accountEmail = await FindLoginQuery(identifier, normalizedIdentifier).AsNoTracking().Select(x => x.NormalizedEmail).SingleOrDefaultAsync(ct);
+        // Both aliases share the canonical account lock and persistent rate-limit bucket.
+        var lockKey = accountEmail ?? Normalize(identifier);
+        return await ExecuteAsync(lockKey, context, SecurityEventType.LOGIN_FAILED, async () =>
         {
-            await LimitAsync(request.Email, "login", 10, 1, null, ct);
-            var user = await FindEmailAsync(request.Email, ct);
+            await LimitAsync(lockKey, "login", 10, 1, null, ct);
+            var user = await FindLoginQuery(identifier, normalizedIdentifier).SingleOrDefaultAsync(ct);
             if (user is null || !user.IsActive)
             {
                 hasher.VerifyHashedPassword(new ApplicationUser(), timing.DummyHash, request.Password);
@@ -138,6 +152,10 @@ public sealed partial class AuthService(
             audit.Record(user.Id, SecurityEventType.LOGIN_SUCCESS, true, context);
             return response;
         }, ct);
+    }
+    private IQueryable<ApplicationUser> FindLoginQuery(string identifier, string normalizedIdentifier) =>
+        identifier.Contains('@') ? db.Users.Where(x => x.NormalizedEmail == normalizedIdentifier)
+            : db.Users.Where(x => x.NormalizedUserName == normalizedIdentifier);
     public async Task<TokenResponse> RefreshTokenAsync(RefreshRequest request, RequestContext context, CancellationToken ct)
     {
         var hash = tokens.HashToken(request.RefreshToken);
@@ -367,7 +385,7 @@ public sealed partial class AuthService(
         limiter.CheckAsync(Normalize(address), operation, limit, TimeSpan.FromMinutes(minutes), cooldown, ct);
     private static void EnsureAvailable(ApplicationUser user)
     { if (!user.IsActive || !user.EmailConfirmed) throw Unauthorized(); }
-    private static AuthException Credentials() => new("INVALID_CREDENTIALS", "Invalid email or password.", 401);
+    private static AuthException Credentials() => new("INVALID_CREDENTIALS", "Tên đăng nhập, email hoặc mật khẩu không đúng.", 401);
     private static AuthException Unauthorized() => new("UNAUTHORIZED", "Please sign in again.", 401);
     private static AuthException OtpInvalid() => new("OTP_INVALID", "Invalid or already used verification code.");
     private static AuthException InvalidRefresh() => new("UNAUTHORIZED", "Invalid session. Please sign in again.", 401);

@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 namespace SPWPOS.Application.Authentication.DTOs;
 
-public sealed class RegisterRequest(string email, string password, string confirmPassword, string firstName, string lastName)
+public sealed class RegisterRequest(string email, string password, string confirmPassword, string firstName, string lastName, string userName = "")
 {
+    [Required, StringLength(32, MinimumLength = 3), RegularExpression("^[A-Za-z0-9][A-Za-z0-9._-]{2,31}$")]
+    public string UserName { get; init; } = userName?.Trim() ?? "";
     [Required, EmailAddress, StringLength(254)] public string Email { get; init; } = email;
     [Required, StringLength(32, MinimumLength = 8)] public string Password { get; init; } = password;
     [Required, Compare(nameof(Password))] public string ConfirmPassword { get; init; } = confirmPassword;
@@ -20,7 +22,8 @@ public sealed class OtpRequest(string email, string otp)
 }
 public sealed class LoginRequest(string email, string password)
 {
-    [Required, EmailAddress, StringLength(254)] public string Email { get; init; } = email;
+    // Keep the wire field name for existing clients; its value may be a username or email.
+    [Required, StringLength(254)] public string Email { get; init; } = email;
     [Required, StringLength(128)] public string Password { get; init; } = password;
 }
 public sealed class RefreshRequest(string refreshToken)

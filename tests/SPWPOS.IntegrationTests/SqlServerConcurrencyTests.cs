@@ -17,7 +17,7 @@ public sealed class SqlServerConcurrencyTests
     private static async Task<HttpResponseMessage> Post(HttpClient c, string route, object body) => await c.PostAsJsonAsync("/api/auth/" + route, body, Ct);
     private static async Task Register(ApiFactory factory, HttpClient client, bool verify = true)
     {
-        using var registered = await Post(client, "register", new { email = ServiceHarness.Address, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "N", lastName = "A" });
+        using var registered = await Post(client, "register", new { userName = ServiceHarness.UserName, email = ServiceHarness.Address, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "N", lastName = "A" });
         Assert.Equal(HttpStatusCode.OK, registered.StatusCode);
         if (verify)
         {
@@ -106,7 +106,7 @@ public sealed class SqlServerConcurrencyTests
     public async Task Migration_has_unique_normalized_email_and_parallel_register_creates_one_account()
     {
         await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync();
-        var body = new { email = ServiceHarness.Address, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "N", lastName = "A" };
+        var body = new { userName = ServiceHarness.UserName, email = ServiceHarness.Address, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "N", lastName = "A" };
         var responses = await Task.WhenAll(Post(client, "register", body), Post(client, "register", body));
         try
         {
@@ -115,6 +115,42 @@ public sealed class SqlServerConcurrencyTests
             Assert.Equal(1, await db.Users.CountAsync(Ct));
             Assert.True(db.Model.FindEntityType(typeof(SPWPOS.Domain.Entities.ApplicationUser))!.GetIndexes().Single(x => x.Properties.Count == 1 && x.Properties[0].Name == "NormalizedEmail").IsUnique);
         Assert.Equal(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync(Ct));
+        }
+        finally { foreach (var response in responses) response.Dispose(); }
+    }
+    [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Set SPWPOS_TEST_SQLSERVER to run real SQL Server concurrency tests."), Trait("Category", "SqlServer")]
+    public async Task Parallel_registration_with_the_same_username_creates_one_account()
+    {
+        await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync();
+        var responses = await Task.WhenAll(
+            Post(client, "register", new { userName = "shared.name", email = "first@example.com", password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "N", lastName = "A" }),
+            Post(client, "register", new { userName = "SHARED.NAME", email = "second@example.com", password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "N", lastName = "A" }));
+        try
+        {
+            Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK);
+            Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Conflict);
+            await using var scope = factory.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Equal(1, await db.Users.CountAsync(Ct));
+            Assert.Equal("SHARED.NAME", await db.Users.Select(x => x.NormalizedUserName).SingleAsync(Ct));
+        }
+        finally { foreach (var response in responses) response.Dispose(); }
+    }
+    [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Set SPWPOS_TEST_SQLSERVER to run real SQL Server concurrency tests."), Trait("Category", "SqlServer")]
+    public async Task Concurrent_username_and_email_attempts_share_one_account_lockout()
+    {
+        await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync();
+        await Register(factory, client);
+        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(index => Post(client, "login", new {
+            email = index % 2 == 0 ? ServiceHarness.UserName : ServiceHarness.Address, password = "Wrong secret 12!"
+        })));
+        try
+        {
+            Assert.All(responses, response => Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode));
+            using var username = await Post(client, "login", new { email = ServiceHarness.UserName, password = ServiceHarness.Password });
+            using var email = await Post(client, "login", new { email = ServiceHarness.Address, password = ServiceHarness.Password });
+            Assert.Equal(HttpStatusCode.Locked, username.StatusCode); Assert.Equal(HttpStatusCode.Locked, email.StatusCode);
+            await using var scope = factory.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Empty(await db.RefreshTokens.ToArrayAsync(Ct));
         }
         finally { foreach (var response in responses) response.Dispose(); }
     }

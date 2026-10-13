@@ -36,6 +36,8 @@ beforeEach(() => {
     settingsTab: "profile",
     scenario: null,
     calendarStart: null,
+    authIdentifier: "",
+    authEmail: "",
   });
   update({
     screen: null,
@@ -54,7 +56,8 @@ beforeEach(() => {
       if (url === "/api/browser-session/me")
         data = { user: profile, roles: ["Admin"] };
       if (url === "/api/workspace") data = currentWorkspace;
-      if (url === "/api/auth/login-methods") data = { hasPassword: true, googleLinked: false };
+      if (url === "/api/auth/login-methods")
+        data = { hasPassword: true, googleLinked: false };
       if (url === "/api/intelligence") data = insights;
       if (url === "/api/plans/conflicts") data = [];
       if (url === "/api/tasks" && options.method === "POST") {
@@ -115,12 +118,37 @@ async function navigate(route, title) {
   await screen.findByRole("heading", { level: 1, name: title });
 }
 
+it("accepts a username in the login field and keeps email recovery separate", async () => {
+  mount(false);
+  authSetup(vi.fn());
+  act(() => renderAuth());
+  const user = userEvent.setup();
+  const identifier = screen.getByLabelText("Tên đăng nhập hoặc email");
+  expect(identifier.type).toBe("text");
+  expect(identifier.autocomplete).toBe("username");
+  await user.type(identifier, "quan.nhat");
+  await user.type(screen.getByLabelText("Mật khẩu"), "ValidSecret123!");
+  await user.click(
+    screen.getByRole("button", { name: "Đăng nhập", exact: true }),
+  );
+  await waitFor(() =>
+    expect(
+      calls.find((call) => call.url === "/api/browser-session/login")?.body,
+    ).toEqual({ email: "quan.nhat", password: "ValidSecret123!" }),
+  );
+  act(() => renderAuth("forgot"));
+  expect(screen.getByLabelText("Email").value).toBe("");
+});
+
 it("submits login with same-origin cookies and toggles password without clearing it", async () => {
   mount(false);
   authSetup(vi.fn());
   act(() => renderAuth());
   const user = userEvent.setup();
-  await user.type(screen.getByLabelText("Email"), "member@example.test");
+  await user.type(
+    screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/),
+    "member@example.test",
+  );
   await user.type(screen.getByLabelText("Mật khẩu"), "ValidSecret123!");
   await user.click(screen.getByRole("button", { name: "Hiện mật khẩu" }));
   expect(screen.getByLabelText("Mật khẩu").type).toBe("text");
@@ -142,7 +170,7 @@ it("shows failed login directly on the password field, repeats feedback, and cle
   authSetup(onLogin);
   act(() => renderAuth());
   const password = screen.getByLabelText("Mật khẩu");
-  const email = screen.getByLabelText("Email");
+  const email = screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/);
   fireEvent.change(email, { target: { value: "member@example.test" } });
   fireEvent.change(password, { target: { value: "Secret123!" } });
   const shell = password.closest(".input-with-action");
@@ -151,17 +179,30 @@ it("shows failed login directly on the password field, repeats feedback, and cle
   const failure = {
     ok: false,
     status: 401,
-    json: async () => ({ error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password." } }),
+    json: async () => ({
+      error: {
+        code: "INVALID_CREDENTIALS",
+        message: "Invalid email or password.",
+      },
+    }),
   };
-  vi.mocked(fetch).mockResolvedValueOnce(failure).mockResolvedValueOnce(failure);
+  vi.mocked(fetch)
+    .mockResolvedValueOnce(failure)
+    .mockResolvedValueOnce(failure);
   const user = userEvent.setup();
   const button = screen.getByRole("button", { name: "Đăng nhập", exact: true });
   await user.click(button);
-  await waitFor(() => expect(password.getAttribute("aria-invalid")).toBe("true"));
+  await waitFor(() =>
+    expect(password.getAttribute("aria-invalid")).toBe("true"),
+  );
   const field = password.closest("label");
   expect(field.dataset.rejected).toBe("true");
-  expect(password.getAttribute("aria-describedby")).toBe("password-login-error");
-  expect(within(field).getByRole("alert").textContent).toBe("Email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra và thử lại.");
+  expect(password.getAttribute("aria-describedby")).toBe(
+    "password-login-error",
+  );
+  expect(within(field).getByRole("alert").textContent).toBe(
+    "Tên đăng nhập, email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra và thử lại.",
+  );
   expect(document.querySelector(".form-error").textContent).toBe("");
   expect(password.value).toBe("Secret123!");
   expect(document.activeElement).toBe(password);
@@ -190,17 +231,29 @@ it("shows login rejection without shaking when reduced motion is enabled", async
   authSetup(vi.fn());
   act(() => renderAuth());
   const password = screen.getByLabelText("Mật khẩu");
-  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "member@example.test" } });
+  fireEvent.change(
+    screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/),
+    { target: { value: "member@example.test" } },
+  );
   fireEvent.change(password, { target: { value: "Secret123!" } });
   const shell = password.closest(".input-with-action");
   shell.animate = vi.fn();
   vi.mocked(fetch).mockResolvedValueOnce({
     ok: false,
     status: 401,
-    json: async () => ({ error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password." } }),
+    json: async () => ({
+      error: {
+        code: "INVALID_CREDENTIALS",
+        message: "Invalid email or password.",
+      },
+    }),
   });
-  await userEvent.setup().click(screen.getByRole("button", { name: "Đăng nhập", exact: true }));
-  await waitFor(() => expect(password.getAttribute("aria-invalid")).toBe("true"));
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Đăng nhập", exact: true }));
+  await waitFor(() =>
+    expect(password.getAttribute("aria-invalid")).toBe("true"),
+  );
   expect(shell.animate).not.toHaveBeenCalled();
   fireEvent.input(password, { target: { value: "Secret124!" } });
   expect(password.hasAttribute("aria-invalid")).toBe(false);
@@ -211,46 +264,85 @@ it("keeps rate-limit errors separate from password rejection feedback", async ()
   authSetup(vi.fn());
   act(() => renderAuth());
   const password = screen.getByLabelText("Mật khẩu");
-  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "member@example.test" } });
+  fireEvent.change(
+    screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/),
+    { target: { value: "member@example.test" } },
+  );
   fireEvent.change(password, { target: { value: "Secret123!" } });
   vi.mocked(fetch).mockResolvedValueOnce({
     ok: false,
     status: 429,
-    json: async () => ({ error: { code: "RATE_LIMITED", message: "Please wait before trying again." } }),
+    json: async () => ({
+      error: {
+        code: "RATE_LIMITED",
+        message: "Please wait before trying again.",
+      },
+    }),
   });
-  await userEvent.setup().click(screen.getByRole("button", { name: "Đăng nhập", exact: true }));
-  await waitFor(() => expect(document.querySelector(".form-error").textContent).toBe("Please wait before trying again."));
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Đăng nhập", exact: true }));
+  await waitFor(() =>
+    expect(document.querySelector(".form-error").textContent).toBe(
+      "Please wait before trying again.",
+    ),
+  );
   expect(password.hasAttribute("aria-invalid")).toBe(false);
   expect(password.closest("label").hasAttribute("data-rejected")).toBe(false);
 });
 
-it.each(["register", "reset"])("blocks invalid passwords in the %s form before calling the API", async (mode) => {
-  mount(false);
-  state.authEmail = "member@example.test";
-  act(() => renderAuth(mode));
-  expect(screen.getByRole("list", { name: "Yêu cầu mật khẩu" })).toBeTruthy();
-  const password = screen.getByLabelText(mode === "reset" ? "Mật khẩu mới" : "Mật khẩu");
-  expect(password.minLength).toBe(8);
-  expect(password.maxLength).toBe(32);
-  fireEvent.change(password, { target: { value: "SafeMEMBER1!" } });
-  fireEvent.change(screen.getByLabelText("Nhập lại mật khẩu"), { target: { value: "SafeMEMBER1!" } });
-  expect(document.querySelector(".form-error").textContent).toBe("");
-  fireEvent.submit(document.querySelector('form[data-form="auth"]'));
-  expect(document.querySelectorAll('.password-checklist [data-met="true"]')).toHaveLength(4);
-  await waitFor(() => expect(document.querySelector(".form-error").textContent).toBe("Mật khẩu không được chứa email hoặc tên tài khoản (phần trước @)."));
-  expect(calls).toHaveLength(0);
-});
+it.each(["register", "reset"])(
+  "blocks invalid passwords in the %s form before calling the API",
+  async (mode) => {
+    mount(false);
+    state.authEmail = "member@example.test";
+    act(() => renderAuth(mode));
+    expect(screen.getByRole("list", { name: "Yêu cầu mật khẩu" })).toBeTruthy();
+    const password = screen.getByLabelText(
+      mode === "reset" ? "Mật khẩu mới" : "Mật khẩu",
+    );
+    expect(password.minLength).toBe(8);
+    expect(password.maxLength).toBe(32);
+    fireEvent.change(password, { target: { value: "SafeMEMBER1!" } });
+    fireEvent.change(screen.getByLabelText("Nhập lại mật khẩu"), {
+      target: { value: "SafeMEMBER1!" },
+    });
+    expect(document.querySelector(".form-error").textContent).toBe("");
+    fireEvent.submit(document.querySelector('form[data-form="auth"]'));
+    expect(
+      document.querySelectorAll('.password-checklist [data-met="true"]'),
+    ).toHaveLength(4);
+    await waitFor(() =>
+      expect(document.querySelector(".form-error").textContent).toBe(
+        "Mật khẩu không được chứa tên đăng nhập, email hoặc tên tài khoản (phần trước @).",
+      ),
+    );
+    expect(calls).toHaveLength(0);
+  },
+);
 
 it("notifies about forbidden text only after clicking reset", async () => {
   mount(false);
   state.authEmail = "member@example.test";
   act(() => renderAuth("reset"));
-  fireEvent.change(screen.getByLabelText("Mật khẩu mới"), { target: { value: "SafePASSWORD1!" } });
-  fireEvent.change(screen.getByLabelText("Nhập lại mật khẩu"), { target: { value: "SafePASSWORD1!" } });
-  expect(document.querySelectorAll('.password-checklist [data-met="true"]')).toHaveLength(4);
+  fireEvent.change(screen.getByLabelText("Mật khẩu mới"), {
+    target: { value: "SafePASSWORD1!" },
+  });
+  fireEvent.change(screen.getByLabelText("Nhập lại mật khẩu"), {
+    target: { value: "SafePASSWORD1!" },
+  });
+  expect(
+    document.querySelectorAll('.password-checklist [data-met="true"]'),
+  ).toHaveLength(4);
   expect(document.querySelector(".form-error").textContent).toBe("");
-  await userEvent.setup().click(screen.getByRole("button", { name: "Đặt mật khẩu mới" }));
-  await waitFor(() => expect(document.querySelector(".form-error").textContent).toBe("Mật khẩu không được chứa password, websitename hoặc PLANORA."));
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Đặt mật khẩu mới" }));
+  await waitFor(() =>
+    expect(document.querySelector(".form-error").textContent).toBe(
+      "Mật khẩu không được chứa password, websitename hoặc PLANORA.",
+    ),
+  );
   expect(calls).toHaveLength(0);
 });
 
@@ -259,20 +351,40 @@ it("shows the server's password reuse error after clicking reset and keeps the f
   state.authEmail = "member@example.test";
   state.resetToken = "saved-reset-token";
   act(() => renderAuth("reset"));
-  fireEvent.change(screen.getByLabelText("Mật khẩu mới"), { target: { value: "Abcdef1!" } });
-  fireEvent.change(screen.getByLabelText("Nhập lại mật khẩu"), { target: { value: "Abcdef1!" } });
+  fireEvent.change(screen.getByLabelText("Mật khẩu mới"), {
+    target: { value: "Abcdef1!" },
+  });
+  fireEvent.change(screen.getByLabelText("Nhập lại mật khẩu"), {
+    target: { value: "Abcdef1!" },
+  });
   expect(document.querySelector(".form-error").textContent).toBe("");
   vi.mocked(fetch).mockResolvedValueOnce({
     ok: false,
     status: 400,
-    json: async () => ({ error: { code: "PASSWORD_POLICY_FAILED", message: "New password must differ from your current password." } }),
+    json: async () => ({
+      error: {
+        code: "PASSWORD_POLICY_FAILED",
+        message: "New password must differ from your current password.",
+      },
+    }),
   });
-  await userEvent.setup().click(screen.getByRole("button", { name: "Đặt mật khẩu mới" }));
-  await waitFor(() => expect(document.querySelector(".form-error").textContent).toBe("New password must differ from your current password."));
-  expect(fetch).toHaveBeenCalledWith("/api/auth/reset-password", expect.objectContaining({ method: "POST" }));
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Đặt mật khẩu mới" }));
+  await waitFor(() =>
+    expect(document.querySelector(".form-error").textContent).toBe(
+      "New password must differ from your current password.",
+    ),
+  );
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/auth/reset-password",
+    expect.objectContaining({ method: "POST" }),
+  );
   expect(state.resetToken).toBe("saved-reset-token");
   expect(screen.getByLabelText("Mật khẩu mới").value).toBe("Abcdef1!");
-  expect(screen.getByRole("button", { name: "Đặt mật khẩu mới" }).disabled).toBe(false);
+  expect(
+    screen.getByRole("button", { name: "Đặt mật khẩu mới" }).disabled,
+  ).toBe(false);
 });
 
 it("blocks reuse in the account password form before calling the API", async () => {
@@ -282,12 +394,25 @@ it("blocks reuse in the account password form before calling the API", async () 
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Bảo mật" }));
   expect(screen.getByRole("list", { name: "Yêu cầu mật khẩu" })).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Mật khẩu hiện tại"), { target: { value: "Abcdef1!" } });
-  fireEvent.change(screen.getByLabelText("Mật khẩu mới"), { target: { value: "Abcdef1!" } });
-  fireEvent.change(screen.getByLabelText("Nhập lại mật khẩu mới"), { target: { value: "Abcdef1!" } });
+  fireEvent.change(screen.getByLabelText("Mật khẩu hiện tại"), {
+    target: { value: "Abcdef1!" },
+  });
+  fireEvent.change(screen.getByLabelText("Mật khẩu mới"), {
+    target: { value: "Abcdef1!" },
+  });
+  fireEvent.change(screen.getByLabelText("Nhập lại mật khẩu mới"), {
+    target: { value: "Abcdef1!" },
+  });
   fireEvent.submit(document.querySelector('form[data-form="password"]'));
-  await waitFor(() => expect(document.querySelector('form[data-form="password"] .form-error').textContent).toBe("Mật khẩu mới phải khác mật khẩu hiện tại."));
-  expect(calls.some((call) => call.url === "/api/auth/change-password")).toBe(false);
+  await waitFor(() =>
+    expect(
+      document.querySelector('form[data-form="password"] .form-error')
+        .textContent,
+    ).toBe("Mật khẩu mới phải khác mật khẩu hiện tại."),
+  );
+  expect(calls.some((call) => call.url === "/api/auth/change-password")).toBe(
+    false,
+  );
 });
 
 it("completes forgot password, OTP and reset transitions with the returned token", async () => {
@@ -296,8 +421,11 @@ it("completes forgot password, OTP and reset transitions with the returned token
   const artwork = document.querySelector(".login-scene");
   expect(artwork).not.toBeNull();
   const user = userEvent.setup();
-  await user.clear(screen.getByLabelText("Email"));
-  await user.type(screen.getByLabelText("Email"), "member@example.test");
+  await user.clear(screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/));
+  await user.type(
+    screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/),
+    "member@example.test",
+  );
   await user.click(screen.getByRole("button", { name: "Gửi mã xác minh" }));
   await screen.findByRole("heading", { name: "Xác minh mã OTP" });
   expect(document.querySelector(".login-scene")).toBe(artwork);
@@ -308,10 +436,7 @@ it("completes forgot password, OTP and reset transitions with the returned token
   await screen.findByRole("heading", { name: "Đặt mật khẩu mới" });
   expect(document.querySelector(".login-scene")).toBe(artwork);
   await user.type(screen.getByLabelText("Mật khẩu mới"), "NewSecret123!");
-  await user.type(
-    screen.getByLabelText("Nhập lại mật khẩu"),
-    "NewSecret123!",
-  );
+  await user.type(screen.getByLabelText("Nhập lại mật khẩu"), "NewSecret123!");
   await user.click(screen.getByRole("button", { name: "Đặt mật khẩu mới" }));
   await screen.findByRole("heading", { name: "Đăng nhập vào PLANORA" });
   expect(document.querySelector(".login-scene")).toBe(artwork);
@@ -345,8 +470,12 @@ it("keeps the animated auth page and pause setting through registration and veri
   ).toBe("true");
   await user.type(screen.getByLabelText("Tên"), "Lan");
   await user.type(screen.getByLabelText("Họ"), "Nguyen");
-  await user.clear(screen.getByLabelText("Email"));
-  await user.type(screen.getByLabelText("Email"), "new-member@example.test");
+  await user.type(screen.getByLabelText("Tên đăng nhập"), "lan.nguyen");
+  await user.clear(screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/));
+  await user.type(
+    screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/),
+    "new-member@example.test",
+  );
   await user.type(screen.getByLabelText("Mật khẩu"), "ValidSecret123!");
   await user.type(
     screen.getByLabelText("Nhập lại mật khẩu"),
@@ -358,6 +487,7 @@ it("keeps the animated auth page and pause setting through registration and veri
   await screen.findByRole("heading", { name: "Xác minh email" });
   expect(document.querySelector(".login-scene")).toBe(artwork);
   expect(calls.find((c) => c.url === "/api/auth/register").body).toEqual({
+    userName: "lan.nguyen",
     email: "new-member@example.test",
     password: "ValidSecret123!",
     confirmPassword: "ValidSecret123!",
@@ -370,7 +500,9 @@ it("keeps the animated auth page and pause setting through registration and veri
   );
   await screen.findByRole("heading", { name: "Đăng nhập vào PLANORA" });
   expect(document.querySelector(".login-scene")).toBe(artwork);
-  expect(screen.getByLabelText("Email").value).toBe("new-member@example.test");
+  expect(
+    screen.getByLabelText(/^(Email|Tên đăng nhập hoặc email)$/).value,
+  ).toBe("new-member@example.test");
   expect(screen.getByLabelText("Mật khẩu").value).toBe("");
   expect(
     screen
@@ -381,7 +513,14 @@ it("keeps the animated auth page and pause setting through registration and veri
 it("sets a first password for a Google account from Security and returns to login", async () => {
   const regularFetch = fetch.getMockImplementation();
   fetch.mockImplementation(async (url, options) => {
-    if (url === "/api/auth/login-methods") return { ok: true, status: 200, json: async () => ({ data: { hasPassword: false, googleLinked: true } }) };
+    if (url === "/api/auth/login-methods")
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { hasPassword: false, googleLinked: true },
+        }),
+      };
     return regularFetch(url, options);
   });
   mount();
@@ -389,16 +528,32 @@ it("sets a first password for a Google account from Security and returns to logi
   await navigate("settings", "Tài khoản & nhóm");
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Bảo mật" }));
-  await screen.findByRole("heading", { name: "Thiết lập đăng nhập bằng mật khẩu" });
+  await screen.findByRole("heading", {
+    name: "Thiết lập đăng nhập bằng mật khẩu",
+  });
   expect(screen.queryByLabelText("Mật khẩu hiện tại")).toBeNull();
   await user.click(screen.getByRole("button", { name: "Gửi mã OTP" }));
   await user.type(screen.getByLabelText("Mã OTP xác nhận từ Email"), "123456");
-  await user.type(screen.getByLabelText("Mật khẩu mới", { exact: true }), "ValidSecret123!");
-  await user.type(screen.getByLabelText("Nhập lại mật khẩu mới"), "ValidSecret123!");
-  await user.click(screen.getByRole("button", { name: "Thiết lập mật khẩu", exact: true }));
+  await user.type(
+    screen.getByLabelText("Mật khẩu mới", { exact: true }),
+    "ValidSecret123!",
+  );
+  await user.type(
+    screen.getByLabelText("Nhập lại mật khẩu mới"),
+    "ValidSecret123!",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Thiết lập mật khẩu", exact: true }),
+  );
   await screen.findByRole("heading", { name: "Đăng nhập vào PLANORA" });
-  expect(calls.find((c) => c.url === "/api/auth/set-password").body).toEqual({ otp: "123456", newPassword: "ValidSecret123!", confirmNewPassword: "ValidSecret123!" });
-  expect(calls.some((c) => c.url === "/api/auth/change-password/request-otp")).toBe(true);
+  expect(calls.find((c) => c.url === "/api/auth/set-password").body).toEqual({
+    otp: "123456",
+    newPassword: "ValidSecret123!",
+    confirmNewPassword: "ValidSecret123!",
+  });
+  expect(
+    calls.some((c) => c.url === "/api/auth/change-password/request-otp"),
+  ).toBe(true);
   expect(calls.some((c) => c.url === "/api/browser-session/logout")).toBe(true);
   expect(calls.some((c) => c.url === "/api/auth/change-password")).toBe(false);
 });
@@ -408,9 +563,9 @@ it("navigates all workspace screens and renders the admin data", async () => {
   for (const [route, title] of Object.entries({
     tasks: "Công việc",
     calendar: "Lịch làm việc",
-    time: "Thời gian & tùy chọn",
+    time: "Giờ rảnh",
     insights: "Phân tích cá nhân",
-    scenario: "Thử kịch bản",
+    scenario: "Thử nhận thêm việc",
     notifications: "Thông báo",
     settings: "Tài khoản & nhóm",
     admin: "Quản trị",
@@ -442,7 +597,7 @@ it("creates a task and retains filters while updating the React result list", as
 it("adds and removes availability rows without losing unsaved time values", async () => {
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
-  await navigate("time", "Thời gian & tùy chọn");
+  await navigate("time", "Giờ rảnh");
   const user = userEvent.setup();
   fireEvent.change(screen.getAllByLabelText("Bắt đầu")[1], {
     target: { value: "09:30" },
@@ -487,9 +642,9 @@ it("shows apply only for real proposals and keeps simulations read-only", async 
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   act(() => planModal(plan));
-  expect(screen.getByRole("button", { name: "Áp dụng kế hoạch" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Lưu lịch này" })).toBeTruthy();
   act(() => planModal(plan, true));
-  expect(screen.queryByRole("button", { name: "Áp dụng kế hoạch" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Lưu lịch này" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Bỏ đề xuất" })).toBeNull();
 });
 it("reviews a captured task with safe text notes before saving", async () => {
@@ -534,4 +689,57 @@ it("opens and closes the mobile drawer with inert content and restored focus", a
   fireEvent.keyDown(document.activeElement, { key: "Escape" });
   await waitFor(() => expect(document.activeElement).toBe(button));
   expect(document.querySelector(".main").inert).toBe(false);
+});
+
+it("guides users to hours before generating a plan without changing saved tasks", async () => {
+  currentWorkspace.availability = [];
+  currentWorkspace.exceptions = [];
+  mount();
+  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Lập kế hoạch", exact: true }));
+  await screen.findByRole("heading", {
+    name: "Chọn giờ rảnh trước khi tạo lịch",
+  });
+  expect(calls.some((c) => c.url === "/api/plans")).toBe(false);
+  await userEvent
+    .setup()
+    .click(
+      within(document.querySelector("#modal")).getByRole("button", {
+        name: "Chọn giờ rảnh",
+      }),
+    );
+  await screen.findByRole("heading", { level: 1, name: "Giờ rảnh" });
+  expect(currentWorkspace.tasks).toHaveLength(6);
+});
+it("finishing a session asks for progress and completes the whole task only on explicit click", async () => {
+  currentWorkspace.sessions[1].status = "Running";
+  currentWorkspace.tasks[1].status = "InProgress";
+  const original = vi.mocked(fetch).getMockImplementation();
+  vi.mocked(fetch).mockImplementation(async (url, options = {}) => {
+    if (url === "/api/sessions/session-1/complete")
+      currentWorkspace.sessions[1].status = "Completed";
+    if (url === "/api/tasks/task-1/status")
+      Object.assign(currentWorkspace.tasks[1], JSON.parse(options.body));
+    return original(url, options);
+  });
+  mount();
+  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "Xong phiên", exact: true }),
+  );
+  await screen.findByRole("heading", {
+    name: "Bạn đã làm xong cả công việc chưa?",
+  });
+  expect(calls.some((c) => c.url === "/api/tasks/task-1/status")).toBe(false);
+  await user.click(
+    screen.getByRole("button", { name: "Đã hoàn thành cả công việc" }),
+  );
+  await waitFor(() =>
+    expect(
+      calls.find((c) => c.url === "/api/tasks/task-1/status")?.body,
+    ).toEqual({ status: "Completed", progress: 100 }),
+  );
 });

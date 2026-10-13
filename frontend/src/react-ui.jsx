@@ -100,7 +100,7 @@ export function Slot({ as: Tag = "div", id, children, ...props }) {
     </Tag>
   );
 }
-export function SessionTimer({ id, className }) {
+export function SessionTimer({ id, className, compact = false }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => tick((n) => n + 1), 1000);
@@ -116,11 +116,15 @@ export function SessionTimer({ id, className }) {
         ),
       )
     : 0;
-  const text = [
-    Math.floor(seconds / 3600),
-    Math.floor(seconds / 60) % 60,
-    seconds % 60,
-  ]
+  const text = (
+    compact && seconds < 3600
+      ? [Math.floor(seconds / 60), seconds % 60]
+      : [
+          Math.floor(seconds / 3600),
+          Math.floor(seconds / 60) % 60,
+          seconds % 60,
+        ]
+  )
     .map((n) => String(n).padStart(2, "0"))
     .join(":");
   return (

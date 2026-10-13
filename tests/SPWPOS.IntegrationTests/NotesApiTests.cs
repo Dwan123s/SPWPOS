@@ -2,12 +2,23 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SPWPOS.Application.Workspace;
 using SPWPOS.TestSupport;
 namespace SPWPOS.IntegrationTests;
 
 public sealed class NotesApiTests
 {
+    private sealed class AiFactory : ApiFactory
+    {
+        public NoteAiTestDouble Ai { get; } = new();
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.ConfigureServices(services => services.AddSingleton<ITaskInterpreter>(Ai));
+        }
+    }
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     private static async Task<JsonElement> Data(HttpResponseMessage response)
     {
@@ -20,8 +31,12 @@ public sealed class NotesApiTests
     {
         await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/notes", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/notes/agent", Ct)).StatusCode);
         var tokens = await AuthFlowTests.RegisterLoginAsync(factory, client);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Access);
+        var capabilities = await Data(await client.GetAsync("/api/notes/agent", Ct));
+        Assert.False(capabilities.GetProperty("aiAvailable").GetBoolean());
+        Assert.Equal(12, capabilities.GetProperty("maxTasks").GetInt32());
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/notes", new NoteInput("", ""), Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/notes", new NoteInput("Title", new string('x', 8001)), Ct)).StatusCode);
         var empty = await Data(await client.GetAsync("/api/notes", Ct)); Assert.Equal(0, empty.GetArrayLength());
@@ -29,7 +44,7 @@ public sealed class NotesApiTests
 
     [Fact] public async Task Note_endpoints_support_automatic_schedule_and_idempotent_retry()
     {
-        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        await using var factory = new AiFactory(); using var client = await factory.ClientAsync();
         var tokens = await AuthFlowTests.RegisterLoginAsync(factory, client);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Access);
         await Data(await client.PutAsJsonAsync("/api/time/availability",
@@ -38,6 +53,8 @@ public sealed class NotesApiTests
         var id = saved.GetProperty("id").GetGuid();
         var input = new NoteScheduleInput(saved.GetProperty("version").GetGuid(), false, 7);
         var scheduled = await Data(await client.PostAsJsonAsync($"/api/notes/{id}/schedule", input, Ct));
+        Assert.True(factory.Ai.LastUseAi);
+        Assert.Equal("Gemini", scheduled.GetProperty("note").GetProperty("analysis").GetProperty("source").GetString());
         Assert.True(scheduled.GetProperty("plan").GetProperty("isApplied").GetBoolean());
         var retry = await Data(await client.PostAsJsonAsync($"/api/notes/{id}/schedule", input, Ct));
         Assert.Equal(scheduled.GetProperty("plan").GetProperty("id").GetGuid(), retry.GetProperty("plan").GetProperty("id").GetGuid());
@@ -47,5 +64,19 @@ public sealed class NotesApiTests
         var list = await Data(await client.GetAsync("/api/notes", Ct)); Assert.Equal(1, list.GetArrayLength());
         var missing = await client.PostAsJsonAsync($"/api/notes/{Guid.NewGuid()}/analyze", new NoteAnalysisInput(Guid.NewGuid()), Ct);
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+    [Fact] public async Task Missing_ai_returns_503_instead_of_creating_work_with_rules()
+    {
+        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        var tokens = await AuthFlowTests.RegisterLoginAsync(factory, client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Access);
+        var saved = await Data(await client.PostAsJsonAsync("/api/notes", new NoteInput("AI only", "Viết báo cáo ngày mai 60 phút"), Ct));
+        var response = await client.PostAsJsonAsync($"/api/notes/{saved.GetProperty("id").GetGuid()}/analyze", new NoteAnalysisInput(saved.GetProperty("version").GetGuid(), false), Ct);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("NOTE_AI_NOT_CONFIGURED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        var workspace = await Data(await client.GetAsync("/api/workspace", Ct));
+        Assert.Equal(0, workspace.GetProperty("tasks").GetArrayLength()); Assert.Equal(0, workspace.GetProperty("sessions").GetArrayLength());
+        var list = await Data(await client.GetAsync("/api/notes", Ct)); Assert.Equal(1, list.GetArrayLength());
     }
 }

@@ -49,39 +49,56 @@ export function renderAuth(mode = "login") {
   const fields = (
     <>
       {mode === "register" && (
-        <div className="form-grid">
+        <>
+          <div className="form-grid">
+            {field(
+              "Tên",
+              "firstName",
+              "text",
+              "",
+              'required maxlength="100" autocomplete="given-name" placeholder="Tên của bạn"',
+            )}
+            {field(
+              "Họ",
+              "lastName",
+              "text",
+              "",
+              'required maxlength="100" autocomplete="family-name" placeholder="Họ của bạn"',
+            )}
+          </div>
           {field(
-            "Tên",
-            "firstName",
+            "Tên đăng nhập",
+            "userName",
             "text",
             "",
-            'required maxlength="100" autocomplete="given-name" placeholder="Tên của bạn"',
+            'required minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="username-requirements" placeholder="Ví dụ: quan.nhat"',
           )}
-          {field(
-            "Họ",
-            "lastName",
-            "text",
-            "",
-            'required maxlength="100" autocomplete="family-name" placeholder="Họ của bạn"',
-          )}
-        </div>
+          <p id="username-requirements" className="reason">
+            3–32 ký tự: chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.
+            Không phân biệt chữ hoa/thường.
+          </p>
+        </>
       )}
       {mode === "login" ? (
         <>
           <label className="field">
-            <span className="auth-visually-hidden">Email</span>
+            <span className="auth-visually-hidden">
+              Tên đăng nhập hoặc email
+            </span>
             <div className="input-with-action login-input-shell">
               <span className="login-input-icon" aria-hidden="true">
                 {icon("mail")}
               </span>
               <input
-                type="email"
+                type="text"
                 name="email"
-                defaultValue={state.authEmail}
+                defaultValue={state.authIdentifier || state.authEmail}
                 required
                 maxLength={254}
-                autoComplete="email"
-                placeholder="Địa chỉ email"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="Tên đăng nhập hoặc email"
               />
             </div>
           </label>
@@ -140,6 +157,7 @@ export function renderAuth(mode = "login") {
   const [title, description] = titles[mode] || titles.login;
   transitionAuthPanel(() => {
     currentMode = mode;
+    history.replaceState(null, "", `#${mode}`);
     setScreen(
       authView(mode, title, description, fields, buttons, onLogin),
       `auth-${mode}`,
@@ -150,7 +168,13 @@ export function renderAuth(mode = "login") {
 export async function handleAuthAction(action) {
   if (!action.startsWith("auth-")) return false;
   const email = $('input[name="email"]');
-  if (email) state.authEmail = email.value;
+  if (email) {
+    if (currentMode === "login") state.authIdentifier = email.value.trim();
+    state.authEmail =
+      currentMode === "login" && !email.value.includes("@")
+        ? ""
+        : email.value.trim();
+  }
   if (action === "auth-resend") {
     try {
       await api("/api/auth/resend-verification-otp", "POST", {
@@ -169,11 +193,18 @@ export async function handleAuthSubmit(form) {
   if (form.dataset.form !== "auth") return false;
   try {
     await submit(form, async (data) => {
-      const email = String(data.get("email") || state.authEmail);
-      state.authEmail = email;
+      const email = String(data.get("email") || state.authEmail).trim();
+      if (currentMode === "login") state.authIdentifier = email;
+      state.authEmail =
+        currentMode === "login" && !email.includes("@") ? "" : email;
       const password = String(data.get("password") || "");
       if (["register", "reset"].includes(currentMode)) {
-        validateNewPassword(password, email);
+        validateNewPassword(
+          password,
+          email,
+          undefined,
+          String(data.get("userName") || ""),
+        );
         if (password !== String(data.get("confirmPassword") || "")) {
           throw new Error("Mật khẩu xác nhận không khớp.");
         }
@@ -193,6 +224,7 @@ export async function handleAuthSubmit(form) {
           break;
         case "register":
           await api("/api/auth/register", "POST", {
+            userName: String(data.get("userName") || "").trim(),
             email,
             password,
             confirmPassword: String(data.get("confirmPassword")),
@@ -207,6 +239,7 @@ export async function handleAuthSubmit(form) {
             email,
             otp: String(data.get("otp")),
           });
+          state.authIdentifier = email;
           renderAuth("login");
           toast("Email đã xác minh. Bạn có thể đăng nhập.", "success");
           break;
@@ -233,6 +266,7 @@ export async function handleAuthSubmit(form) {
             confirmNewPassword: String(data.get("confirmPassword")),
           });
           state.resetToken = null;
+          state.authIdentifier = email;
           renderAuth("login");
           toast("Đã đặt lại mật khẩu. Hãy đăng nhập lại.", "success");
           break;

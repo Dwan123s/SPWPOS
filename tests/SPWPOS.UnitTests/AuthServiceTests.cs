@@ -166,6 +166,6 @@ public sealed class AuthServiceTests
     public async Task Blocklisted_password_is_rejected()
     {
         await using var h = await ServiceHarness.CreateAsync();
-        Assert.Equal("PASSWORD_POLICY_FAILED", (await Assert.ThrowsAsync<AuthException>(() => h.AuthAsync(a => a.RegisterAsync(new(ServiceHarness.Address, "Password123!", "Password123!", "N", "A"), ServiceHarness.Context, Ct)))).Code);
+        Assert.Equal("PASSWORD_POLICY_FAILED", (await Assert.ThrowsAsync<AuthException>(() => h.AuthAsync(a => a.RegisterAsync(new(ServiceHarness.Address, "Password123!", "Password123!", "N", "A", ServiceHarness.UserName), ServiceHarness.Context, Ct)))).Code);
     }
 }

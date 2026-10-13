@@ -5,6 +5,7 @@ namespace SPWPOS.Api.Controllers;
 [Route("api/notes"), Tags("Notes")]
 public sealed class NotesController(IWorkspaceService service) : WorkspaceController
 {
+    [HttpGet("agent")] public IActionResult Agent() => Data(service.GetNoteAgentCapabilities());
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct) => Data(await service.GetNotesAsync(UserId, ct));
     [HttpPost] public async Task<IActionResult> Create(NoteInput input, CancellationToken ct) => Data(await service.SaveNoteAsync(UserId, null, input, ct));
     [HttpPut("{id:guid}")] public async Task<IActionResult> Update(Guid id, NoteInput input, CancellationToken ct) => Data(await service.SaveNoteAsync(UserId, id, input, ct));

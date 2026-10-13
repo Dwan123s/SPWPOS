@@ -32,6 +32,8 @@ import {
 } from "./ui.jsx";
 import { api, submit } from "./api.js";
 import { NotesPage } from "./notes.jsx";
+import { GettingStarted } from "./getting-started.jsx";
+import { completeGuideStep } from "./onboarding.js";
 import { validateNewPassword } from "./password-policy.js";
 import {
   authSetup,
@@ -71,7 +73,11 @@ import {
   adminStatus,
 } from "./pages.jsx";
 const routes = {
-  notes: ["Ghi chú & agent", "Ghi điều cần làm, phân tích và tạo lịch phù hợp với bạn.", "edit"],
+  notes: [
+    "Ghi chú & AI",
+    "Viết việc cần làm, rồi chọn xem trước hoặc để AI tạo và lưu lịch ngay.",
+    "edit",
+  ],
   today: [
     "Hôm nay",
     "Một góc nhìn rõ ràng về công việc và thời gian của bạn.",
@@ -79,27 +85,27 @@ const routes = {
   ],
   tasks: [
     "Công việc",
-    "Quản lý điều cần làm, deadline và những bước thực hiện.",
+    "Thêm việc, đặt hạn chót và cập nhật tiến độ khi làm xong.",
     "tasks",
   ],
   calendar: [
     "Lịch làm việc",
-    "Dành những khoảng thời gian cụ thể cho công việc.",
+    "Bấm vào một khoảng trong lịch để bắt đầu, tạm dừng hoặc kết thúc lượt làm.",
     "calendar",
   ],
   time: [
-    "Thời gian & tùy chọn",
-    "Thiết lập lịch rảnh và cách bạn muốn làm việc.",
+    "Giờ rảnh",
+    "Chọn ngày, giờ bạn có thể làm việc rồi bấm Lưu lịch rảnh.",
     "clock",
   ],
   insights: [
     "Phân tích cá nhân",
-    "Hiểu cách bạn ước lượng và thực hiện công việc.",
+    "So sánh thời gian dự kiến với thực tế sau khi bạn đã ghi nhận các lượt làm.",
     "insights",
   ],
   scenario: [
-    "Thử kịch bản",
-    "Xem điều gì thay đổi trước khi nhận thêm việc.",
+    "Thử nhận thêm việc",
+    "Nhập một việc giả định để kiểm tra thời gian trước khi nhận; lịch hiện tại chưa thay đổi.",
     "scenario",
   ],
   notifications: [
@@ -127,6 +133,7 @@ function expiry() {
   state.user = null;
   state.roles = [];
   closeModal();
+  history.replaceState(null, "", "#login");
   renderAuth();
   toast("Phiên đăng nhập đã kết thúc. Hãy đăng nhập lại.");
 }
@@ -162,6 +169,10 @@ async function loggedIn() {
 function render() {
   if (!state.workspace) return;
   state.route = location.hash.slice(1) || "today";
+  if (state.route === "getting-started") {
+    setScreen(<GettingStarted signedIn />, "getting-started");
+    return;
+  }
   if (
     !routes[state.route] ||
     (state.route === "admin" && !state.roles.includes("Admin"))
@@ -234,6 +245,53 @@ async function loadAdmin(search = "") {
   if ($("#system-status")) setSlot("system-status", adminStatus(status));
 }
 function planOptions(affected = []) {
+  const go = (route) => {
+    closeModal();
+    navigation(route);
+  };
+  if (
+    !state.workspace.tasks.some(
+      (task) => !["Completed", "Cancelled"].includes(task.status),
+    )
+  ) {
+    modal(
+      "Nhập việc trước khi tạo lịch",
+      "Bạn chưa có công việc cần làm. Thêm một việc hoặc nhập ghi chú để AI tạo công việc.",
+      <div className="form-actions">
+        <button
+          type="button"
+          className="btn primary"
+          onClick={() => go("notes")}
+        >
+          Nhập việc bằng AI
+        </button>
+        <button
+          type="button"
+          className="btn secondary"
+          onClick={() => {
+            closeModal();
+            openTask();
+          }}
+        >
+          Tự thêm công việc
+        </button>
+      </div>,
+    );
+    return;
+  }
+  if (
+    !state.workspace.availability.length &&
+    !state.workspace.exceptions.some((item) => item.isAvailable)
+  ) {
+    modal(
+      "Chọn giờ rảnh trước khi tạo lịch",
+      "Hệ thống cần biết ngày và giờ bạn có thể làm việc. Các công việc hiện tại đã được giữ nguyên.",
+      <button type="button" className="btn primary" onClick={() => go("time")}>
+        Chọn giờ rảnh
+      </button>,
+    );
+    return;
+  }
   state.affected = affected;
   modal(
     affected.length ? "Lập lại lịch liên quan" : "Tạo kế hoạch mới",
@@ -346,6 +404,13 @@ async function action(name, id, element) {
     case "task-detail":
       openDetail(id);
       break;
+    case "task-finish":
+      await api(`/api/tasks/${id}/status`, "PATCH", {
+        status: "Completed",
+        progress: 100,
+      });
+      await refreshAfter("Đã đánh dấu hoàn thành cả công việc.");
+      break;
     case "edit-task":
       openTask(taskById(id));
       break;
@@ -383,7 +448,7 @@ async function action(name, id, element) {
         state.breakdown = result;
         modal(
           "Gợi ý chia nhỏ",
-          `Nguồn: ${result.source === "OpenAI" ? "AI" : "quy tắc (AI chưa khả dụng)"}`,
+          `Nguồn: ${["OpenAI", "Gemini"].includes(result.source) ? result.source : "quy tắc (AI chưa khả dụng)"}`,
           <form data-form="breakdown" data-id={id}>
             {nodeList(
               result.subtasks.map((s, n) => (
@@ -485,6 +550,11 @@ async function action(name, id, element) {
     case "apply-plan":
       await api(`/api/plans/${id}/apply`, "POST");
       await refreshAfter("Đã áp dụng kế hoạch.");
+      if (
+        state.plan?.id === id &&
+        state.plan.sessions.some((session) => !session.preserved)
+      )
+        completeGuideStep(2);
       navigation("calendar");
       break;
     case "session-detail":
@@ -503,12 +573,13 @@ async function action(name, id, element) {
     case "session-complete": {
       const s = sessionById(id);
       await api(`/api/sessions/${id}/${name.slice(8)}`, "POST");
+      if (name === "session-start") completeGuideStep(3);
       await refreshAfter(
         name === "session-complete"
           ? "Đã ghi nhận phiên. Cập nhật tiến độ công việc để kế hoạch tiếp theo chính xác."
           : "Đã cập nhật phiên.",
       );
-      if (name === "session-complete") openDetail(s.taskId);
+      if (name === "session-complete") openDetail(s.taskId, true);
       break;
     }
     case "discard-plan":
@@ -707,7 +778,7 @@ async function formAction(form, data) {
       });
       modal(
         "Kiểm tra công việc gợi ý",
-        `Nguồn: ${result.source === "OpenAI" ? "AI" : "quy tắc tiếng Việt/Anh"}`,
+        `Nguồn: ${["OpenAI", "Gemini"].includes(result.source) ? result.source : "quy tắc tiếng Việt/Anh"}`,
         <>
           <div className="info section-gap">{lines(result.notes)}</div>
           {taskForm(result.task)}
@@ -759,6 +830,7 @@ async function formAction(form, data) {
       await api("/api/time/availability", "PUT", {
         slots,
       });
+      if (slots.length) completeGuideStep(1);
       await refreshAfter("Đã lưu thời gian rảnh.");
       break;
     }
@@ -961,8 +1033,23 @@ export function onChange(event) {
     filterTasks();
 }
 export function startController() {
+  const entryLogin = () => {
+    history.pushState(null, "", "#login");
+    renderAuth("login");
+  };
+  const publicPage = () => {
+    const route = location.hash.slice(1);
+    if (
+      ["login", "register", "forgot", "verify", "forgotOtp", "reset"].includes(
+        route,
+      )
+    )
+      renderAuth(route);
+    else setScreen(<GettingStarted onLogin={entryLogin} />, "getting-started");
+  };
   const hash = () => {
     if (state.workspace) render();
+    else publicPage();
   };
   window.addEventListener("hashchange", hash);
   window.addEventListener("session-expired", expiry);
@@ -973,13 +1060,21 @@ export function startController() {
       !document.hidden &&
       !document.querySelector("#modal")?.open &&
       !working &&
-      !["time", "settings", "scenario", "admin", "tasks", "notes"].includes(state.route)
+      ![
+        "time",
+        "settings",
+        "scenario",
+        "admin",
+        "tasks",
+        "notes",
+        "getting-started",
+      ].includes(state.route)
     )
       load().catch((e) => {
         if (state.workspace) toast(e.message, "error");
       });
   }, 30000);
-  loggedIn().catch(() => renderAuth());
+  loggedIn().catch(publicPage);
   return () => {
     clearInterval(poll);
     window.removeEventListener("hashchange", hash);

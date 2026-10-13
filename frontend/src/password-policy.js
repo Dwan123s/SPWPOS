@@ -1,10 +1,11 @@
 export const PASSWORD_REQUIREMENTS =
-  "Mật khẩu phải có 8–32 ký tự, gồm chữ thường, chữ hoa, số và ký tự đặc biệt (không tính khoảng trắng). Không chứa email, tên trước @, password, websitename hoặc PLANORA. Mật khẩu mới phải khác mật khẩu hiện tại.";
+  "Mật khẩu phải có 8–32 ký tự, gồm chữ thường, chữ hoa, số và ký tự đặc biệt (không tính khoảng trắng). Không chứa tên đăng nhập, email, tên trước @, password, websitename hoặc PLANORA. Mật khẩu mới phải khác mật khẩu hiện tại.";
 
 export function getPasswordRequirements(
   password,
   username = "",
   currentPassword,
+  additionalUsername = "",
 ) {
   const normalized = password.toLowerCase();
   const accountName = username.trim().toLowerCase();
@@ -37,12 +38,14 @@ export function getPasswordRequirements(
     },
     {
       id: "username",
-      label: "Không chứa email hoặc tên trước @",
+      label: "Không chứa tên đăng nhập, email hoặc tên trước @",
       met:
         hasPassword &&
-        ![accountName, accountName.split("@")[0]].some(
-          (value) => value && normalized.includes(value),
-        ),
+        ![
+          accountName,
+          accountName.split("@")[0],
+          additionalUsername.trim().toLowerCase(),
+        ].some((value) => value && normalized.includes(value)),
     },
     {
       id: "forbidden",
@@ -64,14 +67,22 @@ export function getPasswordRequirements(
   return requirements;
 }
 
-export function validateNewPassword(password, username = "", currentPassword) {
-  const failed = getPasswordRequirements(password, username).find(
-    (requirement) => !requirement.met,
-  );
+export function validateNewPassword(
+  password,
+  username = "",
+  currentPassword,
+  additionalUsername = "",
+) {
+  const failed = getPasswordRequirements(
+    password,
+    username,
+    undefined,
+    additionalUsername,
+  ).find((requirement) => !requirement.met);
   if (failed) {
     const messages = {
       username:
-        "Mật khẩu không được chứa email hoặc tên tài khoản (phần trước @).",
+        "Mật khẩu không được chứa tên đăng nhập, email hoặc tên tài khoản (phần trước @).",
       forbidden: "Mật khẩu không được chứa password, websitename hoặc PLANORA.",
     };
     throw new Error(messages[failed.id] || PASSWORD_REQUIREMENTS);

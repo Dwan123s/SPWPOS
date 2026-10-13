@@ -16,8 +16,8 @@ export function revealSurface(element, delay = 0) {
   if (!element?.animate || document.hidden) return null;
   return element.animate(
     [
-      { opacity: 0, translate: "0 12px" },
-      { opacity: 1, translate: "0 0" },
+      { opacity: 0, translate: "0 10px", scale: 0.99 },
+      { opacity: 1, translate: "0 0", scale: 1 },
     ],
     { duration: 420, delay, easing, fill: "backwards" },
   );
@@ -40,6 +40,39 @@ export function WorkspaceAtmosphere() {
       <span className="workspace-halo workspace-halo--two" />
       <span className="workspace-orb workspace-orb--one" />
       <span className="workspace-orb workspace-orb--two" />
+      <picture className="workspace-ribbon-art">
+        <source
+          srcSet="/assets/login-sprites/ribbon-background.webp"
+          type="image/webp"
+        />
+        <img
+          src="/assets/login-sprites/ribbon-background.png"
+          width="1000"
+          height="1000"
+          alt=""
+          decoding="async"
+        />
+      </picture>
+      <picture className="workspace-bubble-art workspace-bubble-art--one">
+        <source srcSet="/assets/login-sprites/bubble.webp" type="image/webp" />
+        <img
+          src="/assets/login-sprites/bubble.png"
+          width="1000"
+          height="1000"
+          alt=""
+          decoding="async"
+        />
+      </picture>
+      <picture className="workspace-bubble-art workspace-bubble-art--two">
+        <source srcSet="/assets/login-sprites/bubble.webp" type="image/webp" />
+        <img
+          src="/assets/login-sprites/bubble.png"
+          width="1000"
+          height="1000"
+          alt=""
+          decoding="async"
+        />
+      </picture>
     </div>
   );
 }
@@ -54,11 +87,9 @@ export function WorkspaceMotionControl() {
     const root = host.current.closest(".glass-workspace");
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const animations = new Set();
-    const targets = [
-      ...root.querySelectorAll(
-        ".page-header, .content .card, .focus-card, .profile-hero-card",
-      ),
-    ];
+    const surfaceSelector =
+      ".page-header, .content .card, .focus-card, .profile-hero-card, .backlog-panel, .focus-cockpit, .runway-card, .intelligence-card, .console-note-link";
+    const seen = new WeakSet();
     let observer;
     let manuallyPaused = readPaused();
     const finish = () => {
@@ -67,6 +98,7 @@ export function WorkspaceMotionControl() {
       animations.clear();
     };
     const reveal = (element, delay = 0) => {
+      if (root.dataset.motionState !== "running") return;
       const animation = revealSurface(element, delay);
       if (!animation) return;
       animations.add(animation);
@@ -88,32 +120,54 @@ export function WorkspaceMotionControl() {
       sync();
     };
     sync();
-    if (root.dataset.motionState === "running") {
-      if (typeof IntersectionObserver === "function") {
-        observer = new IntersectionObserver(
-          (entries) => {
-            entries
-              .filter((entry) => entry.isIntersecting)
-              .forEach((entry, index) => {
-                reveal(entry.target, Math.min(index, 4) * 40);
-                observer.unobserve(entry.target);
-              });
-          },
-          { threshold: 0.05 },
-        );
-        targets.forEach((element) => observer.observe(element));
-      } else {
-        targets.forEach((element, index) =>
-          reveal(element, Math.min(index, 4) * 40),
-        );
-      }
+    if (typeof IntersectionObserver === "function") {
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries
+            .filter((entry) => entry.isIntersecting)
+            .forEach((entry, index) => {
+              reveal(entry.target, Math.min(index, 4) * 40);
+              observer.unobserve(entry.target);
+            });
+        },
+        { threshold: 0.05 },
+      );
     }
+    const observeSurfaces = (node) => {
+      if (!(node instanceof Element)) return;
+      const surfaces = [
+        ...(node.matches(surfaceSelector) ? [node] : []),
+        ...node.querySelectorAll(surfaceSelector),
+      ];
+      surfaces.forEach((element, index) => {
+        if (seen.has(element)) return;
+        seen.add(element);
+        const editing =
+          root.contains(document.activeElement) &&
+          document.activeElement.matches(
+            "input,textarea,select,[contenteditable=true]",
+          );
+        if (root.dataset.motionState !== "running" || editing) return;
+        if (observer) observer.observe(element);
+        else reveal(element, Math.min(index, 4) * 40);
+      });
+    };
+    observeSurfaces(root);
+    // Notes, security cards and API results mount after the shell's first render.
+    const mutations = new MutationObserver((records) => {
+      records.forEach((record) => record.addedNodes.forEach(observeSurfaces));
+    });
+    mutations.observe(root.querySelector(".content") || root, {
+      childList: true,
+      subtree: true,
+    });
     // Interaction finishes reveals so controls never remain partly faded while editing.
     root.addEventListener("pointerdown", finish);
     root.addEventListener("keydown", finish);
     document.addEventListener("visibilitychange", sync);
     media.addEventListener("change", sync);
     return () => {
+      mutations.disconnect();
       finish();
       syncMotion.current = null;
       root.removeEventListener("pointerdown", finish);

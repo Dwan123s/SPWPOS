@@ -120,7 +120,7 @@ public sealed class WorkspaceFlowTests
         var category = (await Send(owner, HttpMethod.Post, "/api/categories", new CategoryInput("Private"))).GetProperty("data").GetProperty("id").GetGuid();
         using var other = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
         const string email = "other@example.com";
-        await Send(other, HttpMethod.Post, "/api/auth/register", new { email, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "Other", lastName = "User" });
+        await Send(other, HttpMethod.Post, "/api/auth/register", new { userName = "other.member", email, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "Other", lastName = "User" });
         await Send(other, HttpMethod.Post, "/api/auth/verify-email", new { email, otp = factory.Email.Inbox[(email, SPWPOS.Domain.Enums.OtpPurpose.EmailVerification)] });
         var login = (await Send(other, HttpMethod.Post, "/api/auth/login", new { email, password = ServiceHarness.Password })).GetProperty("data");
         other.DefaultRequestHeaders.Authorization = new("Bearer", login.GetProperty("accessToken").GetString());

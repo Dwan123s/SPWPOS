@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { WorkspaceMotionControl } from "../src/workspace-motion.jsx";
 
 const preferenceKey = "planora.workspace.motion-paused";
@@ -102,4 +108,27 @@ it("keeps content usable when native animation is unavailable", () => {
       .getByRole("button", { name: "Bật chuyển động" })
       .getAttribute("aria-pressed"),
   ).toBe("true");
+});
+
+it("reveals dashboard and asynchronous surfaces once without animating timer updates", async () => {
+  mount();
+  animate.mockClear();
+  const card = document.createElement("section");
+  card.className = "focus-cockpit";
+  document.querySelector(".glass-workspace").append(card);
+  await waitFor(() => expect(animate).toHaveBeenCalledOnce());
+  card.append(document.createElement("span"));
+  await act(async () => {});
+  expect(animate).toHaveBeenCalledOnce();
+});
+
+it("keeps asynchronously loaded cards visible while motion is paused", async () => {
+  localStorage.setItem(preferenceKey, "true");
+  mount();
+  const card = document.createElement("section");
+  card.className = "focus-cockpit";
+  document.querySelector(".glass-workspace").append(card);
+  await act(async () => {});
+  expect(animate).not.toHaveBeenCalled();
+  expect(card.style.opacity).toBe("");
 });

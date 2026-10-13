@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 export const INVALID_LOGIN_MESSAGE =
-  "Email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra và thử lại.";
+  "Tên đăng nhập, email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra và thử lại.";
 
 const rejectionEvent = "login-password-rejected";
 

@@ -547,12 +547,12 @@
 ) {
   .auth-facebook.is-login .auth-card {
     background: #ffffff91;
-    backdrop-filter: blur(24px) saturate(165%);
     -webkit-backdrop-filter: blur(24px) saturate(165%);
+    backdrop-filter: blur(24px) saturate(165%);
   }
   .auth-facebook.is-login .auth-site-footer {
-    backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
   }
 }
 @media (max-width: 800px) {

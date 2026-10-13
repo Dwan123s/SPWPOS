@@ -38,10 +38,13 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: #abc9e5 transparent;
+  scrollbar-width: none;
   padding: 2px;
   gap: 16px;
+}
+.glass-workspace .nav::-webkit-scrollbar {
+  display: none;
+  width: 0;
 }
 .glass-workspace .nav-group {
   display: grid;

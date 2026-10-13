@@ -4,7 +4,14 @@ import { LoginBackground, LoginScene } from "./login-scene.jsx";
 import { LoginMotionControl } from "./login-motion.jsx";
 import { GoogleSignIn } from "./google-signin.jsx";
 
-export function authView(mode, title, description, fields, buttons, onGoogleLogin) {
+export function authView(
+  mode,
+  title,
+  description,
+  fields,
+  buttons,
+  onGoogleLogin,
+) {
   const login = mode === "login";
   return (
     <div
@@ -146,6 +153,9 @@ export function authView(mode, title, description, fields, buttons, onGoogleLogi
           <span className="login-footer-tagline">
             Plan smarter. Work realistically.
           </span>
+          <a href="#getting-started" className="auth-intro-link">
+            {icon("back")}Giới thiệu PLANORA
+          </a>
         </div>
       </footer>
     </div>

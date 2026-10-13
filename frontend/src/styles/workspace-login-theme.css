@@ -1,0 +1,447 @@
+/* The login's blue glass, lighting and native depth motion across the workspace. */
+.planning-console {
+  --workspace-panel: linear-gradient(145deg, #ffffffd9, #f3faffb8);
+  --workspace-edge: #ffffffed;
+  --workspace-shadow:
+    inset 0 1px 0 #fff, inset 0 -1px 0 #d5eaff80, 0 10px 30px #1866b314,
+    0 2px 6px #2468b80a;
+  background:
+    radial-gradient(ellipse at 28% 10%, #cff5ff, transparent 48%),
+    radial-gradient(ellipse at 95% 60%, #bfddff75, transparent 55%),
+    linear-gradient(125deg, #f3fbff, #e8f4ff 62%, #eff8ff);
+  color: var(--planora-ink);
+}
+.planning-console .workspace-atmosphere {
+  opacity: 1;
+}
+.planning-console .workspace-halo {
+  background: radial-gradient(circle at 35% 25%, #ffffffb3, #8bdbff1a 65%);
+  border-color: #ffffffcc;
+}
+.planning-console .workspace-orb {
+  opacity: 0.45;
+}
+.workspace-ribbon-art,
+.workspace-bubble-art {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+.workspace-atmosphere picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.workspace-ribbon-art {
+  width: clamp(380px, 43vw, 720px);
+  left: -240px;
+  bottom: -260px;
+  opacity: 0.14;
+  rotate: -20deg;
+  animation: workspace-art-drift 24s var(--planora-ambient-ease) infinite;
+}
+.workspace-bubble-art--one {
+  width: clamp(90px, 10vw, 155px);
+  right: -48px;
+  top: 10%;
+  opacity: 0.42;
+  animation: workspace-art-drift 17s var(--planora-ambient-ease) infinite;
+}
+.workspace-bubble-art--two {
+  width: 54px;
+  left: 39%;
+  bottom: 7%;
+  opacity: 0.25;
+  animation: workspace-art-drift 19s var(--planora-ambient-ease) -9s infinite;
+}
+.planning-console :is(.topbar, .sidebar) {
+  border: 1px solid var(--workspace-edge);
+  background: linear-gradient(145deg, #ffffffb8, #f2f9ffa6);
+  box-shadow: var(--workspace-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  backdrop-filter: blur(22px) saturate(145%);
+}
+.planning-console .topbar {
+  border-radius: 16px;
+}
+.planning-console
+  :is(
+    .card,
+    .backlog-panel,
+    .runway-card,
+    .intelligence-card,
+    .console-note-link
+  ) {
+  background: var(--workspace-panel);
+  border: 1px solid var(--workspace-edge);
+  border-radius: 20px;
+  box-shadow: var(--workspace-shadow);
+  transition:
+    border-color 200ms,
+    box-shadow 200ms var(--planora-ease);
+}
+.planning-console
+  :is(
+    .backlog-panel,
+    .runway-card,
+    .intelligence-card,
+    .notes-library,
+    .notes-workspace > .stack > .card,
+    .equal-columns > .card
+  ) {
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+  backdrop-filter: blur(12px) saturate(135%);
+}
+.planning-console :is(.focus-cockpit, .focus-card, .profile-hero-card) {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--workspace-edge);
+  border-radius: 22px;
+  background:
+    radial-gradient(ellipse at 15% 0%, #c3f6ffb8, transparent 62%),
+    linear-gradient(120deg, #f4fdffeb, #ddecffe0);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 12px 34px #1880cf20;
+}
+.planning-console .focus-cockpit {
+  overflow: hidden;
+}
+.planning-console .focus-cockpit::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  width: 240px;
+  height: 130px;
+  right: -80px;
+  top: -58px;
+  border: 22px solid #ffffff65;
+  border-radius: 50%;
+  rotate: -30deg;
+  box-shadow:
+    0 0 0 1px #84caff30,
+    inset 0 1px 0 #ffffffb3;
+}
+.planning-console .focus-cockpit.is-active {
+  border-color: #8ecbff;
+  box-shadow:
+    var(--workspace-shadow),
+    0 0 0 3px #39c8ff10;
+}
+.planning-console .cockpit-time {
+  color: #07316b;
+  text-shadow: 0 2px 0 #fff9;
+}
+.planning-console
+  :is(.console-column-heading h2, .card-header h2, .console-card-heading h3) {
+  color: var(--planora-ink);
+}
+.planning-console :is(.console-kicker, .cockpit-timer > span:first-child) {
+  color: #486a8e;
+}
+.planning-console
+  :is(
+    .queue-card,
+    .note-task-draft,
+    .session-card,
+    .category-card-item,
+    .checkbox-switch-card
+  ) {
+  border-color: #d0e3f5;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffffffeb, #eff8ffc9);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px #2268a908;
+}
+.planning-console .queue-card {
+  border-left-color: #6fd1e9;
+}
+.planning-console :is(.note-list-item.active, .nav button.active) {
+  color: #0054d1;
+  border-color: #a9d4ff;
+  background: linear-gradient(135deg, #dcf5ff, #e5eeff);
+  box-shadow:
+    inset 0 1px 0 #ffffffed,
+    inset 3px 0 0 #0068ff,
+    0 5px 16px #1476d214;
+}
+.planning-console .nav button:not(.active) {
+  color: #526e90;
+}
+.planning-console:not([data-route="today"]) .page-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 22px;
+  border-color: var(--workspace-edge);
+  background:
+    radial-gradient(ellipse at 90% 5%, #90dfff40, transparent 55%),
+    linear-gradient(120deg, #ffffffc9, #edf8ff94);
+  box-shadow: var(--workspace-shadow);
+}
+.planning-console:not([data-route="today"]) .page-header::after {
+  content: "";
+  z-index: -1;
+  position: absolute;
+  pointer-events: none;
+  right: -65px;
+  top: -115px;
+  width: 240px;
+  height: 240px;
+  border: 30px solid #ffffff75;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 1px 0 #ffffffcc,
+    0 0 0 1px #a2d9ff38;
+  rotate: -25deg;
+}
+:is(.planning-console, #modal)
+  :is(.btn, .console-icon-button, .view-switch button, .settings-tab-btn) {
+  border-radius: 13px;
+  transition:
+    background 180ms,
+    border-color 180ms,
+    box-shadow 180ms,
+    translate 180ms var(--planora-ease),
+    scale 180ms var(--planora-ease);
+}
+:is(.planning-console, #modal) .btn.primary,
+:is(.planning-console, #modal) .cockpit-actions .btn.primary {
+  background: linear-gradient(145deg, #1672de, #0068ff 60%, #0054db);
+  color: #fff;
+  border-color: #4e9aff;
+  box-shadow:
+    inset 0 1px 1px #ffffffb3,
+    inset 0 -1px 0 #003b9566,
+    0 5px 14px #0068ff26;
+}
+:is(.planning-console, #modal) .btn.secondary {
+  background: linear-gradient(145deg, #ffffffed, #e8f5ffd9);
+  color: #175b9f;
+  border-color: #b4d5f5;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px #2773ba0b;
+}
+.planning-console
+  :is(.console-icon-button, .workspace-motion-toggle, .avatar-button, .bell) {
+  background: linear-gradient(145deg, #ffffffdb, #edf7ffa6);
+  border: 1px solid #ffffffed;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px #1767ae0d;
+}
+:is(.planning-console, #modal)
+  :is(
+    .field input,
+    .field textarea,
+    .field select,
+    .filter,
+    .console-command-search
+  ) {
+  background: linear-gradient(145deg, #fffffff2, #f5fbffdb);
+  border: 1px solid #bad5f3;
+  border-radius: 15px;
+  color: var(--planora-ink);
+  box-shadow:
+    inset 0 1px 2px #1e69bc06,
+    0 2px 5px #2468b805;
+}
+:is(.planning-console, #modal) :is(input, textarea)::placeholder {
+  color: #7185a4;
+  opacity: 1;
+}
+:is(.planning-console, #modal)
+  :is(.field input, .field textarea, .field select, .filter):focus {
+  background: #fff;
+  border-color: #0068ff;
+  box-shadow:
+    0 0 0 4px #0068ff12,
+    inset 0 1px 0 #fff;
+}
+.planning-console
+  :is(.capacity-ribbon, .task-tabs, .settings-tabs-bar, .view-switch) {
+  border-color: var(--workspace-edge);
+  background: #ffffffa3;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 5px 18px #2268a90c;
+}
+.planning-console .capacity-ribbon {
+  border-radius: 13px;
+}
+.planning-console .capacity-segment--scheduled {
+  background: linear-gradient(135deg, #03d7e7, #02bfd9);
+}
+.planning-console .capacity-segment--focus {
+  background: linear-gradient(135deg, #1672de, #0068ef);
+}
+.planning-console .runway-block--blue {
+  background: linear-gradient(135deg, #1672de, #0068ef);
+  box-shadow:
+    inset 0 1px 0 #ffffff80,
+    0 3px 8px #0068ff17;
+}
+.planning-console .runway-block--cyan {
+  background: linear-gradient(135deg, #0fdae5, #11bddb);
+  color: #07344a;
+  box-shadow:
+    inset 0 1px 0 #ffffff90,
+    0 3px 8px #00a1bf17;
+}
+.planning-console .runway-block--event {
+  background: linear-gradient(135deg, #edf5ff, #c8dcf0);
+}
+.planning-console .runway-block.is-completed {
+  background: linear-gradient(135deg, #d4f4ee, #bce6db);
+  color: #215c4f;
+}
+.planning-console :is(.table-scroll, .calendar-scroll) {
+  border-radius: 16px;
+}
+:is(.planning-console, #modal) th {
+  background: #e8f3ffd9;
+  color: #315c88;
+}
+.planning-console .notification:not(.read) {
+  background: linear-gradient(120deg, #e8f4ff, #ffffffb8);
+}
+.planning-console .note-agent-banner {
+  background: linear-gradient(135deg, #e3fbffc9, #e2edffc9);
+  border-color: #a9dafa;
+  box-shadow: inset 0 1px 0 #fff;
+}
+.planning-console :is(.empty, .runway-empty) {
+  color: #526e90;
+}
+.planning-console
+  :is(
+    .queue-card-bottom,
+    .backlog-toolbar,
+    .console-note-link small,
+    .runway-toolbar,
+    .runway-hours > span,
+    .runway-legend,
+    .horizon-legend,
+    .horizon-day > span,
+    .gauge-caption,
+    .estimation-gauge span,
+    .intelligence-card > p,
+    .cockpit-timer small,
+    .deadline-info small,
+    .workspace-footer
+  ) {
+  color: #526b8a;
+}
+#modal {
+  border-radius: 26px;
+  background: linear-gradient(145deg, #ffffffed, #eff8fff2);
+  border: 1px solid #ffffffed;
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  backdrop-filter: blur(22px) saturate(145%);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 24px 90px #17466f4d;
+}
+#modal::backdrop {
+  background: #0d2c4e52;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+.toast {
+  border: 1px solid #ffffffd9;
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 #ffffff80,
+    0 8px 24px #134c8724;
+}
+@keyframes workspace-art-drift {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: -12deg;
+  }
+  50% {
+    translate: 14px -18px;
+    rotate: -7deg;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .planning-console
+    :is(.card, .backlog-panel, .runway-card, .intelligence-card):hover {
+    border-color: #c0dcf8;
+    box-shadow:
+      var(--workspace-shadow),
+      0 8px 20px #0068ff09;
+  }
+  :is(.planning-console, #modal) .btn.primary:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 1px #ffffffb3,
+      0 8px 22px #0068ff30;
+  }
+}
+@media (max-width: 800px) {
+  .workspace-ribbon-art {
+    width: 430px;
+    left: -310px;
+    bottom: -160px;
+    opacity: 0.1;
+  }
+  .workspace-bubble-art--one {
+    width: 100px;
+    right: -70px;
+  }
+  .workspace-bubble-art--two {
+    display: none;
+  }
+  .planning-console
+    :is(
+      .card,
+      .backlog-panel,
+      .runway-card,
+      .intelligence-card,
+      .console-note-link
+    ) {
+    border-radius: 18px;
+  }
+  .planning-console
+    :is(
+      .backlog-panel,
+      .runway-card,
+      .intelligence-card,
+      .notes-library,
+      .notes-workspace > .stack > .card,
+      .equal-columns > .card
+    ) {
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-atmosphere * {
+    animation: none !important;
+  }
+  :is(.planning-console, #modal)
+    :is(.btn, .console-icon-button, .view-switch button, .settings-tab-btn) {
+    transition: none;
+    translate: none;
+    scale: none;
+  }
+}
+@media print {
+  .planning-console,
+  .planning-console
+    :is(
+      .card,
+      .focus-cockpit,
+      .backlog-panel,
+      .runway-card,
+      .intelligence-card
+    ) {
+    background: #fff;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+}

@@ -16,17 +16,24 @@ public static class AccountTransaction
         {
             if (db.Database.IsSqlServer())
             {
-                var resource = "SPWPOS:account:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedEmail)));
-                await using var command = db.Database.GetDbConnection().CreateCommand();
-                command.Transaction = tx.GetDbTransaction();
-                command.CommandText = "DECLARE @result int; EXEC @result = sys.sp_getapplock @Resource = @key, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @result;";
-                var p = command.CreateParameter(); p.ParameterName = "@key"; p.Value = resource;
-                command.Parameters.Add(p);
-                var result = Convert.ToInt32(await command.ExecuteScalarAsync(ct));
-                if (result < 0) throw new AuthException("REQUEST_BUSY", "Please retry the request.", 409);
+                await LockAsync(db, tx, "account", normalizedEmail, ct);
             }
             return tx;
         }
         catch { await tx.DisposeAsync(); throw; }
+    }
+    public static Task LockUserNameAsync(ApplicationDbContext db, string normalizedUserName, CancellationToken ct) =>
+        db.Database.IsSqlServer() ? LockAsync(db, db.Database.CurrentTransaction!, "username", normalizedUserName, ct) : Task.CompletedTask;
+
+    private static async Task LockAsync(ApplicationDbContext db, IDbContextTransaction tx, string scope, string identifier, CancellationToken ct)
+    {
+        var resource = "SPWPOS:" + scope + ":" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identifier)));
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.Transaction = tx.GetDbTransaction();
+        command.CommandText = "DECLARE @result int; EXEC @result = sys.sp_getapplock @Resource = @key, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @result;";
+        var p = command.CreateParameter(); p.ParameterName = "@key"; p.Value = resource;
+        command.Parameters.Add(p);
+        var result = Convert.ToInt32(await command.ExecuteScalarAsync(ct));
+        if (result < 0) throw new AuthException("REQUEST_BUSY", "Please retry the request.", 409);
     }
 }

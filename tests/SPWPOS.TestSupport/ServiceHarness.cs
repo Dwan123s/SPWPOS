@@ -13,6 +13,7 @@ namespace SPWPOS.TestSupport;
 public sealed class ServiceHarness : IAsyncDisposable
 {
     public const string Address = "person@example.com";
+    public const string UserName = "test.member";
     public const string Password = "Rainy morning with coffee 42!";
     public const string NewPassword = "An entirely new passphrase 83!";
     public static readonly RequestContext Context = new("127.0.0.1", "SPWPOS.Tests");
@@ -20,7 +21,7 @@ public sealed class ServiceHarness : IAsyncDisposable
     public TestClock Clock { get; } = new();
     public TestEmailService Email { get; } = new();
     public ServiceProvider Provider { get; private set; } = null!;
-    public static async Task<ServiceHarness> CreateAsync()
+    public static async Task<ServiceHarness> CreateAsync(Action<IServiceCollection>? configure = null)
     {
         var h = new ServiceHarness(); await h.connection.OpenAsync();
         var services = new ServiceCollection(); services.AddLogging();
@@ -28,6 +29,7 @@ public sealed class ServiceHarness : IAsyncDisposable
         services.AddSingleton<IConfiguration>(config); services.AddInfrastructure(config);
         TestInfrastructure.ReplacePersistence(services, h.connection);
         TestInfrastructure.ReplaceSecurityDependencies(services, h.Clock, h.Email);
+        configure?.Invoke(services);
         h.Provider = services.BuildServiceProvider();
         await using var scope = h.Provider.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.EnsureCreatedAsync();
@@ -41,7 +43,7 @@ public sealed class ServiceHarness : IAsyncDisposable
     public Task AuthAsync(Func<IAuthService, Task> action) => AuthAsync(async auth => { await action(auth); return true; });
     public async Task<ApplicationUser> RegisterAsync(bool verified = true)
     {
-        await AuthAsync(auth => auth.RegisterAsync(new(Address, Password, Password, "Nguyen", "Van A"), Context, CancellationToken.None));
+        await AuthAsync(auth => auth.RegisterAsync(new(Address, Password, Password, "Nguyen", "Van A", UserName), Context, CancellationToken.None));
         if (verified) await AuthAsync(auth => auth.VerifyEmailAsync(new(Address, Email.Inbox[(Address, OtpPurpose.EmailVerification)]), Context, CancellationToken.None));
         return await DbAsync(db => db.Users.AsNoTracking().SingleAsync());
     }

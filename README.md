@@ -15,7 +15,7 @@
 
 **Smart Personal Workload Planning and Optimization System** — ứng dụng quản lý công việc và lập kế hoạch cá nhân dựa trên thời gian rảnh, deadline và năng lực thực tế.
 
-PLANORA kết hợp quản lý công việc, đề xuất lịch, theo dõi phiên làm việc và phân tích khối lượng công việc trong một giao diện tiếng Việt. Thuật toán lập lịch hoạt động độc lập; AI là tùy chọn hỗ trợ nhập và chia nhỏ công việc.
+PLANORA kết hợp quản lý công việc, đề xuất lịch, theo dõi phiên làm việc và phân tích khối lượng công việc trong một giao diện tiếng Việt. Ghi chú được phân tích hoàn toàn bằng AI; thuật toán lập lịch kiểm tra thời gian và ràng buộc trước khi áp dụng. Ghi nhanh và chia nhỏ công việc vẫn hỗ trợ AI tùy chọn.
 
 ## Tính năng
 
@@ -156,7 +156,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-BeforeMer
 
 ## Tài liệu
 
+- [Getting Started: nghiên cứu, thiết kế và luồng trước đăng nhập](docs/GETTING_STARTED_RESEARCH.md)
+- [Hướng dẫn cho người dùng và tutorial 4 bước](docs/USER_GUIDE.md)
 - [Hướng dẫn sử dụng và cấu hình hệ thống](docs/SYSTEM_GUIDE.md)
+- [Tên đăng nhập và đăng nhập bằng email](docs/USERNAME_LOGIN.md)
 - [Ghi chú và agent tự xếp lịch](docs/NOTES_AGENT_GUIDE.md)
 - [Cấu hình Gmail SMTP](docs/GMAIL_SMTP.md)
 - [Use cases](docs/USE_CASE_COVERAGE.md) và [mô hình dữ liệu UML](docs/UML_ALIGNMENT.md)

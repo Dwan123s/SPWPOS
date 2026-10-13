@@ -869,8 +869,8 @@ html::-webkit-scrollbar {
 }
 #modal::backdrop {
   background: #15395766;
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 #modal .modal-head h2 {
   color: #153a5e;
@@ -981,32 +981,32 @@ html::-webkit-scrollbar {
 ) {
   .glass-workspace :is(.sidebar, .topbar) {
     background: #ffffffb3;
-    backdrop-filter: blur(24px) saturate(165%);
     -webkit-backdrop-filter: blur(24px) saturate(165%);
+    backdrop-filter: blur(24px) saturate(165%);
   }
   .glass-workspace .card {
     background: #ffffffb8;
-    backdrop-filter: blur(14px) saturate(125%);
     -webkit-backdrop-filter: blur(14px) saturate(125%);
+    backdrop-filter: blur(14px) saturate(125%);
   }
   .glass-workspace :is(.focus-card, .profile-hero-card) {
     background: linear-gradient(125deg, #e7f4ffcc, #ffffffb8);
-    backdrop-filter: blur(14px) saturate(125%);
     -webkit-backdrop-filter: blur(14px) saturate(125%);
+    backdrop-filter: blur(14px) saturate(125%);
   }
   #modal {
     background: #f9fcffed;
-    backdrop-filter: blur(24px) saturate(140%);
     -webkit-backdrop-filter: blur(24px) saturate(140%);
+    backdrop-filter: blur(24px) saturate(140%);
   }
   .toast {
-    backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
   }
   .auth-facebook.is-account .auth-card {
     background: #ffffffb3;
-    backdrop-filter: blur(24px) saturate(165%);
     -webkit-backdrop-filter: blur(24px) saturate(165%);
+    backdrop-filter: blur(24px) saturate(165%);
   }
 }
 @media (max-width: 1200px) {
@@ -1060,8 +1060,8 @@ html::-webkit-scrollbar {
   }
   .glass-workspace .sidebar-overlay {
     background: #15395759;
-    backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
   }
   .glass-workspace .topbar {
     top: 12px;

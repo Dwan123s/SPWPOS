@@ -34,7 +34,7 @@ public sealed class AuthController(IAuthService auth) : ControllerBase
     { await auth.ResendVerificationOtpAsync(request, Context, ct); return Ok(Message(AuthService.GenericEmailMessage)); }
 
     [HttpPost("login"), Tags("Authentication")]
-    [EndpointSummary("Sign in with a verified email and password.")]
+    [EndpointSummary("Sign in with a username or verified email and password.")]
     [ProducesResponseType(typeof(ApiResponse<TokenResponse>), 200), ProducesResponseType(typeof(ProblemDetails), 403), ProducesResponseType(typeof(ProblemDetails), 423)]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct) => Ok(ApiResponse<TokenResponse>.Ok(await auth.LoginAsync(request, Context, ct)));
 

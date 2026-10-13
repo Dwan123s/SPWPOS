@@ -54,10 +54,10 @@ public sealed class WorkspaceConcurrencyTests
             Assert.True((await roles.CreateAsync(new IdentityRole<Guid>("Admin"))).Succeeded);
             Assert.True((await users.AddToRoleAsync(user, "Admin")).Succeeded);
         }
-        var login = (await Send(client, HttpMethod.Post, "/api/auth/login", new { email = ServiceHarness.Address, password = ServiceHarness.Password })).GetProperty("data");
+        var login = (await Send(client, HttpMethod.Post, "/api/auth/login", new { userName = ServiceHarness.UserName, email = ServiceHarness.Address, password = ServiceHarness.Password })).GetProperty("data");
         client.DefaultRequestHeaders.Authorization = new("Bearer", login.GetProperty("accessToken").GetString());
         using var other = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") }); const string email = "locked@example.com";
-        await Send(other, HttpMethod.Post, "/api/auth/register", new { email, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "Lock", lastName = "Test" });
+        await Send(other, HttpMethod.Post, "/api/auth/register", new { userName = "other.member", email, password = ServiceHarness.Password, confirmPassword = ServiceHarness.Password, firstName = "Lock", lastName = "Test" });
         await Send(other, HttpMethod.Post, "/api/auth/verify-email", new { email, otp = factory.Email.Inbox[(email, SPWPOS.Domain.Enums.OtpPurpose.EmailVerification)] });
         var otherLogin = (await Send(other, HttpMethod.Post, "/api/auth/login", new { email, password = ServiceHarness.Password })).GetProperty("data");
         other.DefaultRequestHeaders.Authorization = new("Bearer", otherLogin.GetProperty("accessToken").GetString());

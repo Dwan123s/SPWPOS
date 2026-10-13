@@ -549,9 +549,16 @@ export function timePage() {
 export function planModal(plan, simulation = false) {
   state.plan = plan;
   modal(
-    plan.isApplied ? "Kế hoạch đã áp dụng" : "Xem trước kế hoạch",
+    plan.isApplied ? "Lịch đã được lưu" : "Xem trước lịch",
     `${dateFmt(plan.start)} → ${dateFmt(plan.end)} · ${plan.sessions.length} phiên · ${plan.isApplied ? "đã cập nhật lịch" : "chưa thay đổi lịch"}.`,
     <>
+      {!simulation && (
+        <div role="status" className="info plan-save-status">
+          {plan.isApplied
+            ? "Lịch này đã được lưu. Mở Lịch làm việc để bắt đầu."
+            : "Đây là lịch xem trước, chưa thay đổi lịch hiện tại. Bấm Lưu lịch này để đưa các khoảng làm việc vào lịch."}
+        </div>
+      )}
       {nodeList(
         plan.warnings.map((w) => (
           <div className="warning">
@@ -627,13 +634,7 @@ export function planModal(plan, simulation = false) {
           ""
         )}
         {!simulation && !plan.isApplied && plan.status !== "DISCARDED"
-          ? button(
-              "Áp dụng kế hoạch",
-              "apply-plan",
-              "primary",
-              plan.id,
-              "check",
-            )
+          ? button("Lưu lịch này", "apply-plan", "primary", plan.id, "check")
           : ""}
       </div>
     </>,

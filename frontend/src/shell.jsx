@@ -1,6 +1,12 @@
 import { Slot, attrs, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
-import { brand } from "./brand.jsx";
+import { CapacityRibbon } from "./dashboard.jsx";
+import {
+  MenuLabelsControl,
+  TutorialButton,
+  GuidedTutorial,
+  openTutorial,
+} from "./tutorial.jsx";
 import {
   WorkspaceAtmosphere,
   WorkspaceMotionControl,
@@ -22,6 +28,7 @@ export function workspaceShell(routes, title, description, body) {
             data-action="nav"
             data-id={key}
             title={routes[key][0]}
+            aria-label={routes[key][0]}
             {...attrs(state.route === key ? 'aria-current="page"' : "")}
           >
             {icon(routes[key][2])}
@@ -56,7 +63,10 @@ export function workspaceShell(routes, title, description, body) {
       <a className="skip-link" href="#main-content">
         Đến nội dung chính
       </a>
-      <div className="shell glass-workspace">
+      <div
+        className="shell glass-workspace planning-console"
+        data-route={state.route}
+      >
         <WorkspaceAtmosphere />
         <button
           type="button"
@@ -69,7 +79,18 @@ export function workspaceShell(routes, title, description, body) {
         <aside className="sidebar" id="workspace-menu">
           <div className="sidebar-top">
             <div className="sidebar-brand-header">
-              {brand("#today", "", "PLANORA — Hôm nay")}
+              <a
+                className="brand brand-lockup console-brand-mark"
+                href="#today"
+                aria-label="PLANORA — Hôm nay"
+              >
+                <img
+                  src="/assets/planora-mark.png"
+                  width="36"
+                  height="36"
+                  alt="PLANORA"
+                />
+              </a>
               <button
                 type="button"
                 className="btn ghost icon-only sidebar-close"
@@ -99,6 +120,16 @@ export function workspaceShell(routes, title, description, body) {
               {nav(["notifications", "settings", "admin"])}
             </section>
           </nav>
+          <button
+            type="button"
+            className="btn secondary small sidebar-tutorial-link"
+            onClick={() => {
+              setMobileMenu(false);
+              openTutorial();
+            }}
+          >
+            Hướng dẫn sử dụng
+          </button>
           <div className="sidebar-bottom">
             <div className="user-mini">
               <button
@@ -141,6 +172,7 @@ export function workspaceShell(routes, title, description, body) {
         <div className="main">
           <header className="topbar">
             <div className="actions">
+              <MenuLabelsControl />
               <button
                 type="button"
                 className="btn ghost icon-only mobile-menu"
@@ -151,6 +183,24 @@ export function workspaceShell(routes, title, description, body) {
               >
                 {icon("menu")}
               </button>
+              <button
+                className="console-brand-name"
+                type="button"
+                data-action="nav"
+                data-id="today"
+              >
+                PLANORA
+              </button>
+              <button
+                type="button"
+                className="console-command-search"
+                data-action="search"
+                aria-label="Mở tìm kiếm nhanh"
+              >
+                {icon("search")}
+                <span>Tìm công việc…</span>
+                <kbd>Ctrl K</kbd>
+              </button>
               <div className="breadcrumb">
                 Không gian cá nhân
                 <span>/</span>
@@ -158,12 +208,20 @@ export function workspaceShell(routes, title, description, body) {
               </div>
             </div>
             <div className="topbar-right">
+              <TutorialButton route={state.route} />
               <WorkspaceMotionControl />
-              <span className="top-date">
-                {dateFmt(Date.now(), {
-                  weekday: "long",
-                  year: "numeric",
-                })}
+              <span
+                className={`console-sync ${state.analysisError ? "has-error" : ""}`}
+                title={
+                  state.loadedAt
+                    ? `Cập nhật lúc ${dateFmt(state.loadedAt, { hour: "2-digit", minute: "2-digit" })}`
+                    : "Dữ liệu hiện tại"
+                }
+              >
+                <span />
+                {state.analysisError
+                  ? "Cần tải lại phân tích"
+                  : "Đã tải dữ liệu"}
               </span>
               <button
                 type="button"
@@ -186,6 +244,7 @@ export function workspaceShell(routes, title, description, body) {
               </button>
             </div>
           </header>
+          <CapacityRibbon />
           <main className="content" id="main-content" tabIndex="-1">
             <div className="page-header">
               <div>
@@ -226,6 +285,7 @@ export function workspaceShell(routes, title, description, body) {
             ) : (
               ""
             )}
+            <GuidedTutorial route={state.route} />
             {body}
             <footer className="workspace-footer">
               <span>PLANORA · Làm việc theo nhịp của bạn.</span>
