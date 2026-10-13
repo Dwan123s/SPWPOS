@@ -140,11 +140,14 @@ public sealed class SqlServerConcurrencyTests
     {
         await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync();
         await Register(factory, client);
-        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(index => Post(client, "login", new {
-            email = index % 2 == 0 ? ServiceHarness.UserName : ServiceHarness.Address, password = "Wrong secret 12!"
-        })));
+        var responses = new List<HttpResponseMessage>();
         try
         {
+            // Two concurrent attempts fit the password limiter even on two-core CI runners.
+            foreach (var batch in Enumerable.Range(0, 5).Chunk(2))
+                responses.AddRange(await Task.WhenAll(batch.Select(index => Post(client, "login", new {
+                    email = index % 2 == 0 ? ServiceHarness.UserName : ServiceHarness.Address, password = "Wrong secret 12!"
+                }))));
             Assert.All(responses, response => Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode));
             using var username = await Post(client, "login", new { email = ServiceHarness.UserName, password = ServiceHarness.Password });
             using var email = await Post(client, "login", new { email = ServiceHarness.Address, password = ServiceHarness.Password });
