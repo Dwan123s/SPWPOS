@@ -25,13 +25,14 @@ export function taskRows(tasks) {
       <div className="task-row task-heading">
         <span>Công việc</span>
         <span>Deadline</span>
-        <span className="task-category">Nhóm</span>
+        <span className="task-category">Danh mục</span>
         <span className="progress-wrap">Tiến độ</span>
         <span>Ưu tiên</span>
+        <span className="sr-only">Thao tác</span>
       </div>
       {nodeList(
         tasks.map((t) => (
-          <div className="task-row">
+          <div className="task-row" key={t.id}>
             <div>
               <button
                 className="title-button"
@@ -65,7 +66,7 @@ export function taskRows(tasks) {
             <div className="task-category">
               {badge(
                 state.workspace.categories.find((c) => c.id === t.categoryId)
-                  ?.name || "Chưa phân nhóm",
+                  ?.name || "Chưa phân loại",
               )}
             </div>
             <div className="progress-wrap">
@@ -82,6 +83,18 @@ export function taskRows(tasks) {
                 ["", "Thấp", "Vừa", "Cao", "Khẩn"][t.priority],
                 t.priority >= 3 ? "amber" : "",
               )}
+            </div>
+            <div className="task-row-actions">
+              <button
+                type="button"
+                className="btn ghost icon-only task-delete-button"
+                data-action="delete-task"
+                data-id={t.id}
+                aria-label={`Xóa công việc ${t.name}`}
+                title={`Xóa công việc ${t.name}`}
+              >
+                {icon("trash")}
+              </button>
             </div>
           </div>
         )),
@@ -148,8 +161,12 @@ export function tasksPage() {
                 .map(([key, label]) => <option value={key}>{label}</option>),
             )}
           </Select>
-          <Select className="filter" id="task-category" aria-label="Lọc nhóm">
-            <option value={``}>Nhóm công việc</option>
+          <Select
+            className="filter"
+            id="task-category"
+            aria-label="Lọc danh mục"
+          >
+            <option value={``}>Danh mục công việc</option>
             {nodeList(
               state.workspace.categories.map((c) => (
                 <option value={c.id}>{c.name}</option>
@@ -279,9 +296,9 @@ export function taskForm(task = {}, parentId = null) {
           </Select>
         </label>
         <label className="field">
-          Nhóm
+          Danh mục
           <Select name="categoryId">
-            <option value={``}>Chưa phân nhóm</option>
+            <option value={``}>Chưa phân loại</option>
             {nodeList(
               state.workspace.categories.map((c) => (
                 <option value={c.id} selected={c.id === task.categoryId}>
@@ -554,7 +571,7 @@ export function openDetail(id, afterSession = false) {
         </form>
       </div>
       <div className="form-actions">
-        {button("Xóa", "delete-task", "danger small", id, "trash")}
+        {button("Xóa công việc", "delete-task", "danger small", id, "trash")}
         {button(
           "Lập lại lịch liên quan",
           "replan-task",

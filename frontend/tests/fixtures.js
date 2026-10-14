@@ -102,6 +102,7 @@ const workspace = () => ({
   notifications: [
     {
       id: "notification-1",
+      kind: "DEADLINE",
       title: "Một deadline đang đến gần",
       message: "Chuẩn bị nội dung buổi thảo luận đến hạn trong 48 giờ.",
       createdAt: date(0, 8),
@@ -110,6 +111,7 @@ const workspace = () => ({
     },
     {
       id: "notification-2",
+      kind: "SCHEDULE_CHANGE",
       title: "Kế hoạch đã được cập nhật",
       message: "Các phiên đã khóa được giữ nguyên khi lập lại lịch.",
       createdAt: date(-1),

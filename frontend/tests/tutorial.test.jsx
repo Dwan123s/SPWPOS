@@ -89,7 +89,7 @@ it("tutorial navigation changes page without saving sample data", () => {
   fireEvent.click(
     screen.getByRole("button", { name: "Hướng dẫn", exact: true }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Mở Ghi chú & AI" }));
+  fireEvent.click(screen.getByRole("button", { name: "Mở Nhập việc" }));
   expect(location.hash).toBe("#notes");
   expect(document.querySelector("#modal").open).toBe(false);
   expect(fetchMock).not.toHaveBeenCalled();
@@ -190,15 +190,15 @@ it("remembers the compact menu while showing names by default", () => {
 it("chooses the next step from saved work, available hours, and active/future sessions", () => {
   const w = state.workspace;
   const next = () => workflowSteps(w, 1000).find((step) => !step.done).label;
-  expect(next()).toBe("Nhập việc bằng AI");
+  expect(next()).toBe("Nhập việc cần làm");
   w.tasks = [{ status: "Todo" }];
   expect(next()).toBe("Chọn giờ rảnh");
   w.availability = [{ dayOfWeek: 1 }];
-  expect(next()).toBe("Tạo lịch cho công việc");
+  expect(next()).toBe("Xem lịch đề xuất");
   w.sessions = [{ status: "Completed", end: new Date(2000).toISOString() }];
-  expect(next()).toBe("Tạo lịch cho công việc");
+  expect(next()).toBe("Xem lịch đề xuất");
   w.sessions = [{ status: "Scheduled", end: new Date(500).toISOString() }];
-  expect(next()).toBe("Tạo lịch cho công việc");
+  expect(next()).toBe("Xem lịch đề xuất");
   w.sessions = [{ status: "Scheduled", end: new Date(2000).toISOString() }];
   expect(next()).toBe("Mở lịch để làm việc");
 });

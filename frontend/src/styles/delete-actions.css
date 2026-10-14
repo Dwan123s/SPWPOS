@@ -1,0 +1,92 @@
+.note-desk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.note-delete-button,
+.note-list-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #a34437;
+  background: transparent;
+  cursor: pointer;
+}
+.note-delete-button svg,
+.note-list-delete svg {
+  width: 18px;
+  height: 18px;
+}
+.note-delete-button:hover:not(:disabled),
+.note-list-delete:hover:not(:disabled) {
+  background: #fce9e3;
+  border-color: #edc6bb;
+}
+.note-delete-button:focus-visible,
+.note-list-delete:focus-visible {
+  outline: 3px solid #a34437;
+  outline-offset: 2px;
+}
+.note-delete-button:disabled,
+.note-list-delete:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.note-list-row {
+  position: relative;
+  min-width: 0;
+}
+.note-studio .note-list-row .note-list-item {
+  width: 100%;
+  padding-right: 52px;
+}
+.note-list-delete {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+}
+.glass-workspace .task-row {
+  grid-template-columns: minmax(0, 1fr) 115px 125px 90px 58px 44px;
+  gap: 14px;
+}
+.task-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+:is(.planning-console, #modal) .task-delete-button {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  color: #a34437;
+  border-radius: 12px;
+}
+:is(.planning-console, #modal) .task-delete-button:hover:not(:disabled) {
+  background: #fce9e3;
+  border-color: #edc6bb;
+}
+@media (max-width: 1020px) {
+  .glass-workspace .task-row {
+    grid-template-columns: minmax(0, 1fr) 90px 78px 58px 44px;
+  }
+}
+@media (max-width: 800px) {
+  .glass-workspace .task-row:not(.task-heading) {
+    position: relative;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .glass-workspace .task-row:not(.task-heading) > div:first-child {
+    padding-right: 50px;
+  }
+  .task-row-actions {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+  }
+}

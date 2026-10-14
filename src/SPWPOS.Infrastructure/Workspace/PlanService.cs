@@ -136,11 +136,22 @@ public sealed partial class WorkspaceService
     { ValidPlan(input); return engine.Analyze(await State(uid, ct), input, Now); }
     public async Task<ScenarioView> ScenarioAsync(Guid uid, ScenarioInput input, CancellationToken ct)
     {
-        ValidPlan(input.Plan); ValidTask(input.NewTask);
-        Require(input.NewTask.ParentId is null && input.NewTask.CategoryId is null, "INVALID_SCENARIO", "Công việc giả định không tham chiếu dữ liệu thật.");
-        var state = await State(uid, ct); var before = engine.Analyze(state, input.Plan, Now);
-        var simulated = NewTask(uid, input.NewTask, Now); var clone = state with { Tasks = state.Tasks.Append(simulated).ToArray() };
-        var after = engine.Analyze(clone, input.Plan, Now); var plan = engine.Generate(clone, input.Plan with { AffectedTaskIds = null }, Now);
+        ValidPlan(input.Plan);
+        var inputs = new[] { input.NewTask }.Concat(input.AdditionalTasks ?? []).ToArray();
+        Require(inputs.Length <= 12, "INVALID_SCENARIO", "Chỉ kiểm tra tối đa 12 công việc mỗi lần.");
+        foreach (var task in inputs)
+        {
+            Require(task is not null, "INVALID_SCENARIO", "Công việc giả định không hợp lệ.");
+            ValidTask(task!);
+            Require(task!.ParentId is null && task.CategoryId is null, "INVALID_SCENARIO", "Công việc giả định không tham chiếu dữ liệu thật.");
+        }
+        var planInput = input.Plan.IsReschedule && input.Plan.Start < Now.AddMinutes(5)
+            ? input.Plan with { Start = Now.AddMinutes(5) } : input.Plan;
+        var state = await State(uid, ct); var before = engine.Analyze(state, planInput, Now);
+        var simulated = inputs.Select(task => NewTask(uid, task, Now)).ToArray();
+        var clone = state with { Tasks = state.Tasks.Concat(simulated).ToArray() };
+        var after = engine.Analyze(clone, planInput, Now);
+        var plan = engine.Generate(clone, planInput with { AffectedTaskIds = planInput.IsReschedule ? simulated.Select(task => task.Id).ToArray() : null }, Now);
         return new(before, after, plan, after.RemainingMinutes - before.RemainingMinutes);
     }
     private void StorePlanDecisions(Guid uid, PlanProposal proposal, PlanView plan, PlanningState state)

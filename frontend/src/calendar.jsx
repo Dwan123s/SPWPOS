@@ -1,6 +1,7 @@
 import { SessionTimer } from "./react-ui.jsx";
 import { Select, nodeList } from "./react-ui.jsx";
 import { availabilityEditor } from "./interactive.jsx";
+import { StartSessionButton } from "./session-start.jsx";
 import {
   state,
   button,
@@ -43,9 +44,7 @@ export function sessionCard(s) {
       {active ? <SessionTimer id={s.id} className="timer" /> : ""}
       <div className="reason">{reasons[s.reasonCode] || s.reasonCode}</div>
       <div className="actions">
-        {upcoming
-          ? button("Bắt đầu", "session-start", "small secondary", s.id, "play")
-          : ""}
+        {upcoming && <StartSessionButton session={s} workspace={state.workspace} />}
         {s.status === "Running"
           ? button(
               "Tạm dừng",
@@ -370,10 +369,25 @@ export function timePage() {
             <div className="form-error" />
             <div className="form-actions">
               {button("Thêm khoảng", "add-slot", "secondary", "", "plus")}
-              <button type="submit" className="btn primary">
+              <button type="submit" className="btn secondary">
                 Lưu lịch rảnh
               </button>
+              {w.tasks.some(
+                (task) => !["Completed", "Cancelled"].includes(task.status),
+              ) && (
+                <button
+                  type="submit"
+                  className="btn primary"
+                  data-next-action="plan"
+                >
+                  Lưu giờ rảnh & xem lịch
+                </button>
+              )}
             </div>
+            <p className="reason spaced">
+              Lưu giờ rảnh chưa thay đổi lịch làm việc. Bạn sẽ được xem lịch đề
+              xuất trước khi chọn áp dụng.
+            </p>
           </form>
         </section>
         <section className="card">
@@ -565,9 +579,9 @@ export function planModal(plan, simulation = false) {
             <strong>{w.taskName}</strong>
             <br />
             {w.message}
-            {" · "}
-            {minutes(w.unscheduledMinutes)}
-            {" chưa xếp"}
+            {w.unscheduledMinutes > 0 && (
+              <> · {minutes(w.unscheduledMinutes)} chưa xếp</>
+            )}
           </div>
         )),
       )}
@@ -635,6 +649,9 @@ export function planModal(plan, simulation = false) {
         )}
         {!simulation && !plan.isApplied && plan.status !== "DISCARDED"
           ? button("Lưu lịch này", "apply-plan", "primary", plan.id, "check")
+          : ""}
+        {!simulation && plan.isApplied
+          ? button("Mở Hôm nay để làm việc", "nav", "primary", "today", "play")
           : ""}
       </div>
     </>,

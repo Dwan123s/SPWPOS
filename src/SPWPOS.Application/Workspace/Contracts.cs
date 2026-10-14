@@ -52,7 +52,7 @@ public sealed record ProposedSession(Guid Id, Guid TaskId, DateTimeOffset Start,
 public sealed record PlanView(Guid Id, Guid Revision, DateTimeOffset Start, DateTimeOffset End,
     ProposedSession[] Sessions, PlanWarning[] Warnings, string[] Explanations, bool IsApplied,
     string Status = "PROPOSED", string Kind = "INITIAL", Guid? PreviousPlanId = null, DateTimeOffset? AppliedAt = null);
-public sealed record ScenarioInput(PlanInput Plan, TaskInput NewTask);
+public sealed record ScenarioInput(PlanInput Plan, TaskInput NewTask, [MaxLength(11)] TaskInput[]? AdditionalTasks = null);
 public sealed record BiasView(string TaskType, int Samples, double Ratio, bool Personalized);
 public sealed record RiskView(Guid TaskId, string Name, string Level, int Score, string[] Reasons, int RemainingMinutes);
 public sealed record IntelligenceView(int RemainingMinutes, int CalendarFreeMinutes, int EffectiveCapacityMinutes,

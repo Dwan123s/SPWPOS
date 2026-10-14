@@ -197,8 +197,8 @@ export function button(text, action, extra = "", id = "", glyph = "") {
     "week-prev": "Tuần trước",
     "week-next": "Tuần sau",
     "remove-slot": "Xóa khoảng thời gian",
-    "edit-category": "Chỉnh sửa nhóm",
-    "delete-category": "Xóa nhóm",
+    "edit-category": "Chỉnh sửa danh mục",
+    "delete-category": "Xóa danh mục",
   };
   const glyphLabels = {
     close: "Đóng",

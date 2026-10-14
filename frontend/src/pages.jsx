@@ -3,6 +3,7 @@ import { avatarPreview, avatarRemove } from "./interactive.jsx";
 import { AccountPassword } from "./account-password.jsx";
 import { Loading } from "./loading.jsx";
 import { GoogleAccountCard } from "./google-signin.jsx";
+import { NotificationCenter } from "./notifications.jsx";
 import {
   state,
   button,
@@ -440,57 +441,7 @@ export function scenarioPage() {
   );
 }
 export function notificationsPage() {
-  return (
-    <section className="card">
-      <div className="card-header">
-        <div>
-          <h2>Hộp thông báo</h2>
-          <p>Deadline, phiên sắp đến, workload và thay đổi lịch.</p>
-        </div>
-      </div>
-      {nodeList(
-        state.workspace.notifications.map((n) => (
-          <div className={`notification ${n.isRead ? "read" : ""}`}>
-            <span className="notification-dot" />
-            <div>
-              <h3>{n.title}</h3>
-              <p>{n.message}</p>
-              <small>
-                {dateFmt(n.createdAt)}
-                {" · "}
-                {timeFmt(n.createdAt)}
-              </small>
-              <div className="actions spaced">
-                {n.taskId
-                  ? button(
-                      "Xem công việc",
-                      "task-detail",
-                      "small ghost",
-                      n.taskId,
-                    )
-                  : ""}
-                {!n.isRead
-                  ? button(
-                      "Đánh dấu đã đọc",
-                      "notification-read",
-                      "small ghost",
-                      n.id,
-                      "check",
-                    )
-                  : ""}
-              </div>
-            </div>
-          </div>
-        )),
-      ) ||
-        empty(
-          "Bạn đã cập nhật mọi thứ",
-          "Thông báo sẽ xuất hiện ở đây khi có điều cần chú ý.",
-          "",
-          "",
-        )}
-    </section>
-  );
+  return <NotificationCenter workspace={state.workspace} />;
 }
 export function settingsPage() {
   const p = state.workspace.profile || {},
@@ -559,7 +510,7 @@ export function settingsPage() {
           data-id="categories"
         >
           {icon("folder")}
-          {" Nhóm công việc "}
+          {" Danh mục công việc "}
           <span className="tab-count">{catCount}</span>
         </button>
         <button
@@ -658,14 +609,14 @@ export function settingsPage() {
         <section className="card settings-content-card">
           <div className="card-header">
             <div>
-              <h2>Quản lý nhóm công việc</h2>
+              <h2>Quản lý danh mục công việc</h2>
               <p>
                 Phân loại công việc theo dự án hoặc chủ đề để dễ dàng sắp xếp kế
                 hoạch.
               </p>
             </div>
             {button(
-              "Thêm nhóm mới",
+              "Thêm danh mục mới",
               "new-category",
               "primary small",
               "",
@@ -708,10 +659,10 @@ export function settingsPage() {
               )),
             ) ||
               empty(
-                "Chưa có nhóm công việc nào",
-                "Tạo nhóm đầu tiên để sắp xếp công việc tốt hơn.",
+                "Chưa có danh mục công việc nào",
+                "Tạo danh mục đầu tiên để sắp xếp công việc tốt hơn.",
                 "new-category",
-                "Thêm nhóm",
+                "Thêm danh mục",
               )}
           </div>
         </section>
@@ -719,10 +670,31 @@ export function settingsPage() {
         ""
       )}
       {currentTab === "security" ? (
-        <section className="card settings-content-card">
-          <GoogleAccountCard />
-          <AccountPassword email={p.email || ""} />
-        </section>
+        <div className="stack">
+          {" "}
+          <section className="card settings-content-card">
+            <GoogleAccountCard />
+            <AccountPassword email={p.email || ""} />
+          </section>{" "}
+          <section className="card danger-card">
+            <div className="card-header">
+              <div>
+                <h2 className="danger-title">{"Quản lý phiên & Đăng xuất"}</h2>
+                <p>
+                  Đăng xuất tài khoản khỏi tất cả thiết bị khác trên trình
+                  duyệt.
+                </p>
+              </div>
+              {button(
+                "Đăng xuất tất cả thiết bị",
+                "logout-all",
+                "danger",
+                "",
+                "logout",
+              )}
+            </div>
+          </section>
+        </div>
       ) : (
         ""
       )}
@@ -769,7 +741,7 @@ export function settingsPage() {
                   'required min="1" max="120"',
                 )}
                 <label className="field wide">
-                  Cảnh báo khi Workload đạt mức
+                  Cảnh báo khi khối lượng công việc đạt mức
                   <Select name="workloadWarningLevel">
                     {nodeList(
                       Object.entries({
@@ -797,24 +769,6 @@ export function settingsPage() {
               </div>
             </form>
           </section>
-          <section className="card danger-card">
-            <div className="card-header">
-              <div>
-                <h2 className="danger-title">{"Quản lý phiên & Đăng xuất"}</h2>
-                <p>
-                  Đăng xuất tài khoản khỏi tất cả thiết bị khác trên trình
-                  duyệt.
-                </p>
-              </div>
-              {button(
-                "Đăng xuất tất cả thiết bị",
-                "logout-all",
-                "danger",
-                "",
-                "logout",
-              )}
-            </div>
-          </section>
         </div>
       ) : (
         ""
@@ -824,11 +778,11 @@ export function settingsPage() {
 }
 export function categoryModal(category = {}) {
   modal(
-    category.id ? "Chỉnh sửa nhóm" : "Thêm nhóm công việc",
-    "Dùng nhóm để lọc và tổ chức công việc.",
+    category.id ? "Chỉnh sửa danh mục" : "Thêm danh mục công việc",
+    "Dùng danh mục để lọc và tổ chức công việc.",
     <form data-form="category" data-id={category.id || ""}>
       {field(
-        "Tên nhóm",
+        "Tên danh mục",
         "name",
         "text",
         category.name || "",
@@ -846,7 +800,7 @@ export function categoryModal(category = {}) {
       <div className="form-error" />
       <div className="form-actions">
         <button type="submit" className="btn primary">
-          Lưu nhóm
+          Lưu danh mục
         </button>
       </div>
     </form>,

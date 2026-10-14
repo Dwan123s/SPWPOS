@@ -13,6 +13,8 @@ import {
   skipGuide,
   advanceGuide,
 } from "./onboarding.js";
+import { workflowSteps } from "./workflow.js";
+export { workflowSteps } from "./workflow.js";
 
 const menuKey = "planora.menu.compact";
 function read(key) {
@@ -30,56 +32,12 @@ function write(key, value) {
   }
 }
 
-export function workflowSteps(workspace, now = Date.now()) {
-  const hasTasks = (workspace?.tasks || []).some(
-    (task) => !["Completed", "Cancelled"].includes(task.status),
-  );
-  const hasTime =
-    !!workspace?.availability?.length ||
-    !!workspace?.exceptions?.some((item) => item.isAvailable);
-  const hasPlan = (workspace?.sessions || []).some(
-    (session) =>
-      ["Running", "Paused"].includes(session.status) ||
-      (session.status === "Scheduled" && new Date(session.end).getTime() > now),
-  );
-  return [
-    {
-      title: "Nhập việc",
-      description: "Viết việc cần làm vào ghi chú để AI giúp tạo công việc.",
-      done: hasTasks,
-      route: "notes",
-      label: "Nhập việc bằng AI",
-    },
-    {
-      title: "Chọn giờ rảnh",
-      description: "Chọn ngày và giờ bạn có thể làm việc để hệ thống xếp lịch.",
-      done: hasTime,
-      route: "time",
-      label: "Chọn giờ rảnh",
-    },
-    {
-      title: "Tạo lịch",
-      description: "Tạo lịch cho các công việc. Bạn được xem trước khi lưu.",
-      done: hasPlan,
-      action: "generate-plan",
-      label: "Tạo lịch cho công việc",
-    },
-    {
-      title: "Bắt đầu làm",
-      description:
-        "Mở một khoảng làm việc trong lịch, bấm Bắt đầu để ghi nhận thời gian.",
-      route: "calendar",
-      label: "Mở lịch để làm việc",
-    },
-  ];
-}
-
 const lessons = [
   {
     title: "Nhập việc cần làm",
     route: "notes",
-    cta: "Mở Ghi chú & AI",
-    text: "Mỗi việc viết một dòng. Có thể thêm thời lượng và hạn chót nếu bạn biết. Bấm Dùng ví dụ trong trang ghi chú để thử cách nhập.",
+    cta: "Mở Nhập việc",
+    text: "Mỗi việc viết một dòng, thêm thời lượng và hạn chót nếu biết, rồi bấm Xem trước công việc. Bạn cũng có thể thêm việc thủ công trong Công việc khi không dùng AI.",
     example:
       "Viết báo cáo ngày mai, khoảng 2 tiếng\nÔn chương 4 trước thứ Sáu, khoảng 90 phút",
     note: "Lưu bản nháp chỉ lưu nội dung. Xem trước công việc cho bạn sửa kết quả AI trước khi tạo lịch.",
@@ -96,9 +54,9 @@ const lessons = [
     title: "Tạo và lưu lịch",
     route: "notes",
     cta: "Mở ghi chú để tạo lịch",
-    text: "Cách nhanh nhất là bấm Tạo và lưu lịch ngay trong ghi chú. AI tạo công việc và lưu lịch tự động.",
+    text: "Kiểm tra kết quả AI rồi bấm Tạo công việc & xem lịch. Xem giờ làm và các cảnh báo trước khi bấm Lưu lịch này. Với công việc đã có, mở Lịch làm việc và bấm Lập kế hoạch.",
     example:
-      "Tự động: nhập ghi chú → Tạo và lưu lịch ngay\nXem trước: Xem trước công việc → Tạo công việc & xem lịch → Lưu lịch này",
+      "Nhập việc → Xem trước công việc → Chọn giờ rảnh → Xem lịch đề xuất → Lưu lịch này",
     note: "Lịch đề xuất chưa được lưu cho đến khi bấm Lưu lịch này. Nếu thiếu thời gian, xem cảnh báo để biết việc nào chưa được xếp đủ.",
   },
   {
@@ -161,7 +119,7 @@ function Tutorial() {
             onClick={() => {
               startGuide();
               closeModal();
-              location.hash = missions[getGuide().step].route;
+              location.hash = missionFor(getGuide()).route;
             }}
           >
             Hướng dẫn từng thao tác
@@ -201,12 +159,12 @@ export function openTutorial() {
 
 const missions = [
   {
-    title: "Viết ghi chú đầu tiên",
+    title: "Nhập công việc đầu tiên",
     route: "notes",
     target: ".note-editor-actions",
-    text: "Nhập tiêu đề và các việc cần làm. Bấm Xem trước công việc, chờ AI trả kết quả có ít nhất một việc. Bạn có thể dùng ví dụ rồi sửa lại.",
-    done: "AI đã phân tích ghi chú của bạn.",
-    link: "Mở Ghi chú & AI",
+    text: "Nhập các việc cần làm rồi bấm Xem trước công việc để kiểm tra kết quả AI. Bạn cũng có thể mở Công việc và thêm một việc thủ công để bắt đầu.",
+    done: "Bạn đã chuẩn bị công việc đầu tiên.",
+    link: "Mở Nhập việc",
   },
   {
     title: "Lưu giờ bạn rảnh",
@@ -219,8 +177,8 @@ const missions = [
   {
     title: "Tạo và lưu lịch đầu tiên",
     route: "notes",
-    target: ".note-editor-actions",
-    text: "Mở lại ghi chú đã phân tích và bấm Tạo và lưu lịch ngay. Đợi thông báo lịch đã lưu và có phiên mới. Nếu dùng xem trước, bấm Lưu lịch này để hoàn thành bước.",
+    target: '[aria-describedby="note-proposal-help"]',
+    text: "Mở lại ghi chú đã phân tích, kiểm tra kết quả và bấm Tạo công việc & xem lịch. Chỉ khi bấm Lưu lịch này, lịch mới được áp dụng và bước này mới hoàn thành.",
     done: "Bạn đã lưu lịch có phiên làm việc.",
     link: "Mở ghi chú để tạo lịch",
   },
@@ -233,6 +191,25 @@ const missions = [
     link: "Mở Lịch làm việc",
   },
 ];
+const manualInputMission = {
+  ...missions[0],
+  route: "tasks",
+  target: ".page-header .actions",
+  text: "Bấm Thêm công việc, nhập tên, thời lượng và hạn chót rồi lưu. Bạn không cần sử dụng AI để hoàn thành bước này.",
+  link: "Mở Công việc",
+};
+const manualPlanMission = {
+  ...missions[2],
+  route: "calendar",
+  target: ".page-header .actions",
+  text: "Bấm Lập kế hoạch để xem lịch đề xuất cho các công việc đã lưu. Kiểm tra giờ làm và cảnh báo, rồi bấm Lưu lịch này khi phù hợp.",
+  link: "Mở Lịch làm việc",
+};
+function missionFor(guide, route) {
+  if (guide.step === 0 && route === "tasks") return manualInputMission;
+  if (guide.step === 2 && !guide.noteId) return manualPlanMission;
+  return missions[guide.step];
+}
 function openWelcome() {
   modal(
     "Chào mừng đến PLANORA",
@@ -264,7 +241,7 @@ function openWelcome() {
           onClick={() => {
             startGuide();
             closeModal();
-            location.hash = missions[getGuide().step].route;
+            location.hash = missionFor(getGuide()).route;
           }}
         >
           Tiếp tục
@@ -275,7 +252,7 @@ function openWelcome() {
 }
 export function GuidedTutorial({ route }) {
   const guide = useSyncExternalStore(subscribeGuide, getGuide, getGuide);
-  const mission = missions[guide.step];
+  const mission = missionFor(guide, route);
   const done = guide.completed.includes(guide.step);
   useEffect(() => {
     if (guide.status !== "active" || route !== mission.route || done) return;
@@ -350,7 +327,7 @@ export function GuidedTutorial({ route }) {
           disabled={!done}
           onClick={() => {
             if (advanceGuide() && getGuide().status === "active")
-              location.hash = missions[getGuide().step].route;
+              location.hash = missionFor(getGuide()).route;
           }}
         >
           {guide.step === 3 ? "Hoàn thành hướng dẫn" : "Tiếp tục"}

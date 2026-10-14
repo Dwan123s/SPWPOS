@@ -12,11 +12,16 @@ import {
   WorkspaceMotionControl,
 } from "./workspace-motion.jsx";
 import { $, state, icon, button, userAvatar, dateFmt, modal } from "./ui.jsx";
+import { nextWorkflowStep, workflowSteps } from "./workflow.js";
 export function workspaceShell(routes, title, description, body) {
   const p = state.workspace.profile || {},
     unread = (state.workspace.notifications || []).filter(
       (n) => !n.isRead,
     ).length;
+  const next = nextWorkflowStep(state.workspace);
+  const readyToPlan = workflowSteps(state.workspace)
+    .slice(0, 2)
+    .every((step) => step.done);
   const nav = (keys) =>
     nodeList(
       keys
@@ -48,9 +53,25 @@ export function workspaceShell(routes, title, description, body) {
         {button("Thêm công việc", "new-task", "primary", "", "plus")}
       </>
     ) : state.route === "today" ? (
-      button("Thêm công việc", "new-task", "primary", "", "plus")
+      button(
+        next.label,
+        next.action || "nav",
+        "primary",
+        next.route || "",
+        next.symbol,
+      )
     ) : state.route === "calendar" ? (
-      button("Lập kế hoạch", "generate-plan", "primary", "", "spark")
+      readyToPlan ? (
+        button("Lập kế hoạch", "generate-plan", "primary", "", "spark")
+      ) : (
+        button(
+          next.label,
+          next.action || "nav",
+          "primary",
+          next.route || "",
+          next.symbol,
+        )
+      )
     ) : (
       ""
     );
@@ -107,13 +128,13 @@ export function workspaceShell(routes, title, description, body) {
             </button>
           </div>
           <nav className="nav" aria-label="Điều hướng chính">
-            <section className="nav-group" aria-label="Làm việc">
-              <div className="nav-label">Làm việc</div>
-              {nav(["today", "notes", "tasks", "calendar"])}
+            <section className="nav-group" aria-label="Không gian cá nhân">
+              <div className="nav-label">Không gian cá nhân</div>
+              {nav(["today", "notes", "calendar", "tasks"])}
             </section>
-            <section className="nav-group" aria-label="Lên kế hoạch">
-              <div className="nav-label">Lên kế hoạch</div>
-              {nav(["time", "insights", "scenario"])}
+            <section className="nav-group" aria-label="Theo dõi và thiết lập">
+              <div className="nav-label">Theo dõi & thiết lập</div>
+              {nav(["insights", "time"])}
             </section>
             <section className="nav-group" aria-label="Quản lý">
               <div className="nav-label">Quản lý</div>
@@ -210,19 +231,6 @@ export function workspaceShell(routes, title, description, body) {
             <div className="topbar-right">
               <TutorialButton route={state.route} />
               <WorkspaceMotionControl />
-              <span
-                className={`console-sync ${state.analysisError ? "has-error" : ""}`}
-                title={
-                  state.loadedAt
-                    ? `Cập nhật lúc ${dateFmt(state.loadedAt, { hour: "2-digit", minute: "2-digit" })}`
-                    : "Dữ liệu hiện tại"
-                }
-              >
-                <span />
-                {state.analysisError
-                  ? "Cần tải lại phân tích"
-                  : "Đã tải dữ liệu"}
-              </span>
               <button
                 type="button"
                 className="bell"
@@ -244,7 +252,7 @@ export function workspaceShell(routes, title, description, body) {
               </button>
             </div>
           </header>
-          <CapacityRibbon />
+          {state.route === "today" && <CapacityRibbon />}
           <main className="content" id="main-content" tabIndex="-1">
             <div className="page-header">
               <div>

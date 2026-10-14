@@ -19,6 +19,10 @@
 @import "./tutorial.css" layer(components);
 @import "./daily-schedule.css" layer(components);
 @import "./getting-started.css" layer(components);
+@import "./note-studio.css" layer(components);
+@import "./note-notebook.css" layer(components);
+@import "./delete-actions.css" layer(components);
+@import "./notifications.css" layer(components);
 
 @theme {
   --color-planora-50: #effbff;

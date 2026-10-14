@@ -209,3 +209,71 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.note-quick-options {
+  padding-top: 14px;
+  border-top: 1px solid var(--line, #ccdeee);
+}
+.note-quick-options > summary {
+  cursor: pointer;
+  color: var(--muted, #526a81);
+  font-size: 13px;
+  font-weight: 600;
+}
+.note-quick-options[open] > summary {
+  color: var(--ink, #122941);
+}
+.note-quick-options input {
+  max-width: 180px;
+}
+.note-impact {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f4faff;
+  overflow-wrap: anywhere;
+}
+.note-impact h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.note-impact-verdict {
+  font-weight: 700;
+  color: #16634e;
+}
+.note-impact-result.needs-review .note-impact-verdict {
+  color: #925b11;
+}
+.note-impact-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.note-impact-stats > div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #ffffffb5;
+}
+.note-impact-stats span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.note-impact-stats strong {
+  font-size: 20px;
+}
+.note-impact-issues {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+@media (max-width: 480px) {
+  .note-impact {
+    padding: 14px;
+  }
+  .note-impact-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

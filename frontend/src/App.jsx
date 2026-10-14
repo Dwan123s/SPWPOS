@@ -48,7 +48,11 @@ export function App({ initialize = true }) {
     >
       <Fragment
         key={
-          snapshot.screenKey.startsWith("auth-") ? "auth" : snapshot.screenKey
+          snapshot.screenKey.startsWith("auth-")
+            ? "auth"
+            : snapshot.screenKey.startsWith("notifications-")
+              ? "notifications"
+              : snapshot.screenKey
         }
       >
         {snapshot.screen || <Loading fullscreen />}

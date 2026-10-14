@@ -1,7 +1,14 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NotesPage } from "../src/notes.jsx";
+
 import { state } from "../src/ui.jsx";
 
 vi.mock("../src/calendar.jsx", () => ({ planModal: vi.fn() }));
@@ -12,6 +19,7 @@ let notes,
   failPlan,
   failAi,
   failAvailability,
+  failDelete,
   aiErrorCode,
   aiAvailable,
   aiSource;
@@ -26,11 +34,13 @@ const candidate = (name, minutes) => ({
   splittable: true,
 });
 beforeEach(() => {
+  localStorage.clear();
   notes = [];
   calls = [];
   failPlan = false;
   failAi = false;
   failAvailability = false;
+  failDelete = false;
   aiErrorCode = undefined;
   aiAvailable = true;
   aiSource = "Gemini";
@@ -72,6 +82,19 @@ beforeEach(() => {
       if (url === "/api/notes/agent")
         data = { aiAvailable, maxTasks: 12, provider: "Gemini" };
       if (url === "/api/notes" && options.method === "GET") data = notes;
+      if (url.startsWith("/api/notes/") && options.method === "DELETE") {
+        if (failDelete)
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: { message: "Ghi chú đã thay đổi. Tải lại trước khi xóa." },
+            }),
+          };
+        const id = url.split("?")[0].split("/").at(-1);
+        notes = notes.filter((item) => item.id !== id);
+        data = {};
+      }
       if (url === "/api/notes" && options.method === "POST") {
         data = {
           ...body,
@@ -81,7 +104,7 @@ beforeEach(() => {
           createdTaskIds: [],
           analysis: null,
         };
-        notes = [data];
+        notes = [data, ...notes.filter((item) => item.id !== data.id)];
       }
       if (url.endsWith("/analyze")) {
         data = {
@@ -93,7 +116,7 @@ beforeEach(() => {
             messages: ["Kiểm tra deadline trước khi lưu."],
           },
         };
-        notes = [data];
+        notes = [data, ...notes.filter((item) => item.id !== data.id)];
       }
       if (url.endsWith("/tasks")) {
         data = { ...notes[0], version: "imported", createdTaskIds: ["task-1"] };
@@ -137,7 +160,7 @@ beforeEach(() => {
     }),
   );
 });
-async function analyze(user) {
+async function ready() {
   await waitFor(() =>
     expect(
       screen
@@ -145,6 +168,9 @@ async function analyze(user) {
         .closest("fieldset").disabled,
     ).toBe(false),
   );
+}
+async function analyze(user) {
+  await ready();
   await user.type(screen.getByLabelText("Tiêu đề ghi chú"), "Tuần này");
   await user.type(
     screen.getByLabelText("Nội dung ghi chú"),
@@ -153,10 +179,113 @@ async function analyze(user) {
   await user.click(screen.getByRole("button", { name: "Xem trước công việc" }));
   await screen.findByRole("heading", { name: "Xem trước công việc" });
 }
+async function useQuickSchedule(user) {
+  const options = document.querySelector(".note-quick-options");
+  if (options && !options.open)
+    await user.click(within(options).getByText("Tùy chọn tạo lịch nhanh"));
+  await user.click(
+    screen.getByRole("button", { name: "Tạo và lưu lịch ngay" }),
+  );
+}
+it("cancels note deletion without changing the saved note or editor", async () => {
+  const user = userEvent.setup();
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await analyze(user);
+  await user.click(
+    screen.getByRole("button", { name: "Xóa ghi chú", exact: true }),
+  );
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Tuần này"));
+  expect(calls.some((call) => call.method === "DELETE")).toBe(false);
+  expect(
+    screen.getByRole("heading", { name: "Xem trước công việc" }),
+  ).toBeTruthy();
+  expect(notes).toHaveLength(1);
+});
+it("deletes the reviewed note with its latest version and clears the editor", async () => {
+  const user = userEvent.setup();
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await analyze(user);
+  await user.click(
+    screen.getByRole("button", { name: "Xóa ghi chú", exact: true }),
+  );
+  await screen.findByText("Đã xóa ghi chú “Tuần này”.");
+  expect(calls.filter((call) => call.method === "DELETE")).toEqual([
+    {
+      url: "/api/notes/note-1?version=analyzed",
+      method: "DELETE",
+      body: undefined,
+    },
+  ]);
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe("");
+  expect(
+    screen.queryByRole("heading", { name: "Xem trước công việc" }),
+  ).toBeNull();
+  expect(notes).toHaveLength(0);
+});
+it("deletes a library note without losing the unsaved current note", async () => {
+  notes = ["Đang viết", "Ghi chú cũ"].map((title, index) => ({
+    id: `saved-${index}`,
+    title,
+    content: `Nội dung ${index}`,
+    version: `version ${index}`,
+    createdTaskIds: [],
+    analysis: null,
+    updatedAt: "2026-10-08T10:00:00Z",
+  }));
+  const user = userEvent.setup();
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  await user.click(screen.getByRole("button", { name: /^Đang viết/ }));
+  await user.type(screen.getByLabelText("Nội dung ghi chú"), " chưa lưu");
+  await user.click(
+    screen.getByRole("button", { name: "Xóa ghi chú Ghi chú cũ" }),
+  );
+  await screen.findByText("Đã xóa ghi chú “Ghi chú cũ”.");
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(
+    "Nội dung 0 chưa lưu",
+  );
+  expect(screen.queryByRole("button", { name: /^Ghi chú cũ/ })).toBeNull();
+  expect(calls.find((call) => call.method === "DELETE").url).toBe(
+    "/api/notes/saved-1?version=version%201",
+  );
+});
+it("preserves saved and unsaved content when note deletion fails", async () => {
+  const user = userEvent.setup();
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await analyze(user);
+  await user.click(screen.getByRole("button", { name: "Sửa ghi chú" }));
+  await user.type(screen.getByLabelText("Nội dung ghi chú"), " chưa lưu");
+  failDelete = true;
+  await user.click(
+    screen.getByRole("button", { name: "Xóa ghi chú", exact: true }),
+  );
+  await screen.findByRole("alert");
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toContain("chưa lưu");
+  expect(notes).toHaveLength(1);
+  expect(confirm).toHaveBeenCalledWith(
+    expect.stringContaining("Các thay đổi chưa lưu"),
+  );
+  failDelete = false;
+  await user.click(
+    screen.getByRole("button", { name: "Xóa ghi chú", exact: true }),
+  );
+  await screen.findByText("Đã xóa ghi chú “Tuần này”.");
+  expect(notes).toHaveLength(0);
+});
 it("saves a note, reviews selected tasks, and previews the schedule without applying it", async () => {
   const refresh = vi.fn(async () => {}),
     user = userEvent.setup();
   render(<NotesPage onWorkspaceChanged={refresh} />);
+  expect(document.querySelector(".note-quick-options").open).toBe(false);
+  expect(
+    screen
+      .getByRole("button", { name: "Xem trước công việc" })
+      .classList.contains("primary"),
+  ).toBe(true);
   await analyze(user);
   expect(calls.some((c) => c.url === "/api/notes" && c.method === "POST")).toBe(
     true,
@@ -208,10 +337,15 @@ it("offers availability setup and explains why edited notes need fresh analysis"
     screen.getByRole("button", { name: "Tạo công việc & xem lịch" }).disabled,
   ).toBe(false);
   expect(
-    screen.getAllByRole("link", { name: "giờ rảnh" })[0].getAttribute("href"),
+    screen.getByRole("button", { name: "Chọn giờ rảnh để kiểm tra" }),
+  ).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Sửa ghi chú" }));
+  expect(
+    screen.getByRole("link", { name: "giờ rảnh" }).getAttribute("href"),
   ).toBe("#time");
   await user.type(screen.getByLabelText("Nội dung ghi chú"), " mới");
   expect(screen.getByText(/Bạn đã sửa nội dung/)).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "2 Kiểm tra" }));
   expect(
     screen.getByText(
       "Nội dung ghi chú đã thay đổi. Phân tích lại trước khi tạo công việc.",
@@ -239,9 +373,7 @@ it("automatically schedules a saved note and reports the applied calendar", asyn
     screen.getByLabelText("Nội dung ghi chú"),
     "Báo cáo 120 phút",
   );
-  await user.click(
-    screen.getByRole("button", { name: "Tạo và lưu lịch ngay" }),
-  );
+  await useQuickSchedule(user);
   await screen.findByText(/Đã tự động áp dụng lịch với 1 phiên mới/);
   expect(calls.find((c) => c.url.endsWith("/schedule")).body).toEqual({
     version: "saved",
@@ -264,6 +396,7 @@ it("allows saving but disables AI actions when Gemini is not configured", async 
   expect(
     screen.getByRole("button", { name: "Xem trước công việc" }).disabled,
   ).toBe(true);
+  await user.click(screen.getByText("Tùy chọn tạo lịch nhanh"));
   expect(
     screen.getByRole("button", { name: "Tạo và lưu lịch ngay" }).disabled,
   ).toBe(true);
@@ -290,13 +423,9 @@ it("identifies Gemini capabilities and the actual analysis provider", async () =
   aiSource = "Gemini";
   const user = userEvent.setup();
   render(<NotesPage onWorkspaceChanged={vi.fn(async () => {})} />);
-  await waitFor(() =>
-    expect(
-      screen.getByRole("button", { name: "Xem trước công việc" }).disabled,
-    ).toBe(false),
-  );
+  await ready();
   await analyze(user);
-  expect(screen.getByText("Gemini sẵn sàng")).toBeTruthy();
+  expect(screen.queryByText("Gemini sẵn sàng")).toBeNull();
   expect(screen.getByText(/Phân tích bằng Gemini/)).toBeTruthy();
   expect(calls.find((call) => call.url.endsWith("/analyze")).body.useAi).toBe(
     true,
@@ -307,16 +436,14 @@ it("preserves saved note on AI failure and retries without creating tasks from r
   const user = userEvent.setup(),
     refresh = vi.fn(async () => {});
   render(<NotesPage onWorkspaceChanged={refresh} />);
-  await screen.findByText("Gemini sẵn sàng");
+  await ready();
   await user.type(screen.getByLabelText("Tiêu đề ghi chú"), "AI retry");
   await user.type(
     screen.getByLabelText("Nội dung ghi chú"),
     "Viết báo cáo 60 phút",
   );
   failAi = true;
-  await user.click(
-    screen.getByRole("button", { name: "Tạo và lưu lịch ngay" }),
-  );
+  await useQuickSchedule(user);
   await screen.findByRole("alert");
   expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(
     "Viết báo cáo 60 phút",
@@ -327,9 +454,7 @@ it("preserves saved note on AI failure and retries without creating tasks from r
   expect(planModal).not.toHaveBeenCalled();
   expect(calls.some((c) => c.url.endsWith("/tasks"))).toBe(false);
   failAi = false;
-  await user.click(
-    screen.getByRole("button", { name: "Tạo và lưu lịch ngay" }),
-  );
+  await useQuickSchedule(user);
   await screen.findByText(/Đã tự động áp dụng lịch với 1 phiên mới/);
   expect(
     calls.filter((c) => c.url === "/api/notes" && c.method === "POST"),
@@ -437,15 +562,13 @@ it("continues automatic scheduling after inline availability setup", async () =>
   state.workspace.availability = [];
   const user = userEvent.setup();
   render(<NotesPage onWorkspaceChanged={vi.fn(async () => {})} />);
-  await screen.findByText("Gemini sẵn sàng");
+  await ready();
   await user.type(screen.getByLabelText("Tiêu đề ghi chú"), "Auto");
   await user.type(
     screen.getByLabelText("Nội dung ghi chú"),
     "Viết báo cáo 60 phút",
   );
-  await user.click(
-    screen.getByRole("button", { name: "Tạo và lưu lịch ngay" }),
-  );
+  await useQuickSchedule(user);
   await setHours(user);
   await user.click(
     screen.getByRole("button", { name: "Lưu giờ rảnh & tiếp tục" }),
@@ -467,21 +590,80 @@ it("explains a missing task selection beside the proposal button", async () => {
   ).toBe(true);
 });
 
-it("fills an example without sending or saving it and keeps existing text intact", async () => {
-  const user = userEvent.setup();
+it("starts with a blank note and no sample-content action", async () => {
   render(<NotesPage onWorkspaceChanged={vi.fn()} />);
-  await screen.findByText("Gemini sẵn sàng");
-  await user.click(screen.getByRole("button", { name: "Dùng ví dụ" }));
-  expect(screen.getByLabelText("Nội dung ghi chú").value).toContain(
-    "Viết báo cáo ngày mai",
-  );
+  await ready();
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe("");
   expect(calls.some((c) => c.method === "POST")).toBe(false);
   expect(screen.queryByRole("button", { name: "Dùng ví dụ" })).toBeNull();
+});
+it("keeps the note intact while changing writing size, paper and focus mode", async () => {
+  const user = userEvent.setup();
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  const content = screen.getByLabelText("Nội dung ghi chú");
+  await user.type(content, "Báo cáo 90 phút");
+  await user.click(screen.getByText("Aa"));
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Cỡ chữ" }),
+    "20",
+  );
+  expect(
+    document
+      .querySelector(".note-studio")
+      .style.getPropertyValue("--note-writing-size"),
+  ).toBe("20px");
+  await user.click(screen.getByRole("button", { name: "Giấy kẻ dòng" }));
+  expect(
+    document.querySelector(".note-studio").classList.contains("is-ruled"),
+  ).toBe(true);
+  await user.click(screen.getByRole("button", { name: "Tập trung viết" }));
+  expect(screen.queryByRole("region", { name: "Ghi chú của bạn" })).toBeNull();
+  expect(content.value).toBe("Báo cáo 90 phút");
+  await user.click(screen.getByRole("button", { name: "Thoát tập trung" }));
+  expect(screen.getByRole("region", { name: "Ghi chú của bạn" })).toBeTruthy();
+  expect(content.value).toBe("Báo cáo 90 phút");
+  expect(calls.some((call) => call.method === "POST")).toBe(false);
+});
+it("saves a title from the first line when the user only writes note content", async () => {
+  const user = userEvent.setup();
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  await user.type(
+    screen.getByLabelText("Nội dung ghi chú"),
+    "Viết báo cáo trước thứ Sáu\nÔn chương 4",
+  );
+  await user.click(screen.getByRole("button", { name: "Lưu bản nháp" }));
+  await screen.findByText(/Đã lưu bản nháp/);
+  expect(
+    calls.find((call) => call.url === "/api/notes" && call.method === "POST")
+      .body.title,
+  ).toBe("Viết báo cáo trước thứ Sáu");
+  expect(calls.some((call) => call.url.endsWith("/analyze"))).toBe(false);
+});
+it("preserves task edits and selections when returning to the note and back to review", async () => {
+  const user = userEvent.setup();
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await analyze(user);
+  await user.click(screen.getByLabelText("Việc 2"));
+  const name = screen.getAllByLabelText("Tên công việc")[0];
+  await user.clear(name);
+  await user.type(name, "Báo cáo đã sửa");
+  await user.click(screen.getByRole("button", { name: "Sửa ghi chú" }));
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toContain(
+    "Viết báo cáo 2 tiếng",
+  );
+  await user.click(screen.getByRole("button", { name: "2 Kiểm tra" }));
+  expect(screen.getAllByLabelText("Tên công việc")[0].value).toBe(
+    "Báo cáo đã sửa",
+  );
+  expect(screen.getByLabelText("Việc 2").checked).toBe(false);
+  expect(calls.filter((call) => call.url.endsWith("/analyze"))).toHaveLength(1);
 });
 it("shows an actionable quota message and retries the saved note without duplicates", async () => {
   const user = userEvent.setup();
   render(<NotesPage onWorkspaceChanged={vi.fn(async () => {})} />);
-  await screen.findByText("Gemini sẵn sàng");
+  await ready();
   await user.type(screen.getByLabelText("Tiêu đề ghi chú"), "Retry");
   await user.type(
     screen.getByLabelText("Nội dung ghi chú"),
@@ -489,9 +671,7 @@ it("shows an actionable quota message and retries the saved note without duplica
   );
   aiErrorCode = "NOTE_AI_QUOTA_EXCEEDED";
   failAi = true;
-  await user.click(
-    screen.getByRole("button", { name: "Tạo và lưu lịch ngay" }),
-  );
+  await useQuickSchedule(user);
   await screen.findByText(
     "AI đang đạt giới hạn sử dụng. Ghi chú được giữ nguyên; hãy chờ rồi bấm Thử lại.",
   );
@@ -503,4 +683,280 @@ it("shows an actionable quota message and retries the saved note without duplica
   expect(
     calls.filter((c) => c.url === "/api/notes" && c.method === "POST"),
   ).toHaveLength(1);
+});
+
+it("filters real note states and searches Vietnamese titles without accents", async () => {
+  notes = [
+    {
+      id: "draft",
+      title: "Ý tưởng hôm nay",
+      content: "Lên ý tưởng cho báo cáo",
+      version: "draft-v",
+      createdTaskIds: [],
+      analysis: null,
+      updatedAt: "2026-10-14T04:00:00Z",
+    },
+    {
+      id: "reviewed",
+      title: "Báo cáo đã kiểm tra",
+      content: "Báo cáo 120 phút",
+      version: "review-v",
+      createdTaskIds: [],
+      analysis: {
+        source: "Gemini",
+        tasks: [candidate("Báo cáo", 120)],
+        messages: [],
+      },
+      updatedAt: "2026-10-14T03:00:00Z",
+    },
+    {
+      id: "created",
+      title: "Việc đã tạo",
+      content: "Ôn chương 4",
+      version: "created-v",
+      createdTaskIds: ["task-1"],
+      analysis: {
+        source: "Gemini",
+        tasks: [candidate("Ôn bài", 60)],
+        messages: [],
+      },
+      updatedAt: "2026-10-13T04:00:00Z",
+    },
+  ];
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  const user = userEvent.setup();
+  const library = within(
+    screen.getByRole("region", { name: "Ghi chú của bạn" }),
+  );
+  await user.selectOptions(
+    library.getByRole("combobox", { name: "Lọc ghi chú" }),
+    "reviewed",
+  );
+  expect(
+    library.queryByRole("button", { name: "Ý tưởng hôm nay", exact: true }),
+  ).toBeNull();
+  await user.type(
+    library.getByRole("searchbox", { name: "Tìm ghi chú" }),
+    "bao cao",
+  );
+  expect(
+    library.getByRole("button", { name: "Báo cáo đã kiểm tra", exact: true }),
+  ).toBeTruthy();
+  await user.type(
+    library.getByRole("searchbox", { name: "Tìm ghi chú" }),
+    " xyz",
+  );
+  expect(library.getByText("Không tìm thấy ghi chú.")).toBeTruthy();
+  await user.click(library.getByRole("button", { name: "Bỏ bộ lọc" }));
+  expect(
+    library.getByRole("button", { name: "Ý tưởng hôm nay", exact: true }),
+  ).toBeTruthy();
+  expect(library.getByRole("combobox", { name: "Lọc ghi chú" }).value).toBe(
+    "all",
+  );
+});
+it("asks before discarding unsaved note content when opening another note", async () => {
+  notes = [
+    {
+      id: "other",
+      title: "Ghi chú đã lưu",
+      content: "Nội dung đã lưu",
+      version: "other-v",
+      createdTaskIds: [],
+      analysis: null,
+      updatedAt: "2026-10-14T04:00:00Z",
+    },
+  ];
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  const user = userEvent.setup();
+  await user.type(
+    screen.getByLabelText("Nội dung ghi chú"),
+    "Ý tưởng chưa lưu",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Ghi chú đã lưu", exact: true }),
+  );
+  expect(screen.getByText("Có thay đổi chưa lưu")).toBeTruthy();
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(
+    "Ý tưởng chưa lưu",
+  );
+  await user.click(screen.getByRole("button", { name: "Tiếp tục chỉnh sửa" }));
+  expect(screen.queryByText("Có thay đổi chưa lưu")).toBeNull();
+  await user.click(
+    screen.getByRole("button", { name: "Ghi chú đã lưu", exact: true }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Bỏ thay đổi và chuyển" }),
+  );
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(
+    "Nội dung đã lưu",
+  );
+  expect(
+    calls.some((call) => call.method === "POST" || call.method === "PUT"),
+  ).toBe(false);
+});
+it("keeps edited AI tasks when selecting the same note and confirms switching away from review", async () => {
+  notes = [
+    {
+      id: "other",
+      title: "Ghi chú khác",
+      content: "Nội dung khác",
+      version: "other-v",
+      createdTaskIds: [],
+      analysis: null,
+      updatedAt: "2026-10-14T04:00:00Z",
+    },
+  ];
+  const user = userEvent.setup();
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await analyze(user);
+  const name = screen.getAllByLabelText("Tên công việc")[0];
+  await user.clear(name);
+  await user.type(name, "Báo cáo đã sửa");
+  await user.click(
+    screen.getByRole("button", { name: "Tuần này", exact: true }),
+  );
+  expect(screen.getAllByLabelText("Tên công việc")[0].value).toBe(
+    "Báo cáo đã sửa",
+  );
+  expect(screen.queryByText("Có thay đổi chưa lưu")).toBeNull();
+  await user.click(
+    screen.getByRole("button", { name: "Ghi chú khác", exact: true }),
+  );
+  expect(screen.getByText("Có thay đổi chưa lưu")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Tiếp tục chỉnh sửa" }));
+  expect(screen.getAllByLabelText("Tên công việc")[0].value).toBe(
+    "Báo cáo đã sửa",
+  );
+  expect(calls.filter((call) => call.url.endsWith("/analyze"))).toHaveLength(1);
+});
+it("inserts a checklist at the editor selection from the top toolbar without sending the note", async () => {
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  const user = userEvent.setup();
+  const body = screen.getByLabelText("Nội dung ghi chú");
+  await user.type(body, "Viết báo cáo");
+  body.setSelectionRange(4, 4);
+  await user.click(
+    screen.getByRole("button", { name: "Thêm dòng checklist", exact: true }),
+  );
+  expect(body.value).toBe("Viết\n☐  báo cáo");
+  expect(
+    screen
+      .getByRole("button", { name: "Thêm dòng checklist" })
+      .closest(".note-desk-header"),
+  ).toBeTruthy();
+  expect(calls.some((call) => call.method === "POST")).toBe(false);
+});
+
+it("remembers the appearance of a new note after saving, switching notes and reopening the page", async () => {
+  notes = [
+    {
+      id: "other",
+      title: "Ghi chú khác",
+      content: "Nội dung khác",
+      version: "other-v",
+      createdTaskIds: [],
+      analysis: null,
+      updatedAt: "2026-10-14T04:00:00Z",
+    },
+  ];
+  const user = userEvent.setup();
+  const view = render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  await user.type(screen.getByLabelText("Nội dung ghi chú"), "Báo cáo 90 phút");
+  await user.click(screen.getByText("Aa"));
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Font chữ" }),
+    "serif",
+  );
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Cỡ chữ" }),
+    "24",
+  );
+  await user.click(screen.getByRole("radio", { name: "Màu chữ: Tím" }));
+  await user.click(screen.getByRole("radio", { name: "Màu giấy: Kem" }));
+  await user.click(screen.getByRole("button", { name: "Giấy kẻ dòng" }));
+  await user.click(screen.getByRole("button", { name: "Lưu bản nháp" }));
+  await screen.findByText(/Đã lưu bản nháp/);
+  const post = calls.find((call) => call.method === "POST");
+  expect(post.body.content).toBe("Báo cáo 90 phút");
+  expect(Object.keys(post.body).sort()).toEqual(["content", "title"]);
+  await user.click(
+    screen.getByRole("button", { name: "Ghi chú khác", exact: true }),
+  );
+  expect(
+    document
+      .querySelector(".note-studio")
+      .style.getPropertyValue("--note-paper"),
+  ).toBe("#ffffff");
+  await user.click(
+    screen.getByRole("button", { name: "Báo cáo 90 phút", exact: true }),
+  );
+  const checkAppearance = () => {
+    const studio = document.querySelector(".note-studio");
+    expect(studio.style.getPropertyValue("--note-paper")).toBe("#fff8e8");
+    expect(studio.style.getPropertyValue("--note-ink")).toBe("#7145a0");
+    expect(studio.style.getPropertyValue("--note-writing-size")).toBe("24px");
+    expect(studio.style.getPropertyValue("--note-writing-font")).toContain(
+      "Georgia",
+    );
+    expect(studio.classList.contains("is-ruled")).toBe(true);
+    expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(
+      "Báo cáo 90 phút",
+    );
+  };
+  checkAppearance();
+  view.unmount();
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  await user.click(
+    screen.getByRole("button", { name: "Báo cáo 90 phút", exact: true }),
+  );
+  checkAppearance();
+  expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
+});
+
+it("changes custom colors and resets appearance without invalidating AI analysis or task edits", async () => {
+  const user = userEvent.setup();
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await analyze(user);
+  const name = screen.getAllByLabelText("Tên công việc")[0];
+  await user.clear(name);
+  await user.type(name, "Báo cáo đã sửa");
+  await user.click(screen.getByRole("button", { name: "Sửa ghi chú" }));
+  const content = screen.getByLabelText("Nội dung ghi chú").value;
+  await user.click(screen.getByText("Aa"));
+  fireEvent.change(screen.getByLabelText("Tùy chọn màu chữ"), {
+    target: { value: "#123456" },
+  });
+  fireEvent.change(screen.getByLabelText("Tùy chọn màu giấy"), {
+    target: { value: "#faf0d2" },
+  });
+  expect(
+    document.querySelector(".note-studio").style.getPropertyValue("--note-ink"),
+  ).toBe("#123456");
+  expect(
+    document
+      .querySelector(".note-studio")
+      .style.getPropertyValue("--note-paper"),
+  ).toBe("#faf0d2");
+  await user.click(screen.getByRole("button", { name: "Khôi phục mặc định" }));
+  expect(
+    document
+      .querySelector(".note-studio")
+      .style.getPropertyValue("--note-paper"),
+  ).toBe("#ffffff");
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(content);
+  await user.click(screen.getByRole("button", { name: "2 Kiểm tra" }));
+  expect(screen.getAllByLabelText("Tên công việc")[0].value).toBe(
+    "Báo cáo đã sửa",
+  );
+  expect(
+    screen.getByRole("button", { name: "Tạo công việc & xem lịch" }).disabled,
+  ).toBe(false);
+  expect(calls.filter((call) => call.url.endsWith("/analyze"))).toHaveLength(1);
+  expect(calls.some((call) => call.method === "PUT")).toBe(false);
 });

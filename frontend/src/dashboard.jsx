@@ -10,7 +10,8 @@ import {
   riskLabels,
 } from "./ui.jsx";
 import { dashboardModel } from "./dashboard-model.js";
-import { NextStep } from "./tutorial.jsx";
+import { nextWorkflowStep, workflowSteps } from "./workflow.js";
+import { StartSessionButton } from "./session-start.jsx";
 
 const clock = (value) =>
   `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
@@ -76,6 +77,7 @@ export function CapacityRibbon() {
   );
 }
 function FocusCockpit({ model }) {
+  const next = nextWorkflowStep(state.workspace);
   const focus = model.focus;
   const active = focus && ["Running", "Paused"].includes(focus.status);
   const planned = focus
@@ -99,7 +101,7 @@ function FocusCockpit({ model }) {
         <small>
           {focus
             ? `${timeFmt(focus.start)} — ${timeFmt(focus.end)}`
-            : "Sẵn sàng cho kế hoạch mới"}
+            : "Chưa có phiên trong hôm nay"}
         </small>
       </div>
       <div className="cockpit-content">
@@ -108,25 +110,36 @@ function FocusCockpit({ model }) {
             ? "ĐANG TẠM DỪNG"
             : active
               ? "ĐANG TẬP TRUNG"
-              : "TIẾP THEO TRONG NGÀY"}
+              : focus
+                ? "TIẾP THEO TRONG NGÀY"
+                : "CHUẨN BỊ ĐỂ BẮT ĐẦU"}
         </span>
-        <h2>{focus?.taskName || "Dành thời gian cho điều quan trọng"}</h2>
+        <h2>{focus?.taskName || next.title}</h2>
+        {!focus && <p className="reason">{next.description}</p>}
         {focus ? (
           <div className="cockpit-actions">
-            {button(
-              focus.status === "Running"
-                ? "Tạm dừng"
-                : focus.status === "Paused"
-                  ? "Tiếp tục"
-                  : "Bắt đầu phiên",
-              focus.status === "Running"
-                ? "session-pause"
-                : focus.status === "Paused"
-                  ? "session-resume"
-                  : "session-start",
-              "small secondary",
-              focus.id,
-              focus.status === "Running" ? "pause" : "play",
+            {!active ? (
+              <StartSessionButton
+                session={focus}
+                workspace={state.workspace}
+                label="Bắt đầu phiên"
+              />
+            ) : (
+              button(
+                focus.status === "Running"
+                  ? "Tạm dừng"
+                  : focus.status === "Paused"
+                    ? "Tiếp tục"
+                    : "Bắt đầu phiên",
+                focus.status === "Running"
+                  ? "session-pause"
+                  : focus.status === "Paused"
+                    ? "session-resume"
+                    : "session-start",
+                "small secondary",
+                focus.id,
+                focus.status === "Running" ? "pause" : "play",
+              )
             )}
             {button("Chi tiết", "session-detail", "small ghost", focus.id)}
             {active &&
@@ -141,13 +154,11 @@ function FocusCockpit({ model }) {
         ) : (
           <div className="cockpit-actions">
             {button(
-              state.workspace.availability.length
-                ? "Lập kế hoạch"
-                : "Thiết lập giờ rảnh",
-              state.workspace.availability.length ? "generate-plan" : "nav",
+              next.label,
+              next.action || "nav",
               "small primary",
-              state.workspace.availability.length ? "" : "time",
-              "plus",
+              next.route || "",
+              next.symbol,
             )}
           </div>
         )}
@@ -157,6 +168,7 @@ function FocusCockpit({ model }) {
 }
 function DayRunway({ model }) {
   const [view, setView] = useState("agenda");
+  const next = nextWorkflowStep(state.workspace);
   const preference = state.workspace.preference;
   const first = Math.min(
     preference.preferredStartMinute ?? 480,
@@ -296,13 +308,13 @@ function DayRunway({ model }) {
             <div className="daily-agenda-empty">
               <span>{icon("calendar")}</span>
               <h3>Hôm nay còn trống</h3>
-              <p>Tạo lịch để biết việc nào cần làm và lúc nào bắt đầu.</p>
+              <p>{next.description}</p>
               {button(
-                "Tạo lịch",
-                "generate-plan",
+                next.label,
+                next.action || "nav",
                 "small secondary",
-                "",
-                "calendar",
+                next.route || "",
+                next.symbol,
               )}
             </div>
           )}
@@ -564,9 +576,12 @@ function Deadlines({ model }) {
 export function todayPage() {
   const model = dashboardModel(state.workspace, state.insights);
   const insights = state.insights;
+  const next = nextWorkflowStep(state.workspace);
+  const readyToPlan = workflowSteps(state.workspace)
+    .slice(0, 2)
+    .every((step) => step.done);
   return (
     <>
-      <NextStep />
       <div className="planning-dashboard">
         <section
           className="console-column backlog-column"
@@ -625,7 +640,7 @@ export function todayPage() {
                       <span>
                         {state.workspace.categories.find(
                           (category) => category.id === task.categoryId,
-                        )?.name || "Chưa phân nhóm"}
+                        )?.name || "Chưa phân loại"}
                       </span>
                       <span>{dateFmt(task.deadline)}</span>
                     </div>
@@ -643,10 +658,20 @@ export function todayPage() {
                 ))
               ) : (
                 <div className="console-empty">
-                  <h3>Một khoảng trống để bắt đầu</h3>
-                  <p>Thêm công việc đầu tiên để xây dựng kế hoạch của bạn.</p>
+                  <h3>Bắt đầu từ việc bạn cần làm</h3>
+                  <p>
+                    Viết vài dòng để AI giúp nhận diện công việc, hoặc tự thêm
+                    từng việc.
+                  </p>
                   {button(
-                    "Thêm công việc",
+                    "Nhập việc cần làm",
+                    "nav",
+                    "small primary",
+                    "notes",
+                    "edit",
+                  )}
+                  {button(
+                    "Thêm việc thủ công",
                     "new-task",
                     "small secondary",
                     "",
@@ -671,7 +696,7 @@ export function todayPage() {
           >
             {icon("edit")}
             <span>
-              <strong>Ghi chú & AI</strong>
+              <strong>Nhập việc</strong>
               <small>Nhập việc cần làm, để AI giúp tạo lịch</small>
             </span>
             {icon("arrow")}
@@ -686,10 +711,11 @@ export function todayPage() {
               <h2>Lịch hôm nay & tập trung</h2>
             </div>
             <ToolButton
-              label="Lập kế hoạch"
-              action="generate-plan"
-              symbol="calendar"
-              text="Tạo lịch"
+              label={readyToPlan ? "Xem lịch đề xuất" : next.label}
+              action={readyToPlan ? "generate-plan" : next.action || "nav"}
+              id={readyToPlan ? "" : next.route || ""}
+              symbol={readyToPlan ? "calendar" : next.symbol}
+              text={readyToPlan ? "Xem lịch đề xuất" : next.label}
             />
           </div>
           <FocusCockpit model={model} />

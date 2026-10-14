@@ -1,21 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
-import { state, dateFmt, localInput, toUtc } from "./ui.jsx";
+import { state } from "./ui.jsx";
 import { planModal } from "./calendar.jsx";
 import { Loading } from "./loading.jsx";
 import { getGuide, completeGuideStep } from "./onboarding.js";
+import { NoteStudio } from "./note-studio.jsx";
+import {
+  clearNoteAppearance,
+  normalizeNoteAppearance,
+  readNoteAppearance,
+  saveNoteAppearance,
+} from "./note-appearance.js";
 
 const blank = () => ({ title: "", content: "" });
-const priorityLabels = ["", "Thấp", "Vừa", "Cao", "Khẩn"];
-const typeLabels = {
-  OTHER: "Khác",
-  PROGRAMMING: "Lập trình",
-  WRITING: "Viết nội dung",
-  STUDY: "Học tập",
-  MEETING_PREP: "Chuẩn bị họp",
-  DESIGN: "Thiết kế",
-  ADMIN: "Hành chính",
-};
 const aiMessages = {
   NOTE_AI_NOT_CONFIGURED:
     "Chức năng AI chưa sẵn sàng. Bạn có thể lưu bản nháp hoặc thêm việc ở mục Công việc.",
@@ -42,9 +39,15 @@ const aiMessages = {
 };
 
 export function NotesPage({ onWorkspaceChanged }) {
+  const appearanceAccount =
+    state.user?.id || state.workspace?.profile?.id || "guest";
+  const [appearance, setAppearance] = useState(() =>
+    readNoteAppearance(appearanceAccount),
+  );
   const [notes, setNotes] = useState([]);
   const [note, setNote] = useState(blank);
   const [drafts, setDrafts] = useState([]);
+  const [stage, setStage] = useState("write");
   const [agent, setAgent] = useState(null);
   const [agentResult, setAgentResult] = useState(null);
   const [pendingSchedule, setPendingSchedule] = useState(null);
@@ -53,6 +56,8 @@ export function NotesPage({ onWorkspaceChanged }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [failedAction, setFailedAction] = useState(null);
+  const [selectionTarget, setSelectionTarget] = useState(null);
+  const selectionPrompt = useRef(null);
   const [libraryOpen, setLibraryOpen] = useState(
     () => !window.matchMedia("(max-width: 800px)").matches,
   );
@@ -82,7 +87,18 @@ export function NotesPage({ onWorkspaceChanged }) {
         ? "Phân tích lại ghi chú bằng AI trước khi tạo công việc."
         : !drafts.some((task) => task.selected)
           ? "Chọn ít nhất một công việc để tạo lịch."
-          : "";
+          : drafts.some(
+                (task) =>
+                  task.selected &&
+                  (!task.name.trim() ||
+                    task.name.length > 200 ||
+                    !Number.isInteger(task.estimatedMinutes) ||
+                    task.estimatedMinutes < 1 ||
+                    task.estimatedMinutes > 43200 ||
+                    !Number.isFinite(new Date(task.deadline).getTime())),
+              )
+            ? "Điền tên việc, thời lượng và hạn chót hợp lệ trước khi tạo lịch."
+            : "";
 
   useEffect(() => {
     alive.current = true;
@@ -110,7 +126,10 @@ export function NotesPage({ onWorkspaceChanged }) {
   }, []);
 
   const select = (item) => {
+    setSelectionTarget(null);
+    setAppearance(readNoteAppearance(appearanceAccount, item.id));
     setNote(item);
+    setStage(item.analysis ? "review" : "write");
     setDrafts(
       (item.analysis?.tasks || []).map((task) => ({ ...task, selected: true })),
     );
@@ -120,7 +139,32 @@ export function NotesPage({ onWorkspaceChanged }) {
     setPendingSchedule(null);
     setFailedAction(null);
   };
+  const requestSelect = (item) => {
+    if (busy || (item.id && item.id === note.id)) return;
+    const contentChanged =
+      dirty || (!note.id && (note.title.trim() || note.content.trim()));
+    const reviewChanged =
+      !imported &&
+      note.analysis &&
+      JSON.stringify(drafts) !==
+        JSON.stringify(
+          note.analysis.tasks.map((task) => ({ ...task, selected: true })),
+        );
+    if (contentChanged || reviewChanged) setSelectionTarget(item);
+    else select(item);
+  };
+  useEffect(() => {
+    if (selectionTarget) {
+      selectionPrompt.current?.focus();
+      selectionPrompt.current?.scrollIntoView?.({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
+  }, [selectionTarget]);
   const remember = (saved) => {
+    saveNoteAppearance(appearanceAccount, saved.id, appearance);
+    if (!note.id) clearNoteAppearance(appearanceAccount);
     setNotes((items) => [saved, ...items.filter((n) => n.id !== saved.id)]);
     setNote(saved);
     return saved;
@@ -128,6 +172,7 @@ export function NotesPage({ onWorkspaceChanged }) {
   const run = async (label, operation, intent = null) => {
     if (locked.current) return;
     locked.current = true;
+    setSelectionTarget(null);
     setBusy(label);
     setError("");
     setMessage("");
@@ -145,14 +190,22 @@ export function NotesPage({ onWorkspaceChanged }) {
     }
   };
   const save = async () => {
-    if (!note.title.trim() || !note.content.trim())
-      throw new Error("Nhập tiêu đề và nội dung ghi chú.");
+    if (!note.content.trim()) throw new Error("Nhập nội dung ghi chú.");
+    const title =
+      note.title.trim() ||
+      note.content
+        .split("\n")
+        .find((line) => line.trim())
+        ?.trim()
+        .replace(/^[•☐\s]+/, "")
+        .slice(0, 120) ||
+      "Ghi chú mới";
     if (note.id && !dirty) return note;
     const saved = await api(
       `/api/notes${note.id ? `/${note.id}` : ""}`,
       note.id ? "PUT" : "POST",
       {
-        title: note.title,
+        title,
         content: note.content,
         version: note.version,
       },
@@ -182,6 +235,10 @@ export function NotesPage({ onWorkspaceChanged }) {
           setDrafts(
             result.analysis.tasks.map((task) => ({ ...task, selected: true })),
           );
+          setStage(result.analysis.tasks.length ? "review" : "write");
+          requestAnimationFrame(() =>
+            document.getElementById("note-analysis-title")?.focus(),
+          );
           setMessage(
             result.analysis.tasks.length
               ? "Đây là kết quả xem trước. Chưa tạo công việc hoặc lưu lịch; bạn có thể chỉnh các việc bên dưới."
@@ -195,6 +252,12 @@ export function NotesPage({ onWorkspaceChanged }) {
     run(
       "AI đang phân tích, tạo công việc và lưu lịch…",
       async () => {
+        if (
+          !Number.isInteger(Number(horizonDays)) ||
+          Number(horizonDays) < 1 ||
+          Number(horizonDays) > 30
+        )
+          throw new Error("Chọn phạm vi xếp lịch từ 1 đến 30 ngày.");
         const saved = imported ? note : await save();
         try {
           const result = await api(`/api/notes/${saved.id}/schedule`, "POST", {
@@ -253,6 +316,13 @@ export function NotesPage({ onWorkspaceChanged }) {
       "Đang chuẩn bị công việc và lịch đề xuất…",
       async () => {
         let saved = note;
+        if (
+          !Number.isInteger(Number(horizonDays)) ||
+          Number(horizonDays) < 1 ||
+          Number(horizonDays) > 30
+        )
+          throw new Error("Chọn phạm vi xếp lịch từ 1 đến 30 ngày.");
+        if (createTasks && proposalIssue) throw new Error(proposalIssue);
         if (createTasks) {
           if (!hasAiAnalysis)
             throw new Error(
@@ -334,7 +404,7 @@ export function NotesPage({ onWorkspaceChanged }) {
     });
     if (saved && alive.current) {
       if (next === "auto") await autoSchedule();
-      else await propose(!imported);
+      else if (next === "proposal") await propose(!imported);
     }
   };
   const updateDraft = (index, key, value) =>
@@ -343,260 +413,111 @@ export function NotesPage({ onWorkspaceChanged }) {
     );
 
   return (
-    <div className="notes-workspace">
-      <section
-        className="card notes-library"
-        aria-labelledby="note-library-title"
-      >
-        <div className="card-header">
-          <button
-            type="button"
-            className="note-library-toggle"
-            aria-expanded={libraryOpen}
-            aria-controls="saved-notes"
-            onClick={() => setLibraryOpen(!libraryOpen)}
+    <NoteStudio
+      notes={notes}
+      note={note}
+      appearance={appearance}
+      setAppearance={(value) => {
+        const next = normalizeNoteAppearance(value);
+        setAppearance(next);
+        saveNoteAppearance(appearanceAccount, note.id, next);
+      }}
+      drafts={drafts}
+      agent={agent}
+      imported={imported}
+      busy={busy}
+      dirty={dirty}
+      hasAiAnalysis={hasAiAnalysis}
+      hasTime={hasTime}
+      horizonDays={horizonDays}
+      setHorizonDays={setHorizonDays}
+      libraryOpen={libraryOpen}
+      setLibraryOpen={setLibraryOpen}
+      select={requestSelect}
+      setNote={setNote}
+      analyze={analyze}
+      requestSchedule={requestSchedule}
+      updateDraft={updateDraft}
+      proposalIssue={proposalIssue}
+      workspace={state.workspace}
+      stage={stage}
+      setStage={setStage}
+      navigationPrompt={
+        selectionTarget && (
+          <div
+            className="note-switch-prompt"
+            ref={selectionPrompt}
+            tabIndex={-1}
+            role="alert"
+            aria-labelledby="note-switch-title"
           >
-            <span id="note-library-title">Ghi chú đã lưu ({notes.length})</span>
-          </button>
-          <button
-            type="button"
-            className="btn secondary small"
-            disabled={!!busy}
-            onClick={() => select(blank())}
-          >
-            Ghi chú mới
-          </button>
-        </div>
-        <div id="saved-notes" className="notes-list" hidden={!libraryOpen}>
-          {notes.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`note-list-item ${note.id === item.id ? "active" : ""}`}
-              disabled={!!busy}
-              aria-pressed={note.id === item.id}
-              onClick={() => select(item)}
-            >
-              <strong>{item.title}</strong>
-              <span>{item.content.slice(0, 110)}</span>
-              <small>
-                {dateFmt(item.updatedAt)} ·{" "}
-                {item.createdTaskIds.length
-                  ? "Đã tạo công việc"
-                  : item.analysis
-                    ? "Đã phân tích"
-                    : "Bản ghi chú"}
-              </small>
-            </button>
-          ))}
-          {!notes.length && !busy && (
-            <p className="reason">
-              Chưa có ghi chú. Viết ghi chú đầu tiên ở bên cạnh.
-            </p>
-          )}
-        </div>
-      </section>
-      <div className="stack">
-        <section className="card" aria-labelledby="note-editor-title">
-          <div className="note-agent-banner">
-            <span className="note-agent-symbol" aria-hidden="true">
-              ✦
-            </span>
             <div>
-              <strong>Nhập việc, để AI giúp xếp lịch</strong>
-              <p>Viết ghi chú → Chọn giờ rảnh → Tạo lịch → Bắt đầu làm</p>
-            </div>
-            <span className="note-agent-badge">
-              {agent?.aiAvailable
-                ? `${agent.provider || "AI"} sẵn sàng`
-                : "AI chưa sẵn sàng"}
-            </span>
-          </div>
-          <div className="card-header">
-            <div>
-              <h2 id="note-editor-title">Bạn cần làm những việc gì?</h2>
+              <strong id="note-switch-title">Có thay đổi chưa lưu</strong>
               <p>
-                Ghi lại các việc bạn cần làm, thời lượng và hạn chót nếu đã
-                biết.
+                Nội dung ghi chú hoặc công việc gợi ý đang được chỉnh sửa.
+                Chuyển ghi chú sẽ bỏ các thay đổi này.
               </p>
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="btn secondary small"
+                onClick={() => {
+                  setSelectionTarget(null);
+                  requestAnimationFrame(() =>
+                    document
+                      .querySelector(
+                        stage === "review"
+                          ? "#note-analysis-title"
+                          : ".note-title-field input",
+                      )
+                      ?.focus(),
+                  );
+                }}
+              >
+                Tiếp tục chỉnh sửa
+              </button>
+              <button
+                type="button"
+                className="btn danger small"
+                onClick={() => select(selectionTarget)}
+              >
+                Bỏ thay đổi và chuyển
+              </button>
             </div>
           </div>
-          <form
-            hidden={imported}
-            onSubmit={(event) => {
-              event.preventDefault();
-              run("Đang lưu ghi chú…", async () => {
-                await save();
-                setMessage(
-                  "Đã lưu bản nháp. Chưa tạo công việc hoặc thay đổi lịch.",
-                );
-              });
-            }}
-          >
-            <fieldset disabled={!!busy || imported} className="note-fields">
-              <label className="field">
-                Tiêu đề ghi chú
-                <input
-                  required
-                  maxLength={120}
-                  value={note.title}
-                  onChange={(e) => setNote({ ...note, title: e.target.value })}
-                  placeholder="Việc cần làm tuần này"
-                />
-              </label>
-              <label className="field">
-                Nội dung ghi chú
-                <textarea
-                  aria-label="Nội dung ghi chú"
-                  required
-                  maxLength={8000}
-                  rows={8}
-                  value={note.content}
-                  onChange={(e) =>
-                    setNote({ ...note, content: e.target.value })
-                  }
-                  placeholder={
-                    "Viết báo cáo SWP trước thứ Sáu, khoảng 3 tiếng\nÔn chương 4 vào ngày mai, khoảng 90 phút"
-                  }
-                />
-              </label>
-              {!note.content.trim() && !note.id && (
-                <div className="note-example-action spaced">
-                  <button
-                    type="button"
-                    className="btn secondary small"
-                    onClick={() =>
-                      setNote({
-                        ...note,
-                        title: note.title || "Kế hoạch tuần này",
-                        content:
-                          "Viết báo cáo ngày mai, khoảng 2 tiếng\nÔn chương 4 trước thứ Sáu, khoảng 90 phút",
-                      })
-                    }
-                  >
-                    Dùng ví dụ
-                  </button>
-                  <small>Chỉ điền nội dung, chưa lưu hoặc tạo lịch.</small>
-                </div>
-              )}
-              <p className="info spaced">
-                Nội dung được gửi đến AI khi bạn chọn xem trước hoặc tạo lịch.
-                Lưu bản nháp chưa gửi nội dung đến AI.
-              </p>
-              {!agent?.aiAvailable && (
-                <p className="warning spaced">
-                  AI chưa sẵn sàng. Bạn vẫn có thể lưu bản nháp hoặc
-                  <a href="#tasks"> tự thêm công việc</a> để lập kế hoạch.
-                </p>
-              )}
-              <label className="field spaced">
-                Số ngày tự xếp lịch
-                <input
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={horizonDays}
-                  onChange={(e) => setHorizonDays(e.target.value)}
-                />
-              </label>
-              <p className="reason spaced">
-                Bấm tự xếp lịch sẽ tạo các công việc được nhận diện và áp dụng
-                lịch ngay. Nếu thiếu thông tin, thời lượng mặc định 60 phút,
-                deadline sau 7 ngày.
-              </p>
-              <div className="form-actions note-editor-actions">
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={!agent?.aiAvailable}
-                  onClick={() => requestSchedule("auto")}
-                >
-                  Tạo và lưu lịch ngay
-                </button>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  disabled={!agent?.aiAvailable}
-                  onClick={analyze}
-                >
-                  Xem trước công việc
-                </button>
-                <button type="submit" className="btn secondary">
-                  Lưu bản nháp
-                </button>
-              </div>
-              <p className="note-action-help spaced">
-                <strong>Tạo và lưu lịch ngay:</strong> tạo công việc và lưu lịch
-                tự động. <strong>Xem trước công việc:</strong> kiểm tra và sửa
-                kết quả trước khi tạo lịch.
-              </p>
-            </fieldset>
-          </form>
-          {imported && (
-            <article className="note-source spaced">
-              <h3>{note.title}</h3>
-              <p>{note.content}</p>
-            </article>
-          )}
-          {imported && (
-            <p className="info spaced">
-              Ghi chú đã tạo {note.createdTaskIds.length} công việc. Sửa tiến độ
-              và nội dung ở mục Công việc; tạo ghi chú mới để thêm việc.
-            </p>
-          )}
-          {imported && (
-            <div className="form-actions">
-              <a className="btn secondary small" href="#tasks">
-                Sửa công việc đã tạo
-              </a>
-              <button
-                className="btn ghost small"
-                type="button"
-                disabled={!!busy}
-                onClick={() => select(blank())}
-              >
-                Nhập việc mới
-              </button>
-            </div>
-          )}
-          {!hasTime && (
-            <p className="warning spaced">
-              Thêm <a href="#time">giờ rảnh</a> để AI có thể tự xếp lịch. Bạn
-              vẫn có thể lưu và phân tích ghi chú.
-            </p>
-          )}
-          {imported && (
-            <div className="form-actions">
-              <button
-                type="button"
-                className="btn primary"
-                disabled={!!busy}
-                onClick={() => requestSchedule("auto")}
-              >
-                {note.planId
-                  ? "Xem kết quả tự xếp lịch"
-                  : "Tiếp tục tự xếp lịch"}
-              </button>
-            </div>
-          )}
-          {dirty && note.analysis && (
-            <p className="warning spaced">
-              Bạn đã sửa nội dung. Phân tích lại để cập nhật các gợi ý.
-            </p>
-          )}
-          <p className="reason spaced">
-            Lịch sử dụng giờ rảnh và sự kiện đã thiết lập. Điều kiện về lịch bận
-            hoặc phụ thuộc trong ghi chú cần được khai báo ở các mục tương ứng.
-          </p>
+        )
+      }
+      saveDraft={() =>
+        run("Đang lưu ghi chú…", async () => {
+          await save();
+          setMessage("Đã lưu bản nháp. Chưa tạo công việc hoặc thay đổi lịch.");
+        })
+      }
+      onSetTime={() => setPendingSchedule("impact")}
+      availability={
+        pendingSchedule && (
+          <NoteAvailabilitySetup
+            busy={!!busy}
+            timeZone={
+              state.workspace?.preference?.timeZoneId || "Asia/Ho_Chi_Minh"
+            }
+            onSave={saveAvailability}
+            onCancel={() => setPendingSchedule(null)}
+          />
+        )
+      }
+      feedback={
+        <>
           {busy && <Loading label={busy} />}
           {message && (
-            <p role="status" className="info spaced">
+            <p role="status" className="note-feedback info">
               {message}
             </p>
           )}
           {agentResult && <AgentResult result={agentResult} />}
           {error && (
-            <div role="alert" className="form-error spaced">
+            <div role="alert" className="form-error note-feedback">
               {error}
               {failedAction && (
                 <div className="form-actions">
@@ -607,9 +528,9 @@ export function NotesPage({ onWorkspaceChanged }) {
                     onClick={() =>
                       failedAction === "analysis"
                         ? analyze()
-                        : failedAction === "auto"
-                          ? requestSchedule("auto")
-                          : requestSchedule("proposal")
+                        : requestSchedule(
+                            failedAction === "auto" ? "auto" : "proposal",
+                          )
                     }
                   >
                     Thử lại
@@ -618,291 +539,32 @@ export function NotesPage({ onWorkspaceChanged }) {
               )}
             </div>
           )}
-          {note.id && (
-            <button
-              type="button"
-              className="btn ghost small spaced"
-              disabled={!!busy}
-              onClick={() => {
-                if (
-                  !window.confirm(
-                    "Xóa ghi chú này? Các công việc và lịch đã tạo vẫn được giữ.",
-                  )
-                )
-                  return;
-                run("Đang xóa ghi chú…", async () => {
-                  await api(
-                    `/api/notes/${note.id}?version=${encodeURIComponent(note.version)}`,
-                    "DELETE",
-                  );
-                  setNotes((items) => items.filter((n) => n.id !== note.id));
-                  select(blank());
-                });
-              }}
-            >
-              Xóa ghi chú
-            </button>
-          )}
-        </section>
-        {pendingSchedule && (
-          <NoteAvailabilitySetup
-            busy={!!busy}
-            timeZone={
-              state.workspace?.preference?.timeZoneId || "Asia/Ho_Chi_Minh"
-            }
-            onSave={saveAvailability}
-            onCancel={() => setPendingSchedule(null)}
-          />
-        )}
-        {note.analysis && (
-          <section className="card" aria-labelledby="note-analysis-title">
-            <div className="card-header">
-              <div>
-                <h2 id="note-analysis-title">
-                  {imported ? "Công việc đã được lưu" : "Xem trước công việc"}
-                </h2>
-                <p>
-                  {["OpenAI", "Gemini"].includes(note.analysis.source)
-                    ? `Phân tích bằng ${note.analysis.source}`
-                    : "Kết quả phân tích cũ"}{" "}
-                  ·{" "}
-                  {imported
-                    ? "Các công việc đã lưu từ ghi chú này."
-                    : "Chọn và chỉnh sửa các việc bạn muốn đưa vào lịch."}
-                </p>
-              </div>
-            </div>
-            {!imported && (
-              <p className="info spaced">
-                Các việc dưới đây chưa được lưu. Chọn việc cần làm, sửa tên,
-                thời lượng hoặc hạn chót, rồi bấm Tạo công việc & xem lịch. Sau
-                đó chọn Lưu lịch này trong bản xem trước.
-              </p>
-            )}
-            {!imported && !hasAiAnalysis && (
-              <p className="warning spaced">
-                Kết quả này chưa được phân tích bằng AI. Bấm Xem trước công việc
-                để cập nhật trước khi tạo công việc.
-              </p>
-            )}
-            <ul className="explanation-list">
-              {note.analysis.messages.map((text, index) => (
-                <li key={index}>{text}</li>
-              ))}
-            </ul>
-            {note.analysis.needsReview && (
-              <p className="warning spaced">
-                AI chưa thể tự áp dụng các điều kiện trong ghi chú. Kiểm tra các
-                dòng bên trên, thiết lập giờ rảnh hoặc phụ thuộc rồi sửa note để
-                tiếp tục. Bạn vẫn có thể chỉnh công việc và xem lịch đề xuất.
-              </p>
-            )}
-            {!drafts.length && (
-              <p className="info">
-                Chưa có gợi ý công việc. Kiểm tra nội dung và phân tích lại.
-              </p>
-            )}
-            {imported && (
-              <div className="note-created-tasks spaced">
-                {drafts.map((task, index) => (
-                  <article key={index}>
-                    <strong>{task.name}</strong>
-                    <p>
-                      Hạn chót:{" "}
-                      {dateFmt(task.deadline, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                    <div>
-                      <span>{task.estimatedMinutes} phút</span>
-                      <span>
-                        Ưu tiên {priorityLabels[task.priority]?.toLowerCase()}
-                      </span>
-                      <span>{typeLabels[task.taskType] || "Khác"}</span>
-                      {task.isHardDeadline && <span>Deadline cứng</span>}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                requestSchedule("proposal");
-              }}
-            >
-              <fieldset
-                disabled={!!busy || imported || dirty || !hasAiAnalysis}
-                hidden={imported}
-                className="note-fields"
-              >
-                {drafts.map((task, index) => (
-                  <article key={index} className="note-task-draft">
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        checked={task.selected}
-                        onChange={(e) =>
-                          updateDraft(index, "selected", e.target.checked)
-                        }
-                      />
-                      Việc {index + 1}
-                    </label>
-                    <div className="form-grid spaced">
-                      <label className="field wide">
-                        Tên công việc
-                        <input
-                          required={task.selected}
-                          maxLength={200}
-                          value={task.name}
-                          onChange={(e) =>
-                            updateDraft(index, "name", e.target.value)
-                          }
-                        />
-                      </label>
-                      <label className="field">
-                        Deadline
-                        <input
-                          type="datetime-local"
-                          disabled={!task.selected}
-                          required={task.selected}
-                          value={task.deadline ? localInput(task.deadline) : ""}
-                          onChange={(e) =>
-                            updateDraft(
-                              index,
-                              "deadline",
-                              e.target.value ? toUtc(e.target.value) : "",
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="field">
-                        Thời gian dự kiến (phút)
-                        <input
-                          type="number"
-                          required={task.selected}
-                          disabled={!task.selected}
-                          min={1}
-                          max={43200}
-                          value={task.estimatedMinutes}
-                          onChange={(e) =>
-                            updateDraft(
-                              index,
-                              "estimatedMinutes",
-                              Number(e.target.value),
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="field">
-                        Mức ưu tiên
-                        <select
-                          value={task.priority}
-                          onChange={(e) =>
-                            updateDraft(
-                              index,
-                              "priority",
-                              Number(e.target.value),
-                            )
-                          }
-                        >
-                          {[1, 2, 3, 4].map((p) => (
-                            <option key={p} value={p}>
-                              {priorityLabels[p]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field">
-                        Loại công việc
-                        <select
-                          value={
-                            typeLabels[task.taskType] ? task.taskType : "OTHER"
-                          }
-                          onChange={(e) =>
-                            updateDraft(index, "taskType", e.target.value)
-                          }
-                        >
-                          {Object.entries(typeLabels).map(([key, label]) => (
-                            <option key={key} value={key}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <label className="checkbox spaced">
-                      <input
-                        type="checkbox"
-                        checked={!!task.isHardDeadline}
-                        onChange={(e) =>
-                          updateDraft(index, "isHardDeadline", e.target.checked)
-                        }
-                      />
-                      Deadline cứng: không xếp sau hạn chót
-                    </label>
-                  </article>
-                ))}
-              </fieldset>
-              {!note.planId && (
-                <label className="field spaced">
-                  Số ngày xếp lịch
-                  <input
-                    type="number"
-                    min={1}
-                    max={30}
-                    required
-                    value={horizonDays}
-                    disabled={!!busy}
-                    onChange={(e) => setHorizonDays(e.target.value)}
-                  />
-                </label>
-              )}
-              {!hasTime && (
-                <p className="warning spaced">
-                  Chưa có giờ rảnh. Bấm nút bên dưới để chọn ngay tại đây; các
-                  công việc bạn đã chỉnh sửa được giữ nguyên. Bạn cũng có thể
-                  thiết lập ở mục <a href="#time">giờ rảnh</a>.
-                </p>
-              )}
-              {!note.planId && (
-                <p className="reason spaced">
-                  Giữ các phiên hiện có và đề xuất phiên cho những việc từ ghi
-                  chú. Bạn xem lịch trước khi áp dụng.
-                </p>
-              )}
-              {!note.planId && (
-                <p
-                  id="note-proposal-help"
-                  className={proposalIssue ? "warning spaced" : "reason spaced"}
-                >
-                  {proposalIssue ||
-                    (!hasTime
-                      ? "Bạn sẽ chọn giờ rảnh trước khi tạo công việc và lịch đề xuất."
-                      : "Sẵn sàng tạo công việc và xem lịch đề xuất.")}
-                </p>
-              )}
-              {!note.planId && (
-                <div className="form-actions">
-                  <button
-                    type="submit"
-                    className="btn primary"
-                    disabled={!!busy || !!proposalIssue}
-                    aria-describedby="note-proposal-help"
-                  >
-                    {imported ? "Xem lịch đề xuất" : "Tạo công việc & xem lịch"}
-                  </button>
-                </div>
-              )}
-            </form>
-          </section>
-        )}
-      </div>
-    </div>
+        </>
+      }
+      onDelete={(target = note) => {
+        if (busy || !target.id) return;
+        const saved = notes.find((item) => item.id === target.id) || target;
+        if (
+          !window.confirm(
+            `Xóa ghi chú “${saved.title}”?\n${saved.id === note.id && dirty ? "Các thay đổi chưa lưu trong ghi chú này cũng sẽ bị xóa.\n" : ""}Các công việc và lịch đã tạo vẫn được giữ.`,
+          )
+        )
+          return;
+        run("Đang xóa ghi chú…", async () => {
+          await api(
+            `/api/notes/${saved.id}?version=${encodeURIComponent(saved.version)}`,
+            "DELETE",
+          );
+          if (!alive.current) return;
+          clearNoteAppearance(appearanceAccount, saved.id);
+          setNotes((items) => items.filter((item) => item.id !== saved.id));
+          if (note.id === saved.id) select(blank());
+          setMessage(`Đã xóa ghi chú “${saved.title}”.`);
+        });
+      }}
+    />
   );
 }
-
 function NoteAvailabilitySetup({ busy, timeZone, onSave, onCancel }) {
   const [days, setDays] = useState([]);
   const [start, setStart] = useState("");

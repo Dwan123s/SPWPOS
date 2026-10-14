@@ -74,8 +74,8 @@ import {
 } from "./pages.jsx";
 const routes = {
   notes: [
-    "Ghi chú & AI",
-    "Viết việc cần làm, rồi chọn xem trước hoặc để AI tạo và lưu lịch ngay.",
+    "Nhập việc",
+    "Viết một ghi chú. Kiểm tra công việc và chọn lịch phù hợp với bạn.",
     "edit",
   ],
   today: [
@@ -99,7 +99,7 @@ const routes = {
     "clock",
   ],
   insights: [
-    "Phân tích cá nhân",
+    "Tiến độ",
     "So sánh thời gian dự kiến với thực tế sau khi bạn đã ghi nhận các lượt làm.",
     "insights",
   ],
@@ -110,12 +110,12 @@ const routes = {
   ],
   notifications: [
     "Thông báo",
-    "Những cập nhật cần chú ý trong không gian của bạn.",
+    "Hạn chót, phiên làm việc và những thay đổi trong lịch của bạn.",
     "bell",
   ],
   settings: [
-    "Tài khoản & nhóm",
-    "Thông tin cá nhân, nhóm công việc và bảo mật.",
+    "Cài đặt",
+    "Thông tin cá nhân, danh mục công việc và bảo mật.",
     "settings",
   ],
   admin: ["Quản trị", "Trạng thái hệ thống và quản lý tài khoản.", "users"],
@@ -327,14 +327,19 @@ function planOptions(affected = []) {
     </form>,
   );
 }
-function confirmAction(title, description, operation) {
+function confirmAction(
+  title,
+  description,
+  operation,
+  confirmLabel = "Xác nhận",
+) {
   state.confirm = operation;
   modal(
     title,
     description,
     <div className="form-actions">
       {button("Hủy", "close-modal", "ghost")}
-      {button("Xác nhận", "confirm-action", "danger")}
+      {button(confirmLabel, "confirm-action", "danger")}
     </div>,
   );
 }
@@ -414,16 +419,44 @@ async function action(name, id, element) {
     case "edit-task":
       openTask(taskById(id));
       break;
-    case "delete-task":
+    case "delete-task": {
+      const task = taskById(id);
+      if (!task) break;
+      const children = state.workspace.tasks.filter(
+        (item) => item.parentId === id,
+      );
+      const ids = new Set([id, ...children.map((item) => item.id)]);
+      const sessions = state.workspace.sessions.filter((session) =>
+        ids.has(session.taskId),
+      );
+      if (
+        sessions.some((session) =>
+          ["Running", "Paused"].includes(session.status),
+        )
+      ) {
+        modal(
+          "Chưa thể xóa công việc",
+          `“${task.name}” hoặc việc con đang có phiên chạy/tạm dừng. Hoàn thành hoặc bỏ qua phiên trước khi xóa.`,
+          <div className="form-actions">
+            {button("Đóng", "close-modal", "secondary")}
+          </div>,
+        );
+        break;
+      }
+      const scheduled = sessions.filter(
+        (session) => session.status === "Scheduled",
+      ).length;
       confirmAction(
         "Xóa công việc?",
-        "Việc con và các phiên chưa thực hiện cũng sẽ được hủy.",
+        `Xóa “${task.name}”${children.length ? ` và ${children.length} việc con` : ""}? ${scheduled ? `${scheduled} phiên chưa thực hiện sẽ bị hủy. ` : ""}Liên kết phụ thuộc với các việc này sẽ được gỡ. Lịch sử phiên đã thực hiện được giữ.`,
         async () => {
           await api(`/api/tasks/${id}`, "DELETE");
           await refreshAfter("Đã xóa công việc.");
         },
+        "Xóa công việc",
       );
       break;
+    }
     case "remove-dependency": {
       const [task, predecessor] = id.split("|");
       await api(`/api/tasks/${task}/dependencies/${predecessor}`, "DELETE");
@@ -483,8 +516,8 @@ async function action(name, id, element) {
       break;
     case "delete-category":
       confirmAction(
-        "Xóa nhóm?",
-        "Công việc trong nhóm sẽ chuyển thành chưa phân nhóm.",
+        "Xóa danh mục?",
+        "Công việc trong danh mục sẽ chuyển thành chưa phân loại.",
         async () => {
           await api(`/api/categories/${id}`, "DELETE");
           await refreshAfter();
@@ -555,7 +588,7 @@ async function action(name, id, element) {
         state.plan.sessions.some((session) => !session.preserved)
       )
         completeGuideStep(2);
-      navigation("calendar");
+      navigation("today");
       break;
     case "session-detail":
       sessionDetail(id);
@@ -673,6 +706,21 @@ async function action(name, id, element) {
     case "notification-read":
       await api(`/api/notifications/${id}/read`, "POST");
       await load();
+      if (state.route === "notifications") {
+        const item = [
+          ...document.querySelectorAll("[data-notification-id]"),
+        ].find((item) => item.dataset.notificationId === id);
+        const next =
+          item?.querySelector(".notice-open") ||
+          document.querySelector(
+            '.notice-status-filters button[aria-pressed="true"]',
+          );
+        next?.focus();
+      }
+      break;
+    case "notification-preferences":
+      state.settingsTab = "notifications";
+      navigation("settings");
       break;
     case "change-otp":
       await api("/api/auth/change-password/request-otp", "POST");
@@ -739,7 +787,7 @@ async function action(name, id, element) {
     }
   }
 }
-async function formAction(form, data) {
+async function formAction(form, data, nextAction = null) {
   const id = form.dataset.id;
   switch (form.dataset.form) {
     case "task":
@@ -748,6 +796,7 @@ async function formAction(form, data) {
         id ? "PUT" : "POST",
         taskInput(data),
       );
+      if (!id) completeGuideStep(0);
       await refreshAfter("Đã lưu công việc.");
       break;
     case "task-progress":
@@ -832,6 +881,7 @@ async function formAction(form, data) {
       });
       if (slots.length) completeGuideStep(1);
       await refreshAfter("Đã lưu thời gian rảnh.");
+      if (nextAction === "plan" && slots.length) planOptions();
       break;
     }
     case "preferences":
@@ -992,7 +1042,13 @@ export async function onSubmit(event) {
   working = true;
   try {
     if (!(await handleAuthSubmit(form)))
-      await submit(form, (data) => formAction(form, data));
+      await submit(form, (data) =>
+        formAction(
+          form,
+          data,
+          event.nativeEvent?.submitter?.dataset.nextAction,
+        ),
+      );
   } catch {
     /* submit renders the error beside the form. */
   } finally {

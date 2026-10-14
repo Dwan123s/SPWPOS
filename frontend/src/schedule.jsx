@@ -113,7 +113,56 @@ export function calendarPage() {
       </span>
     </button>
   );
-  return calendarMarkup(dates, view, sessions, entries, block, fixed);
+  const tasks = (state.workspace.tasks || [])
+    .filter((task) => !["Completed", "Cancelled"].includes(task.status))
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+  return (
+    <div className="calendar-planning-layout">
+      <aside
+        className="card calendar-task-context"
+        aria-label="Công việc cạnh lịch"
+      >
+        <details open={!globalThis.matchMedia?.("(max-width: 800px)").matches}>
+          <summary>
+            <span>Công việc cần làm</span>
+            <span>{tasks.length}</span>
+          </summary>
+          <p className="reason">
+            Xem việc cùng lịch để biết thời gian đang dành cho từng việc.
+          </p>
+          <div className="calendar-task-queue">
+            {tasks.slice(0, 8).map((task) => (
+              <button
+                type="button"
+                key={task.id}
+                data-action="task-detail"
+                data-id={task.id}
+              >
+                <strong>{task.name}</strong>
+                <span>
+                  {minutes(task.remainingMinutes)} còn lại · Hạn{" "}
+                  {dateFmt(task.deadline)}
+                </span>
+              </button>
+            ))}
+          </div>
+          {!tasks.length && (
+            <p className="reason">
+              Chưa có công việc. Viết một ghi chú để bắt đầu.
+            </p>
+          )}
+          <div className="form-actions">
+            {button("Nhập việc", "nav", "small primary", "notes", "edit")}
+            {tasks.length > 0 &&
+              button("Xem tất cả", "nav", "small ghost", "tasks")}
+          </div>
+        </details>
+      </aside>
+      <div className="calendar-schedule-main">
+        {calendarMarkup(dates, view, sessions, entries, block, fixed)}
+      </div>
+    </div>
+  );
 }
 function calendarMarkup(dates, view, sessions, entries, block, fixed) {
   return (
