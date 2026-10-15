@@ -126,12 +126,39 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
       ),
     );
     const free = duration(available);
+    const capacityDay = insights?.days?.find((day) => day.date === key);
+    const dailyLimit = workspace.preference.maximumDailyMinutes ?? 480;
+    const consumed = duration(
+      merge(
+        sessions
+          .filter((session) => session.status === "Completed")
+          .map((session) => interval(session, key, calendar))
+          .filter(Boolean),
+      ),
+    );
+    const reserved = duration(
+      merge(
+        sessions
+          .filter((session) =>
+            ["Scheduled", "Running", "Paused"].includes(session.status),
+          )
+          .map((session) => interval(session, key, calendar))
+          .filter(Boolean),
+      ),
+    );
     return {
       key,
-      free,
+      free: capacityDay?.calendarFreeMinutes ?? free,
       planned,
+      reserved: capacityDay?.reservedMinutes ?? reserved,
+      schedulable: capacityDay?.schedulableMinutes ?? null,
       capacity: Number.isFinite(insights?.capacityFactor)
-        ? Math.floor(free * insights.capacityFactor)
+        ? (capacityDay?.effectiveCapacityMinutes ??
+          Math.max(
+            0,
+            Math.min(dailyLimit, Math.floor(free * insights.capacityFactor)) -
+              consumed,
+          ))
         : null,
     };
   });

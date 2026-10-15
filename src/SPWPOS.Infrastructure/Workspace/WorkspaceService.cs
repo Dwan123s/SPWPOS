@@ -6,7 +6,7 @@ using SPWPOS.Infrastructure.Persistence;
 namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEngine engine, TimeProvider clock,
-    ITaskInterpreter interpreter) : IWorkspaceService
+    ITaskInterpreter interpreter, IAiUsageService aiUsage) : IWorkspaceService, IPlanningAgentService
 {
     private DateTimeOffset Now => clock.GetUtcNow();
     private static void Require([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string code, string message, int status = 400)
@@ -28,11 +28,21 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         Require(await db.Users.AnyAsync(x => x.Id == uid && x.IsActive && x.EmailConfirmed, ct), "FORBIDDEN", "Tài khoản không khả dụng.", 403);
         var preference = await Preference(uid, ct);
         var result = await action();
+        db.ChangeTracker.DetectChanges();
+        revision = revision && db.ChangeTracker.Entries().Any(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted);
         if (revision) preference.Revision = Guid.NewGuid();
         db.ChangeTracker.DetectChanges();
+        var tasksChanged = db.ChangeTracker.Entries<WorkTask>().Any(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted);
+        var timeChanged = db.ChangeTracker.Entries().Any(e =>
+            e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted &&
+            (e.Entity is WeeklyAvailability or AvailabilityException or FixedEvent ||
+             e.Entity is WorkPreference && e.Properties.Any(p => p.IsModified && p.Metadata.Name != nameof(WorkPreference.Revision))));
         foreach (var entry in db.ChangeTracker.Entries<WorkSession>().Where(x => x.State is EntityState.Added or EntityState.Modified))
         { if (entry.State == EntityState.Added) entry.Entity.CreatedAt = Now; entry.Entity.UpdatedAt = Now; }
         await db.SaveChangesAsync(ct);
+        if (revision && tasksChanged) await UpdateContainerProgressAsync(uid, ct);
+        if (revision && timeChanged)
+            await RescheduleTimeConflictsAsync(uid, ct);
         if (revision) { await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, preference.PlanningHorizonDays), ct); await db.SaveChangesAsync(ct); }
         await tx.CommitAsync(ct); return result;
     }
@@ -73,7 +83,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         var profile = await db.UserProfiles.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct);
         var ns = await db.NotificationSettings.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct) ?? new();
         return new(new(user.Id, user.Email!, user.FirstName, user.LastName, profile?.DisplayName ?? (user.FirstName + " " + user.LastName), profile?.Bio ?? "", profile?.AvatarUrl ?? ""),
-            new(preference.TimeZoneId, preference.MinimumSessionMinutes, preference.MaximumSessionMinutes, preference.BreakMinutes, preference.PreferredStartMinute, preference.PreferredEndMinute, preference.Revision, preference.PlanningHorizonDays, preference.PreferredPeriod),
+            new(preference.TimeZoneId, preference.MinimumSessionMinutes, preference.MaximumSessionMinutes, preference.BreakMinutes, preference.PreferredStartMinute, preference.PreferredEndMinute, preference.Revision, preference.PlanningHorizonDays, preference.PreferredPeriod, preference.MaximumDailyMinutes, preference.AutoReschedule),
             categories, state.Tasks.Select(t => new TaskView(t.Id, t.Name, t.Description, t.Deadline, t.EstimatedMinutes, engine.Adjusted(t, bias), engine.Remaining(t, bias),
                 (int)(sessionsByTask[t.Id].Sum(s => s.ActualSeconds) / 60),
                 (int)sessionsByTask[t.Id].Where(s => s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).Sum(s => (s.End - s.Start).TotalMinutes),
@@ -85,7 +95,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
             state.Sessions.Where(s => tasksById.ContainsKey(s.TaskId)).Select(s => new SessionView(s.Id, s.TaskId, tasksById[s.TaskId].Name,
                 s.Start, s.End, s.Status.ToString(), s.IsLocked, (int)((s.ActualSeconds + (s.SegmentStartedAt is { } at ? Math.Max(0, (Now - at).TotalSeconds) : 0)) / 60),
                 s.ActualSeconds + (long)(s.SegmentStartedAt is { } since ? Math.Max(0, (Now - since).TotalSeconds) : 0),
-                s.SegmentStartedAt, s.ReasonCode)).ToArray(), notifications, new(ns.InAppEnabled, ns.DeadlineLeadHours, ns.SessionReminderLeadMinutes, ns.WorkloadWarningLevel));
+                s.SegmentStartedAt, s.ReasonCode)).ToArray(), notifications, new(ns.InAppEnabled, ns.DeadlineLeadHours, ns.SessionReminderLeadMinutes, ns.WorkloadWarningLevel), ["history-v2", "recovery"]);
     }
     public Task UpdateProfileAsync(Guid userId, ProfileInput input, CancellationToken ct) => Mutate(userId, async () =>
     {

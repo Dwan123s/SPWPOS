@@ -9,7 +9,7 @@ public sealed partial class WorkspaceService
     public NoteAgentCapabilities GetNoteAgentCapabilities() => interpreter.Capabilities;
     private static NoteScheduleResult AgentResult(NoteView note, PlanView plan) => new(note, plan, [
         new("READ_NOTE", "Đã đọc ghi chú và múi giờ tài khoản."),
-        new("ANALYZE", $"Đã nhận diện {note.Analysis?.Tasks.Length ?? 0} công việc bằng {(note.Analysis?.Source is "OpenAI" or "Gemini" ? note.Analysis.Source : "bộ phân tích trên server")}."),
+        new("ANALYZE", $"Đã nhận diện {note.Analysis?.Tasks.Length ?? 0} công việc bằng {(note.Analysis?.Source is "OpenAI" or "Gemini" or "VertexAI" ? note.Analysis.Source : "bộ phân tích trên server")}."),
         new("CREATE_TASKS", $"Đã lưu {note.CreatedTaskIds.Length} công việc; thử lại không tạo trùng."),
         new("PLAN", $"Đã xếp {plan.Sessions.Count(x => !x.Preserved)} phiên mới và giữ {plan.Sessions.Count(x => x.Preserved)} phiên hiện có."),
         new("APPLY", plan.IsApplied ? "Đã kiểm tra ràng buộc và áp dụng lịch." : "Lịch chưa được áp dụng.")
@@ -63,7 +63,7 @@ public sealed partial class WorkspaceService
         var analysis = await RunJob(uid, "AI_REQUEST", async () =>
         {
             var result = await interpreter.AnalyzeNoteAsync(snapshot.Content, true, zone, Now, ct);
-            Require(result.Source is "OpenAI" or "Gemini", "NOTE_AI_UNAVAILABLE", "Ghi chú cần được phân tích bằng AI. Vui lòng thử lại.", 503);
+            Require(result.Source is "OpenAI" or "Gemini" or "VertexAI", "NOTE_AI_UNAVAILABLE", "Ghi chú cần được phân tích bằng AI. Vui lòng thử lại.", 503);
             return result;
         }, ct);
         var allowedTypes = await db.TaskTypes.Where(x => x.IsActive).Select(x => x.Code).ToArrayAsync(ct);
@@ -87,7 +87,7 @@ public sealed partial class WorkspaceService
         CheckNoteVersion(note, input.Version);
         Require(note.AnalysisJson.Length > 0, "NOTE_NOT_ANALYZED", "Phân tích ghi chú trước khi tạo công việc.");
         var analysis = JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson)!;
-        Require(analysis.Source is "OpenAI" or "Gemini", "NOTE_AI_REQUIRED", "Phân tích lại ghi chú bằng AI trước khi tạo công việc.", 409);
+        Require(analysis.Source is "OpenAI" or "Gemini" or "VertexAI", "NOTE_AI_REQUIRED", "Phân tích lại ghi chú bằng AI trước khi tạo công việc.", 409);
         Require(input.Tasks is { Length: >= 1 and <= 12 }, "VALIDATION_ERROR", "Chọn từ 1 đến 12 công việc.");
         var activeCount = await Mine<WorkTask>(uid).CountAsync(x => !x.IsDeleted && x.Status != WorkTaskStatus.Completed && x.Status != WorkTaskStatus.Cancelled, ct);
         Require(activeCount + input.Tasks.Length <= 500, "TASK_LIMIT", "Tối đa 500 công việc đang hoạt động.");

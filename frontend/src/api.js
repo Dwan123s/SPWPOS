@@ -37,7 +37,12 @@ export async function api(
     } catch (error) {
       if (error.status === 401) {
         window.dispatchEvent(new Event("session-expired"));
-        throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        const expired = new Error(
+          "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+        );
+        expired.status = 401;
+        expired.code = "SESSION_EXPIRED";
+        throw expired;
       }
       throw error;
     }

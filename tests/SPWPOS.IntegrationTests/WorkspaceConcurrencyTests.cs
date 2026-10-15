@@ -28,7 +28,7 @@ public sealed class WorkspaceConcurrencyTests
         Assert.Equal(proposal.GetProperty("sessions").GetArrayLength(), await db.WorkSessions.CountAsync(Ct));
     }
     [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
-    public async Task Concurrent_session_start_has_one_running_session()
+    public async Task Concurrent_session_start_acknowledges_retries_but_opens_one_segment()
     {
         await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync(); await Authorize(factory, client); await SetupTime(client);
         await Send(client, HttpMethod.Put, "/api/time/preferences", new PreferenceInput("UTC", 25, 90, 0, 0, 1440));
@@ -37,10 +37,12 @@ public sealed class WorkspaceConcurrencyTests
         await Send(client, HttpMethod.Post, $"/api/plans/{proposal.GetProperty("id").GetGuid()}/apply");
         var route = $"/api/sessions/{proposal.GetProperty("sessions")[0].GetProperty("id").GetGuid()}/start";
         var responses = await Task.WhenAll(client.PostAsync(route, null, Ct), client.PostAsync(route, null, Ct));
-        try { Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK); Assert.Single(responses, r => r.StatusCode == HttpStatusCode.BadRequest); }
+        try { Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode)); }
         finally { foreach (var response in responses) response.Dispose(); }
         await using var scope = factory.Services.CreateAsyncScope();
         Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().WorkSessions.CountAsync(x => x.Status == WorkSessionStatus.Running, Ct));
+        Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().SessionExecutions.CountAsync(Ct));
+        Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().ExecutionSegments.CountAsync(Ct));
     }
     [Fact] public async Task Admin_can_lock_other_user_and_revokes_existing_session()
     {

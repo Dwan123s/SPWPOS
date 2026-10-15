@@ -22,6 +22,7 @@ export const sessionById = (id) =>
 export function sessionCard(s) {
   const upcoming = s.status === "Scheduled",
     active = ["Running", "Paused"].includes(s.status);
+  const expired = active && new Date(s.end).getTime() <= Date.now();
   return (
     <div
       className={`session-card ${s.status === "Completed" ? "completed" : ""}`}
@@ -42,9 +43,17 @@ export function sessionCard(s) {
         {s.isLocked ? " · Đã khóa" : ""}
       </div>
       {active ? <SessionTimer id={s.id} className="timer" /> : ""}
+      {expired && (
+        <p className="warning" role="status">
+          Phiên đã hết khung lịch. Hãy kết thúc phiên để giữ thời gian đã làm và
+          xếp lại phần còn lại.
+        </p>
+      )}
       <div className="reason">{reasons[s.reasonCode] || s.reasonCode}</div>
       <div className="actions">
-        {upcoming && <StartSessionButton session={s} workspace={state.workspace} />}
+        {upcoming && (
+          <StartSessionButton session={s} workspace={state.workspace} />
+        )}
         {s.status === "Running"
           ? button(
               "Tạm dừng",
@@ -54,7 +63,7 @@ export function sessionCard(s) {
               "pause",
             )
           : ""}
-        {s.status === "Paused"
+        {s.status === "Paused" && !expired
           ? button(
               "Tiếp tục",
               "session-resume",
@@ -80,7 +89,6 @@ export function sessionCard(s) {
     </div>
   );
 }
-export { calendarPage } from "./schedule.jsx";
 export function sessionDetail(id) {
   const s = sessionById(id);
   if (!s) return;
@@ -192,7 +200,7 @@ export function eventModal(event = {}) {
     end = event.end || new Date(Date.now() + 7200000).toISOString();
   modal(
     event.id ? "Sửa sự kiện" : "Thêm sự kiện cố định",
-    "Khoảng thời gian này sẽ không được dùng để lập lịch.",
+    "Khoảng này được đánh dấu bận. Khi tạo lịch lặp, mỗi lần xuất hiện có thể sửa hoặc xóa riêng.",
     <form data-form="event" data-id={event.id || ""}>
       {field(
         "Tên sự kiện",
@@ -245,6 +253,14 @@ export function eventModal(event = {}) {
           "required",
         )}
       </div>
+      {!event.id &&
+        field(
+          "Số lần lặp hàng tuần (1 = một lần)",
+          "repeatWeeks",
+          "number",
+          1,
+          'required min="1" max="12"',
+        )}
       <div className="form-error" />
       <div className="form-actions">
         {event.id
@@ -348,215 +364,6 @@ export function availabilityRow(
         aria-label="Kết thúc (HH:mm)"
       />
       {button("", "remove-slot", "icon-only ghost", "", "close")}
-    </div>
-  );
-}
-export function timePage() {
-  const w = state.workspace,
-    p = w.preference;
-  return (
-    <div className="equal-columns">
-      <div className="stack">
-        <section className="card">
-          <div className="card-header">
-            <div>
-              <h2>Thời gian rảnh hàng tuần</h2>
-              <p>Chỉ những khoảng này được dùng để lên lịch.</p>
-            </div>
-          </div>
-          <form data-form="availability">
-            {availabilityEditor(w.availability)}
-            <div className="form-error" />
-            <div className="form-actions">
-              {button("Thêm khoảng", "add-slot", "secondary", "", "plus")}
-              <button type="submit" className="btn secondary">
-                Lưu lịch rảnh
-              </button>
-              {w.tasks.some(
-                (task) => !["Completed", "Cancelled"].includes(task.status),
-              ) && (
-                <button
-                  type="submit"
-                  className="btn primary"
-                  data-next-action="plan"
-                >
-                  Lưu giờ rảnh & xem lịch
-                </button>
-              )}
-            </div>
-            <p className="reason spaced">
-              Lưu giờ rảnh chưa thay đổi lịch làm việc. Bạn sẽ được xem lịch đề
-              xuất trước khi chọn áp dụng.
-            </p>
-          </form>
-        </section>
-        <section className="card">
-          <div className="card-header">
-            <div>
-              <h2>Ngoại lệ theo ngày</h2>
-              <p>Ngày nghỉ, lịch bận hoặc giờ rảnh thêm.</p>
-            </div>
-            {button("Thêm", "new-exception", "small secondary", "", "plus")}
-          </div>
-          {nodeList(
-            w.exceptions.map((e) => (
-              <div className="list-line">
-                <div>
-                  <strong>
-                    {e.date}
-                    {" · "}
-                    {e.isAvailable ? "Rảnh" : "Bận"}
-                  </strong>
-                  <p>
-                    {timeValue(e.startMinute)}
-                    {" – "}
-                    {timeValue(e.endMinute)}
-                    {" · "}
-                    {e.note}
-                  </p>
-                </div>
-                {button("Sửa", "edit-exception", "small ghost", e.id)}
-              </div>
-            )),
-          ) || (
-            <p className="muted">
-              <small>Chưa có ngoại lệ</small>
-            </p>
-          )}
-        </section>
-        <section className="card">
-          <div className="card-header">
-            <h2>Sự kiện cố định</h2>
-            {button("Thêm", "new-event", "small secondary", "", "plus")}
-          </div>
-          {nodeList(
-            w.events.map((e) => (
-              <div className="list-line">
-                <div>
-                  <strong>{e.name}</strong>
-                  <p>
-                    {dateFmt(e.start)} {timeFmt(e.start)}
-                    {" – "}
-                    {dateFmt(e.end)} {timeFmt(e.end)}
-                  </p>
-                </div>
-                {button("Sửa", "edit-event", "small ghost", e.id)}
-              </div>
-            )),
-          ) || (
-            <p className="muted">
-              <small>Chưa có sự kiện</small>
-            </p>
-          )}
-        </section>
-      </div>
-      <section className="card">
-        <div className="card-header">
-          <div>
-            <h2>Cách bạn muốn làm việc</h2>
-            <p>Giới hạn phiên và thời gian nghỉ.</p>
-          </div>
-        </div>
-        <form data-form="preferences">
-          <div className="form-grid">
-            <label className="field wide">
-              Múi giờ
-              <Select name="timeZoneId">
-                {nodeList(
-                  [
-                    ...new Set([
-                      "Asia/Ho_Chi_Minh",
-                      "Asia/Bangkok",
-                      "Asia/Tokyo",
-                      "UTC",
-                      "Europe/London",
-                      "America/New_York",
-                      p.timeZoneId,
-                    ]),
-                  ].map((z) => (
-                    <option value={z} selected={z === p.timeZoneId}>
-                      {z}
-                    </option>
-                  )),
-                )}
-              </Select>
-            </label>
-            {field(
-              "Phiên ngắn nhất (phút)",
-              "minimumSessionMinutes",
-              "number",
-              p.minimumSessionMinutes,
-              'required min="5" max="480"',
-            )}
-            {field(
-              "Phiên dài nhất (phút)",
-              "maximumSessionMinutes",
-              "number",
-              p.maximumSessionMinutes,
-              'required min="5" max="480"',
-            )}
-            {field(
-              "Số ngày lập kế hoạch",
-              "planningHorizonDays",
-              "number",
-              p.planningHorizonDays || 14,
-              'required min="1" max="30"',
-            )}
-            <label className="field">
-              Buổi làm việc ưu tiên
-              <Select name="preferredPeriod">
-                {nodeList(
-                  Object.entries({
-                    NONE: "Theo giờ bên dưới",
-                    MORNING: "Sáng",
-                    AFTERNOON: "Chiều",
-                    EVENING: "Tối",
-                  }).map(([code, label]) => (
-                    <option
-                      value={code}
-                      selected={code === (p.preferredPeriod || "NONE")}
-                    >
-                      {label}
-                    </option>
-                  )),
-                )}
-              </Select>
-            </label>
-            {field(
-              "Nghỉ giữa phiên (phút)",
-              "breakMinutes",
-              "number",
-              p.breakMinutes,
-              'required min="0" max="120"',
-            )}
-            <div />
-            {field(
-              "Giờ làm việc ưu tiên từ",
-              "preferredStart",
-              "time",
-              timeValue(p.preferredStartMinute),
-              "required",
-            )}
-            {field(
-              "Đến (HH:mm)",
-              "preferredEnd",
-              "text",
-              timeValue(p.preferredEndMinute),
-              'required pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]|24:00"',
-            )}
-          </div>
-          <p className="reason spaced">
-            Giờ ưu tiên giúp sắp xếp lịch. Những phiên đã khóa được bảo vệ khi
-            bạn thay đổi lịch rảnh.
-          </p>
-          <div className="form-error" />
-          <div className="form-actions">
-            <button type="submit" className="btn primary">
-              Lưu tùy chọn
-            </button>
-          </div>
-        </form>
-      </section>
     </div>
   );
 }

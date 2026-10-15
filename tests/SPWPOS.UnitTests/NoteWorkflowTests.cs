@@ -7,8 +7,8 @@ namespace SPWPOS.UnitTests;
 
 public sealed class NoteWorkflowTests
 {
-    private static Task<ServiceHarness> CreateHarnessAsync(int count = 1, bool needsReview = false) =>
-        ServiceHarness.CreateAsync(services => services.AddSingleton<ITaskInterpreter>(new NoteAiTestDouble(count, needsReview)));
+    private static Task<ServiceHarness> CreateHarnessAsync(int count = 1, bool needsReview = false, string source = "Gemini") =>
+        ServiceHarness.CreateAsync(services => services.AddSingleton<ITaskInterpreter>(new NoteAiTestDouble(count, needsReview, source)));
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     private static async Task<T> Call<T>(ServiceHarness h, Func<IWorkspaceService, Task<T>> action)
     { await using var scope = h.Provider.CreateAsyncScope(); return await action(scope.ServiceProvider.GetRequiredService<IWorkspaceService>()); }
@@ -29,9 +29,10 @@ public sealed class NoteWorkflowTests
         Assert.Empty(await h.DbAsync(db => db.PlanProposals.ToArrayAsync(Ct)));
     }
 
-    [Fact] public async Task Import_is_atomic_and_retry_does_not_duplicate_tasks()
+    [Theory] [InlineData("Gemini")] [InlineData("VertexAI")]
+    public async Task Import_is_atomic_and_retry_does_not_duplicate_tasks(string source)
     {
-        await using var h = await CreateHarnessAsync(count: 2); var user = await h.RegisterAsync();
+        await using var h = await CreateHarnessAsync(count: 2, source: source); var user = await h.RegisterAsync();
         var note = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Công việc", "Báo cáo 60 phút\nÔn bài 30 phút"), Ct));
         note = await Call(h, s => s.AnalyzeNoteAsync(user.Id, note.Id, new(note.Version), Ct));
         var tasks = note.Analysis!.Tasks;

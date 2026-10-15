@@ -947,8 +947,8 @@
       },
       "System.Security.Cryptography.Pkcs": {
         "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "CoCRHFym33aUSf/NtWSVSZa99dkd0Hm7OCZUxORBjRB16LNhIEOf8THPqzIYlvKM0nNDAPTRBa1FxEECrgaxxA=="
+        "resolved": "8.0.2",
+        "contentHash": "VWACYq0JGxi9sw3TonSSV4B2MfhYk5nhgOtp9wbrt5NFOtUetFqHkMZylcCwPX+117cBJH5EnIzIy6X4OKn/kA=="
       },
       "System.Security.Cryptography.ProtectedData": {
         "type": "Transitive",
@@ -1087,12 +1087,14 @@
         "type": "Project",
         "dependencies": {
           "FirebaseAdmin": "[3.7.0, )",
+          "Google.Apis.Auth": "[1.73.0, )",
           "MailKit": "[4.17.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[8.0.31, )",
           "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "[8.0.31, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[8.0.31, )",
           "SPWPOS.Application": "[1.0.0, )",
-          "Sodium.Core": "[1.4.1, )"
+          "Sodium.Core": "[1.4.1, )",
+          "System.Security.Cryptography.Pkcs": "[8.0.2, )"
         }
       },
       "spwpos.testsupport": {

@@ -268,6 +268,37 @@
   background: #fff;
   border-color: #80c4ed;
 }
+.console-icon-button.console-text-button {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  min-width: unset !important;
+  max-width: max-content !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 9999px !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+.console-icon-button.console-text-button span {
+  white-space: nowrap !important;
+  display: inline-block !important;
+  line-height: 1 !important;
+  overflow: visible !important;
+}
+.console-icon-button.console-text-button .icon {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
+}
 .backlog-panel,
 .focus-cockpit,
 .runway-card,

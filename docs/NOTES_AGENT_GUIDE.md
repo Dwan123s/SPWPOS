@@ -102,3 +102,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Không khôi phục được công cụ EF.' }
 `Initialize-Development.ps1` khởi tạo cả SDK và connection string. Chỉ chạy `Initialize-Dotnet.ps1` không khởi tạo connection string cho terminal mới. Không đưa giá trị connection string hoặc AI key vào Git.
 
 Frontend build lại bằng quy trình hiện có. Kiểm thử AI mặc định sử dụng provider giả; không gọi provider thật hay dùng dữ liệu người dùng.
+
+## Google Cloud
+
+Ghi chú hỗ trợ provider VertexAI với Cloud API key hoặc ADC. Xem [GOOGLE_CLOUD_AI.md](GOOGLE_CLOUD_AI.md) để nhập key ẩn và kiểm tra trước khi kích hoạt. Nguồn VertexAI được phép tạo task và xếp lịch giống Gemini/OpenAI. Không thay Cloud key vào trường GeminiApiKey.

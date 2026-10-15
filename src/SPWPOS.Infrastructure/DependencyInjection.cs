@@ -31,6 +31,8 @@ public static class DependencyInjection
         services.Replace(ServiceDescriptor.Scoped<IPasswordHasher<ApplicationUser>, Argon2PasswordHasher>());
         services.AddScoped<IPasswordValidator<ApplicationUser>, PasswordPolicyValidator>();
         services.AddSingleton(TimeProvider.System);
+        services.AddScoped<SPWPOS.Infrastructure.Workspace.AiUsageCollector>();
+        services.AddScoped<SPWPOS.Application.Workspace.IAiUsageService, SPWPOS.Infrastructure.Workspace.AiUsageService>();
         services.AddSingleton<PasswordTiming>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddSingleton<IFirebaseTokenVerifier, FirebaseTokenVerifier>();
@@ -47,12 +49,22 @@ public static class DependencyInjection
         services.AddScoped<AccountRateLimiter>();
         services.AddSingleton<SPWPOS.Application.Workspace.PlanningEngine>();
         services.AddScoped<SPWPOS.Infrastructure.Workspace.WorkspaceHistoryMaintenance>();
-        services.AddScoped<SPWPOS.Application.Workspace.IWorkspaceService, SPWPOS.Infrastructure.Workspace.WorkspaceService>();
+        services.AddScoped<SPWPOS.Infrastructure.Workspace.WorkspaceService>();
+        services.AddScoped<SPWPOS.Application.Workspace.IWorkspaceService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
+        services.AddScoped<SPWPOS.Application.Workspace.IPlanningAgentService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
         services.AddSingleton<SPWPOS.Infrastructure.Workspace.NotificationJobStatus>();
         services.AddHostedService<SPWPOS.Infrastructure.Workspace.WorkspaceNotificationWorker>();
         services.AddHostedService<SPWPOS.Infrastructure.Workspace.AdminBootstrapWorker>();
+        services.AddSingleton<SPWPOS.Infrastructure.Workspace.IVertexAccessTokenProvider, SPWPOS.Infrastructure.Workspace.VertexAccessTokenProvider>();
         services.AddHttpClient<SPWPOS.Application.Workspace.ITaskInterpreter, SPWPOS.Infrastructure.Workspace.TaskInterpreter>(client =>
         { client.Timeout = TimeSpan.FromSeconds(20); client.MaxResponseContentBufferSize = 131072; })
+            // Vertex API-key compatibility includes a credential in the request URL.
+            // Disable this client's URL/header logging even if the app enables Trace logging.
+            .RemoveAllLoggers()
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddHttpClient<SPWPOS.Application.Workspace.IAgentVoiceTranscriber, SPWPOS.Infrastructure.Workspace.TaskInterpreter>(client =>
+        { client.Timeout = TimeSpan.FromSeconds(20); client.MaxResponseContentBufferSize = 131072; })
+            .RemoveAllLoggers()
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddOptions<JwtSettings>().BindConfiguration("JwtSettings")
             .Validate(x => StrongKey(x.SigningKey) && !string.IsNullOrWhiteSpace(x.Issuer) && !string.IsNullOrWhiteSpace(x.Audience)

@@ -132,3 +132,17 @@ it("keeps asynchronously loaded cards visible while motion is paused", async () 
   expect(animate).not.toHaveBeenCalled();
   expect(card.style.opacity).toBe("");
 });
+
+it("does not stack card reveals on top of a page transition", () => {
+  render(
+    <div className="glass-workspace">
+      <WorkspaceMotionControl />
+      <div className="page-scene">
+        <div className="page-header">Tiêu đề</div>
+        <section className="card">Nội dung mới</section>
+      </div>
+    </div>,
+  );
+  expect(animate).not.toHaveBeenCalled();
+  expect(screen.getByText("Nội dung mới").style.opacity).toBe("");
+});

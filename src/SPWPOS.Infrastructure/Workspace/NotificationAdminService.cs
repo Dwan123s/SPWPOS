@@ -104,7 +104,10 @@ public sealed class WorkspaceNotificationWorker(IServiceScopeFactory scopes, Not
                 {
                     try
                     {
-                        using var scope = scopes.CreateScope(); await scope.ServiceProvider.GetRequiredService<IWorkspaceService>().EnsureNotificationsAsync(uid, stoppingToken);
+                        using var scope = scopes.CreateScope();
+                        var workspace = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
+                        await workspace.EnsureNotificationsAsync(uid, stoppingToken);
+                        await workspace.ScanRecoveryAsync(uid, stoppingToken);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
                     catch (Exception e)

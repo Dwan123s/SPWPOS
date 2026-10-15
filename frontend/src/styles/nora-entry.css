@@ -1,0 +1,40 @@
+@import "./nora-chat.css" layer(components);
+
+@layer components {
+  .nora-usage {
+    flex-shrink: 0;
+    margin: 0 14px 14px;
+    padding-top: 12px;
+    border-top: 1px solid #e1eaf3;
+    max-height: 28dvh;
+    overflow: auto;
+    scrollbar-width: thin;
+    color: #526980;
+  }
+  .nora-usage > summary {
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1.7;
+    color: #365b7f;
+  }
+  .nora-usage[open] > summary {
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .nora-usage p {
+    font-size: 11px;
+    line-height: 1.8;
+    margin: 8px 0;
+    overflow-wrap: anywhere;
+  }
+  .nora-usage button {
+    padding: 6px 10px;
+    margin: 5px 0;
+    color: #245e96;
+    background: #edf5fc;
+    border: 1px solid #d7e7f4;
+    border-radius: 7px;
+    font: inherit;
+    font-size: 11px;
+  }
+}

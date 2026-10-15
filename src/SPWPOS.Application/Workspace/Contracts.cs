@@ -30,15 +30,18 @@ public sealed record ExceptionInput(DateOnly Date, [Range(0, 1439)] int StartMin
     [Range(1, 1440)] int EndMinute, bool IsAvailable, [StringLength(300)] string Note = "");
 public sealed record ExceptionView(Guid Id, DateOnly Date, int StartMinute, int EndMinute, bool IsAvailable, string Note);
 public sealed record EventInput([Required, StringLength(200)] string Name, DateTimeOffset Start, DateTimeOffset End,
-    [StringLength(1000)] string Description = "", [RegularExpression("^(MEETING|CLASS|APPOINTMENT|OTHER)$")] string EventType = "OTHER");
+    [StringLength(1000)] string Description = "", [RegularExpression("^(MEETING|CLASS|APPOINTMENT|OTHER)$")] string EventType = "OTHER",
+    [Range(1, 12)] int RepeatWeeks = 1);
 public sealed record EventView(Guid Id, string Name, DateTimeOffset Start, DateTimeOffset End, string Description = "", string EventType = "OTHER");
 public sealed record PreferenceInput([Required, StringLength(100)] string TimeZoneId,
     [Range(5, 480)] int MinimumSessionMinutes, [Range(5, 480)] int MaximumSessionMinutes,
     [Range(0, 120)] int BreakMinutes, [Range(0, 1439)] int PreferredStartMinute,
     [Range(1, 1440)] int PreferredEndMinute, [Range(1, 30)] int PlanningHorizonDays = 14,
-    [RegularExpression("^(MORNING|AFTERNOON|EVENING|NONE)$")] string PreferredPeriod = "NONE");
+    [RegularExpression("^(MORNING|AFTERNOON|EVENING|NONE)$")] string PreferredPeriod = "NONE",
+    [Range(5, 1440)] int MaximumDailyMinutes = 480, bool AutoReschedule = true);
 public sealed record PreferenceView(string TimeZoneId, int MinimumSessionMinutes, int MaximumSessionMinutes,
-    int BreakMinutes, int PreferredStartMinute, int PreferredEndMinute, Guid Revision, int PlanningHorizonDays = 14, string PreferredPeriod = "NONE");
+    int BreakMinutes, int PreferredStartMinute, int PreferredEndMinute, Guid Revision, int PlanningHorizonDays = 14, string PreferredPeriod = "NONE",
+    int MaximumDailyMinutes = 480, bool AutoReschedule = true);
 public sealed record SessionView(Guid Id, Guid TaskId, string TaskName, DateTimeOffset Start, DateTimeOffset End,
     string Status, bool IsLocked, int ActualMinutes, long ActualSeconds, DateTimeOffset? SegmentStartedAt, string ReasonCode);
 public sealed record SessionEdit(DateTimeOffset Start, DateTimeOffset End);
@@ -46,23 +49,28 @@ public sealed record SplitInput([Range(5, 480)] int FirstMinutes);
 public sealed record DurationInput([Range(0, 10080)] int ActualMinutes);
 public sealed record PlanInput(DateTimeOffset Start, [Range(1, 30)] int HorizonDays = 7,
     [MaxLength(500)] Guid[]? AffectedTaskIds = null, bool IsReschedule = false,
-    [RegularExpression("^(MANUAL|NEW_TASK|TASK_CHANGED|EARLY_COMPLETION|SESSION_MISSED|DEADLINE_CHANGED|AVAILABILITY_CHANGED)$")] string TriggerEvent = "MANUAL");
+    [RegularExpression("^(MANUAL|NEW_TASK|TASK_CHANGED|EARLY_COMPLETION|SESSION_MISSED|DEADLINE_CHANGED|AVAILABILITY_CHANGED)$")] string TriggerEvent = "MANUAL",
+    bool UseCapacityFactor = true, bool UseEstimateBias = true);
 public sealed record PlanWarning(Guid TaskId, string TaskName, string Code, string Message, int UnscheduledMinutes);
 public sealed record ProposedSession(Guid Id, Guid TaskId, DateTimeOffset Start, DateTimeOffset End, string ReasonCode, bool Preserved);
 public sealed record PlanView(Guid Id, Guid Revision, DateTimeOffset Start, DateTimeOffset End,
     ProposedSession[] Sessions, PlanWarning[] Warnings, string[] Explanations, bool IsApplied,
-    string Status = "PROPOSED", string Kind = "INITIAL", Guid? PreviousPlanId = null, DateTimeOffset? AppliedAt = null);
+    string Status = "PROPOSED", string Kind = "INITIAL", Guid? PreviousPlanId = null, DateTimeOffset? AppliedAt = null,
+    bool UseEstimateBias = true);
 public sealed record ScenarioInput(PlanInput Plan, TaskInput NewTask, [MaxLength(11)] TaskInput[]? AdditionalTasks = null);
 public sealed record BiasView(string TaskType, int Samples, double Ratio, bool Personalized);
 public sealed record RiskView(Guid TaskId, string Name, string Level, int Score, string[] Reasons, int RemainingMinutes);
+public sealed record CapacityDayView(DateOnly Date, int CalendarFreeMinutes, int DailyBudgetMinutes,
+    int ConsumedMinutes, int ReservedMinutes, int EffectiveCapacityMinutes, int SchedulableMinutes);
 public sealed record IntelligenceView(int RemainingMinutes, int CalendarFreeMinutes, int EffectiveCapacityMinutes,
     double CapacityFactor, int CapacitySamples, double LoadRatio, string RiskLevel, string[] Reasons,
-    BiasView[] Biases, RiskView[] Tasks, int PlannedMinutes, int ActualMinutes, int HorizonDemandMinutes = 0);
+    BiasView[] Biases, RiskView[] Tasks, int PlannedMinutes, int ActualMinutes, int HorizonDemandMinutes = 0,
+    CapacityDayView[]? Days = null, DateTimeOffset? RangeStart = null, DateTimeOffset? RangeEnd = null);
 public sealed record ScenarioView(IntelligenceView Before, IntelligenceView After, PlanView ProposedPlan, int AddedMinutes);
 public sealed record NotificationView(Guid Id, string Kind, string Title, string Message, Guid? TaskId, DateTimeOffset CreatedAt, bool IsRead);
 public sealed record WorkspaceView(ProfileView Profile, PreferenceView Preference, CategoryView[] Categories,
     TaskView[] Tasks, AvailabilityInput[] Availability, ExceptionView[] Exceptions, EventView[] Events,
-    SessionView[] Sessions, NotificationView[] Notifications, NotificationSettingInput NotificationSettings);
+    SessionView[] Sessions, NotificationView[] Notifications, NotificationSettingInput NotificationSettings, string[]? Features = null);
 public sealed record NotificationSettingInput(bool InAppEnabled = true, [Range(1, 168)] int DeadlineLeadHours = 24,
     [Range(1, 120)] int SessionReminderLeadMinutes = 10, [RegularExpression("^(MODERATE|HIGH|OVERLOAD)$")] string WorkloadWarningLevel = "HIGH");
 public sealed record PlanItemView(Guid Id, Guid TaskId, Guid? PreviousSessionId, string Action, DateTimeOffset? Start, DateTimeOffset? End, int? PlannedMinutes, string[] ReasonCodes);
@@ -79,6 +87,14 @@ public sealed record SystemStatusView(bool DatabaseHealthy, int Users, int Tasks
 
 public interface IWorkspaceService
 {
+    Task<RecoveryPage> GetRecoveryAsync(Guid userId, int page, CancellationToken ct);
+    Task SetRecoverySettingsAsync(Guid userId, RecoverySettingInput input, CancellationToken ct);
+    Task ScanRecoveryAsync(Guid userId, CancellationToken ct);
+    Task RebuildRecoveryAsync(Guid userId, Guid id, CancellationToken ct);
+    Task ApplyRecoveryAsync(Guid userId, Guid id, CancellationToken ct);
+    Task DismissRecoveryAsync(Guid userId, Guid id, CancellationToken ct);
+    Task<AnalyticsView> GetAnalyticsAsync(Guid userId, AnalyticsInput input, CancellationToken ct);
+    Task<TaskPerformancePage> GetTaskPerformanceAsync(Guid userId, int page, int pageSize, string? search, CancellationToken ct);
     NoteAgentCapabilities GetNoteAgentCapabilities();
     Task<NoteView[]> GetNotesAsync(Guid userId, CancellationToken ct);
     Task<NoteView> SaveNoteAsync(Guid userId, Guid? id, NoteInput input, CancellationToken ct);

@@ -15,12 +15,15 @@ const workspace = {
   events: [],
 };
 
-it("allows starting only from fifteen minutes before a scheduled session through its end", () => {
+it("allows starting from fifteen minutes before a session until just before its end", () => {
   expect(
     sessionStartIssue(session, workspace, start - 15 * 60000 - 1),
   ).toContain("sớm 15 phút");
   expect(sessionStartIssue(session, workspace, start - 15 * 60000)).toBeNull();
-  expect(sessionStartIssue(session, workspace, start + 3600000)).toBeNull();
+  expect(sessionStartIssue(session, workspace, start + 3599999)).toBeNull();
+  expect(sessionStartIssue(session, workspace, start + 3600000)).toContain(
+    "quá giờ",
+  );
   expect(sessionStartIssue(session, workspace, start + 3600001)).toContain(
     "quá giờ",
   );

@@ -1976,3 +1976,149 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261008132609_AddPlanningNotes'
+)
+BEGIN
+    CREATE TABLE [PlanningNotes] (
+        [Id] uniqueidentifier NOT NULL,
+        [Title] nvarchar(120) NOT NULL,
+        [Content] nvarchar(max) NOT NULL,
+        [Version] uniqueidentifier NOT NULL,
+        [AnalysisJson] nvarchar(max) NOT NULL,
+        [CreatedTaskIdsJson] nvarchar(max) NOT NULL,
+        [PlanId] uniqueidentifier NULL,
+        [CreatedAt] datetimeoffset NOT NULL,
+        [UpdatedAt] datetimeoffset NOT NULL,
+        [UserId] uniqueidentifier NOT NULL,
+        CONSTRAINT [PK_PlanningNotes] PRIMARY KEY ([Id]),
+        CONSTRAINT [AK_PlanningNotes_UserId_Id] UNIQUE ([UserId], [Id]),
+        CONSTRAINT [FK_PlanningNotes_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261008132609_AddPlanningNotes'
+)
+BEGIN
+    CREATE INDEX [IX_PlanningNotes_UserId] ON [PlanningNotes] ([UserId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261008132609_AddPlanningNotes'
+)
+BEGIN
+    CREATE INDEX [IX_PlanningNotes_UserId_UpdatedAt] ON [PlanningNotes] ([UserId], [UpdatedAt]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261008132609_AddPlanningNotes'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261008132609_AddPlanningNotes', N'8.0.31');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261014132803_AddPlanningAgent'
+)
+BEGIN
+    ALTER TABLE [WorkPreferences] ADD [AutoReschedule] bit NOT NULL DEFAULT CAST(1 AS bit);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261014132803_AddPlanningAgent'
+)
+BEGIN
+    ALTER TABLE [WorkPreferences] ADD [MaximumDailyMinutes] int NOT NULL DEFAULT 480;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261014132803_AddPlanningAgent'
+)
+BEGIN
+    CREATE TABLE [AgentTurns] (
+        [Id] uniqueidentifier NOT NULL,
+        [ConversationId] uniqueidentifier NOT NULL,
+        [RequestId] uniqueidentifier NOT NULL,
+        [Text] nvarchar(2000) NOT NULL,
+        [Status] nvarchar(24) NOT NULL,
+        [CommandJson] nvarchar(max) NOT NULL,
+        [ChangesJson] nvarchar(max) NOT NULL,
+        [ResultJson] nvarchar(max) NOT NULL,
+        [UndoJson] nvarchar(max) NOT NULL,
+        [ExpectedRevision] uniqueidentifier NOT NULL,
+        [AppliedRevision] uniqueidentifier NULL,
+        [CreatedAt] datetimeoffset NOT NULL,
+        [UpdatedAt] datetimeoffset NOT NULL,
+        [ExpiresAt] datetimeoffset NOT NULL,
+        [UserId] uniqueidentifier NOT NULL,
+        CONSTRAINT [PK_AgentTurns] PRIMARY KEY ([Id]),
+        CONSTRAINT [AK_AgentTurns_UserId_Id] UNIQUE ([UserId], [Id]),
+        CONSTRAINT [FK_AgentTurns_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261014132803_AddPlanningAgent'
+)
+BEGIN
+    CREATE INDEX [IX_AgentTurns_UserId] ON [AgentTurns] ([UserId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261014132803_AddPlanningAgent'
+)
+BEGIN
+    CREATE INDEX [IX_AgentTurns_UserId_CreatedAt] ON [AgentTurns] ([UserId], [CreatedAt]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261014132803_AddPlanningAgent'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_AgentTurns_UserId_RequestId] ON [AgentTurns] ([UserId], [RequestId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261014132803_AddPlanningAgent'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261014132803_AddPlanningAgent', N'8.0.31');
+END;
+GO
+
+COMMIT;
+GO
+

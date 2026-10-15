@@ -10,7 +10,7 @@ namespace SPWPOS.IntegrationTests;
 public sealed class UmlAlignmentTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
-    [Fact] public async Task Long_running_timer_is_not_truncated_and_pause_time_is_excluded()
+    [Fact] public async Task Long_running_timer_is_preserved_but_expired_resume_requires_replanning()
     {
         await using var factory = new ApiFactory(); using var client = await factory.ClientAsync(); await Authorize(factory, client); await SetupTime(client);
         await Create(client, factory.Clock.GetUtcNow());
@@ -20,10 +20,11 @@ public sealed class UmlAlignmentTests
         var sid = plan.GetProperty("sessions")[0].GetProperty("id").GetGuid();
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/start"); factory.Clock.Advance(TimeSpan.FromHours(25));
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/pause"); factory.Clock.Advance(TimeSpan.FromHours(3));
-        await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/resume"); factory.Clock.Advance(TimeSpan.FromHours(1));
+        var resumed = await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/resume", expected: HttpStatusCode.Conflict);
+        Assert.Equal("SESSION_WINDOW_EXPIRED", resumed.GetProperty("error").GetProperty("code").GetString());
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/complete");
         var history = (await Send(client, HttpMethod.Get, $"/api/sessions/{sid}/execution")).GetProperty("data");
-        Assert.Equal(26*3600, history.GetProperty("timerSeconds").GetInt64()); Assert.Equal(26*3600, history.GetProperty("actualSeconds").GetInt64());
+        Assert.Equal(25*3600, history.GetProperty("timerSeconds").GetInt64()); Assert.Equal(25*3600, history.GetProperty("actualSeconds").GetInt64());
     }
     [Fact] public async Task Plan_decisions_remain_proposals_until_apply_then_supersede_previous_plan()
     {

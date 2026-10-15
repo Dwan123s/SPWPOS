@@ -66,6 +66,8 @@ public sealed class FixedEvent : OwnedRecord
 }
 public sealed class WorkPreference : OwnedRecord
 {
+    public int MaximumDailyMinutes { get; set; } = 480;
+    public bool AutoReschedule { get; set; } = true;
     public int PlanningHorizonDays { get; set; } = 14;
     public string PreferredPeriod { get; set; } = "NONE";
     public string TimeZoneId { get; set; } = "Asia/Ho_Chi_Minh";

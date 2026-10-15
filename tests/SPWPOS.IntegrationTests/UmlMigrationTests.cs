@@ -12,6 +12,28 @@ public sealed class UmlMigrationTests
 {
     public static bool SqlServerAvailable => SqlServerConcurrencyTests.SqlServerAvailable;
     [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
+    public async Task Conversation_upgrade_backfills_each_owner_and_keeps_turns_unchanged()
+    {
+        var ct=TestContext.Current.CancellationToken;
+        await using var factory=new ApiFactory(true);using var client=await factory.ClientAsync();
+        await WorkspaceFlowTests.Authorize(factory,client);
+        await using var scope=factory.Services.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var migrations=(await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();var index=Array.FindIndex(migrations,x=>x.EndsWith("_AddAgentConversationLifecycle",StringComparison.Ordinal));Assert.True(index>0);
+        var migrator=db.GetService<IMigrator>();await migrator.MigrateAsync(migrations[index-1],ct);
+        var uid=await db.Users.Select(x=>x.Id).SingleAsync(ct);var conversation=Guid.NewGuid();var now=factory.Clock.GetUtcNow();
+        foreach(var offset in new[]{-1,0})
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO AgentTurns(Id,UserId,ConversationId,RequestId,Text,Status,CommandJson,ChangesJson,ResultJson,UndoJson,ExpectedRevision,CreatedAt,UpdatedAt,ExpiresAt)
+                VALUES({Guid.NewGuid()},{uid},{conversation},{Guid.NewGuid()},{(offset==-1?"Legacy conversation":"Follow-up")},'ANSWERED','','','','',{Guid.Empty},{now.AddMinutes(offset)},{now.AddMinutes(offset)},{now.AddMinutes(30)});
+                """,ct);
+        }
+        await migrator.MigrateAsync(null,ct);
+        var row=await db.AgentConversations.SingleAsync(ct);Assert.Equal(uid,row.UserId);Assert.Equal(conversation,row.Id);Assert.Equal("Legacy conversation",row.Title);
+        Assert.Equal(now.AddMinutes(-1),row.CreatedAt);Assert.Equal(now,row.UpdatedAt);Assert.Equal(2,await db.AgentTurns.CountAsync(ct));
+        Assert.Equal("Follow-up",await db.AgentTurns.OrderByDescending(x=>x.CreatedAt).Select(x=>x.Text).FirstAsync(ct));
+    }
+    [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
     public async Task Upgrade_preserves_legacy_data_and_backfills_plan_execution_profile_and_observations()
     {
         var ct = TestContext.Current.CancellationToken;

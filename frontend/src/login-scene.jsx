@@ -4,7 +4,7 @@ const spriteFrames = {
   checklist: ["checklist", "checklist-frame-02", "checklist-frame-03"],
 };
 
-function RibbonShine({ id }) {
+export function RibbonShine({ id }) {
   return (
     <svg
       className="login-ribbon-shine"
@@ -69,7 +69,7 @@ function RibbonShine({ id }) {
   );
 }
 
-function Sprite({ name, className = name, depth }) {
+export function Sprite({ name, className = name, depth }) {
   return (
     <div
       className={`login-sprite login-sprite--${className}`}

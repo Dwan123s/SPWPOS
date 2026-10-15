@@ -153,3 +153,6 @@ jobs:
       - name: SMTP configuration regression tests
         shell: powershell
         run: .\tests\scripts\SmtpConfiguration.Tests.ps1
+      - name: Google Cloud AI configuration regression tests
+        shell: powershell
+        run: .\tests\scripts\CloudAiConfiguration.Tests.ps1

@@ -9,8 +9,9 @@ import {
   settingsPage,
   adminPage,
 } from "../src/pages.jsx";
-import { tasksPage, taskForm } from "../src/tasks.jsx";
-import { timePage } from "../src/calendar.jsx";
+import { taskForm } from "../src/tasks.jsx";
+import { tasksPage } from "../src/page-tasks.jsx";
+import { timePage } from "../src/page-time.jsx";
 import { weekStart, calendarPage } from "../src/schedule.jsx";
 import { workspace, insights, resetFixtures } from "./fixtures.js";
 beforeEach(() => {

@@ -7,6 +7,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
     {
         if (exception is OperationCanceledException && context.RequestAborted.IsCancellationRequested) return true;
+        if (context.Response.HasStarted) { context.Abort(); return true; }
         var auth = exception as AuthException;
         int status = auth?.StatusCode ?? (exception is BadHttpRequestException bad ? bad.StatusCode : 500);
         string code = auth?.Code ?? (status == 413 ? "REQUEST_TOO_LARGE" : status == 400 ? "VALIDATION_ERROR" : "INTERNAL_ERROR");

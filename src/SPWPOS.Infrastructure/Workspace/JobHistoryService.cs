@@ -12,7 +12,7 @@ public sealed partial class WorkspaceService
         db.SystemJobRuns.Add(job); await db.SaveChangesAsync(ct);
         try
         {
-            var result = await action(); job.Status = succeeded is null || succeeded(result) ? "SUCCESS" : "FAILED"; job.FinishedAt = Now;
+            var result = kind == "AI_REQUEST" ? await aiUsage.RunAsync(uid,kind,action,ct) : await action(); job.Status = succeeded is null || succeeded(result) ? "SUCCESS" : "FAILED"; job.FinishedAt = Now;
             if (job.Status == "FAILED") job.ErrorMessage = "AI_UNAVAILABLE_OR_INVALID_RESPONSE";
             await db.SaveChangesAsync(ct); return result;
         }

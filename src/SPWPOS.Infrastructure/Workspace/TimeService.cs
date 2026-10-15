@@ -35,16 +35,45 @@ public sealed partial class WorkspaceService
     }, ct);
     public Task<Guid> SaveEventAsync(Guid uid, Guid? id, EventInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
-        Require(!string.IsNullOrWhiteSpace(input.Name) && input.Start < input.End && (input.End - input.Start).TotalDays <= 31, "VALIDATION_ERROR", "Sự kiện phải có tên và thời gian hợp lệ, tối đa 31 ngày.");
-        Require(!await Mine<FixedEvent>(uid).AnyAsync(x => x.Id != id && x.Start < input.End && input.Start < x.End, ct), "FIXED_EVENT_OVERLAP", "Sự kiện trùng với một sự kiện khác.", 409);
-        Require(!await Mine<WorkSession>(uid).AnyAsync(x => x.Start < input.End && input.Start < x.End &&
-            (x.Status == WorkSessionStatus.Running || x.Status == WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && x.IsLocked), ct),
-            "LOCKED_SESSION_CONFLICT", "Sự kiện trùng với phiên đã khóa hoặc đang chạy.", 409);
-        var item = id is { } eventId ? await Find<FixedEvent>(uid, eventId, ct) : new FixedEvent { UserId = uid };
-        Require(input.EventType is "MEETING" or "CLASS" or "APPOINTMENT" or "OTHER" && input.Description.Length <= 1000, "VALIDATION_ERROR", "Loại hoặc mô tả sự kiện không hợp lệ.");
-        item.Name = input.Name.Trim(); item.Start = input.Start; item.End = input.End; item.Description = input.Description; item.EventType = input.EventType;
-        if (id is null) db.FixedEvents.Add(item); return item.Id;
+        Require(id is null || input.RepeatWeeks == 1, "VALIDATION_ERROR", "Khi sửa sự kiện, chỉ cập nhật lần xuất hiện đang chọn.");
+        var state = await State(uid, ct); var occurrences = EventOccurrences(uid, input, state.Preference);
+        ValidateEventConflicts(state, occurrences, id);
+        if (id is { } eventId)
+        {
+            var item = await Find<FixedEvent>(uid, eventId, ct); var occurrence = occurrences[0];
+            item.Name = occurrence.Name; item.Start = occurrence.Start; item.End = occurrence.End; item.Description = occurrence.Description; item.EventType = occurrence.EventType;
+            return item.Id;
+        }
+        db.FixedEvents.AddRange(occurrences); return occurrences[0].Id;
     }, ct);
+    private static FixedEvent[] EventOccurrences(Guid uid, EventInput input, WorkPreference preference)
+    {
+        Require(!string.IsNullOrWhiteSpace(input.Name) && input.Name.Length <= 200 && input.Start < input.End && (input.End - input.Start).TotalDays <= 31 &&
+            input.RepeatWeeks is >= 1 and <= 12 && input.Description is not null && input.Description.Length <= 1000 &&
+            input.EventType is "MEETING" or "CLASS" or "APPOINTMENT" or "OTHER", "VALIDATION_ERROR", "Sự kiện hoặc số tuần lặp không hợp lệ.");
+        var zone = PlanningEngine.Zone(preference.TimeZoneId);
+        var start = TimeZoneInfo.ConvertTime(input.Start, zone).DateTime; var end = TimeZoneInfo.ConvertTime(input.End, zone).DateTime;
+        return Enumerable.Range(0, input.RepeatWeeks).Select(index =>
+        {
+            var from = start.AddDays(index * 7); var to = end.AddDays(index * 7);
+            Require(index == 0 || !zone.IsInvalidTime(from) && !zone.IsInvalidTime(to) && !zone.IsAmbiguousTime(from) && !zone.IsAmbiguousTime(to),
+                "INVALID_TIME_WINDOW", "Một lần lặp rơi vào giờ chuyển múi giờ không rõ ràng; hãy nhập riêng lần đó.");
+            return new FixedEvent { UserId = uid, Name = input.Name.Trim(), Description = input.Description, EventType = input.EventType,
+                Start = index == 0 ? input.Start : new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(from, zone)),
+                End = index == 0 ? input.End : new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(to, zone)) };
+        }).ToArray();
+    }
+    private void ValidateEventConflicts(PlanningState state, FixedEvent[] events, Guid? excludeId)
+    {
+        foreach (var item in events)
+        {
+            Require(!state.Events.Concat(events.Where(x => x.Id != item.Id)).Any(x => x.Id != excludeId && x.Start < item.End && item.Start < x.End),
+                "FIXED_EVENT_OVERLAP", "Sự kiện trùng với một sự kiện cố định khác. Hãy chọn cách xử lý xung đột.", 409);
+            Require(!state.Sessions.Any(x => x.Start < item.End && item.Start < x.End &&
+                (x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && (x.IsLocked || x.Start < Now))),
+                "LOCKED_SESSION_CONFLICT", "Sự kiện trùng với phiên đã khóa hoặc đang thực hiện.", 409);
+        }
+    }
     public Task DeleteEventAsync(Guid uid, Guid id, CancellationToken ct) => Mutate(uid, async () => db.FixedEvents.Remove(await Find<FixedEvent>(uid, id, ct)), ct);
     public Task SetPreferenceAsync(Guid uid, PreferenceInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
@@ -55,12 +84,19 @@ public sealed partial class WorkspaceService
         preference.MaximumSessionMinutes = input.MaximumSessionMinutes; preference.BreakMinutes = input.BreakMinutes;
         preference.PreferredStartMinute = input.PreferredStartMinute; preference.PreferredEndMinute = input.PreferredEndMinute;
         Require(input.PlanningHorizonDays is >= 1 and <= 30 && input.PreferredPeriod is "MORNING" or "AFTERNOON" or "EVENING" or "NONE", "VALIDATION_ERROR", "Tùy chọn kế hoạch không hợp lệ.");
+        Require(input.MaximumDailyMinutes is >= 5 and <= 1440, "VALIDATION_ERROR", "Giới hạn mỗi ngày phải từ 5 đến 1440 phút.");
+        preference.MaximumDailyMinutes = input.MaximumDailyMinutes; preference.AutoReschedule = input.AutoReschedule;
         preference.PlanningHorizonDays = input.PlanningHorizonDays; preference.PreferredPeriod = input.PreferredPeriod;
         var profile = await EnsureProfileAsync(uid, ct); profile.TimeZoneId = input.TimeZoneId; profile.UpdatedAt = Now;
         ValidateProtectedSessions(await State(uid, ct));
     }, ct);
     private void ValidateProtectedSessions(PlanningState state)
     {
+        foreach (var active in state.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused ||
+            x.Status == WorkSessionStatus.Scheduled && x.End > Now && x.Start < Now))
+            Require(!state.Events.Any(x => x.Start < active.End && active.Start < x.End) &&
+                engine.FreeSlots(state, active.Start, active.End).Any(x => x.Start <= active.Start && x.End >= active.End),
+                "LOCKED_SESSION_CONFLICT", "Thay đổi thời gian xung đột với phiên đang thực hiện hoặc đã bắt đầu.", 409);
         foreach (var session in state.Sessions.Where(x => x.Start >= Now && x.Status == WorkSessionStatus.Scheduled && x.IsLocked))
         {
             var free = engine.FreeSlots(state, session.Start, session.End);
@@ -69,5 +105,49 @@ public sealed partial class WorkspaceService
             Require((session.End - session.Start).TotalMinutes >= Math.Max(task.MinimumSessionMinutes, state.Preference.MinimumSessionMinutes) &&
                 (session.End - session.Start).TotalMinutes <= state.Preference.MaximumSessionMinutes, "LOCKED_SESSION_CONFLICT", "Giới hạn phiên mới xung đột với phiên đã khóa.", 409);
         }
+        var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
+        foreach (var group in state.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused or WorkSessionStatus.Completed ||
+            x.Status == WorkSessionStatus.Scheduled && x.IsLocked && x.End > Now)
+            .GroupBy(x => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(x.Start, zone).DateTime)))
+            Require(group.Sum(x => (x.End - x.Start).TotalMinutes) <= state.Preference.MaximumDailyMinutes ||
+                group.Key < DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Now, zone).DateTime),
+                "LOCKED_SESSION_CONFLICT", "Giới hạn mỗi ngày nhỏ hơn tổng thời gian đã thực hiện hoặc đã khóa.", 409);
+    }
+
+    private async Task RescheduleTimeConflictsAsync(Guid uid, CancellationToken ct)
+    {
+        var state = await State(uid, ct);
+        var affected = TimeConflictTaskIds(state);
+        if (affected.Length == 0) return;
+        if (!state.Preference.AutoReschedule)
+        {
+            await AddNotification(uid, "SCHEDULE_CHANGE", "Cần kiểm tra lại lịch", "Thời gian đã thay đổi. Có phiên cần xếp lại; chế độ tự điều chỉnh đang tắt.", "time:" + state.Preference.Revision, null, ct);
+            return;
+        }
+        Require(!state.Sessions.Any(x => affected.Contains(x.TaskId) && x.Status == WorkSessionStatus.Scheduled && x.Start >= Now.AddDays(30) &&
+            !engine.FreeSlots(state, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End)), "TIME_CHANGE_OUTSIDE_HORIZON", "Có phiên bị ảnh hưởng ngoài phạm vi 30 ngày. Hãy chỉnh phiên đó trước.", 409);
+        // Leave a short margin for validation/persistence; already-started work is protected.
+        Require(!state.Sessions.Any(x => x.Status == WorkSessionStatus.Scheduled && x.Start >= Now && x.Start < Now.AddMinutes(1) &&
+            !engine.FreeSlots(state, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End)),
+            "LOCKED_SESSION_CONFLICT", "Thay đổi trùng phiên sắp bắt đầu. Hãy xử lý phiên đó trước.", 409);
+        var plan = engine.Generate(state, new(Now.AddMinutes(1), 30, affected, true, "AVAILABILITY_CHANGED"), Now);
+        var proposal = await StoreAgentPlanAsync(uid, plan, state, "AVAILABILITY_CHANGED", ct);
+        plan = plan with { Id = proposal.Id };
+        await ApplyPlanCoreAsync(uid, proposal, plan, state, ct);
+    }
+
+    private Guid[] TimeConflictTaskIds(PlanningState state)
+    {
+        var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
+        var future = state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && !x.IsLocked && x.Start >= Now).ToArray();
+        var affected = future.Where(x => !engine.FreeSlots(state, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End) ||
+            (x.End - x.Start).TotalMinutes > state.Preference.MaximumSessionMinutes ||
+            (x.End - x.Start).TotalMinutes < Math.Max(state.Preference.MinimumSessionMinutes, state.Tasks.Single(t => t.Id == x.TaskId).MinimumSessionMinutes))
+            .Select(x => x.TaskId).ToHashSet();
+        foreach (var group in state.Sessions.Where(x => x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused or WorkSessionStatus.Completed && x.End > Now.AddDays(-1))
+            .GroupBy(x => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(x.Start, zone).DateTime)))
+            if (group.Sum(x => (x.End - x.Start).TotalMinutes) > state.Preference.MaximumDailyMinutes)
+                foreach (var session in group.Where(x => x.Status == WorkSessionStatus.Scheduled && !x.IsLocked && x.Start >= Now)) affected.Add(session.TaskId);
+        return affected.ToArray();
     }
 }

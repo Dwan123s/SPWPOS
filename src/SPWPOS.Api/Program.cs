@@ -7,6 +7,8 @@ using Microsoft.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Net;
+using System.IO.Compression;
+using Microsoft.AspNetCore.ResponseCompression;
 using SPWPOS.Api.Middleware;
 using SPWPOS.Application.Authentication;
 using SPWPOS.Infrastructure;
@@ -21,6 +23,14 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(o => o.InvalidMode
     return new BadRequestObjectResult(ApiProblems.Create(context.HttpContext, 400, "VALIDATION_ERROR", msg)) { ContentTypes = { "application/problem+json" } };
 });
 builder.Services.AddProblemDetails();
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<BrotliCompressionProvider>();
+    o.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddHttpsRedirection(o => o.HttpsPort = 7043);
 builder.Services.AddHsts(o => { o.MaxAge = TimeSpan.FromDays(365); o.IncludeSubDomains = true; });
@@ -101,6 +111,9 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("auth-ip", c => RateLimitPartition.GetSlidingWindowLimiter(
         $"{c.Connection.RemoteIpAddress}:{c.Request.Path}", _ => new SlidingWindowRateLimiterOptions
         { PermitLimit = c.Request.Path.Value?.Contains("request-otp", StringComparison.Ordinal) == true ? 5 : 20, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
+    o.AddPolicy("agent-voice", c => RateLimitPartition.GetSlidingWindowLimiter(
+        $"voice:{c.User.FindFirst("sub")?.Value ?? c.Connection.RemoteIpAddress?.ToString()}", _ => new SlidingWindowRateLimiterOptions
+        { PermitLimit = 24, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
     o.OnRejected = async (context, ct) =>
     {
         context.HttpContext.Response.Headers.RetryAfter = "60";
@@ -117,6 +130,58 @@ builder.Services.AddSwaggerGen(o =>
 });
 var app = builder.Build();
 var firebaseSettings = builder.Configuration.GetSection("Firebase").Get<FirebaseSettings>() ?? new();
+if (args.Contains("--check-schema", StringComparer.Ordinal))
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var pending = (await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.GetPendingMigrationsAsync(timeout.Token)).Count();
+        if (pending > 0) { Console.Error.WriteLine($"Database has {pending} pending migrations. Review the upgrade runbook before restarting."); Environment.ExitCode = 3; }
+        else Console.WriteLine("Database schema matches the current migration set. No database changes were made.");
+    }
+    catch (Exception exception)
+    {
+        Console.Error.WriteLine($"Schema check failed ({exception.GetType().Name}). No database changes were made.");
+        Environment.ExitCode = 1;
+    }
+    await app.DisposeAsync();
+    return;
+}
+if (args.Contains("--check-ai", StringComparer.Ordinal) || args.Contains("--check-ai-stream", StringComparer.Ordinal) || args.Contains("--check-ai-voice", StringComparer.Ordinal))
+{
+    try
+    {
+        using var checkScope = app.Services.CreateScope();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(75));
+        if (args.Contains("--check-ai-voice", StringComparer.Ordinal))
+        {
+            var fileIndex = Array.IndexOf(args, "--voice-file");
+            if (fileIndex < 0 || fileIndex + 1 >= args.Length) throw new InvalidOperationException("Voice test file is required.");
+            await SPWPOS.Infrastructure.Workspace.LiveAiCheck.RunVoiceAsync(
+                checkScope.ServiceProvider.GetRequiredService<SPWPOS.Application.Workspace.IAgentVoiceTranscriber>(), args[fileIndex + 1], timeout.Token);
+        }
+        else if (args.Contains("--check-ai-stream", StringComparer.Ordinal))
+            await SPWPOS.Infrastructure.Workspace.LiveAiCheck.RunStreamingAsync(
+                checkScope.ServiceProvider.GetRequiredService<SPWPOS.Application.Workspace.ITaskInterpreter>(),
+                checkScope.ServiceProvider.GetRequiredService<TimeProvider>(), timeout.Token);
+        else await SPWPOS.Infrastructure.Workspace.LiveAiCheck.RunAsync(
+            checkScope.ServiceProvider.GetRequiredService<SPWPOS.Application.Workspace.ITaskInterpreter>(),
+            checkScope.ServiceProvider.GetRequiredService<TimeProvider>(), timeout.Token);
+    }
+    catch (Exception exception)
+    {
+        // Never print provider bodies, API keys or credentials in diagnostics.
+        Console.Error.WriteLine(exception is SPWPOS.Application.Authentication.AuthException failure
+            ? $"LIVE AI check failed: {failure.Code}. {failure.Message}"
+            : $"LIVE AI check failed ({exception.GetType().Name}). Check AI configuration and connectivity.");
+        if (exception.Data["GoogleHttpStatus"] is int googleStatus && exception.Data["GoogleReason"] is string googleReason)
+            Console.Error.WriteLine($"LIVE AI provider detail: HTTP={googleStatus}; REASON={googleReason}.");
+        Environment.ExitCode = 1;
+    }
+    await app.DisposeAsync();
+    return;
+}
 if (args.Contains("--check-smtp", StringComparer.Ordinal))
 {
     try
@@ -147,8 +212,8 @@ app.Use(async (context, next) =>
     context.Response.Headers.XContentTypeOptions = "nosniff";
     context.Response.Headers.XFrameOptions = "DENY";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
-    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
-    context.Response.Headers.CacheControl = "no-store";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()";
+    context.Response.Headers.CacheControl = context.Request.Path.StartsWithSegments("/api") ? "no-store" : "no-cache";
     if (context.Request.Path.StartsWithSegments("/api"))
     {
         context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
@@ -177,12 +242,25 @@ app.Use(async (context, next) =>
 });
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseHttpsRedirection();
+// Compress public files only. Authenticated JSON and other private responses
+// retain their existing no-store behavior and are never compressed here.
+app.UseWhen(c => c.Request.Path.StartsWithSegments("/app") || c.Request.Path.StartsWithSegments("/assets") ||
+    c.Request.Path == "/" || c.Request.Path == "/index.html", branch => branch.UseResponseCompression());
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        if (context.Context.Request.Path.StartsWithSegments("/app/assets"))
+            context.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+        else if (context.Context.Request.Path.StartsWithSegments("/assets"))
+            context.Context.Response.Headers.CacheControl = "public,max-age=3600,must-revalidate";
+    }
+});
 app.UseRouting();
 app.UseCors("frontend");
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.MapControllers();

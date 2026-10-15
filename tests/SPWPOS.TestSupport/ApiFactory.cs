@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using SPWPOS.Infrastructure.Persistence;
 namespace SPWPOS.TestSupport;
 
@@ -31,7 +34,16 @@ public class ApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
-        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(TestInfrastructure.Configuration()));
+        builder.ConfigureLogging(logging => logging.ClearProviders());
+        builder.ConfigureTestServices(services => services.AddDataProtection().UseEphemeralDataProtectionProvider());
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            // Tests must never inherit workstation secrets, external providers or
+            // live JSON watchers. Configuration disposal races otherwise obscure
+            // the actual HTTP result when many hosts are started and stopped.
+            config.Sources.Clear();
+            config.AddInMemoryCollection(TestInfrastructure.Configuration());
+        });
         builder.ConfigureServices(services =>
         {
             if (sqlConnection is null) TestInfrastructure.ReplacePersistence(services, connection);
@@ -55,7 +67,7 @@ public class ApiFactory : WebApplicationFactory<Program>
     }
     public override async ValueTask DisposeAsync()
     {
-        DeleteTestDatabase(); await base.DisposeAsync(); await connection.DisposeAsync();
+        DeleteTestDatabase(); await base.DisposeAsync().ConfigureAwait(false); await connection.DisposeAsync().ConfigureAwait(false);
     }
     private void DeleteTestDatabase()
     {

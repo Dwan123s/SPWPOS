@@ -209,7 +209,7 @@ function ProductDemo() {
 const faqs = [
   [
     "Mình bắt đầu từ đâu?",
-    "Tạo tài khoản, xác minh email rồi làm theo hướng dẫn từng bước. Bạn nhập việc, chọn giờ rảnh, tạo lịch và bắt đầu phiên đầu tiên. Có thể bỏ qua tutorial và mở lại khi cần.",
+    "Tạo tài khoản, xác minh email rồi bắt đầu. Bạn nhập việc, chọn giờ rảnh, tạo lịch và bắt đầu phiên đầu tiên.",
   ],
   [
     "Ghi chú được gửi đến AI khi nào?",
@@ -426,10 +426,6 @@ export function GettingStarted({ signedIn = false, onLogin }) {
               </p>
             </div>
             <ProductDemo />
-            <p className="start-tutorial-note" data-start-reveal>
-              {icon("spark")} Người dùng mới có tutorial hướng dẫn từng thao
-              tác. Bạn có thể tiếp tục, bỏ qua hoặc mở lại khi cần.
-            </p>
           </section>
           <section
             id="start-faq"

@@ -1,4 +1,7 @@
 import { nodeList, lines } from "./react-ui.jsx";
+import { RoutePage } from "./route-pages.jsx";
+import { ConnectionState } from "./connection-state.jsx";
+import { Loading } from "./loading.jsx";
 import { setScreen, setSlot } from "./store.js";
 import {
   editAvailability,
@@ -31,7 +34,6 @@ import {
   minuteValue,
 } from "./ui.jsx";
 import { api, submit } from "./api.js";
-import { NotesPage } from "./notes.jsx";
 import { GettingStarted } from "./getting-started.jsx";
 import { completeGuideStep } from "./onboarding.js";
 import { validateNewPassword } from "./password-policy.js";
@@ -42,7 +44,6 @@ import {
   handleAuthSubmit,
 } from "./auth.jsx";
 import {
-  tasksPage,
   filterTasks,
   taskById,
   openTask,
@@ -53,26 +54,19 @@ import {
   breakdownModal,
 } from "./tasks.jsx";
 import {
-  calendarPage,
-  timePage,
   sessionById,
   sessionDetail,
   eventModal,
   exceptionModal,
   planModal,
 } from "./calendar.jsx";
-import {
-  todayPage,
-  insightsPage,
-  scenarioPage,
-  notificationsPage,
-  settingsPage,
-  categoryModal,
-  adminPage,
-  adminUsers,
-  adminStatus,
-} from "./pages.jsx";
+import { categoryModal, adminUsers, adminStatus } from "./page-actions.jsx";
 const routes = {
+  agent: [
+    "NORA · Trợ lý AI",
+    "Cùng NORA dành thời gian cho những điều quan trọng.",
+    "spark",
+  ],
   notes: [
     "Nhập việc",
     "Viết một ghi chú. Kiểm tra công việc và chọn lịch phù hợp với bạn.",
@@ -179,31 +173,29 @@ function render() {
   )
     state.route = "today";
   const [title, description] = routes[state.route];
-  const renderers = {
-    notes: () => <NotesPage onWorkspaceChanged={() => load(false)} />,
-    today: todayPage,
-    tasks: tasksPage,
-    calendar: calendarPage,
-    time: timePage,
-    insights: insightsPage,
-    scenario: scenarioPage,
-    notifications: notificationsPage,
-    settings: settingsPage,
-    admin: adminPage,
-  };
   setScreen(
-    workspaceShell(routes, title, description, renderers[state.route]()),
+    workspaceShell(
+      routes,
+      title,
+      description,
+      <RoutePage
+        key={state.route}
+        route={state.route}
+        onWorkspaceChanged={() =>
+          load(state.route !== "agent" && state.route !== "notes")
+        }
+        onReady={
+          state.route === "admin"
+            ? () => loadAdmin().catch((e) => toast(e.message, "error"))
+            : undefined
+        }
+      />,
+    ),
     state.route,
+    { group: "workspace" },
   );
   setMobileMenu(false);
   syncDecorations();
-  if (state.route === "scenario") {
-    const input = $('input[name="deadline"]');
-    if (input && !input.value)
-      input.value = localInput(Date.now() + 7 * 86400000);
-  }
-  if (state.route === "admin")
-    loadAdmin().catch((e) => toast(e.message, "error"));
 }
 async function loadAdmin(search = "") {
   const [users, status, jobs] = await Promise.all([
@@ -313,6 +305,19 @@ function planOptions(affected = []) {
           'required min="1" max="30"',
         )}
       </div>
+      <label>
+        <input name="useCapacityFactor" type="checkbox" defaultChecked /> Chừa
+        thời gian dự phòng theo khả năng thực hiện
+      </label>
+      <label>
+        <input name="useEstimateBias" type="checkbox" defaultChecked /> Dùng
+        thời lượng đã cá nhân hóa
+      </label>
+      <p className="reason">
+        Bỏ hai lựa chọn để giữ thời lượng đã nhập và dùng toàn bộ giờ rảnh như
+        chế độ mặc định của NORA. Các giới hạn ngày, phiên, giờ nghỉ và deadline
+        vẫn được giữ.
+      </p>
       <p className="reason spaced">
         {affected.length
           ? "Giữ nguyên phiên không bị ảnh hưởng, phiên đã khóa và lịch sử thực hiện."
@@ -481,7 +486,7 @@ async function action(name, id, element) {
         state.breakdown = result;
         modal(
           "Gợi ý chia nhỏ",
-          `Nguồn: ${["OpenAI", "Gemini"].includes(result.source) ? result.source : "quy tắc (AI chưa khả dụng)"}`,
+          `Nguồn: ${["OpenAI", "Gemini", "VertexAI"].includes(result.source) ? result.source : "quy tắc (AI chưa khả dụng)"}`,
           <form data-form="breakdown" data-id={id}>
             {nodeList(
               result.subtasks.map((s, n) => (
@@ -827,7 +832,7 @@ async function formAction(form, data, nextAction = null) {
       });
       modal(
         "Kiểm tra công việc gợi ý",
-        `Nguồn: ${["OpenAI", "Gemini"].includes(result.source) ? result.source : "quy tắc tiếng Việt/Anh"}`,
+        `Nguồn: ${["OpenAI", "Gemini", "VertexAI"].includes(result.source) ? result.source : "quy tắc tiếng Việt/Anh"}`,
         <>
           <div className="info section-gap">{lines(result.notes)}</div>
           {taskForm(result.task)}
@@ -894,6 +899,8 @@ async function formAction(form, data, nextAction = null) {
         preferredEndMinute: minuteValue(String(data.get("preferredEnd"))),
         planningHorizonDays: Number(data.get("planningHorizonDays")),
         preferredPeriod: String(data.get("preferredPeriod")),
+        maximumDailyMinutes: Number(data.get("maximumDailyMinutes")),
+        autoReschedule: data.get("autoReschedule") === "true",
       });
       await refreshAfter();
       break;
@@ -918,6 +925,7 @@ async function formAction(form, data, nextAction = null) {
         end: toUtc(String(data.get("end"))),
         description: String(data.get("description") || ""),
         eventType: String(data.get("eventType") || "OTHER"),
+        repeatWeeks: Number(data.get("repeatWeeks") || 1),
       });
       await refreshAfter();
       break;
@@ -929,6 +937,8 @@ async function formAction(form, data, nextAction = null) {
           {
             start: toUtc(String(data.get("start"))),
             horizonDays: Number(data.get("horizonDays")),
+            useCapacityFactor: data.get("useCapacityFactor") === "on",
+            useEstimateBias: data.get("useEstimateBias") === "on",
             affectedTaskIds: state.affected?.length ? state.affected : null,
           },
         ),
@@ -1089,11 +1099,14 @@ export function onChange(event) {
     filterTasks();
 }
 export function startController() {
+  let disposed = false,
+    connecting = false;
   const entryLogin = () => {
     history.pushState(null, "", "#login");
     renderAuth("login");
   };
   const publicPage = () => {
+    if (disposed) return;
     const route = location.hash.slice(1);
     if (
       ["login", "register", "forgot", "verify", "forgotOtp", "reset"].includes(
@@ -1102,6 +1115,24 @@ export function startController() {
     )
       renderAuth(route);
     else setScreen(<GettingStarted onLogin={entryLogin} />, "getting-started");
+  };
+  const connect = async () => {
+    if (connecting || disposed) return;
+    connecting = true;
+    setScreen(<Loading fullscreen />, "loading");
+    try {
+      await loggedIn();
+    } catch (error) {
+      if (disposed) return;
+      if (error.status === 401) publicPage();
+      else
+        setScreen(
+          <ConnectionState onRetry={connect} onLogin={entryLogin} />,
+          "connection-error",
+        );
+    } finally {
+      connecting = false;
+    }
   };
   const hash = () => {
     if (state.workspace) render();
@@ -1123,6 +1154,7 @@ export function startController() {
         "admin",
         "tasks",
         "notes",
+        "agent",
         "getting-started",
       ].includes(state.route)
     )
@@ -1130,8 +1162,9 @@ export function startController() {
         if (state.workspace) toast(e.message, "error");
       });
   }, 30000);
-  loggedIn().catch(publicPage);
+  void connect();
   return () => {
+    disposed = true;
     clearInterval(poll);
     window.removeEventListener("hashchange", hash);
     window.removeEventListener("session-expired", expiry);

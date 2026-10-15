@@ -17,6 +17,11 @@ import {
 import { setupShell } from "./shell.jsx";
 import { Loading } from "./loading.jsx";
 import { revealModal } from "./workspace-motion.jsx";
+import { prefetchPage } from "./route-pages.jsx";
+function prefetchNavigation(event) {
+  const link = event.target.closest?.('[data-action="nav"][data-id]');
+  if (link) prefetchPage(link.dataset.id);
+}
 export function App({ initialize = true }) {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot),
     dialog = useRef(null);
@@ -44,15 +49,18 @@ export function App({ initialize = true }) {
       onSubmit={onSubmit}
       onInput={onInput}
       onChange={onChange}
+      onPointerOver={prefetchNavigation}
+      onFocusCapture={prefetchNavigation}
       className="min-h-dvh text-slate-900 antialiased"
     >
       <Fragment
         key={
-          snapshot.screenKey.startsWith("auth-")
+          snapshot.screenGroup ||
+          (snapshot.screenKey.startsWith("auth-")
             ? "auth"
             : snapshot.screenKey.startsWith("notifications-")
               ? "notifications"
-              : snapshot.screenKey
+              : snapshot.screenKey)
         }
       >
         {snapshot.screen || <Loading fullscreen />}

@@ -51,6 +51,8 @@ export function WorkspaceAtmosphere() {
           height="1000"
           alt=""
           decoding="async"
+          loading="lazy"
+          fetchPriority="low"
         />
       </picture>
       <picture className="workspace-bubble-art workspace-bubble-art--one">
@@ -61,6 +63,8 @@ export function WorkspaceAtmosphere() {
           height="1000"
           alt=""
           decoding="async"
+          loading="lazy"
+          fetchPriority="low"
         />
       </picture>
       <picture className="workspace-bubble-art workspace-bubble-art--two">
@@ -71,6 +75,8 @@ export function WorkspaceAtmosphere() {
           height="1000"
           alt=""
           decoding="async"
+          loading="lazy"
+          fetchPriority="low"
         />
       </picture>
     </div>
@@ -142,6 +148,9 @@ export function WorkspaceMotionControl() {
       surfaces.forEach((element, index) => {
         if (seen.has(element)) return;
         seen.add(element);
+        // Route content already has one coordinated transition. Animating
+        // every nested card again makes navigation linger and flicker.
+        if (element.closest(".page-scene")) return;
         const editing =
           root.contains(document.activeElement) &&
           document.activeElement.matches(

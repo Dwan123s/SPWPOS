@@ -6,7 +6,7 @@ public sealed record PlanningState(WorkTask[] Tasks, TaskDependency[] Dependenci
     AvailabilityException[] Exceptions, FixedEvent[] Events, WorkSession[] Sessions, WorkPreference Preference, EstimationObservation[]? Observations = null);
 
 // Pure deterministic planner: no EF, HTTP, secrets, AI, or wall-clock dependencies.
-public sealed class PlanningEngine
+public sealed partial class PlanningEngine
 {
     public const int MinimumBiasSamples = 3;
     public const double ColdCapacityFactor = .8;
@@ -117,30 +117,22 @@ public sealed class PlanningEngine
     public PlanView Generate(PlanningState state, PlanInput input, DateTimeOffset now)
     {
         var start = input.Start < now ? now : input.Start; var end = start.AddDays(input.HorizonDays);
-        var bias = Biases(state); var factor = Capacity(state, now).Factor;
-        var affected = input.AffectedTaskIds?.ToHashSet();
-        if (affected is not null)
-        {
-            bool changed;
-            do { changed = false; foreach (var dep in state.Dependencies) if (affected.Contains(dep.PredecessorId)) changed |= affected.Add(dep.TaskId); } while (changed);
-        }
+        var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
+        var factor = input.UseCapacityFactor ? Capacity(state, now).Factor : 1;
+        var affected = input.AffectedTaskIds is null ? null : AffectedClosure(state, input.AffectedTaskIds);
         var preserve = state.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused ||
             x.Status == WorkSessionStatus.Scheduled && x.End > now && (x.Start < start || x.Start >= end || x.IsLocked || affected is not null && !affected.Contains(x.TaskId))).ToArray();
         var schedule = preserve.Where(x => x.End > start && x.Start < end).Select(x => new ProposedSession(x.Id, x.TaskId, x.Start, x.End, "PRESERVED_SESSION", true)).ToList();
         TimeSlot Block(DateTimeOffset from, DateTimeOffset to) => new(from.AddMinutes(-state.Preference.BreakMinutes), to.AddMinutes(state.Preference.BreakMinutes));
-        var free = FreeSlots(state, start, end, preserve.Select(x => Block(x.Start, x.End)));
+        var completedBlocks = state.Sessions.Where(x => x.Status == WorkSessionStatus.Completed).Select(x => Block(x.Start, x.End)).ToArray();
+        var free = FreeSlots(state, start, end, preserve.Select(x => Block(x.Start, x.End)).Concat(completedBlocks));
         var zone = Zone(state.Preference.TimeZoneId);
         DateOnly Day(DateTimeOffset date) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(date, zone).DateTime);
-        var originalFree = FreeSlots(state, start, end);
-        var budgets = originalFree.GroupBy(x => Day(x.Start)).ToDictionary(x => x.Key, x => (int)Math.Floor(x.Sum(s => (s.End - s.Start).TotalMinutes) * factor));
-        foreach (var session in schedule) if (budgets.ContainsKey(Day(session.Start))) budgets[Day(session.Start)] -= (int)(session.End - session.Start).TotalMinutes;
+        var budgets = CapacityDays(state, start, end, now, input.UseCapacityFactor, preserve)
+            .ToDictionary(x => x.Date, x => x.SchedulableMinutes);
         var tasks = state.Tasks.Where(x => Remaining(x, bias) > 0 && !state.Tasks.Any(child => child.ParentId == x.Id && !child.IsDeleted) && (affected is null || affected.Contains(x.Id))).ToDictionary(x => x.Id);
-        var done = state.Tasks.Where(x => x.Status == WorkTaskStatus.Completed).ToDictionary(x => x.Id, _ => start);
-        foreach (var group in preserve.GroupBy(x => x.TaskId))
-        {
-            var task = state.Tasks.FirstOrDefault(x => x.Id == group.Key);
-            if (task is not null && group.Sum(x => (x.End - x.Start).TotalMinutes) >= Remaining(task, bias)) done[group.Key] = group.Max(x => x.End);
-        }
+        var preservedSessions = preserve.Select(x => new ProposedSession(x.Id, x.TaskId, x.Start, x.End, x.ReasonCode, true)).ToArray();
+        var done = CompletionTimes(state, preservedSessions, bias, start);
         var warnings = new List<PlanWarning>();
         while (tasks.Count > 0)
         {
@@ -205,33 +197,43 @@ public sealed class PlanningEngine
                 warnings.Add(new(task.Id, task.Name, task.Deadline <= start ? "DEADLINE_PASSED" : "INSUFFICIENT_CAPACITY",
                     "Không đủ thời gian phù hợp trước hạn chót; phần còn lại chưa được xếp lịch.", remaining));
             }
-            else done[task.Id] = tentative.Select(x => x.End).Concat(preserve.Where(x => x.TaskId == task.Id).Select(x => x.End)).DefaultIfEmpty(start).Max();
             schedule.AddRange(tentative); budgets = trialBudgets;
+            done = CompletionTimes(state, preservedSessions.Concat(schedule.Where(x => !x.Preserved)), bias, start);
             var allBlocks = preserve.Select(x => Block(x.Start, x.End)).Concat(schedule.Where(x => !x.Preserved).Select(x => Block(x.Start, x.End)));
-            free = FreeSlots(state, start, end, allBlocks);
+            free = FreeSlots(state, start, end, allBlocks.Concat(completedBlocks));
         }
         return new(Guid.Empty, state.Preference.Revision, start, end, schedule.OrderBy(x => x.Start).ToArray(), warnings.ToArray(),
-            ["Sắp xếp theo deadline, ưu tiên và thứ tự phụ thuộc.", $"Khả năng sử dụng thời gian: {factor:P0}; dữ liệu ước lượng chỉ cá nhân hóa từ {MinimumBiasSamples} mẫu.", "Giữ phiên đã khóa/đang thực hiện; không vượt deadline cứng. Phiên sau deadline mềm luôn có cảnh báo."], false);
+            ["Sắp xếp theo deadline, ưu tiên và thứ tự phụ thuộc.", $"Khả năng sử dụng thời gian: {factor:P0}; " + (input.UseEstimateBias ? $"dữ liệu ước lượng chỉ cá nhân hóa từ {MinimumBiasSamples} mẫu." : "dùng thời lượng công việc đã xác định trong yêu cầu."), "Giữ phiên đã khóa/đang thực hiện; không vượt deadline cứng. Phiên sau deadline mềm luôn có cảnh báo."], false, UseEstimateBias: input.UseEstimateBias);
     }
     public IntelligenceView Analyze(PlanningState state, PlanInput input, DateTimeOffset now)
     {
-        var start = input.Start < now ? now : input.Start; var end = start.AddDays(input.HorizonDays); var bias = Biases(state);
+        var start = input.Start < now ? now : input.Start; var end = start.AddDays(input.HorizonDays);
+        var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         var capacity = Capacity(state, now); var free = FreeSlots(state, start, end);
-        var freeMinutes = (int)free.Sum(x => (x.End - x.Start).TotalMinutes); var usable = (int)(freeMinutes * capacity.Factor);
+        var freeMinutes = (int)free.Sum(x => (x.End - x.Start).TotalMinutes);
+        var days = CapacityDays(state, start, end, now, input.UseCapacityFactor);
+        var usable = days.Sum(x => x.EffectiveCapacityMinutes);
+        var feasibility = Generate(state, input with { Start = start }, now);
         var tasks = state.Tasks.Where(x => !x.IsDeleted && Remaining(x, bias) > 0 && !state.Tasks.Any(child => child.ParentId == x.Id && !child.IsDeleted)).ToArray();
         var remaining = tasks.Sum(x => Remaining(x, bias));
         var horizonDemand = tasks.Where(x => x.Deadline <= end).Sum(x => Remaining(x, bias));
         var ratio = usable == 0 ? horizonDemand == 0 ? 0 : 99 : horizonDemand / (double)usable;
         var risks = tasks.Select(task =>
         {
-            var minutes = Remaining(task, bias); var beforeDeadline = free.Sum(s => Math.Max(0, ((s.End < task.Deadline ? s.End : task.Deadline) - s.Start).TotalMinutes)) * capacity.Factor;
+            var minutes = Remaining(task, bias);
+            var beforeDeadline = task.Deadline > start
+                ? CapacityDays(state, start, task.Deadline < end ? task.Deadline : end, now, input.UseCapacityFactor).Sum(x => x.EffectiveCapacityMinutes) : 0;
             var demand = tasks.Where(x => x.Deadline <= task.Deadline).Sum(x => Remaining(x, bias));
             var reasons = new List<string>(); int score = 0;
             if (task.Deadline <= now) { score += 70; reasons.Add("DEADLINE_PASSED"); }
             if (task.Deadline > end) reasons.Add("DEADLINE_OUTSIDE_HORIZON");
-            else if (beforeDeadline < demand) { score += 55; reasons.Add("DEADLINE_CAPACITY_DEFICIT"); }
+            else if (beforeDeadline < demand || feasibility.Warnings.Any(x => x.TaskId == task.Id && x.UnscheduledMinutes > 0 && x.Code != "DEPENDENCY_UNSCHEDULED"))
+            { score += 55; reasons.Add("DEADLINE_CAPACITY_DEFICIT"); }
             if ((task.Deadline - now).TotalHours <= 48) { score += 15; reasons.Add("DEADLINE_WITHIN_48_HOURS"); }
-            if (state.Dependencies.Where(x => x.TaskId == task.Id).Any(d => state.Tasks.Any(t => t.Id == d.PredecessorId && t.Status != WorkTaskStatus.Completed))) { score += 20; reasons.Add("UNFINISHED_DEPENDENCY"); }
+            if (feasibility.Warnings.Any(x => x.TaskId == task.Id && x.Code == "DEPENDENCY_UNSCHEDULED"))
+            { score += 55; reasons.Add("UNFINISHED_DEPENDENCY"); }
+            else if (state.Dependencies.Where(x => x.TaskId == task.Id).Any(d => state.Tasks.Any(t => t.Id == d.PredecessorId && t.Status != WorkTaskStatus.Completed)))
+            { score += 20; reasons.Add("UNFINISHED_DEPENDENCY"); }
             if (task.Deadline <= end && !task.Splittable && !free.Any(s =>
                 ((task.IsHardDeadline && task.Deadline < s.End ? task.Deadline : s.End) - s.Start).TotalMinutes >= minutes))
             { score += 30; reasons.Add("NO_CONTIGUOUS_SLOT"); }
@@ -243,6 +245,7 @@ public sealed class PlanningEngine
         if (tasks.Count(x => (x.Deadline - now).TotalHours <= 48) >= 3) explanations.Add("DEADLINE_CLUSTER");
         return new(remaining, freeMinutes, usable, Math.Round(capacity.Factor, 3), capacity.Samples, Math.Round(ratio, 2),
             ratio > 1 ? "Overload" : risks.Any(x => x.Level == "High") || ratio > .85 ? "High" : ratio > .6 ? "Moderate" : "Low",
-            explanations.ToArray(), bias, risks, (int)state.Sessions.Where(x => x.Status == WorkSessionStatus.Completed).Sum(x => (x.End - x.Start).TotalMinutes), (int)(state.Sessions.Sum(x => x.ActualSeconds) / 60), horizonDemand);
+            explanations.ToArray(), bias, risks, (int)state.Sessions.Where(x => x.Status == WorkSessionStatus.Completed).Sum(x => (x.End - x.Start).TotalMinutes), (int)(state.Sessions.Sum(x => x.ActualSeconds) / 60), horizonDemand,
+            days, start, end);
     }
 }

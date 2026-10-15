@@ -33,6 +33,7 @@ public sealed partial class WorkspaceService
         ValidPlan(input); var state = await State(uid, ct); var start = input.Start < Now ? Now : input.Start;
         var sessions = state.Sessions.Where(x => x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).ToArray();
         var warnings = new List<PlanWarning>(); var biases = engine.Biases(state);
+        var completion = engine.CompletionTimes(state, Occupied(state), biases, Now);
         foreach (var session in sessions.Where(x => x.End > start && x.Start < start.AddDays(input.HorizonDays)))
         {
             var task = state.Tasks.FirstOrDefault(x => x.Id == session.TaskId); if (task is null) continue;
@@ -43,9 +44,7 @@ public sealed partial class WorkspaceService
             if (sessions.Any(x => x.Id != session.Id && x.Start < session.End && session.Start < x.End)) Warn("SESSION_OVERLAP", "Hai phiên làm việc đang trùng giờ.");
             foreach (var edge in state.Dependencies.Where(x => x.TaskId == task.Id))
             {
-                var predecessor = state.Tasks.FirstOrDefault(x => x.Id == edge.PredecessorId);
-                if (predecessor?.Status == WorkTaskStatus.Completed) continue;
-                if (predecessor is null || sessions.Where(x => x.TaskId == edge.PredecessorId && x.End <= session.Start).Sum(x => (x.End - x.Start).TotalMinutes) < engine.Remaining(predecessor, biases))
+                if (!completion.TryGetValue(edge.PredecessorId, out var finished) || finished > session.Start)
                     Warn("DEPENDENCY_CONFLICT", "Công việc tiền nhiệm chưa có đủ thời gian trước phiên này.");
             }
         }
@@ -57,6 +56,11 @@ public sealed partial class WorkspaceService
         Require(!proposal.IsApplied && proposal.Status == "PROPOSED" && proposal.ExpiresAt > Now, "PLAN_EXPIRED", "Kế hoạch đã dùng hoặc hết hạn. Hãy tạo lại.", 409);
         Require(proposal.Revision == state.Preference.Revision, "PLAN_STALE", "Dữ liệu đã thay đổi. Hãy tạo lại kế hoạch.", 409);
         var plan = JsonSerializer.Deserialize<PlanView>(proposal.PayloadJson)!;
+        await ApplyPlanCoreAsync(uid, proposal, plan, state, ct);
+    }, ct);
+    private async Task ApplyPlanCoreAsync(Guid uid, PlanProposal proposal, PlanView plan, PlanningState state, CancellationToken ct)
+    {
+        var id = proposal.Id;
         var retained = plan.Sessions.Where(x => x.Preserved).Select(x => x.Id).ToHashSet();
         // Sessions outside the bounded proposal horizon remain untouched.
         var replacements = await Mine<WorkSession>(uid).Where(x => x.Status == WorkSessionStatus.Scheduled && x.Start >= plan.Start && x.Start < plan.End).ToArrayAsync(ct);
@@ -65,7 +69,7 @@ public sealed partial class WorkspaceService
             .Select(x => new ProposedSession(x.Id, x.TaskId, x.Start, x.End, x.ReasonCode, true)).ToList();
         foreach (var session in plan.Sessions.Where(x => !x.Preserved).OrderBy(x => x.Start))
         {
-            ValidateSession(state, session.TaskId, session.Start, session.End, occupied, Guid.Empty, false);
+            ValidateSession(state, session.TaskId, session.Start, session.End, occupied, Guid.Empty, false, plan.UseEstimateBias);
             var decision = await Mine<PlanItem>(uid).SingleOrDefaultAsync(x => x.PlanId == id && x.Id == session.Id, ct);
             var item = new WorkSession { Id = session.Id, UserId = uid, TaskId = session.TaskId, Start = session.Start, End = session.End, ReasonCode = session.ReasonCode,
                 SourceItemId = decision?.Id, CreatedAt = Now, UpdatedAt = Now };
@@ -75,9 +79,9 @@ public sealed partial class WorkspaceService
         proposal.Status = "APPLIED"; proposal.AppliedAt = Now;
         foreach (var previous in await Mine<PlanProposal>(uid).Where(x => x.Id != id && x.Status == "APPLIED").ToArrayAsync(ct)) previous.Status = "SUPERSEDED";
         await AddNotification(uid, "SCHEDULE_CHANGE", "Kế hoạch đã cập nhật", $"Đã áp dụng {plan.Sessions.Count(x => !x.Preserved)} phiên mới. {plan.Warnings.Length} công việc có cảnh báo.", "plan:" + id, null, ct, planId: id);
-    }, ct);
+    }
     private void ValidateSession(PlanningState state, Guid taskId, DateTimeOffset start, DateTimeOffset end,
-        IEnumerable<ProposedSession> occupied, Guid excludeId, bool dependenciesMustBeCompleted)
+        IEnumerable<ProposedSession> occupied, Guid excludeId, bool dependenciesMustBeCompleted, bool useEstimateBias = true)
     {
         var task = state.Tasks.SingleOrDefault(x => x.Id == taskId);
         Require(task is not null && !task.IsDeleted && task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled, "INVALID_TASK", "Công việc không thể xếp lịch.");
@@ -90,14 +94,24 @@ public sealed partial class WorkspaceService
         Require(!others.Any(x => x.Start < end && start < x.End), "SESSION_OVERLAP", "Phiên làm việc trùng lịch.", 409);
         Require(!others.Any(x => x.Start < end.AddMinutes(state.Preference.BreakMinutes) && start.AddMinutes(-state.Preference.BreakMinutes) < x.End),
             "SESSION_BREAK_CONFLICT", "Cần giữ thời gian nghỉ giữa các phiên làm việc.", 409);
-        var bias = engine.Biases(state);
+        var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
+        var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start, zone).DateTime);
+        double MinutesOnDay(DateTimeOffset from, DateTimeOffset to)
+        {
+            var first = PlanningEngine.At(day, 0, zone); var last = PlanningEngine.At(day.AddDays(1), 0, zone);
+            var a = from > first ? from : first; var b = to < last ? to : last;
+            return b > a ? (b - a).TotalMinutes : 0;
+        }
+        var elapsed = state.Sessions.Where(x => x.Status == WorkSessionStatus.Completed).Sum(x => MinutesOnDay(x.Start, x.End));
+        Require(elapsed + others.Sum(x => MinutesOnDay(x.Start, x.End)) + duration <= state.Preference.MaximumDailyMinutes,
+            "DAILY_LIMIT", "Tổng thời gian làm việc vượt giới hạn mỗi ngày.", 409);
+        var bias = useEstimateBias ? engine.Biases(state) : [new BiasView("All", 0, 1, false)];
+        var completion = engine.CompletionTimes(state, others, bias, Now);
         foreach (var edge in state.Dependencies.Where(x => x.TaskId == taskId))
         {
-            var predecessor = state.Tasks.SingleOrDefault(x => x.Id == edge.PredecessorId);
-            if (predecessor?.Status == WorkTaskStatus.Completed) continue;
-            var predecessorSessions = others.Where(x => x.TaskId == edge.PredecessorId).ToArray();
-            Require(!dependenciesMustBeCompleted && predecessor is not null && predecessorSessions.Sum(x => (x.End - x.Start).TotalMinutes) >= engine.Remaining(predecessor, bias)
-                && predecessorSessions.All(x => x.End <= start), "DEPENDENCY_CONFLICT", "Công việc tiền nhiệm chưa thể hoàn thành trước phiên này.", 409);
+            var actualCompletion = dependenciesMustBeCompleted ? engine.CompletionTimes(state, [], bias, Now) : completion;
+            Require(actualCompletion.TryGetValue(edge.PredecessorId, out var finished) && finished <= start,
+                "DEPENDENCY_CONFLICT", "Công việc tiền nhiệm chưa thể hoàn thành trước phiên này.", 409);
         }
         foreach (var edge in state.Dependencies.Where(x => x.PredecessorId == taskId))
             Require(!others.Any(x => x.TaskId == edge.TaskId && x.Start < end), "DEPENDENCY_CONFLICT", "Phiên mới kết thúc sau lúc bắt đầu công việc phụ thuộc.", 409);

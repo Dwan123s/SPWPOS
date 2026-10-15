@@ -36,46 +36,7 @@ function ToolButton({
     </button>
   );
 }
-export function CapacityRibbon() {
-  const model = dashboardModel(state.workspace, state.insights);
-  const used = model.scheduledMinutes + model.focusMinutes + model.restMinutes;
-  const ceiling = Math.max(
-    used,
-    model.capacityMinutes || model.availableMinutes,
-    1,
-  );
-  return (
-    <section className="capacity-ribbon" aria-label="Phân bổ thời gian hôm nay">
-      <div className="capacity-ribbon-track">
-        {[
-          {
-            name: "Đã xếp lịch",
-            value: model.scheduledMinutes,
-            tone: "scheduled",
-          },
-          { name: "Tập trung", value: model.focusMinutes, tone: "focus" },
-          { name: "Đệm nghỉ", value: model.restMinutes, tone: "rest" },
-        ].map((segment) => (
-          <div
-            key={segment.tone}
-            className={`capacity-segment capacity-segment--${segment.tone}`}
-            style={{ flexGrow: Math.max(segment.value / ceiling, 0.14) }}
-            title={`${minutes(segment.value)} ${segment.name.toLowerCase()}`}
-          >
-            <strong>{minutes(segment.value)}</strong>
-            <span>{segment.name}</span>
-          </div>
-        ))}
-        <div
-          className={`capacity-ceiling ${model.capacityMinutes !== null && used > model.capacityMinutes ? "is-overloaded" : ""}`}
-        >
-          <strong>{minutes(model.capacityMinutes)}</strong>
-          <span>Khả năng hôm nay</span>
-        </div>
-      </div>
-    </section>
-  );
-}
+export { CapacityRibbon } from "./capacity-ribbon.jsx";
 function FocusCockpit({ model }) {
   const next = nextWorkflowStep(state.workspace);
   const focus = model.focus;
@@ -573,7 +534,7 @@ function Deadlines({ model }) {
     </section>
   );
 }
-export function todayPage() {
+export function todayPage({ onWorkspaceChanged } = {}) {
   const model = dashboardModel(state.workspace, state.insights);
   const insights = state.insights;
   const next = nextWorkflowStep(state.workspace);
@@ -715,7 +676,7 @@ export function todayPage() {
               action={readyToPlan ? "generate-plan" : next.action || "nav"}
               id={readyToPlan ? "" : next.route || ""}
               symbol={readyToPlan ? "calendar" : next.symbol}
-              text={readyToPlan ? "Xem lịch đề xuất" : next.label}
+              text={readyToPlan ? "Lịch đề xuất" : (next.title || next.label)}
             />
           </div>
           <FocusCockpit model={model} />

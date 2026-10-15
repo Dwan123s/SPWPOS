@@ -9,20 +9,17 @@
 @import "./login-scene.css" layer(components);
 @import "./password-checklist.css" layer(components);
 @import "./login-feedback.css" layer(components);
-@import "./notes.css" layer(components);
 @import "./loading.css" layer(components);
 @import "./workspace-experience.css" layer(components);
 @import "./google-signin.css" layer(components);
 @import "./sidebar.css" layer(components);
 @import "./planning-console.css" layer(components);
 @import "./workspace-login-theme.css" layer(components);
-@import "./tutorial.css" layer(components);
 @import "./daily-schedule.css" layer(components);
 @import "./getting-started.css" layer(components);
-@import "./note-studio.css" layer(components);
-@import "./note-notebook.css" layer(components);
 @import "./delete-actions.css" layer(components);
 @import "./notifications.css" layer(components);
+@import "./workspace-polish.css" layer(components);
 
 @theme {
   --color-planora-50: #effbff;

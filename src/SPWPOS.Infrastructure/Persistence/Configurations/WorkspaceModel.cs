@@ -13,6 +13,27 @@ public static class WorkspaceModel
     }
     public static void Configure(ModelBuilder b)
     {
+        var recoverySetting=Owned<RecoverySetting>(b);recoverySetting.HasIndex(x=>x.UserId).IsUnique();recoverySetting.Property(x=>x.Version).IsConcurrencyToken();
+        var recovery=Owned<RecoveryCase>(b);recovery.Property(x=>x.DedupeKey).HasMaxLength(64);recovery.Property(x=>x.Status).HasMaxLength(24);recovery.Property(x=>x.Message).HasMaxLength(1000);
+        recovery.HasIndex(x=>new{x.UserId,x.DedupeKey}).IsUnique();recovery.HasIndex(x=>new{x.UserId,x.CreatedAt});
+        recovery.HasOne<PlanProposal>().WithMany().HasForeignKey(x=>new{x.UserId,x.PlanId}).HasPrincipalKey(x=>new{x.UserId,x.Id}).OnDelete(DeleteBehavior.Restrict);
+        var usage=Owned<AiUsageRecord>(b);
+        usage.Property(x=>x.Operation).HasMaxLength(32);usage.Property(x=>x.Provider).HasMaxLength(32);
+        usage.Property(x=>x.Model).HasMaxLength(120);usage.Property(x=>x.ModelVersion).HasMaxLength(120);usage.Property(x=>x.Status).HasMaxLength(16);
+        usage.HasIndex(x=>new{x.UserId,x.ReservedAt});usage.HasIndex(x=>new{x.UserId,x.Status,x.LeaseUntil});
+        var turn = Owned<AgentTurn>(b);
+        turn.Property(x => x.InputFingerprint).HasMaxLength(64);
+        turn.Property(x => x.Text).HasMaxLength(2000);
+        turn.Property(x => x.Status).HasMaxLength(24);
+        turn.HasIndex(x => new { x.UserId, x.RequestId }).IsUnique();
+        turn.HasIndex(x => new { x.UserId, x.CreatedAt });
+        turn.HasIndex(x => new { x.UserId, x.ConversationId, x.CreatedAt, x.Id });
+        var conversation = b.Entity<AgentConversation>();
+        conversation.HasKey(x => new { x.UserId, x.Id });
+        conversation.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        conversation.Property(x => x.Title).HasMaxLength(120);
+        conversation.Property(x => x.Version).IsConcurrencyToken();
+        conversation.HasIndex(x => new { x.UserId, x.DeletedAt, x.ArchivedAt, x.UpdatedAt, x.Id });
         var note = Owned<PlanningNote>(b);
         note.Property(x => x.Title).HasMaxLength(120);
         note.Property(x => x.Content).HasMaxLength(8000);

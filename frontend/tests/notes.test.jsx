@@ -276,41 +276,45 @@ it("preserves saved and unsaved content when note deletion fails", async () => {
   await screen.findByText("Đã xóa ghi chú “Tuần này”.");
   expect(notes).toHaveLength(0);
 });
-it("saves a note, reviews selected tasks, and previews the schedule without applying it", async () => {
-  const refresh = vi.fn(async () => {}),
-    user = userEvent.setup();
-  render(<NotesPage onWorkspaceChanged={refresh} />);
-  expect(document.querySelector(".note-quick-options").open).toBe(false);
-  expect(
-    screen
-      .getByRole("button", { name: "Xem trước công việc" })
-      .classList.contains("primary"),
-  ).toBe(true);
-  await analyze(user);
-  expect(calls.some((c) => c.url === "/api/notes" && c.method === "POST")).toBe(
-    true,
-  );
-  expect(calls.some((c) => c.url.endsWith("/tasks"))).toBe(false);
-  const section = screen
-    .getByRole("heading", { name: "Xem trước công việc" })
-    .closest("section");
-  await user.click(within(section).getByLabelText("Việc 2"));
-  const name = within(section).getAllByLabelText("Tên công việc")[0];
-  await user.clear(name);
-  await user.type(name, "Báo cáo đã chỉnh");
-  await user.click(
-    screen.getByRole("button", { name: "Tạo công việc & xem lịch" }),
-  );
-  await waitFor(() => expect(planModal).toHaveBeenCalledOnce());
-  const submitted = calls.find((c) => c.url.endsWith("/tasks"));
-  expect(submitted.body.tasks).toHaveLength(1);
-  expect(submitted.body.tasks[0].name).toBe("Báo cáo đã chỉnh");
-  expect(refresh).toHaveBeenCalledOnce();
-  expect(
-    calls.find((c) => c.url === "/api/plans/reschedule").body.affectedTaskIds,
-  ).toEqual(["task-1"]);
-  expect(calls.some((c) => c.url.endsWith("/apply"))).toBe(false);
-});
+it.each(["Gemini", "VertexAI"])(
+  "saves a note, reviews %s tasks, and previews the schedule without applying it",
+  async (source) => {
+    aiSource = source;
+    const refresh = vi.fn(async () => {}),
+      user = userEvent.setup();
+    render(<NotesPage onWorkspaceChanged={refresh} />);
+    expect(document.querySelector(".note-quick-options").open).toBe(false);
+    expect(
+      screen
+        .getByRole("button", { name: "Xem trước công việc" })
+        .classList.contains("primary"),
+    ).toBe(true);
+    await analyze(user);
+    expect(
+      calls.some((c) => c.url === "/api/notes" && c.method === "POST"),
+    ).toBe(true);
+    expect(calls.some((c) => c.url.endsWith("/tasks"))).toBe(false);
+    const section = screen
+      .getByRole("heading", { name: "Xem trước công việc" })
+      .closest("section");
+    await user.click(within(section).getByLabelText("Việc 2"));
+    const name = within(section).getAllByLabelText("Tên công việc")[0];
+    await user.clear(name);
+    await user.type(name, "Báo cáo đã chỉnh");
+    await user.click(
+      screen.getByRole("button", { name: "Tạo công việc & xem lịch" }),
+    );
+    await waitFor(() => expect(planModal).toHaveBeenCalledOnce());
+    const submitted = calls.find((c) => c.url.endsWith("/tasks"));
+    expect(submitted.body.tasks).toHaveLength(1);
+    expect(submitted.body.tasks[0].name).toBe("Báo cáo đã chỉnh");
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(
+      calls.find((c) => c.url === "/api/plans/reschedule").body.affectedTaskIds,
+    ).toEqual(["task-1"]);
+    expect(calls.some((c) => c.url.endsWith("/apply"))).toBe(false);
+  },
+);
 it("keeps imported tasks after a planning failure and retries only the plan", async () => {
   const user = userEvent.setup();
   render(<NotesPage onWorkspaceChanged={vi.fn(async () => {})} />);

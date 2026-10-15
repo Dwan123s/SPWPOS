@@ -15,3 +15,5 @@ HTMLDialogElement.prototype.showModal = function () {
 HTMLDialogElement.prototype.close = function () {
   this.open = false;
 };
+// jsdom has no visual viewport. Navigation scrolling is verified separately.
+window.scrollTo = () => {};

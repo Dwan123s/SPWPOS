@@ -21,6 +21,7 @@ PLANORA kết hợp quản lý công việc, đề xuất lịch, theo dõi phi�
 
 - **Quản lý công việc:** nhóm công việc, task/subtask, phụ thuộc, ưu tiên, deadline và tiến độ.
 - **Ghi chú & agent:** lưu note, phân tích nhiều công việc, tự tạo và áp dụng lịch hoặc xem trước để chỉnh sửa.
+- **Trợ lý AI:** chat tiếng Việt để cập nhật giờ rảnh, cuộc họp và task; kiểm tra/xếp lịch, xem trước, tự áp dụng và hoàn tác thay đổi hợp lệ.
 - **Lập kế hoạch:** thiết lập giờ rảnh, sự kiện cố định và thời gian nghỉ; xem trước, áp dụng hoặc lập lại lịch.
 - **Theo dõi thực hiện:** bắt đầu, tạm dừng, tiếp tục và kết thúc phiên; ghi nhận thời gian thực tế.
 - **Phân tích workload:** so sánh estimate/actual, đánh giá năng lực, cảnh báo rủi ro deadline và mô phỏng kịch bản.
@@ -31,7 +32,7 @@ PLANORA kết hợp quản lý công việc, đề xuất lịch, theo dõi phi�
 
 | Thành phần | Công nghệ |
 |---|---|
-| Backend | .NET 8, ASP.NET Core Web API, Entity Framework Core |
+| Backend | .NET 8 LTS, ASP.NET Core Web API, Entity Framework Core |
 | Database | SQL Server |
 | Frontend | React 19, Tailwind CSS 4, Vite 8; responsive, liquid glass |
 | Authentication | ASP.NET Core Identity, Firebase Authentication (Google), JWT, cookie HttpOnly, Argon2id |
@@ -45,7 +46,7 @@ Frontend viết bằng JSX trong `frontend/`, build thành tài nguyên tĩnh v�
 ### Yêu cầu
 
 - .NET **SDK 8.0.425 trở lên trong nhánh 8.0**.
-- Script tìm SDK trong thư mục riêng của dự án, `%USERPROFILE%\.dotnet` và các đường dẫn trên PATH; có thể cài đồng thời các phiên bản .NET khác.
+- Có thể chạy `scripts/Install-Dotnet8.ps1` để cài SDK riêng cho dự án từ Microsoft và kiểm tra SHA-512. Script tìm SDK trong thư mục riêng của dự án, `%USERPROFILE%\.dotnet` và các đường dẫn trên PATH; có thể cài đồng thời các phiên bản .NET khác.
 - Docker Desktop với Linux containers; engine đang chạy.
 - Windows PowerShell 5.1 hoặc PowerShell 7.
 - Git để clone repository.
@@ -161,6 +162,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-BeforeMer
 - [Hướng dẫn sử dụng và cấu hình hệ thống](docs/SYSTEM_GUIDE.md)
 - [Tên đăng nhập và đăng nhập bằng email](docs/USERNAME_LOGIN.md)
 - [Ghi chú và agent tự xếp lịch](docs/NOTES_AGENT_GUIDE.md)
+- [Chat agent và tự điều chỉnh khi thay đổi thời gian](docs/PLANNING_AGENT_GUIDE.md)
+- [Cấu hình Gemini trên Google Cloud và kiểm tra kết nối](docs/GOOGLE_CLOUD_AI.md)
+- [Kế hoạch nâng cấp PLANORA qua bốn giai đoạn](docs/PLANORA_UPGRADE_PLAN.md)
 - [Cấu hình Gmail SMTP](docs/GMAIL_SMTP.md)
 - [Use cases](docs/USE_CASE_COVERAGE.md) và [mô hình dữ liệu UML](docs/UML_ALIGNMENT.md)
 - [Thiết kế bảo mật](docs/SECURITY.md)

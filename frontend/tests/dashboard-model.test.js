@@ -97,3 +97,34 @@ it("uses actual recorded data for the gauge and leaves unavailable statistics un
       .accuracy,
   ).toBeNull();
 });
+
+it("caps the displayed daily capacity by the user's daily limit", () => {
+  const w = workspace();
+  w.preference.maximumDailyMinutes = 60;
+  const model = dashboardModel(w, { capacityFactor: 0.8 }, now);
+  expect(model.capacityMinutes).toBe(60);
+});
+
+it("uses the server's capacity day instead of reconstructing different business rules", () => {
+  const model = dashboardModel(
+    workspace(),
+    {
+      capacityFactor: 0.8,
+      days: [
+        {
+          date: "2026-10-12",
+          calendarFreeMinutes: 240,
+          dailyBudgetMinutes: 360,
+          consumedMinutes: 120,
+          reservedMinutes: 60,
+          effectiveCapacityMinutes: 180,
+          schedulableMinutes: 120,
+        },
+      ],
+    },
+    now,
+  );
+  expect(model.capacityMinutes).toBe(180);
+  expect(model.availableMinutes).toBe(240);
+  expect(model.days[0].reserved).toBe(60);
+});

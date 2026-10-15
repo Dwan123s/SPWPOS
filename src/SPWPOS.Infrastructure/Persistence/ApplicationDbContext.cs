@@ -15,6 +15,11 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<PasswordChangeNotification> PasswordChangeNotifications => Set<PasswordChangeNotification>();
     public DbSet<WorkTask> WorkTasks => Set<WorkTask>();
     public DbSet<PlanningNote> PlanningNotes => Set<PlanningNote>();
+    public DbSet<AgentTurn> AgentTurns => Set<AgentTurn>();
+    public DbSet<AgentConversation> AgentConversations => Set<AgentConversation>();
+    public DbSet<AiUsageRecord> AiUsageRecords => Set<AiUsageRecord>();
+    public DbSet<RecoverySetting> RecoverySettings => Set<RecoverySetting>();
+    public DbSet<RecoveryCase> RecoveryCases => Set<RecoveryCase>();
     public DbSet<TaskCategory> TaskCategories => Set<TaskCategory>();
     public DbSet<TaskDependency> TaskDependencies => Set<TaskDependency>();
     public DbSet<WeeklyAvailability> WeeklyAvailability => Set<WeeklyAvailability>();

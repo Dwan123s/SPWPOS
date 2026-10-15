@@ -4,18 +4,17 @@ $taskRoot = Split-Path -Parent $PSScriptRoot
 $startupLease = $null
 Push-Location -LiteralPath $taskRoot
 try {
-    & (Join-Path $PSScriptRoot 'Build-Frontend.ps1') -Install
-    $ownedApiPaths = @(
-        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Debug\net8.0\SPWPOS.Api.exe'),
-        (Join-Path $taskRoot 'src\SPWPOS.Api\bin\Release\net8.0\SPWPOS.Api.exe')
-    )
+    # Include older framework builds from this checkout so an upgrade cannot
+    # migrate its database while the previous API is still serving requests.
+    $ownedApiBin = [IO.Path]::GetFullPath((Join-Path $taskRoot 'src\SPWPOS.Api\bin')) + '\'
     $runningApi = Get-CimInstance Win32_Process -Filter "Name = 'SPWPOS.Api.exe'" |
-        Where-Object { $_.ExecutablePath -and $_.ExecutablePath -in $ownedApiPaths }
+        Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($ownedApiBin, [StringComparison]::OrdinalIgnoreCase) }
     if ($runningApi) {
         Write-Host 'SPWPOS is already running: https://localhost:7043'
         Write-Host 'Stop the existing API before restarting after configuration changes.'
         return
     }
+    & (Join-Path $PSScriptRoot 'Build-Frontend.ps1') -Install
     $artifactDirectory = Join-Path $taskRoot 'artifacts'
     $null = New-Item -ItemType Directory -Path $artifactDirectory -Force
     try {

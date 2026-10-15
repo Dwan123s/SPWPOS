@@ -1,18 +1,58 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { Slot, attrs, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
-import { CapacityRibbon } from "./dashboard.jsx";
-import {
-  MenuLabelsControl,
-  TutorialButton,
-  GuidedTutorial,
-  openTutorial,
-} from "./tutorial.jsx";
+import { CapacityRibbon } from "./capacity-ribbon.jsx";
+import { PageTransition } from "./page-transition.jsx";
 import {
   WorkspaceAtmosphere,
   WorkspaceMotionControl,
 } from "./workspace-motion.jsx";
 import { $, state, icon, button, userAvatar, dateFmt, modal } from "./ui.jsx";
 import { nextWorkflowStep, workflowSteps } from "./workflow.js";
+
+const menuKey = "planora.menu.compact";
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* Storage is optional. */
+  }
+}
+export function MenuLabelsControl() {
+  const host = useRef(null);
+  const [compact, setCompact] = useState(() => readStorage(menuKey) === "true");
+  useLayoutEffect(() => {
+    const consoleEl = host.current?.closest(".planning-console");
+    if (consoleEl) {
+      consoleEl.dataset.navMode = compact ? "compact" : "expanded";
+    }
+  }, [compact]);
+  return (
+    <button
+      ref={host}
+      type="button"
+      className="btn ghost icon-only menu-labels-control"
+      aria-label={compact ? "Hiện tên menu" : "Thu gọn menu"}
+      title={compact ? "Hiện tên menu" : "Thu gọn menu"}
+      aria-expanded={!compact}
+      aria-controls="workspace-menu"
+      onClick={() => {
+        const value = !compact;
+        setCompact(value);
+        writeStorage(menuKey, String(value));
+      }}
+    >
+      {icon("menu")}
+    </button>
+  );
+}
 export function workspaceShell(routes, title, description, body) {
   const p = state.workspace.profile || {},
     unread = (state.workspace.notifications || []).filter(
@@ -81,7 +121,14 @@ export function workspaceShell(routes, title, description, body) {
       : title;
   return (
     <>
-      <a className="skip-link" href="#main-content">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >
         Đến nội dung chính
       </a>
       <div
@@ -130,7 +177,7 @@ export function workspaceShell(routes, title, description, body) {
           <nav className="nav" aria-label="Điều hướng chính">
             <section className="nav-group" aria-label="Không gian cá nhân">
               <div className="nav-label">Không gian cá nhân</div>
-              {nav(["today", "notes", "calendar", "tasks"])}
+              {nav(["today", "agent", "notes", "calendar", "tasks"])}
             </section>
             <section className="nav-group" aria-label="Theo dõi và thiết lập">
               <div className="nav-label">Theo dõi & thiết lập</div>
@@ -141,21 +188,14 @@ export function workspaceShell(routes, title, description, body) {
               {nav(["notifications", "settings", "admin"])}
             </section>
           </nav>
-          <button
-            type="button"
-            className="btn secondary small sidebar-tutorial-link"
-            onClick={() => {
-              setMobileMenu(false);
-              openTutorial();
-            }}
-          >
-            Hướng dẫn sử dụng
-          </button>
           <div className="sidebar-bottom">
             <div className="user-mini">
               <button
                 className="user-link"
                 type="button"
+                aria-label={
+                  state.route === "agent" ? "Hồ sơ của bạn" : undefined
+                }
                 data-action="nav"
                 data-id="settings"
                 title={
@@ -229,7 +269,6 @@ export function workspaceShell(routes, title, description, body) {
               </div>
             </div>
             <div className="topbar-right">
-              <TutorialButton route={state.route} />
               <WorkspaceMotionControl />
               <button
                 type="button"
@@ -254,51 +293,52 @@ export function workspaceShell(routes, title, description, body) {
           </header>
           {state.route === "today" && <CapacityRibbon />}
           <main className="content" id="main-content" tabIndex="-1">
-            <div className="page-header">
-              <div>
-                <div className="eyebrow">
-                  {state.route === "today"
-                    ? dateFmt(Date.now(), {
-                        weekday: "long",
-                        month: "long",
-                      })
-                    : "KHÔNG GIAN CỦA BẠN"}
-                </div>
-                <h1>{headline}</h1>
-                <p>
-                  {state.route === "today"
-                    ? "Nhìn rõ việc cần làm. Dành thời gian để hoàn thành."
-                    : description}
-                </p>
-              </div>
-              <div className="actions">{actions}</div>
-            </div>
-            {state.analysisError ? (
-              <div className="warning analysis-warning" role="status">
+            <PageTransition route={state.route}>
+              <div className="page-header">
                 <div>
-                  <strong>Phân tích chưa sẵn sàng</strong>
+                  <div className="eyebrow">
+                    {state.route === "today"
+                      ? dateFmt(Date.now(), {
+                          weekday: "long",
+                          month: "long",
+                        })
+                      : "KHÔNG GIAN CỦA BẠN"}
+                  </div>
+                  <h1 tabIndex="-1">{headline}</h1>
                   <p>
-                    Chưa tải được đầy đủ phân tích hoặc kiểm tra xung đột. Không
-                    thể xác nhận lịch đang an toàn.
+                    {state.route === "today"
+                      ? "Nhìn rõ việc cần làm. Dành thời gian để hoàn thành."
+                      : description}
                   </p>
                 </div>
-                {button(
-                  "Thử lại",
-                  "reload-workspace",
-                  "small secondary",
-                  "",
-                  "refresh",
-                )}
+                <div className="actions">{actions}</div>
               </div>
-            ) : (
-              ""
-            )}
-            <GuidedTutorial route={state.route} />
-            {body}
-            <footer className="workspace-footer">
-              <span>PLANORA · Làm việc theo nhịp của bạn.</span>
-              <span>{state.workspace.preference.timeZoneId}</span>
-            </footer>
+              {state.analysisError ? (
+                <div className="warning analysis-warning" role="status">
+                  <div>
+                    <strong>Phân tích chưa sẵn sàng</strong>
+                    <p>
+                      Chưa tải được đầy đủ phân tích hoặc kiểm tra xung đột.
+                      Không thể xác nhận lịch đang an toàn.
+                    </p>
+                  </div>
+                  {button(
+                    "Thử lại",
+                    "reload-workspace",
+                    "small secondary",
+                    "",
+                    "refresh",
+                  )}
+                </div>
+              ) : (
+                ""
+              )}
+              {body}
+              <footer className="workspace-footer">
+                <span>PLANORA · Làm việc theo nhịp của bạn.</span>
+                <span>{state.workspace.preference.timeZoneId}</span>
+              </footer>
+            </PageTransition>
           </main>
         </div>
       </div>
@@ -307,6 +347,7 @@ export function workspaceShell(routes, title, description, body) {
 }
 export function setMobileMenu(open = false) {
   const sidebar = $(".sidebar");
+  const trigger = $(".nora-app-menu") || $(".mobile-menu");
   if (!sidebar) return;
   const mobile = window.matchMedia("(max-width: 800px)").matches,
     hadFocus = sidebar.contains(document.activeElement),
@@ -317,12 +358,12 @@ export function setMobileMenu(open = false) {
   const overlay = $(".sidebar-overlay");
   if (overlay) overlay.hidden = !(mobile && open);
   document.body.classList.toggle("menu-open", mobile && open);
-  $(".mobile-menu")?.setAttribute("aria-expanded", String(mobile && open));
+  trigger?.setAttribute("aria-expanded", String(mobile && open));
   if (mobile && open) {
     $(".main").inert = true;
     sidebar.querySelector("a,button")?.focus();
   } else if (mobile && (hadFocus || wasOpen)) {
-    queueMicrotask(() => $(".mobile-menu")?.focus());
+    queueMicrotask(() => trigger?.focus());
   }
 }
 export function syncDecorations() {
@@ -393,8 +434,9 @@ export function filterSearch() {
   );
 }
 const onResize = () => {
-  if (!window.matchMedia("(max-width: 800px)").matches) setMobileMenu(false);
-  else if (!$(".sidebar")?.classList.contains("open")) setMobileMenu(false);
+  setMobileMenu(
+    window.matchMedia("(max-width: 800px)").matches && !!$(".sidebar.open"),
+  );
 };
 const onKeyDown = (event) => {
   if (

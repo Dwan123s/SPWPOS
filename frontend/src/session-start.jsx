@@ -9,7 +9,7 @@ export function sessionStartIssue(session, workspace, now = Date.now()) {
     return "Cần cập nhật thời gian của phiên.";
   if (now < start - 15 * 60000)
     return `Có thể bắt đầu từ ${timeFmt(start - 15 * 60000)} (sớm 15 phút).`;
-  if (now > end) return "Phiên đã quá giờ. Điều chỉnh lịch trước khi bắt đầu.";
+  if (now >= end) return "Phiên đã quá giờ. Điều chỉnh lịch trước khi bắt đầu.";
   if (
     (workspace?.sessions || []).some((item) =>
       ["Running", "Paused"].includes(item.status),

@@ -64,8 +64,10 @@ public sealed partial class WorkspaceService
         if (status == WorkTaskStatus.Completed)
         {
             Require(!await Mine<WorkTask>(uid).AnyAsync(x => x.ParentId == id && !x.IsDeleted && x.Status != WorkTaskStatus.Completed && x.Status != WorkTaskStatus.Cancelled, ct), "SUBTASK_INCOMPLETE", "Hoàn thành công việc con trước.");
-            var dependencies = await Mine<TaskDependency>(uid).Where(x => x.TaskId == id).Select(x => x.PredecessorId).ToArrayAsync(ct);
-            Require(!await Mine<WorkTask>(uid).AnyAsync(x => dependencies.Contains(x.Id) && x.Status != WorkTaskStatus.Completed, ct), "DEPENDENCY_INCOMPLETE", "Hoàn thành công việc tiền nhiệm trước.");
+            var state = await State(uid, ct);
+            var completed = engine.CompletionTimes(state, [], engine.Biases(state), Now);
+            Require(state.Dependencies.Where(x => x.TaskId == id).All(x => completed.ContainsKey(x.PredecessorId)),
+                "DEPENDENCY_INCOMPLETE", "Hoàn thành công việc tiền nhiệm trước.");
         }
         task.Status = status; task.Progress = status == WorkTaskStatus.Completed ? 100 : input.Progress; task.UpdatedAt = Now; task.CompletedAt = status == WorkTaskStatus.Completed ? Now : null;
         if (status is WorkTaskStatus.Completed or WorkTaskStatus.Cancelled)

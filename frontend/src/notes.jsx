@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import "./styles/notes-entry.css";
 import { api } from "./api.js";
 import { state } from "./ui.jsx";
 import { planModal } from "./calendar.jsx";
@@ -67,7 +68,7 @@ export function NotesPage({ onWorkspaceChanged }) {
   const locked = useRef(false);
   const alive = useRef(true);
   const imported = !!note.createdTaskIds?.length;
-  const hasAiAnalysis = ["Gemini", "OpenAI"].includes(note.analysis?.source);
+  const hasAiAnalysis = ["Gemini", "OpenAI", "VertexAI"].includes(note.analysis?.source);
   const dirty =
     !!note.id &&
     notes.some(
@@ -229,7 +230,7 @@ export function NotesPage({ onWorkspaceChanged }) {
           remember(result);
           if (
             result.analysis.tasks.length &&
-            ["Gemini", "OpenAI"].includes(result.analysis.source)
+            ["Gemini", "OpenAI", "VertexAI"].includes(result.analysis.source)
           )
             completeGuideStep(0, result.id);
           setDrafts(

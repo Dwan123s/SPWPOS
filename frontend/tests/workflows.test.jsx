@@ -13,7 +13,6 @@ import { update } from "../src/store.js";
 import { state } from "../src/ui.jsx";
 import { renderAuth, authSetup } from "../src/auth.jsx";
 import { planModal } from "../src/calendar.jsx";
-import { getGuide, startGuide } from "../src/onboarding.js";
 import {
   workspace,
   insights,
@@ -66,6 +65,39 @@ beforeEach(() => {
       if (url === "/api/auth/login-methods")
         data = { hasPassword: true, googleLinked: false };
       if (url === "/api/intelligence") data = insights;
+      if (url.startsWith("/api/recovery?"))
+        data = {
+          items: [],
+          page: 1,
+          total: 0,
+          settings: {
+            enabled: true,
+            autoApply: false,
+            missedDays: 2,
+            quietStartMinute: 1320,
+            quietEndMinute: 420,
+            version: "00000000-0000-0000-0000-000000000000",
+          },
+        };
+      if (url.startsWith("/api/intelligence/history?"))
+        data = {
+          start: "2026-10-09",
+          end: "2026-10-15",
+          timeZoneId: "Asia/Ho_Chi_Minh",
+          days: [],
+          current: {
+            focusSeconds: 0,
+            openFocusSeconds: 0,
+            completedTasks: 0,
+            onTimeTasks: 0,
+            plannedSeconds: 0,
+          },
+          previous: { focusSeconds: 0 },
+          focusChangePercent: null,
+          notices: ["NO_COMPARISON_BASELINE"],
+        };
+      if (url.startsWith("/api/intelligence/tasks?"))
+        data = { items: [], page: 1, pageSize: 20, total: 0 };
       if (url === "/api/plans/conflicts") data = [];
       if (
         url.startsWith("/api/notifications/") &&
@@ -436,7 +468,7 @@ it("blocks reuse in the account password form before calling the API", async () 
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   await navigate("settings", "Cài đặt");
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Bảo mật" }));
+  await user.click(await screen.findByRole("button", { name: "Bảo mật" }));
   expect(screen.getByRole("list", { name: "Yêu cầu mật khẩu" })).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Mật khẩu hiện tại"), {
     target: { value: "Abcdef1!" },
@@ -619,6 +651,11 @@ it("navigates all workspace screens and renders the admin data", async () => {
     await navigate(route, title);
   await screen.findByText("Hoạt động");
   expect(calls.some((c) => c.url === "/api/admin/status")).toBe(true);
+  await userEvent
+    .setup()
+    .click(screen.getByRole("link", { name: "Đến nội dung chính" }));
+  expect(location.hash).toBe("#admin");
+  expect(document.activeElement).toBe(document.getElementById("main-content"));
 });
 it("marks a notification read while preserving its filters and updating the shell unread count", async () => {
   mount();
@@ -991,33 +1028,6 @@ it("stays on hours when saving fails instead of proceeding to plan generation", 
     screen.queryByRole("heading", { name: "Tạo kế hoạch mới" }),
   ).toBeNull();
   expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
-});
-it("completes the first guided step by saving a manual task without requiring AI", async () => {
-  profile.id = crypto.randomUUID();
-  mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
-  act(() => startGuide());
-  await navigate("tasks", "Công việc");
-  const user = userEvent.setup();
-  await user.click(
-    screen.getByRole("button", { name: "Thêm công việc", exact: true }),
-  );
-  const form = document.querySelector('[data-form="task"]');
-  const name = form.querySelector('[name="name"]');
-  fireEvent.change(name, { target: { value: "Công việc đầu tiên" } });
-  fireEvent.submit(form);
-  await waitFor(() => expect(getGuide().completed).toContain(0));
-  expect(
-    calls.some(
-      (call) => call.url === "/api/tasks" && call.options.method === "POST",
-    ),
-  ).toBe(true);
-  expect(calls.some((call) => call.url.endsWith("/analyze"))).toBe(false);
-  await user.click(
-    screen.getByRole("button", { name: "Tiếp tục", exact: true }),
-  );
-  await screen.findByRole("heading", { level: 1, name: "Giờ rảnh" });
-  expect(getGuide().step).toBe(1);
 });
 it("finishing a session asks for progress and completes the whole task only on explicit click", async () => {
   currentWorkspace.sessions[1].status = "Running";

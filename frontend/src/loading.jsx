@@ -1,101 +1,155 @@
 import { useEffect, useState } from "react";
 import { icon } from "./ui.jsx";
+import { MascotEyes } from "./mascot-eyes.jsx";
+
+const preferenceKey = "planora.loading.motion-paused";
+const readMotionPaused = () => {
+  try {
+    return localStorage.getItem(preferenceKey) === "true";
+  } catch {
+    return false;
+  }
+};
 
 export function Loading({
   label = "Đang mở không gian làm việc…",
   fullscreen = false,
 }) {
-  const [paused, setPaused] = useState(() => document.hidden);
+  const [paused, setPaused] = useState(readMotionPaused);
+  const [reduced, setReduced] = useState(false);
+  const [hidden, setHidden] = useState(() => document.hidden);
+
   useEffect(() => {
-    const sync = () => setPaused(document.hidden);
-    document.addEventListener("visibilitychange", sync);
-    return () => document.removeEventListener("visibilitychange", sync);
+    const media = matchMedia("(prefers-reduced-motion: reduce)");
+    const onMediaChange = () => setReduced(media.matches);
+    const onVisibilityChange = () => setHidden(document.hidden);
+    onMediaChange();
+    media.addEventListener("change", onMediaChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      media.removeEventListener("change", onMediaChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
+
+  const toggleMotion = () => {
+    const next = !paused;
+    setPaused(next);
+    try {
+      localStorage.setItem(preferenceKey, String(next));
+    } catch {
+      /* Browser storage is optional. */
+    }
+  };
+  const motionState = reduced
+    ? "reduced"
+    : paused || hidden
+      ? "paused"
+      : "running";
 
   return (
     <section
       className={`planora-loading ${fullscreen ? "planora-loading--fullscreen" : "planora-loading--inline"}`}
-      data-motion-state={paused ? "paused" : "running"}
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
+      data-motion-state={motionState}
       aria-busy="true"
+      aria-label={fullscreen ? "Đang tải PLANORA" : undefined}
     >
       {fullscreen && (
         <>
-          <div className="loading-atmosphere" aria-hidden="true">
-            <span className="loading-halo loading-halo--left" />
-            <span className="loading-halo loading-halo--right" />
-            <span className="loading-orb loading-orb--one" />
-            <span className="loading-orb loading-orb--two" />
-            <span className="loading-orb loading-orb--three" />
-          </div>
-          <div className="loading-art" aria-hidden="true">
-            <span className="loading-orbit loading-orbit--back" />
-            <svg
-              className="loading-orbit loading-orbit--front"
-              viewBox="0 0 310 104"
-              preserveAspectRatio="none"
-            >
-              <ellipse cx="155" cy="52" rx="153" ry="50" pathLength="100" />
-            </svg>
-            <div className="loading-logo-glass">
-              <img
-                src="/assets/planora-mark.png"
-                alt=""
-                width="112"
-                height="112"
-                decoding="async"
-              />
-            </div>
-            <span className="loading-art-shadow" />
-            <div className="loading-mini-card loading-mini-card--calendar">
-              <span className="loading-calendar-binding">
-                <i />
-                <i />
-              </span>
-              <span className="loading-calendar-header" />
-              <span className="loading-calendar-grid">
-                {Array.from({ length: 9 }, (_, i) => (
-                  <i key={i} />
-                ))}
-              </span>
-            </div>
-            <div className="loading-mini-card loading-mini-card--checklist">
-              <span className="loading-checklist-title" />
-              {[0, 1, 2].map((i) => (
-                <span className="loading-checklist-row" key={i}>
-                  {icon("check")}
-                  <i />
-                </span>
-              ))}
-            </div>
-            <div className="loading-mini-card loading-mini-card--clock">
-              <span className="loading-clock-face">
-                <i className="loading-clock-hour" />
-                <i className="loading-clock-minute" />
-              </span>
-            </div>
-          </div>
+          <header className="loading-header">
+            <img
+              src="/assets/planora-brand.png"
+              alt="PLANORA"
+              width="170"
+              height="58"
+              decoding="async"
+            />
+            <span>Không gian cho ngày của bạn</span>
+          </header>
+          <button
+            type="button"
+            className="loading-motion-control"
+            onClick={toggleMotion}
+            aria-label={
+              reduced
+                ? "Chuyển động đang tắt theo cài đặt hệ thống"
+                : paused
+                  ? "Bật chuyển động của NORA"
+                  : "Tạm dừng chuyển động của NORA"
+            }
+            aria-pressed={paused || reduced}
+            disabled={reduced}
+          >
+            {icon(paused || reduced ? "play" : "pause")}
+          </button>
         </>
       )}
-      <div className="loading-copy">
-        <p className="loading-label">
-          {!fullscreen && (
-            <span className="loading-spinner" aria-hidden="true" />
+      <div className="loading-content">
+        <div className="loading-art" aria-hidden="true">
+          <span className="loading-halo" />
+          <span className="loading-orbit loading-orbit--outer" />
+          <span className="loading-orbit loading-orbit--inner" />
+          <span className="loading-art-shadow" />
+          <div className="loading-mascot">
+            <img
+              src="/assets/start/planora-owl-v1.png"
+              alt=""
+              width="1254"
+              height="1254"
+              decoding="async"
+              fetchPriority={fullscreen ? "high" : "auto"}
+            />
+            {fullscreen && <MascotEyes rootSelector=".planora-loading" />}
+          </div>
+          {fullscreen && (
+            <>
+              <span className="loading-token loading-token--calendar">
+                {icon("calendar")}
+              </span>
+              <span className="loading-token loading-token--check">
+                {icon("check")}
+              </span>
+              <span className="loading-spark loading-spark--one" />
+              <span className="loading-spark loading-spark--two" />
+            </>
           )}
-          {label}
-        </p>
-        <div className="loading-flow" aria-hidden="true">
-          <span />
-          <span />
-          <span />
+        </div>
+        <div className="loading-copy">
+          {fullscreen && (
+            <>
+              <span className="loading-eyebrow">CÙNG NORA BẮT ĐẦU</span>
+              <h1>
+                Một ngày nhẹ nhàng hơn,
+                <br />
+                <span>bắt đầu từ đây.</span>
+              </h1>
+            </>
+          )}
+          <p
+            className="loading-label"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {label}
+          </p>
+          <div className="loading-progress-track" aria-hidden="true">
+            <span />
+          </div>
+          {fullscreen && (
+            <p className="loading-note">
+              Một chút chờ đợi, nhiều khoảng trống cho điều quan trọng.
+            </p>
+          )}
         </div>
       </div>
       {fullscreen && (
-        <p className="loading-tagline" aria-hidden="true">
+        <footer className="loading-footer">
+          <span className="loading-footer-dot" />
+          PLANORA
+          <span className="loading-footer-divider" />
           Plan smarter. Work realistically.
-        </p>
+        </footer>
       )}
     </section>
   );

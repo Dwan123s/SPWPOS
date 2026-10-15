@@ -28,12 +28,12 @@ export function gazeOffset(pointer, center, viewport) {
   const radius = Math.max(1, Math.hypot(x, y));
   return { x: (x / radius) * 8, y: (y / radius) * 6 };
 }
-export function MascotEyes() {
+export function MascotEyes({ rootSelector = ".getting-started" }) {
   const id = useId().replaceAll(":", ""),
     svg = useRef(null),
     pupils = useRef([]);
   useLayoutEffect(() => {
-    const root = svg.current.closest(".getting-started"),
+    const root = svg.current.closest(rootSelector) || svg.current.parentElement,
       media = matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0,
       touchReset;
@@ -136,7 +136,7 @@ export function MascotEyes() {
       document.removeEventListener("visibilitychange", reset);
       media.removeEventListener("change", reset);
     };
-  }, []);
+  }, [rootSelector]);
   return (
     <svg
       ref={svg}

@@ -15,6 +15,7 @@ if ($env:APPDATA -match '^[A-Za-z]:\\') {
     }
 }
 $sdkCandidates = @(
+    (Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts\dotnet8\dotnet.exe'),
     (Join-Path $env:LOCALAPPDATA 'SPWPOS\dotnet8\dotnet.exe'),
     (Join-Path $env:USERPROFILE '.dotnet\dotnet.exe')
 )
@@ -58,5 +59,5 @@ try {
     }
 }
 if (-not $SpwposDotnet) {
-    throw 'No compatible .NET 8 SDK found. Install the .NET 8 SDK 8.0.425 or newer in the 8.0 feature band (not only the runtime), then open a new terminal.'
+    throw 'No compatible .NET 8 SDK found. Run scripts/Install-Dotnet8.ps1 or install the .NET 8 SDK 8.0.425 or newer in the 8.0 feature band (not only the runtime), then open a new terminal.'
 }
