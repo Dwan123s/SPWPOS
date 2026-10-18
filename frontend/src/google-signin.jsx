@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api.js";
+import { modal } from "./ui.jsx";
 import { googleErrorMessage, prepareGoogleClient } from "./firebase-google.js";
 
 function GoogleMark() {
@@ -76,7 +77,81 @@ export function GoogleSignIn({ link = false, onSuccess }) {
             if (link) setConfig((previous) => ({ ...previous, linked: true }));
             await onSuccess?.();
           } catch (failure) {
-            setError(googleErrorMessage(failure));
+            if (failure.code === "ACCOUNT_DISABLED") {
+              modal(
+                "Tài khoản bị khóa",
+                "Thông báo từ hệ thống",
+                <div className="account-locked-popup">
+                  <div style={{ textAlign: "center", padding: "1.25rem 0.5rem" }}>
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "56px",
+                        height: "56px",
+                        borderRadius: "50%",
+                        backgroundColor: "#fee2e2",
+                        color: "#dc2626",
+                        marginBottom: "1rem",
+                      }}
+                    >
+                      <svg
+                        width="28"
+                        height="28"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </div>
+                    <p
+                      style={{
+                        fontSize: "1.05rem",
+                        fontWeight: 600,
+                        color: "#b91c1c",
+                        lineHeight: "1.6",
+                        margin: "0.5rem 0",
+                      }}
+                    >
+                      {failure.message}
+                    </p>
+                    <p
+                      style={{
+                        color: "#64748b",
+                        fontSize: "0.875rem",
+                        marginTop: "0.75rem",
+                        lineHeight: "1.5",
+                      }}
+                    >
+                      Mọi quyền truy cập vào tài khoản đã bị tạm dừng. Nếu bạn có thắc mắc hoặc cần hỗ trợ, vui lòng liên hệ quản trị viên qua email hệ thống.
+                    </p>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      marginTop: "1rem",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      data-action="close-modal"
+                    >
+                      Đã hiểu
+                    </button>
+                  </div>
+                </div>,
+              );
+            } else {
+              setError(googleErrorMessage(failure));
+            }
           } finally {
             await client.signOut().catch(() => {});
             setBusy(false);

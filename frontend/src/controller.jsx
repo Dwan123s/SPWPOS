@@ -203,6 +203,7 @@ async function loadAdmin(search = "") {
     api("/api/admin/status"),
     api("/api/admin/jobs"),
   ]);
+  state.adminUsers = users;
   if ($("#admin-jobs"))
     setSlot(
       "admin-jobs",
@@ -797,18 +798,52 @@ async function action(name, id, element) {
     case "admin-refresh":
       await loadAdmin();
       break;
-    case "admin-lock":
+    case "admin-lock": {
+      const targetUser = state.adminUsers?.find((x) => x.id === id);
+      const userDisplay = targetUser
+        ? `${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})`
+        : "người dùng";
+      modal(
+        "Khóa tài khoản",
+        `Xác nhận khóa tài khoản ${userDisplay}. Mọi phiên đăng nhập hiện tại sẽ bị thu hồi.`,
+        <form data-form="admin-lock" data-id={id}>
+          <div className="field">
+            <label htmlFor="admin-lock-reason" style={{ fontWeight: 600 }}>
+              Lý do khóa tài khoản <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <textarea
+              id="admin-lock-reason"
+              name="reason"
+              rows="3"
+              className="filter"
+              style={{ width: "100%", padding: "0.6rem", borderRadius: "8px", resize: "vertical", marginTop: "0.25rem" }}
+              placeholder="Nhập lý do khóa tài khoản (lý do này sẽ hiển thị cho người dùng khi họ đăng nhập)..."
+              maxLength="500"
+              required
+              autoFocus
+            />
+          </div>
+          <div className="actions" style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
+            <button type="button" className="btn ghost" data-action="close-modal">
+              Hủy
+            </button>
+            <button type="submit" className="btn danger">
+              Khóa tài khoản
+            </button>
+          </div>
+        </form>,
+      );
+      break;
+    }
     case "admin-unlock":
       confirmAction(
-        name === "admin-lock" ? "Khóa tài khoản?" : "Mở khóa tài khoản?",
-        name === "admin-lock"
-          ? "Phiên đăng nhập của tài khoản này sẽ bị thu hồi."
-          : "Cho phép tài khoản hoạt động lại.",
+        "Mở khóa tài khoản?",
+        "Cho phép tài khoản hoạt động lại bình thường.",
         async () => {
-          await api(`/api/admin/users/${id}/${name.slice(6)}`, "POST");
+          await api(`/api/admin/users/${id}/unlock`, "POST", { reason: "Mở khóa bởi quản trị viên" });
           closeModal();
           await loadAdmin();
-          toast("Đã cập nhật tài khoản.");
+          toast("Đã mở khóa tài khoản thành công.");
         },
       );
       break;
@@ -824,6 +859,15 @@ async function action(name, id, element) {
 async function formAction(form, data, nextAction = null) {
   const id = form.dataset.id;
   switch (form.dataset.form) {
+    case "admin-lock": {
+      const reason = String(data.get("reason") || "").trim();
+      if (!reason) throw new Error("Vui lòng nhập lý do khóa tài khoản.");
+      await api(`/api/admin/users/${id}/lock`, "POST", { reason });
+      closeModal();
+      await loadAdmin();
+      toast("Đã khóa tài khoản thành công.", "success");
+      break;
+    }
     case "task": {
       const saved = await api(
         `/api/tasks${id ? `/${id}` : ""}`,

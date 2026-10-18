@@ -36,7 +36,24 @@ public sealed class AdditionalFlowTests
         await h.DbAsync(async db => { var user = await db.Users.SingleAsync(Ct); user.IsActive = false; await db.SaveChangesAsync(Ct); });
         await h.AuthAsync(a => a.ForgotPasswordAsync(new(ServiceHarness.Address), ServiceHarness.Context, Ct));
         Assert.False(h.Email.Inbox.ContainsKey((ServiceHarness.Address, OtpPurpose.ForgotPassword)));
-        Assert.Equal("INVALID_CREDENTIALS", (await Assert.ThrowsAsync<AuthException>(() => h.LoginAsync())).Code);
+        Assert.Equal("ACCOUNT_DISABLED", (await Assert.ThrowsAsync<AuthException>(() => h.LoginAsync())).Code);
+    }
+    [Fact]
+    public async Task Locked_account_login_returns_account_disabled_with_reason()
+    {
+        await using var h = await ServiceHarness.CreateAsync();
+        await h.RegisterAsync();
+        var uid = await h.DbAsync(db => db.Users.Select(x => x.Id).SingleAsync(Ct));
+        await h.DbAsync(async db =>
+        {
+            var user = await db.Users.SingleAsync(Ct);
+            user.IsActive = false;
+            db.AccountStatusLogs.Add(new() { UserId = uid, AdminId = uid, Action = "LOCK", Reason = "Vi phạm quy định spam", CreatedAt = DateTimeOffset.UtcNow });
+            await db.SaveChangesAsync(Ct);
+        });
+        var ex = await Assert.ThrowsAsync<AuthException>(() => h.LoginAsync());
+        Assert.Equal("ACCOUNT_DISABLED", ex.Code);
+        Assert.Contains("Bạn đã bị khóa tài khoản vì lí do : Vi phạm quy định spam", ex.Message);
     }
     [Fact]
     public async Task Invalid_new_password_does_not_consume_reset_ticket()
