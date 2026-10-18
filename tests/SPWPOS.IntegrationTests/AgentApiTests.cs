@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using SPWPOS.Application.Workspace;
 using SPWPOS.TestSupport;
+using Microsoft.EntityFrameworkCore;
+using SPWPOS.Infrastructure.Persistence;
+using System.Text.Json;
 namespace SPWPOS.IntegrationTests;
 
 public sealed class AgentApiTests
@@ -71,5 +74,26 @@ public sealed class AgentApiTests
         var workspace = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data"); Assert.Single(workspace.GetProperty("events").EnumerateArray());
         await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{id}/undo");
         workspace = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data"); Assert.Empty(workspace.GetProperty("events").EnumerateArray());
+    }
+    [Fact] public async Task Apply_revalidates_task_work_window_even_if_stored_preview_was_altered()
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync();
+        await WorkspaceFlowTests.Authorize(f, client); await WorkspaceFlowTests.SetupTime(client);
+        var day = new DateTimeOffset(f.Clock.GetUtcNow().UtcDateTime.Date.AddDays(2), TimeSpan.Zero);
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Tasks = [new(null, "English", day.AddHours(21), 45, 2, "STUDY", true, day.AddHours(18), day.AddHours(22))] };
+        var result = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns", new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Schedule English", false))).GetProperty("data");
+        var id = result.GetProperty("id").GetGuid(); Assert.Equal("PREVIEW", result.GetProperty("status").GetString());
+        await using (var scope = f.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(); var turn = await db.AgentTurns.SingleAsync(x => x.Id == id, Ct);
+            var view = JsonSerializer.Deserialize<AgentTurnView>(turn.ResultJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            var session = Assert.Single(view.Plan!.Sessions);
+            turn.ResultJson = JsonSerializer.Serialize(view with { Plan = view.Plan with { Sessions = [session with { Start = session.Start.AddDays(-1), End = session.End.AddDays(-1) }] } }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await db.SaveChangesAsync(Ct);
+        }
+        var failure = await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{id}/apply", null, HttpStatusCode.Conflict);
+        Assert.Equal("TASK_WORK_WINDOW", failure.GetProperty("error").GetProperty("code").GetString());
+        var workspace = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Empty(workspace.GetProperty("tasks").EnumerateArray()); Assert.Empty(workspace.GetProperty("sessions").EnumerateArray());
     }
 }

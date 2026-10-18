@@ -2122,3 +2122,382 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015094847_AddAgentConversationLifecycle'
+)
+BEGIN
+    ALTER TABLE [AgentTurns] ADD [InputFingerprint] nvarchar(64) NOT NULL DEFAULT N'';
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015094847_AddAgentConversationLifecycle'
+)
+BEGIN
+    CREATE TABLE [AgentConversations] (
+        [Id] uniqueidentifier NOT NULL,
+        [UserId] uniqueidentifier NOT NULL,
+        [Title] nvarchar(120) NOT NULL,
+        [CreatedAt] datetimeoffset NOT NULL,
+        [UpdatedAt] datetimeoffset NOT NULL,
+        [ArchivedAt] datetimeoffset NULL,
+        [DeletedAt] datetimeoffset NULL,
+        [Version] uniqueidentifier NOT NULL,
+        CONSTRAINT [PK_AgentConversations] PRIMARY KEY ([UserId], [Id]),
+        CONSTRAINT [FK_AgentConversations_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015094847_AddAgentConversationLifecycle'
+)
+BEGIN
+    CREATE INDEX [IX_AgentTurns_UserId_ConversationId_CreatedAt_Id] ON [AgentTurns] ([UserId], [ConversationId], [CreatedAt], [Id]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015094847_AddAgentConversationLifecycle'
+)
+BEGIN
+    WITH history AS (
+        SELECT UserId, ConversationId, Text, CreatedAt,
+            MIN(CreatedAt) OVER (PARTITION BY UserId, ConversationId) AS FirstAt,
+            MAX(UpdatedAt) OVER (PARTITION BY UserId, ConversationId) AS LastAt,
+            ROW_NUMBER() OVER (PARTITION BY UserId, ConversationId ORDER BY CreatedAt, Id) AS Position
+        FROM AgentTurns
+    )
+    INSERT INTO AgentConversations (UserId, Id, Title, CreatedAt, UpdatedAt, Version)
+    SELECT UserId, ConversationId, CASE WHEN LEN(LTRIM(RTRIM(Text)))=0 THEN N'Hội thoại' ELSE LEFT(Text,120) END,
+        FirstAt, LastAt, NEWID()
+    FROM history WHERE Position=1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015094847_AddAgentConversationLifecycle'
+)
+BEGIN
+    CREATE INDEX [IX_AgentConversations_UserId_DeletedAt_ArchivedAt_UpdatedAt_Id] ON [AgentConversations] ([UserId], [DeletedAt], [ArchivedAt], [UpdatedAt], [Id]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015094847_AddAgentConversationLifecycle'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261015094847_AddAgentConversationLifecycle', N'8.0.31');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015095749_AddAiUsageReservations'
+)
+BEGIN
+    CREATE TABLE [AiUsageRecords] (
+        [Id] uniqueidentifier NOT NULL,
+        [Operation] nvarchar(32) NOT NULL,
+        [Provider] nvarchar(32) NOT NULL,
+        [Model] nvarchar(120) NOT NULL,
+        [ModelVersion] nvarchar(120) NULL,
+        [Status] nvarchar(16) NOT NULL,
+        [ReservedAt] datetimeoffset NOT NULL,
+        [LeaseUntil] datetimeoffset NOT NULL,
+        [FinishedAt] datetimeoffset NULL,
+        [InputTokens] bigint NULL,
+        [OutputTokens] bigint NULL,
+        [LatencyMilliseconds] bigint NOT NULL,
+        [UserId] uniqueidentifier NOT NULL,
+        CONSTRAINT [PK_AiUsageRecords] PRIMARY KEY ([Id]),
+        CONSTRAINT [AK_AiUsageRecords_UserId_Id] UNIQUE ([UserId], [Id]),
+        CONSTRAINT [FK_AiUsageRecords_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015095749_AddAiUsageReservations'
+)
+BEGIN
+    CREATE INDEX [IX_AiUsageRecords_UserId] ON [AiUsageRecords] ([UserId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015095749_AddAiUsageReservations'
+)
+BEGIN
+    CREATE INDEX [IX_AiUsageRecords_UserId_ReservedAt] ON [AiUsageRecords] ([UserId], [ReservedAt]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015095749_AddAiUsageReservations'
+)
+BEGIN
+    CREATE INDEX [IX_AiUsageRecords_UserId_Status_LeaseUntil] ON [AiUsageRecords] ([UserId], [Status], [LeaseUntil]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015095749_AddAiUsageReservations'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261015095749_AddAiUsageReservations', N'8.0.31');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015100639_AddRecoveryProposals'
+)
+BEGIN
+    CREATE TABLE [RecoveryCases] (
+        [Id] uniqueidentifier NOT NULL,
+        [DedupeKey] nvarchar(64) NOT NULL,
+        [TaskIdsJson] nvarchar(max) NOT NULL,
+        [Status] nvarchar(24) NOT NULL,
+        [Message] nvarchar(1000) NOT NULL,
+        [Revision] uniqueidentifier NOT NULL,
+        [PlanId] uniqueidentifier NULL,
+        [CreatedAt] datetimeoffset NOT NULL,
+        [UpdatedAt] datetimeoffset NOT NULL,
+        [UserId] uniqueidentifier NOT NULL,
+        CONSTRAINT [PK_RecoveryCases] PRIMARY KEY ([Id]),
+        CONSTRAINT [AK_RecoveryCases_UserId_Id] UNIQUE ([UserId], [Id]),
+        CONSTRAINT [FK_RecoveryCases_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_RecoveryCases_PlanProposals_UserId_PlanId] FOREIGN KEY ([UserId], [PlanId]) REFERENCES [PlanProposals] ([UserId], [Id]) ON DELETE NO ACTION
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015100639_AddRecoveryProposals'
+)
+BEGIN
+    CREATE TABLE [RecoverySettings] (
+        [Id] uniqueidentifier NOT NULL,
+        [Enabled] bit NOT NULL,
+        [AutoApply] bit NOT NULL,
+        [MissedDays] int NOT NULL,
+        [QuietStartMinute] int NOT NULL,
+        [QuietEndMinute] int NOT NULL,
+        [Version] uniqueidentifier NOT NULL,
+        [UserId] uniqueidentifier NOT NULL,
+        CONSTRAINT [PK_RecoverySettings] PRIMARY KEY ([Id]),
+        CONSTRAINT [AK_RecoverySettings_UserId_Id] UNIQUE ([UserId], [Id]),
+        CONSTRAINT [FK_RecoverySettings_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE NO ACTION
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015100639_AddRecoveryProposals'
+)
+BEGIN
+    CREATE INDEX [IX_RecoveryCases_UserId] ON [RecoveryCases] ([UserId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015100639_AddRecoveryProposals'
+)
+BEGIN
+    CREATE INDEX [IX_RecoveryCases_UserId_CreatedAt] ON [RecoveryCases] ([UserId], [CreatedAt]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015100639_AddRecoveryProposals'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_RecoveryCases_UserId_DedupeKey] ON [RecoveryCases] ([UserId], [DedupeKey]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015100639_AddRecoveryProposals'
+)
+BEGIN
+    CREATE INDEX [IX_RecoveryCases_UserId_PlanId] ON [RecoveryCases] ([UserId], [PlanId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015100639_AddRecoveryProposals'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_RecoverySettings_UserId] ON [RecoverySettings] ([UserId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261015100639_AddRecoveryProposals'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261015100639_AddRecoveryProposals', N'8.0.31');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018130002_AddReminderEmailDelivery'
+)
+BEGIN
+    ALTER TABLE [notification_settings] ADD [EmailEnabled] bit NOT NULL DEFAULT CAST(0 AS bit);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018130002_AddReminderEmailDelivery'
+)
+BEGIN
+    ALTER TABLE [InAppNotifications] ADD [EmailAttempts] int NOT NULL DEFAULT 0;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018130002_AddReminderEmailDelivery'
+)
+BEGIN
+    ALTER TABLE [InAppNotifications] ADD [EmailPending] bit NOT NULL DEFAULT CAST(0 AS bit);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018130002_AddReminderEmailDelivery'
+)
+BEGIN
+    ALTER TABLE [InAppNotifications] ADD [EmailSentAt] datetimeoffset NULL;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018130002_AddReminderEmailDelivery'
+)
+BEGIN
+    ALTER TABLE [InAppNotifications] ADD [IsVisible] bit NOT NULL DEFAULT CAST(1 AS bit);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018130002_AddReminderEmailDelivery'
+)
+BEGIN
+    ALTER TABLE [InAppNotifications] ADD [NextEmailAttemptAt] datetimeoffset NULL;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018130002_AddReminderEmailDelivery'
+)
+BEGIN
+    CREATE INDEX [IX_InAppNotifications_UserId_EmailPending_NextEmailAttemptAt] ON [InAppNotifications] ([UserId], [EmailPending], [NextEmailAttemptAt]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018130002_AddReminderEmailDelivery'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261018130002_AddReminderEmailDelivery', N'8.0.31');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018172132_NoraSchedulingConstraints'
+)
+BEGIN
+    ALTER TABLE [WorkTasks] ADD [WorkWindowEnd] datetimeoffset NULL;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018172132_NoraSchedulingConstraints'
+)
+BEGIN
+    ALTER TABLE [WorkTasks] ADD [WorkWindowStart] datetimeoffset NULL;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018172132_NoraSchedulingConstraints'
+)
+BEGIN
+    ALTER TABLE [AvailabilityExceptions] ADD [OverridesWeeklyAvailability] bit NOT NULL DEFAULT CAST(0 AS bit);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261018172132_NoraSchedulingConstraints'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261018172132_NoraSchedulingConstraints', N'8.0.31');
+END;
+GO
+
+COMMIT;
+GO
+

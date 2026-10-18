@@ -35,7 +35,7 @@ public sealed partial class WorkspaceService
         if (id is { } noteId)
         {
             note = await Find<PlanningNote>(uid, noteId, ct);
-            CheckNoteVersion(note, input.Version); CheckNoteEditable(note);
+            CheckNoteVersion(note, input.Version);
         }
         else
         {
@@ -43,13 +43,14 @@ public sealed partial class WorkspaceService
             note = new() { UserId = uid, CreatedAt = Now }; db.PlanningNotes.Add(note);
         }
         note.Title = input.Title.Trim(); note.Content = input.Content.Trim(); note.AnalysisJson = "";
-        note.Version = Guid.NewGuid(); note.UpdatedAt = Now;
+        note.PlanId = null; note.Version = Guid.NewGuid(); note.UpdatedAt = Now;
         return NoteViewOf(note);
     }, ct, false);
 
     public Task DeleteNoteAsync(Guid uid, Guid id, Guid version, CancellationToken ct) => Mutate(uid, async () =>
     {
-        var note = await Find<PlanningNote>(uid, id, ct); CheckNoteVersion(note, version);
+        var note = await Find<PlanningNote>(uid, id, ct);
+        if (version != Guid.Empty) CheckNoteVersion(note, version);
         db.PlanningNotes.Remove(note);
     }, ct, false);
 
@@ -57,7 +58,7 @@ public sealed partial class WorkspaceService
     {
         var snapshot = await Mine<PlanningNote>(uid).AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
         Require(snapshot is not null, "NOT_FOUND", "Không tìm thấy ghi chú.", 404);
-        CheckNoteVersion(snapshot, input.Version); CheckNoteEditable(snapshot);
+        CheckNoteVersion(snapshot, input.Version);
         var zone = (await State(uid, ct)).Preference.TimeZoneId;
         // Provider calls happen outside the account transaction; verify the note again before saving.
         var analysis = await RunJob(uid, "AI_REQUEST", async () =>
@@ -72,7 +73,7 @@ public sealed partial class WorkspaceService
               CreationSource = "NATURAL_LANGUAGE", CategoryId = null, ParentId = null }).ToArray() };
         return await Mutate(uid, async () =>
         {
-            var note = await Find<PlanningNote>(uid, id, ct); CheckNoteVersion(note, input.Version); CheckNoteEditable(note);
+            var note = await Find<PlanningNote>(uid, id, ct); CheckNoteVersion(note, input.Version);
             note.AnalysisJson = JsonSerializer.Serialize(analysis, NoteJson);
             note.Version = Guid.NewGuid(); note.UpdatedAt = Now;
             return NoteViewOf(note);
@@ -82,8 +83,6 @@ public sealed partial class WorkspaceService
     public Task<NoteView> ImportNoteAsync(Guid uid, Guid id, NoteImportInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
         var note = await Find<PlanningNote>(uid, id, ct);
-        // Retrying a successful request returns the same tasks, never creates duplicates.
-        if (note.CreatedTaskIdsJson != "[]") return NoteViewOf(note);
         CheckNoteVersion(note, input.Version);
         Require(note.AnalysisJson.Length > 0, "NOTE_NOT_ANALYZED", "Phân tích ghi chú trước khi tạo công việc.");
         var analysis = JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson)!;
@@ -91,6 +90,11 @@ public sealed partial class WorkspaceService
         Require(input.Tasks is { Length: >= 1 and <= 12 }, "VALIDATION_ERROR", "Chọn từ 1 đến 12 công việc.");
         var activeCount = await Mine<WorkTask>(uid).CountAsync(x => !x.IsDeleted && x.Status != WorkTaskStatus.Completed && x.Status != WorkTaskStatus.Cancelled, ct);
         Require(activeCount + input.Tasks.Length <= 500, "TASK_LIMIT", "Tối đa 500 công việc đang hoạt động.");
+        
+        var existingIds = JsonSerializer.Deserialize<List<Guid>>(note.CreatedTaskIdsJson, NoteJson) ?? new();
+        var existingTasks = await Mine<WorkTask>(uid).Where(x => existingIds.Contains(x.Id) && !x.IsDeleted).ToListAsync(ct);
+        var existingTasksByName = existingTasks.ToDictionary(x => x.Name.Trim().ToLowerInvariant(), x => x);
+
         var ids = new List<Guid>();
         var accepted = new List<TaskInput>();
         foreach (var candidate in input.Tasks)
@@ -100,12 +104,31 @@ public sealed partial class WorkspaceService
             ValidTask(taskInput);
             Require(taskInput.CategoryId is null && taskInput.ParentId is null, "VALIDATION_ERROR", "Các việc từ ghi chú được tạo độc lập.");
             Require(await db.TaskTypes.AnyAsync(x => x.Code == NormalizeTaskType(taskInput.TaskType) && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không hợp lệ.");
-            var task = NewTask(uid, taskInput, Now); db.WorkTasks.Add(task); ids.Add(task.Id);
-            accepted.Add(taskInput with { TaskType = task.TaskType });
+
+            var key = taskInput.Name.Trim().ToLowerInvariant();
+            if (existingTasksByName.TryGetValue(key, out var existing))
+            {
+                existing.Deadline = taskInput.Deadline;
+                existing.EstimatedMinutes = taskInput.EstimatedMinutes;
+                existing.Priority = taskInput.Priority;
+                existing.TaskType = NormalizeTaskType(taskInput.TaskType);
+                existing.IsHardDeadline = taskInput.IsHardDeadline;
+                existing.UpdatedAt = Now;
+                ids.Add(existing.Id);
+                accepted.Add(taskInput with { TaskType = existing.TaskType });
+            }
+            else
+            {
+                var task = NewTask(uid, taskInput, Now);
+                db.WorkTasks.Add(task);
+                ids.Add(task.Id);
+                existingIds.Add(task.Id);
+                accepted.Add(taskInput with { TaskType = task.TaskType });
+            }
         }
         note.AnalysisJson = JsonSerializer.Serialize(analysis with { Tasks = accepted.ToArray() }, NoteJson);
-        note.CreatedTaskIdsJson = JsonSerializer.Serialize(ids, NoteJson);
-        note.Version = Guid.NewGuid(); note.UpdatedAt = Now;
+        note.CreatedTaskIdsJson = JsonSerializer.Serialize(existingIds.Distinct().ToArray(), NoteJson);
+        note.UpdatedAt = Now;
         return NoteViewOf(note);
     }, ct);
 
@@ -113,6 +136,10 @@ public sealed partial class WorkspaceService
     {
         Require(input.HorizonDays is >= 1 and <= 30, "VALIDATION_ERROR", "Số ngày xếp lịch phải từ 1 đến 30.");
         var note = NoteViewOf(await Find<PlanningNote>(uid, id, ct));
+        // Returning an already-applied result is read-only. The original request
+        // version predates analysis/import, so comparing it to the final note
+        // version would incorrectly generate a second plan on retry. Saving an
+        // edited note clears PlanId, preventing replay across content changes.
         if (note.PlanId is { } previousId)
         {
             var previous = await GetPlanAsync(uid, previousId, ct);
@@ -121,7 +148,7 @@ public sealed partial class WorkspaceService
         var state = await State(uid, ct);
         Require(state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable), "NO_AVAILABILITY",
             "Thiết lập giờ rảnh trước khi agent tự xếp lịch.");
-        if (note.CreatedTaskIds.Length == 0)
+        if (note.Analysis is null || note.Analysis.Tasks.Length == 0 || note.CreatedTaskIds.Length == 0)
         {
             note = await AnalyzeNoteAsync(uid, id, new(input.Version, true), ct);
             Require(!note.Analysis!.NeedsReview, "NOTE_NEEDS_REVIEW",

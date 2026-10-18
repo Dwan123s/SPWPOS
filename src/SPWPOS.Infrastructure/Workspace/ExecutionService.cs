@@ -19,7 +19,8 @@ public sealed partial class WorkspaceService
         var completed = engine.CompletionTimes(state, [], engine.Biases(state), Now);
         Require(state.Dependencies.Where(x => x.TaskId == task.Id).All(x => completed.ContainsKey(x.PredecessorId)),
             "DEPENDENCY_INCOMPLETE", "Hoàn thành công việc tiền nhiệm trước.", 409);
-        Require((!task.IsHardDeadline || session.End <= task.Deadline && Now < task.Deadline) &&
+        Require(PlanningEngine.InsideWorkWindow(task, Now < session.Start ? Now : session.Start, session.End) &&
+            (!task.IsHardDeadline || session.End <= task.Deadline && Now < task.Deadline) &&
             engine.FreeSlots(state, session.Start, session.End).Any(x => x.Start <= session.Start && x.End >= session.End) &&
             engine.FreeSlots(state, Now, session.End).Any(x => x.Start <= Now && x.End >= session.End),
             "STALE_SESSION", "Lịch đã thay đổi hoặc hiện không nằm trong giờ rảnh. Hãy xếp lại phần còn lại trước khi tiếp tục.", 409);

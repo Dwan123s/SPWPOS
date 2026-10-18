@@ -178,13 +178,12 @@ export function NoteStudio({
           hidden={reviewing}
         >
           <form
-            hidden={imported}
             onSubmit={(event) => {
               event.preventDefault();
               saveDraft();
             }}
           >
-            <fieldset className="note-fields" disabled={!!busy || imported}>
+            <fieldset className="note-fields" disabled={!!busy}>
               <label className="note-title-field">
                 <span className="sr-only">Tiêu đề ghi chú</span>
                 <input
@@ -250,16 +249,27 @@ export function NoteStudio({
                 </div>
                 <div className="form-actions note-editor-actions">
                   <button type="submit" className="btn secondary">
-                    Lưu bản nháp
+                    {imported ? "Lưu ghi chú" : "Lưu bản nháp"}
                   </button>
-                  <button
-                    type="button"
-                    className="btn primary"
-                    disabled={!agent?.aiAvailable || !note.content.trim()}
-                    onClick={analyze}
-                  >
-                    {icon("spark")} Xem trước công việc {icon("arrow")}
-                  </button>
+                  {imported ? (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={!agent?.aiAvailable || !note.content.trim() || !!busy}
+                      onClick={() => requestSchedule("auto")}
+                    >
+                      {icon("calendar")} Cập nhật công việc &amp; lịch trình
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={!agent?.aiAvailable || !note.content.trim()}
+                      onClick={analyze}
+                    >
+                      {icon("spark")} Xem trước công việc {icon("arrow")}
+                    </button>
+                  )}
                 </div>
               </div>
               {!busy && !agent?.aiAvailable && (
@@ -296,28 +306,24 @@ export function NoteStudio({
             </fieldset>
           </form>
           {imported && (
-            <>
-              <article className="note-source">
-                <h3>{note.title}</h3>
-                <p>{note.content}</p>
-              </article>
-              <p className="info spaced">
-                Ghi chú đã tạo {note.createdTaskIds.length} công việc. Sửa nội
-                dung ở mục Công việc; tạo ghi chú mới để thêm việc.
+            <div className="note-sync-banner info spaced">
+              <p>
+                {icon("check")} Ghi chú đã tạo {note.createdTaskIds.length} công việc trong hệ thống.
+                Bạn có thể sửa nội dung và bấm <strong>Lưu ghi chú</strong>, hoặc bấm <strong>Cập nhật công việc &amp; lịch trình</strong> để đồng bộ sang lịch.
               </p>
-              <div className="form-actions">
-                <a href="#tasks" className="btn secondary">
-                  Sửa công việc đã tạo
-                </a>
+              <div className="form-actions spaced">
                 <button
                   type="button"
-                  className="btn primary"
+                  className="btn secondary small"
                   onClick={goReview}
                 >
                   Xem công việc và lịch
                 </button>
+                <a href="#tasks" className="btn ghost small">
+                  Quản lý công việc
+                </a>
               </div>
-            </>
+            </div>
           )}
           {!hasTime && (
             <p className="note-soft-help">
@@ -359,11 +365,10 @@ export function NoteStudio({
                 className="btn secondary small"
                 disabled={!!busy}
                 onClick={goWrite}
-                aria-label={imported ? "Xem ghi chú gốc" : "Sửa ghi chú"}
-                title={imported ? "Xem ghi chú gốc" : "Sửa ghi chú"}
+                aria-label="Sửa ghi chú"
+                title="Sửa ghi chú"
               >
-                {icon("edit")}{" "}
-                <span>{imported ? "Xem ghi chú gốc" : "Sửa ghi chú"}</span>
+                {icon("edit")} <span>Sửa ghi chú</span>
               </button>
             </div>
             <div className="note-review-grid">

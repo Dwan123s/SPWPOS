@@ -5,19 +5,25 @@ public sealed record AgentTurnInput(Guid ConversationId, Guid RequestId,
     [Required, StringLength(2000)] string Text, bool AutoApply = true,
     bool UseCapacityFactor = false, bool UseEstimateBias = false);
 public sealed record AgentTaskCommand(Guid? TaskId, string Name, DateTimeOffset? Deadline,
-    int? EstimatedMinutes, int? Priority, string TaskType, bool? Splittable);
+    int? EstimatedMinutes, int? Priority, string TaskType, bool? Splittable,
+    DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null,
+    string? DurationEvidence = null, string? DeadlineEvidence = null, string? WorkWindowEvidence = null,
+    bool DeadlineFromWorkWindow = false);
+public sealed record AgentPendingRequest(string OriginalText, Guid? TaskId, DateTimeOffset? WorkWindowStart,
+    DateTimeOffset? WorkWindowEnd, int? EstimatedMinutes, DateTimeOffset? Deadline, string[]? Answers = null);
 public sealed record AgentExceptionCommand(DateOnly Date, int StartMinute, int EndMinute,
     bool IsAvailable, string Note = "", Guid? ExistingId = null);
 public sealed record AgentEventCommand(string Name, DateTimeOffset Start, DateTimeOffset End,
     string Description = "", string EventType = "OTHER", int RepeatWeeks = 1, Guid? ExistingId = null);
 public sealed record AgentIntent(string Reply, string Question, bool ReplaceWeeklyAvailability,
     AvailabilityInput[] WeeklySlots, AgentExceptionCommand[] Exceptions, AgentEventCommand[] Events,
-    AgentTaskCommand[] Tasks, Guid[] ScheduleTaskIds, bool Reschedule, int HorizonDays, string[]? Options = null);
+    AgentTaskCommand[] Tasks, Guid[] ScheduleTaskIds, bool Reschedule, int HorizonDays, string[]? Options = null,
+    AgentPendingRequest? Pending = null, string? ResultKind = null);
 public sealed record AgentMessage(string Text, string Reply, string Status);
 public sealed record AgentChangeView(string Kind, string Name, string Before, string After, Guid? TaskId = null);
 public sealed record AgentTurnView(Guid Id, Guid ConversationId, Guid RequestId, string Text,
     string Reply, string Status, string Question, PlanView? Plan, AgentChangeView[] Changes,
-    string[] Warnings, DateTimeOffset CreatedAt, bool CanUndo = false, string[]? Options = null);
+    string[] Warnings, DateTimeOffset CreatedAt, bool CanUndo = false, string[]? Options = null, string? ErrorCode = null);
 public sealed record AgentStreamEvent(string Type, string? Stage = null, string? Message = null,
     string? Delta = null, AgentTurnView? Turn = null, string? Code = null);
 public sealed record ConversationView(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,

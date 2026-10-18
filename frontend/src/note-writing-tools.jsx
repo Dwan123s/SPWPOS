@@ -101,7 +101,6 @@ export function NoteWritingTools({
       <button
         type="button"
         className="note-tool"
-        hidden={imported}
         title="Thêm dòng danh sách"
         aria-label="Thêm dòng danh sách"
         onClick={() => insertList("• ")}
@@ -111,7 +110,6 @@ export function NoteWritingTools({
       <button
         type="button"
         className="note-tool"
-        hidden={imported}
         title="Thêm dòng checklist"
         aria-label="Thêm dòng checklist"
         onClick={() => insertList("☐ ")}

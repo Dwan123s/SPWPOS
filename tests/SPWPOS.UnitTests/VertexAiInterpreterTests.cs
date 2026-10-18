@@ -15,7 +15,7 @@ namespace SPWPOS.UnitTests;
 public sealed class VertexAiInterpreterTests
 {
     private const string Command = """
-        {"reply":"Thêm cuộc họp","question":"","options":[],"replaceWeeklyAvailability":false,"weeklySlots":[],"exceptions":[],
+        {"reply":"Thêm cuộc họp","resultKind":"MUTATION","question":"","options":[],"replaceWeeklyAvailability":false,"weeklySlots":[],"exceptions":[],
         "events":[{"name":"Họp","start":"2026-10-15T14:00:00+07:00","end":"2026-10-15T16:00:00+07:00","description":"","eventType":"MEETING","repeatWeeks":1,"existingId":null}],
         "tasks":[],"scheduleTaskIds":[],"reschedule":false,"horizonDays":14}
         """;

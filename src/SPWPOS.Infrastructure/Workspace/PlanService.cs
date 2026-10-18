@@ -86,6 +86,7 @@ public sealed partial class WorkspaceService
         var task = state.Tasks.SingleOrDefault(x => x.Id == taskId);
         Require(task is not null && !task.IsDeleted && task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled, "INVALID_TASK", "Công việc không thể xếp lịch.");
         Require(start >= Now && end > start && (!task!.IsHardDeadline || end <= task.Deadline), "DEADLINE_CONFLICT", "Phiên phải ở tương lai và không vượt deadline cứng.", 409);
+        Require(PlanningEngine.InsideWorkWindow(task!, start, end), "TASK_WORK_WINDOW", "Phiên nằm ngoài khung giờ thực hiện đã yêu cầu cho công việc.", 409);
         var duration = (end - start).TotalMinutes;
         Require(duration >= Math.Max(state.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) && duration <= state.Preference.MaximumSessionMinutes,
             "SESSION_LENGTH", "Thời lượng phiên vượt giới hạn.");

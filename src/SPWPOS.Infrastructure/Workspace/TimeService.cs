@@ -92,6 +92,9 @@ public sealed partial class WorkspaceService
     }, ct);
     private void ValidateProtectedSessions(PlanningState state)
     {
+        foreach (var session in state.Sessions.Where(x => x.End > Now && (x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && x.IsLocked)))
+            Require(PlanningEngine.InsideWorkWindow(state.Tasks.Single(x => x.Id == session.TaskId), session.Start, session.End),
+                "LOCKED_SESSION_CONFLICT", "Khung giờ thực hiện mới xung đột với phiên đã khóa hoặc đang thực hiện.", 409);
         foreach (var active in state.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused ||
             x.Status == WorkSessionStatus.Scheduled && x.End > Now && x.Start < Now))
             Require(!state.Events.Any(x => x.Start < active.End && active.Start < x.End) &&
@@ -141,6 +144,7 @@ public sealed partial class WorkspaceService
         var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
         var future = state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && !x.IsLocked && x.Start >= Now).ToArray();
         var affected = future.Where(x => !engine.FreeSlots(state, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End) ||
+            !PlanningEngine.InsideWorkWindow(state.Tasks.Single(t => t.Id == x.TaskId), x.Start, x.End) ||
             (x.End - x.Start).TotalMinutes > state.Preference.MaximumSessionMinutes ||
             (x.End - x.Start).TotalMinutes < Math.Max(state.Preference.MinimumSessionMinutes, state.Tasks.Single(t => t.Id == x.TaskId).MinimumSessionMinutes))
             .Select(x => x.TaskId).ToHashSet();

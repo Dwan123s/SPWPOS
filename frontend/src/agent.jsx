@@ -8,6 +8,7 @@ import {
   LegacyConversationLibrary,
 } from "./conversations.jsx";
 import { sendAgentStream } from "./agent-stream.js";
+import { agentFailure } from "./agent-failure.js";
 import { NoraProgress } from "./nora-progress.jsx";
 import { useVoiceInput } from "./voice-input.js";
 import {
@@ -119,6 +120,12 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
           </details>
         )}
         <NoraReply text={turn.reply} />
+        {turn.status === "FAILED" && (
+          <small role="status">
+            {agentFailure({ code: turn.errorCode }).label} · Yêu cầu này chưa
+            được lưu.
+          </small>
+        )}
         {turn.question && (
           <div className="agent-clarification-box">
             <p className="agent-question">{turn.question}</p>
@@ -496,14 +503,27 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       setPending(null);
       if (!overrideText) setText("");
       retry.current = null;
-      if (result.status === "APPLIED") await onWorkspaceChanged();
-      const history = await api("/api/agent/turns");
-      if (mounted.current) setTurns(history);
+      try {
+        if (result.status === "APPLIED") await onWorkspaceChanged();
+        const history = await api("/api/agent/turns");
+        if (mounted.current) setTurns(history);
+      } catch {
+        if (mounted.current)
+          setError(
+            result.status === "APPLIED"
+              ? "Yêu cầu đã được lưu. Chưa tải lại được giao diện; hãy làm mới để xem lịch mới."
+              : "Đã nhận kết quả. Chưa tải lại được lịch sử hội thoại.",
+          );
+      }
     } catch (failure) {
       if (mounted.current) {
         setPending((previous) =>
           previous
-            ? { ...previous, cancelled: controller.signal.aborted }
+            ? {
+                ...previous,
+                cancelled: controller.signal.aborted,
+                failure: agentFailure(failure),
+              }
             : null,
         );
         setError(

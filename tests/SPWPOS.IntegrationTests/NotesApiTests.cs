@@ -79,4 +79,16 @@ public sealed class NotesApiTests
         Assert.Equal(0, workspace.GetProperty("tasks").GetArrayLength()); Assert.Equal(0, workspace.GetProperty("sessions").GetArrayLength());
         var list = await Data(await client.GetAsync("/api/notes", Ct)); Assert.Equal(1, list.GetArrayLength());
     }
+
+    [Fact] public async Task Note_can_be_deleted_via_api()
+    {
+        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        var tokens = await AuthFlowTests.RegisterLoginAsync(factory, client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Access);
+        var saved = await Data(await client.PostAsJsonAsync("/api/notes", new NoteInput("To delete", "Content"), Ct));
+        var id = saved.GetProperty("id").GetGuid();
+        var version = saved.GetProperty("version").GetGuid();
+        var response = await client.DeleteAsync($"/api/notes/{id}?version={version}", Ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }

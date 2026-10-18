@@ -293,7 +293,9 @@ export function exceptionModal(e = {}) {
               Bận
             </option>
             <option value="true" selected={e.isAvailable}>
-              Rảnh thêm
+              {e.overridesWeeklyAvailability
+                ? "Giờ rảnh duy nhất trong ngày"
+                : "Rảnh thêm"}
             </option>
           </Select>
         </label>

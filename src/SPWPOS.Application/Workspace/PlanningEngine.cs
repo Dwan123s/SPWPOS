@@ -46,6 +46,8 @@ public sealed partial class PlanningEngine
         return (elapsed.Length < 5 || total <= 0 ? ColdCapacityFactor : Math.Clamp(elapsed.Where(x => x.Status == WorkSessionStatus.Completed).Sum(x => (x.End - x.Start).TotalMinutes) / total, .25, 1), elapsed.Length);
     }
     public static TimeZoneInfo Zone(string id) => TimeZoneInfo.FindSystemTimeZoneById(id);
+    public static bool InsideWorkWindow(WorkTask task, DateTimeOffset start, DateTimeOffset end) =>
+        (task.WorkWindowStart is null || start >= task.WorkWindowStart) && (task.WorkWindowEnd is null || end <= task.WorkWindowEnd);
     public static DateTimeOffset At(DateOnly date, int minute, TimeZoneInfo zone)
     {
         var local = date.ToDateTime(TimeOnly.MinValue).AddMinutes(minute);
@@ -62,8 +64,11 @@ public sealed partial class PlanningEngine
         var blocks = state.Events.Select(x => new TimeSlot(x.Start, x.End)).Concat(additionalBlocks ?? []).ToArray();
         for (var day = first; day <= last; day = day.AddDays(1))
         {
-            var windows = state.Availability.Where(x => x.DayOfWeek == (int)day.DayOfWeek).Select(x => new TimeSlot(At(day, x.StartMinute, zone), At(day, x.EndMinute, zone)))
-                .Concat(state.Exceptions.Where(x => x.Date == day && x.IsAvailable).Select(x => new TimeSlot(At(day, x.StartMinute, zone), At(day, x.EndMinute, zone))));
+            var dated = state.Exceptions.Where(x => x.Date == day && x.IsAvailable).ToArray();
+            var replaceDate = dated.Any(x => x.OverridesWeeklyAvailability);
+            var windows = (replaceDate ? [] : state.Availability.Where(x => x.DayOfWeek == (int)day.DayOfWeek))
+                .Select(x => new TimeSlot(At(day, x.StartMinute, zone), At(day, x.EndMinute, zone)))
+                .Concat(dated.Where(x => !replaceDate || x.OverridesWeeklyAvailability).Select(x => new TimeSlot(At(day, x.StartMinute, zone), At(day, x.EndMinute, zone))));
             var unavailable = state.Exceptions.Where(x => x.Date == day && !x.IsAvailable).Select(x => new TimeSlot(At(day, x.StartMinute, zone), At(day, x.EndMinute, zone)));
             foreach (var window in Merge(windows))
             {
@@ -162,7 +167,9 @@ public sealed partial class PlanningEngine
             // other available hours so soft preferences never block a hard deadline.
             var choices = preferredWindows.Concat(task.Splittable ? free.SelectMany(slot => Subtract(slot, preferredWindows)) : free).ToArray();
             var candidates = choices.Select(x => new TimeSlot(x.Start, x.End < task.Deadline ? x.End : task.Deadline)).Where(x => x.End > x.Start)
-                .Concat(task.IsHardDeadline ? [] : choices.Select(x => new TimeSlot(x.Start > task.Deadline ? x.Start : task.Deadline, x.End)).Where(x => x.End > x.Start));
+                .Concat(task.IsHardDeadline ? [] : choices.Select(x => new TimeSlot(x.Start > task.Deadline ? x.Start : task.Deadline, x.End)).Where(x => x.End > x.Start))
+                .Select(x => new TimeSlot(task.WorkWindowStart is { } from && from > x.Start ? from : x.Start,
+                    task.WorkWindowEnd is { } to && to < x.End ? to : x.End)).Where(x => x.End > x.Start);
             foreach (var slot in candidates)
             {
                 // Preferred windows may be visited before earlier fallback windows.

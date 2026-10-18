@@ -411,6 +411,15 @@ export function openDetail(id, afterSession = false) {
         {badge(t.isHardDeadline ? "Deadline cứng" : "Deadline mềm")}
       </div>
       <dl className="detail-list">
+        {t.workWindowStart && t.workWindowEnd && (
+          <div>
+            <dt>Khung giờ thực hiện</dt>
+            <dd>
+              {dateFmt(t.workWindowStart)} · {timeFmt(t.workWindowStart)} →{" "}
+              {dateFmt(t.workWindowEnd)} · {timeFmt(t.workWindowEnd)}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Deadline</dt>
           <dd>
