@@ -507,7 +507,7 @@ html::-webkit-scrollbar {
   background: #eef7ffd9;
   border-left-color: #7faacc;
 }
-.glass-workspace .session-card.fixed {
+.glass-workspace .session-card.fixed-event {
   background: #f4f8fcd9;
   border-left-color: #829ab3;
 }
@@ -662,7 +662,7 @@ html::-webkit-scrollbar {
   border-left-color: #7faacc;
   color: #486581;
 }
-.glass-workspace .calendar-block.fixed {
+.glass-workspace .calendar-block.fixed-event {
   background: #f4f8fcd9;
   border-color: #d4e3f0;
   border-left-color: #829ab3;

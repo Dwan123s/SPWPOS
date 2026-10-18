@@ -926,7 +926,7 @@ textarea:focus-visible {
   border-color: #d8e5ef;
   border-left-color: #7ba6c5;
 }
-.session-card.fixed {
+.session-card.fixed-event {
   background: #f2f6f9;
   border-color: #e1e9ef;
   border-left-color: #99b0c0;
@@ -1270,13 +1270,13 @@ textarea:focus-visible {
   width: 11px;
   height: 11px;
 }
-.calendar-block.fixed {
+.calendar-block.fixed-event {
   background: #f1f6f9;
   border-color: #dee7ee;
   border-left-color: #99b0c0;
   color: #577285;
 }
-.calendar-block.fixed .block-meta {
+.calendar-block.fixed-event .block-meta {
   color: #7c95a7;
 }
 .calendar-block.completed {
@@ -2806,7 +2806,7 @@ dialog::backdrop {
 .preview-session.secondary small {
   color: #446278;
 }
-.calendar-block.fixed .block-meta {
+.calendar-block.fixed-event .block-meta {
   color: #5c7587;
 }
 .priority-task-deadline small {

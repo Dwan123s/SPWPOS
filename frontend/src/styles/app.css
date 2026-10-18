@@ -604,7 +604,7 @@ svg {
 .session-card:last-child {
   margin-bottom: 0;
 }
-.session-card.fixed {
+.session-card.fixed-event {
   border-left-color: #0f73ba;
   background: #eff8fe;
 }

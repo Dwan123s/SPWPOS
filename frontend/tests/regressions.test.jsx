@@ -70,6 +70,36 @@ describe("React view regressions", () => {
     expect(html.match(/Midnight boundary/g)).toHaveLength(1);
     expect(html).toContain("22:00 — 24:00");
   });
+  it.each(["week", "agenda"])(
+    "keeps fixed events in their day instead of applying Tailwind fixed positioning (%s)",
+    (view) => {
+      state.workspace = {
+        preference: { timeZoneId: "Asia/Ho_Chi_Minh" },
+        sessions: [],
+        events: [
+          {
+            id: "meeting",
+            name: "Cuộc họp buổi trưa",
+            start: "2026-10-19T12:00:00+07:00",
+            end: "2026-10-19T13:00:00+07:00",
+          },
+        ],
+      };
+      state.calendarStart = "2026-10-19";
+      state.calendarView = view;
+      const root = document.createElement("div");
+      root.innerHTML = renderToStaticMarkup(calendarPage());
+      const event = root.querySelector(
+        '[data-action="edit-event"][data-id="meeting"]',
+      );
+      const day = event.closest(view === "week" ? ".week-day" : ".agenda-day");
+      expect(day.querySelector("strong").textContent).toBe("19");
+      expect(day.textContent).toContain("12:00 — 13:00");
+      expect(root.querySelectorAll(".fixed-event")).toHaveLength(1);
+      expect(root.querySelector(".fixed")).toBeNull();
+      expect(root.querySelectorAll('[data-id="meeting"]')).toHaveLength(1);
+    },
+  );
   it("retains selected date headings in extreme time zones", () => {
     state.workspace = {
       preference: { timeZoneId: "Pacific/Kiritimati" },

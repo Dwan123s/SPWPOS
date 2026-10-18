@@ -62,7 +62,7 @@ export function calendarPage() {
     return compact ? (
       <button
         type="button"
-        className="calendar-block fixed"
+        className="calendar-block fixed-event"
         data-action="edit-event"
         data-id={e.id}
       >
@@ -78,7 +78,7 @@ export function calendarPage() {
         </span>
       </button>
     ) : (
-      <div className="session-card fixed">
+      <div className="session-card fixed-event">
         <div className="session-top">
           <h3>{e.name}</h3>
           {badge("Cố định")}
