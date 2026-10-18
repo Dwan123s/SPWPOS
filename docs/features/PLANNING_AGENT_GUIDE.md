@@ -20,6 +20,19 @@ Ba gợi ý mẫu chỉ điền và focus ô nhập; không gọi AI hoặc lưu
 
 ## Cách sử dụng
 
+### Quy tắc và guardrail — 19/10/2026
+
+- Danh sách loại công việc đang hoạt động được đọc từ database vào ngữ cảnh AI và enum của schema, thay cho danh sách viết cố định. Backend vẫn kiểm tra loại công việc khi tạo bản xem trước và kiểm tra lại khi áp dụng.
+- Khi AI hỏi làm rõ, backend loại bỏ toàn bộ lệnh thay đổi, cờ thay lịch tuần và cờ xếp lại trước khi lưu lượt ở trạng thái **Cần làm rõ**. Không áp dụng phần khác của yêu cầu trong lúc chờ câu trả lời. Công việc mới thiếu deadline hoặc thời lượng cũng được chuyển thành câu hỏi thay vì lưu một phần.
+- Lượt thất bại được đưa vào tối đa 8 lượt ngữ cảnh gần nhất bằng thông báo cố định rằng yêu cầu chưa lưu; không gửi lại chi tiết lỗi thô. AI phải đối chiếu công việc và phiên thực tế trước khi xác nhận deadline.
+- Câu trả lời không có lệnh thay đổi không chạy kiểm tra/xếp lại các xung đột đã có. Sửa lịch tuần, ngoại lệ, sự kiện hoặc công việc với giá trị không đổi không tạo bản xem trước, thay revision hay cung cấp hoàn tác. Các lệnh sửa lặp cùng ID vẫn bị từ chối.
+- Hướng dẫn AI yêu cầu giữ các điều kiện của lượt trước, hỏi lại giờ sáng/chiều chưa rõ, không tự đặt thời lượng/deadline và không tự nới giờ rảnh hoặc chia yêu cầu liên tục. Các quy tắc diễn giải này vẫn phụ thuộc vào khả năng tuân thủ của model.
+- Công cụ task hiện **chưa hỗ trợ khung thực hiện riêng**, ví dụ “chỉ học tối thứ Năm”. Ngữ cảnh khai báo giới hạn này; AI phải giải thích và hỏi về sự kiện cố định hoặc việc người dùng chấp nhận chỉ ràng buộc deadline, không tự đổi ngày thực hiện thành deadline. Khung thực hiện chưa được bổ sung vào planner/persistence trong thay đổi này.
+
+Kiểm thử hồi quy dùng phản hồi AI được kiểm soát và database SQLite trong bộ test, không gọi AI thật hoặc thay đổi lịch người dùng. Chúng kiểm chứng guardrail backend; chưa chứng minh độ tuân thủ của model thật. [Báo cáo gốc ngày 18/10](../reviews/NORA_REQUEST_RESPONSE_QUALITY_REPORT_2026-10-18.md) giữ nguyên bằng chứng trước sửa.
+
+### Các bước
+
 1. Vào **Giờ rảnh**, nhập các khoảng làm việc thực tế. Cấu hình múi giờ, phiên dài nhất và tổng phút mỗi ngày.
 2. Vào **Trợ lý AI**, nhập yêu cầu có ngày giờ cụ thể, ví dụ:
 
@@ -33,6 +46,8 @@ Ba gợi ý mẫu chỉ điền và focus ô nhập; không gọi AI hoặc lưu
 
 ## Quy tắc thời gian
 
+- Nội dung “chỉ xem thử”, “chưa đồng ý lưu” hoặc yêu cầu không lưu sẽ giữ bản xem trước dù đang bật tự áp dụng. Gửi lại cùng mã yêu cầu không tự lưu; người dùng vẫn có thể bấm áp dụng bản xem trước.
+- Backend kiểm tra cặp thứ/ngày rõ ràng như “thứ Năm ngày 28/10/2026”; nếu không khớp sẽ hỏi lại và không lưu. Ngày tương đối của một sự kiện/ngoại lệ được đối chiếu với ngày tại múi giờ tài khoản.
 - Dùng múi giờ tài khoản để hiểu ngày tương đối và hiển thị lịch. Timestamp AI bắt buộc có offset; backend không suy ra theo múi giờ máy chủ.
 - Yêu cầu liên tục 120 phút cần một khoảng liên tục và giới hạn phiên ít nhất 120 phút. Chat không tự nâng giới hạn hoặc chia nhỏ yêu cầu liên tục.
 - Với chat, bộ lập lịch dùng thời lượng đã xác định trong task và không tự nhân thêm hệ số bias hoặc hệ số năng lực học được. Các giới hạn phiên/ngày/nghỉ vẫn bắt buộc. Những luồng lập lịch thông thường tiếp tục cá nhân hóa estimate.

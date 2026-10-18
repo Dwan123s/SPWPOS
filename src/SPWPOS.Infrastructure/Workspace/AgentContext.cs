@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using SPWPOS.Application.Workspace;
 using SPWPOS.Domain.Entities;
 namespace SPWPOS.Infrastructure.Workspace;
@@ -9,9 +10,11 @@ public sealed partial class WorkspaceService
 {
     private static string MatchText(string value) => string.Concat(value.Normalize(NormalizationForm.FormD)
         .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)).ToLowerInvariant().Replace('đ','d');
-    private (string Json, string[] Notices) BuildAgentContext(PlanningState state, string request)
+    private async Task<(string Json, string[] Notices)> BuildAgentContextAsync(PlanningState state, string request, CancellationToken ct)
     {
         var search = MatchText(request);
+        DateTimeOffset Local(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, PlanningEngine.Zone(state.Preference.TimeZoneId));
+        var today = LocalDate(Now, state.Preference);
         var active = state.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled).ToArray();
         var matches = state.Tasks.Where(x => MatchText(x.Name.Trim()).Length >= 2 && search.Contains(MatchText(x.Name.Trim()), StringComparison.Ordinal) || request.Contains(x.Id.ToString(), StringComparison.OrdinalIgnoreCase)).ToArray();
         var tasks = matches.Concat(active.OrderBy(x=>x.Deadline).ThenByDescending(x=>x.Priority)).DistinctBy(x=>x.Id).Take(100).ToArray();
@@ -20,17 +23,23 @@ public sealed partial class WorkspaceService
         var notices = new List<string>();
         if (active.Length > tasks.Count(x=>active.Any(t=>t.Id==x.Id))) notices.Add($"NORA đang đọc {tasks.Count(x=>active.Any(t=>t.Id==x.Id))}/{active.Length} công việc đang hoạt động, ưu tiên tên khớp yêu cầu và deadline. Hãy nêu tên cụ thể để xem phần khác.");
         if (events.Length > 100 || sessions.Length > 100) notices.Add("NORA chỉ đọc 100 sự kiện và 100 phiên gần nhất trong 30 ngày tới. Câu trả lời chỉ áp dụng cho phạm vi này.");
+        if (notices.Count > 0) notices.Add($"Phạm vi lịch đang đọc: {Local(Now):dd/MM/yyyy HH:mm} đến {Local(Now.AddDays(30)):dd/MM/yyyy HH:mm} ({state.Preference.TimeZoneId}).");
+        var taskTypes = await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Code)
+            .Select(x => new { x.Code, x.DisplayName }).ToArrayAsync(ct);
         var json = JsonSerializer.Serialize(new {
-            scope = new { rangeStart=Now,rangeEnd=Now.AddDays(30), timeZoneId=state.Preference.TimeZoneId,
+            taskTypes,
+            clock = new { currentLocal = Local(Now), today, tomorrow = today.AddDays(1), dayAfterTomorrow = today.AddDays(2) },
+            capabilities = new { taskWorkWindows = false, preferenceChanges = false },
+            scope = new { rangeStart=Local(Now),rangeEnd=Local(Now.AddDays(30)), timeZoneId=state.Preference.TimeZoneId,
                 tasks=new { totalActive=active.Length,included=tasks.Length,truncated=active.Any(x=>!tasks.Any(t=>t.Id==x.Id)),matchingRequestIds=matches.Select(x=>x.Id) },
                 events=new { total=events.Length,included=Math.Min(100,events.Length),truncated=events.Length>100 },
                 sessions=new { total=sessions.Length,included=Math.Min(100,sessions.Length),truncated=sessions.Length>100 },
                 history=new { maximumTurns=8, truncatedPossible=true } },
-            tasks=tasks.Select(x=>new {x.Id,x.Name,x.Deadline,x.EstimatedMinutes,x.Progress,x.Splittable,x.MinimumSessionMinutes,x.Priority,x.TaskType,status=x.Status.ToString()}),
+            tasks=tasks.Select(x=>new {x.Id,x.Name,Deadline=Local(x.Deadline),x.EstimatedMinutes,x.Progress,x.Splittable,x.MinimumSessionMinutes,x.Priority,x.TaskType,status=x.Status.ToString()}),
             availability=state.Availability.Select(x=>new AvailabilityInput(x.DayOfWeek,x.StartMinute,x.EndMinute)),
             exceptions=state.Exceptions.Where(x=>x.Date>=LocalDate(Now,state.Preference) && x.Date<=LocalDate(Now.AddDays(30),state.Preference)).Select(x=>new {x.Id,x.Date,x.StartMinute,x.EndMinute,x.IsAvailable,x.Note}),
-            events=events.Take(100).Select(x=>new{x.Id,x.Name,x.Start,x.End,x.EventType,x.Description}),
-            sessions=sessions.Take(100).Select(x=>new{x.TaskId,x.Start,x.End,x.IsLocked,status=x.Status.ToString()}),
+            events=events.Take(100).Select(x=>new{x.Id,x.Name,Start=Local(x.Start),End=Local(x.End),x.EventType,x.Description}),
+            sessions=sessions.Take(100).Select(x=>new{x.TaskId,Start=Local(x.Start),End=Local(x.End),x.IsLocked,status=x.Status.ToString()}),
             dependencies=state.Dependencies.Select(x=>new{x.TaskId,x.PredecessorId}),
             preference=new {state.Preference.MaximumDailyMinutes,state.Preference.MaximumSessionMinutes,state.Preference.MinimumSessionMinutes,state.Preference.BreakMinutes,state.Preference.PlanningHorizonDays}
         },AgentJson);

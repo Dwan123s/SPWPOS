@@ -34,8 +34,9 @@ public sealed class AgentApiTests
     {
         await using var f = new Factory(); using var client = await f.ClientAsync();
         await WorkspaceFlowTests.Authorize(f, client); await WorkspaceFlowTests.SetupTime(client);
-        var tomorrow = f.Clock.GetUtcNow().UtcDateTime.Date.AddDays(1).AddHours(8);
-        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Họp", new DateTimeOffset(tomorrow), new DateTimeOffset(tomorrow.AddHours(1)), EventType: "MEETING")] };
+        // The account defaults to Vietnam time; tomorrow must follow its calendar even after UTC 17:00.
+        var tomorrow = new DateTimeOffset(f.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).Date.AddDays(1).AddHours(8), TimeSpan.FromHours(7));
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Họp", tomorrow, tomorrow.AddHours(1), EventType: "MEETING")] };
         var input = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Họp ngày mai", false);
         async Task<System.Text.Json.JsonElement[]> SendStream()
         {
@@ -60,8 +61,8 @@ public sealed class AgentApiTests
     {
         await using var f = new Factory(); using var client = await f.ClientAsync();
         await WorkspaceFlowTests.Authorize(f, client); await WorkspaceFlowTests.SetupTime(client);
-        var tomorrow = f.Clock.GetUtcNow().UtcDateTime.Date.AddDays(1).AddHours(8);
-        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Họp", new DateTimeOffset(tomorrow), new DateTimeOffset(tomorrow.AddHours(2)), EventType: "MEETING")] };
+        var tomorrow = new DateTimeOffset(f.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).Date.AddDays(1).AddHours(8), TimeSpan.FromHours(7));
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Họp", tomorrow, tomorrow.AddHours(2), EventType: "MEETING")] };
         var input = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Họp ngày mai 8h đến 10h", false);
         var preview = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns", input)).GetProperty("data");
         Assert.Equal("PREVIEW", preview.GetProperty("status").GetString()); var id = preview.GetProperty("id").GetGuid();

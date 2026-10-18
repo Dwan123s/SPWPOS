@@ -51,16 +51,39 @@ public sealed class AgentInterpreterTests
         var error = await Assert.ThrowsAsync<AuthException>(() => Interpreter(client).InterpretAsync("Họp", "{}", [], "UTC", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken));
         Assert.Equal(503, error.StatusCode);
     }
-    [Theory] [InlineData("missing")] [InlineData("offset")] [InlineData("unknown")]
+    [Theory] [InlineData("missing")] [InlineData("offset")] [InlineData("unknown")] [InlineData("eventType")]
     public async Task Malformed_schema_or_offset_is_rejected(string mode)
     {
         var output = mode switch {
             "missing" => Payload.Replace("\"repeatWeeks\":1", "\"irrelevant\":1"),
             "offset" => Payload.Replace("14:00:00+07:00", "14:00:00"),
+            "eventType" => Payload.Replace("\"MEETING\"", "\"STUDY\""),
             _ => Payload.Replace("\"reschedule\":false", "\"reschedule\":false,\"userId\":\"other\"")
         };
         using var provider = new Provider(output); using var client = new HttpClient(provider);
         var error = await Assert.ThrowsAsync<AuthException>(() => Interpreter(client).InterpretAsync("Họp", "{}", [], "UTC", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken));
         Assert.Equal("AGENT_AI_INVALID_RESPONSE", error.Code);
+    }
+
+    [Theory] [InlineData("CUSTOM", true)] [InlineData("DESIGN", false)] [InlineData("ADMIN", false)]
+    public async Task Task_category_must_match_the_active_context_enum(string code, bool supported)
+    {
+        var output = Payload.Replace("\"tasks\":[]", "\"tasks\":" + JsonSerializer.Serialize(new[] {
+            new { taskId = (Guid?)null, name = "Slide", deadline = "2026-10-15T22:00:00+07:00",
+                estimatedMinutes = 90, priority = 2, taskType = code, splittable = true }
+        }));
+        using var provider = new Provider(output); using var client = new HttpClient(provider);
+        const string context = """{"taskTypes":[{"code":"CUSTOM","displayName":"Custom work"},{"code":"STUDY","displayName":"Study"}]}""";
+        var interpret = () => Interpreter(client).InterpretAsync("Tạo slide 90 phút", context, [], "UTC",
+            DateTimeOffset.Parse("2026-10-14T06:00:00Z"), TestContext.Current.CancellationToken);
+
+        if (supported) Assert.Equal("CUSTOM", Assert.Single((await interpret()).Tasks).TaskType);
+        else Assert.Equal("AGENT_AI_INVALID_RESPONSE", (await Assert.ThrowsAsync<AuthException>(interpret)).Code);
+
+        using var request = JsonDocument.Parse(provider.Body);
+        var codes = request.RootElement.GetProperty("generationConfig").GetProperty("responseFormat").GetProperty("text").GetProperty("schema")
+            .GetProperty("properties").GetProperty("tasks").GetProperty("items").GetProperty("properties").GetProperty("taskType")
+            .GetProperty("enum").EnumerateArray().Select(x => x.GetString()).ToArray();
+        Assert.Contains("CUSTOM", codes); Assert.DoesNotContain("DESIGN", codes); Assert.DoesNotContain("ADMIN", codes);
     }
 }

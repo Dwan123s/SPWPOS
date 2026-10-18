@@ -39,6 +39,7 @@ public static class LiveAiCheck
         var from = PlanningEngine.At(tomorrow, 840, zone); var to = PlanningEngine.At(tomorrow, 960, zone);
         var due = PlanningEngine.At(tomorrow, 1080, zone);
         var context = JsonSerializer.Serialize(new {
+            taskTypes = new[] { new { code = "WRITING", displayName = "Writing" } },
             tasks = Array.Empty<object>(), events = Array.Empty<object>(), exceptions = Array.Empty<object>(),
             sessions = Array.Empty<object>(), dependencies = Array.Empty<object>(),
             availability = new[] { new AvailabilityInput((int)tomorrow.DayOfWeek, 840, 960) },
