@@ -303,6 +303,21 @@ export function settingsPage() {
                   </p>
                 </div>
               </label>
+              <label className="checkbox-switch-card spaced">
+                <input
+                  type="checkbox"
+                  name="emailEnabled"
+                  defaultChecked={n.emailEnabled ?? false}
+                />
+                <div className="switch-content">
+                  <strong>Gửi nhắc nhở qua email</strong>
+                  <p>
+                    Nhắc deadline và phiên làm việc đến {p.email}, kể cả khi bạn
+                    không mở PLANORA. Email xác minh và bảo mật vẫn được gửi
+                    riêng.
+                  </p>
+                </div>
+              </label>
               <div className="form-grid spaced">
                 {field(
                   "Nhắc deadline trước (giờ)",

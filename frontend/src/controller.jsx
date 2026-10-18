@@ -236,6 +236,32 @@ async function loadAdmin(search = "") {
   if ($("#admin-users")) setSlot("admin-users", adminUsers(users));
   if ($("#system-status")) setSlot("system-status", adminStatus(status));
 }
+async function scheduleTask(id, triggerEvent = "MANUAL") {
+  if (
+    !state.workspace.availability.length &&
+    !state.workspace.exceptions.some((item) => item.isAvailable)
+  ) {
+    planOptions([id]);
+    return;
+  }
+  const plan = await api("/api/plans", "POST", {
+    start: new Date().toISOString(),
+    horizonDays: state.workspace.preference.planningHorizonDays || 14,
+    affectedTaskIds: [id],
+    isReschedule: true,
+    triggerEvent,
+  });
+  if (
+    plan.warnings.length ||
+    !plan.sessions.some((session) => !session.preserved)
+  ) {
+    planModal(plan);
+    return;
+  }
+  await api(`/api/plans/${plan.id}/apply`, "POST");
+  await refreshAfter("Đã xếp công việc vào giờ rảnh.");
+  completeGuideStep(2);
+}
 function planOptions(affected = []) {
   const go = (route) => {
     closeModal();
@@ -585,6 +611,9 @@ async function action(name, id, element) {
     case "replan-task":
       planOptions([id]);
       break;
+    case "schedule-task":
+      await scheduleTask(id);
+      break;
     case "apply-plan":
       await api(`/api/plans/${id}/apply`, "POST");
       await refreshAfter("Đã áp dụng kế hoạch.");
@@ -795,15 +824,23 @@ async function action(name, id, element) {
 async function formAction(form, data, nextAction = null) {
   const id = form.dataset.id;
   switch (form.dataset.form) {
-    case "task":
-      await api(
+    case "task": {
+      const saved = await api(
         `/api/tasks${id ? `/${id}` : ""}`,
         id ? "PUT" : "POST",
         taskInput(data),
       );
       if (!id) completeGuideStep(0);
       await refreshAfter("Đã lưu công việc.");
+      if (!id && data.has("scheduleAfterSave")) {
+        try {
+          await scheduleTask(saved.id, "NEW_TASK");
+        } catch (error) {
+          toast(`Công việc đã lưu. Chưa xếp được lịch: ${error.message}`);
+        }
+      }
       break;
+    }
     case "task-progress":
       await api(`/api/tasks/${id}/status`, "PATCH", {
         status:
@@ -966,6 +1003,7 @@ async function formAction(form, data, nextAction = null) {
     case "notification-settings":
       await api("/api/notifications/settings", "PUT", {
         inAppEnabled: data.has("inAppEnabled"),
+        emailEnabled: data.has("emailEnabled"),
         deadlineLeadHours: Number(data.get("deadlineLeadHours")),
         sessionReminderLeadMinutes: Number(
           data.get("sessionReminderLeadMinutes"),

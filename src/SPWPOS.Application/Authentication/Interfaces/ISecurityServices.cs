@@ -22,6 +22,7 @@ public interface IEmailService
     Task SendForgotPasswordOtpAsync(string email, string otp, CancellationToken ct);
     Task SendChangePasswordOtpAsync(string email, string otp, CancellationToken ct);
     Task SendPasswordChangedAsync(string email, CancellationToken ct);
+    Task SendReminderAsync(string email, string title, string message, CancellationToken ct);
 }
 public interface ISecurityAuditService
 {

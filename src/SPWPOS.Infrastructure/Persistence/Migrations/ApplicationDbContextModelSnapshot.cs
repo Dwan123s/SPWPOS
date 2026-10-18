@@ -17,7 +17,7 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "8.0.31")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -706,6 +706,20 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int>("EmailAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("EmailPending")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("EmailSentAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsVisible")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -715,6 +729,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("NextEmailAttemptAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<Guid?>("PlanId")
                         .HasColumnType("uniqueidentifier");
@@ -756,6 +773,8 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "TaskId");
 
+                    b.HasIndex("UserId", "EmailPending", "NextEmailAttemptAt");
+
                     b.ToTable("InAppNotifications");
                 });
 
@@ -766,6 +785,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("DeadlineLeadHours")
                         .HasColumnType("int");
+
+                    b.Property<bool>("EmailEnabled")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("InAppEnabled")
                         .HasColumnType("bit");

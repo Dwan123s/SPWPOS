@@ -27,10 +27,17 @@ export function timePage() {
           <div className="card-header">
             <div>
               <h2>Thời gian rảnh hàng tuần</h2>
-              <p>Chỉ những khoảng này được dùng để lên lịch.</p>
+              <p>
+                Chỉ những khoảng này được dùng để lên lịch. Mỗi ngày có thể thêm
+                nhiều khoảng, ví dụ 07:00–09:00 và 15:00–17:00.
+              </p>
             </div>
           </div>
           <form data-form="availability">
+            <p className="reason">
+              Giờ được nhập theo múi giờ {p.timeZoneId}. Sau khi lưu, bấm biểu
+              tượng lịch cạnh công việc để xếp vào giờ rảnh.
+            </p>
             {availabilityEditor(w.availability)}
             <div className="form-error" />
             <div className="form-actions">

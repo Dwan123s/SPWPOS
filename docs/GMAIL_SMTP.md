@@ -1,4 +1,10 @@
-# Gửi email OTP thật bằng Gmail
+# Gửi email xác minh và nhắc nhở bằng Gmail
+
+PLANORA dùng cùng cấu hình SMTP cho OTP, email đổi mật khẩu và nhắc deadline / phiên làm việc. Email nhắc nhở mặc định tắt; bật **Cài đặt → Thông báo → Gửi nhắc nhở qua email** để gửi đến email đã xác minh của tài khoản. Tùy chọn này độc lập với thông báo trong ứng dụng và không tắt email bảo mật.
+
+Worker kiểm tra mỗi phút khi API đang chạy. Nhắc nhở được lưu trong database trước khi gửi, thử lại khi SMTP lỗi và bỏ qua khi công việc đã xong, đã xóa, phiên đã đổi giờ hoặc không còn phù hợp. Không cần mở trình duyệt để nhận email; backend phải đang chạy. Cấu hình Mailpit (`localhost:1025`) chỉ đưa email vào hộp thư development, chưa gửi đến Gmail thật.
+
+Khi nâng cấp, áp dụng migration `AddReminderEmailDelivery` trước khi khởi động backend mới. Migration thêm cài đặt email và trạng thái gửi, giữ các thông báo hiện có; tài khoản hiện tại vẫn cần tự bật email nhắc nhở.
 
 ## Chuẩn bị tài khoản gửi
 
@@ -17,7 +23,7 @@ Nguồn: [Google — App Passwords](https://support.google.com/accounts/answer/1
 Trong PowerShell:
 
 ```powershell
-cd D:\SWP
+# Từ thư mục repository PLANORA
 .\scripts\Configure-Gmail.ps1 -RestartApi
 ```
 

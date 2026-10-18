@@ -72,7 +72,7 @@ public sealed record WorkspaceView(ProfileView Profile, PreferenceView Preferenc
     TaskView[] Tasks, AvailabilityInput[] Availability, ExceptionView[] Exceptions, EventView[] Events,
     SessionView[] Sessions, NotificationView[] Notifications, NotificationSettingInput NotificationSettings, string[]? Features = null);
 public sealed record NotificationSettingInput(bool InAppEnabled = true, [Range(1, 168)] int DeadlineLeadHours = 24,
-    [Range(1, 120)] int SessionReminderLeadMinutes = 10, [RegularExpression("^(MODERATE|HIGH|OVERLOAD)$")] string WorkloadWarningLevel = "HIGH");
+    [Range(1, 120)] int SessionReminderLeadMinutes = 10, [RegularExpression("^(MODERATE|HIGH|OVERLOAD)$")] string WorkloadWarningLevel = "HIGH", bool EmailEnabled = false);
 public sealed record PlanItemView(Guid Id, Guid TaskId, Guid? PreviousSessionId, string Action, DateTimeOffset? Start, DateTimeOffset? End, int? PlannedMinutes, string[] ReasonCodes);
 public sealed record ExecutionSegmentView(DateTimeOffset Start, DateTimeOffset? End);
 public sealed record ExecutionView(Guid SessionId, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, long TimerSeconds, long ActualSeconds, bool IsUserAdjusted, ExecutionSegmentView[] Segments);
@@ -82,7 +82,8 @@ public sealed record JobRunView(Guid Id, Guid? UserId, string JobType, string St
 public sealed record TaskSuggestion(TaskInput Task, string Source, string[] Notes);
 public sealed record CaptureInput([Required, StringLength(2000)] string Text, bool UseAi = false);
 public sealed record BreakdownView(TaskInput[] Subtasks, string Source);
-public sealed record AdminUserView(Guid Id, string Email, string FirstName, string LastName, bool IsActive, bool EmailConfirmed, DateTimeOffset? LastLoginAt);
+public sealed record AdminUserView(Guid Id, string Email, string FirstName, string LastName, bool IsActive, bool EmailConfirmed, DateTimeOffset? LastLoginAt,
+    string? UserName = null, DateTimeOffset? CreatedAt = null, int TotalTasks = 0, int CompletedTasks = 0, int ActiveLoginSessions = 0);
 public sealed record SystemStatusView(bool DatabaseHealthy, int Users, int Tasks, int ActiveSessions, int FailedLoginsLast24Hours, DateTimeOffset ServerTime, DateTimeOffset? LastNotificationRun, long FailedNotificationRuns);
 
 public interface IWorkspaceService

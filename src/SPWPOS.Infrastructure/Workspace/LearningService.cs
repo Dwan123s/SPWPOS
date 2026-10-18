@@ -82,6 +82,7 @@ public sealed partial class WorkspaceService
         var record = await db.NotificationSettings.SingleOrDefaultAsync(x => x.UserId == uid, ct);
         if (record is null) { record = new() { UserId = uid }; db.NotificationSettings.Add(record); }
         record.InAppEnabled = input.InAppEnabled; record.DeadlineLeadHours = input.DeadlineLeadHours;
+        record.EmailEnabled = input.EmailEnabled;
         record.SessionReminderLeadMinutes = input.SessionReminderLeadMinutes; record.WorkloadWarningLevel = input.WorkloadWarningLevel;
     }, ct, false);
 }

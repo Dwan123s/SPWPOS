@@ -74,7 +74,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     {
         var user = await db.Users.AsNoTracking().SingleAsync(x => x.Id == userId, ct); var state = await State(userId, ct); var bias = engine.Biases(state);
         var categories = await Mine<TaskCategory>(userId).OrderBy(x => x.Name).Select(x => new CategoryView(x.Id, x.Name, x.Color)).ToArrayAsync(ct);
-        var notifications = await Mine<InAppNotification>(userId).OrderByDescending(x => x.CreatedAt).Take(100)
+        var notifications = await Mine<InAppNotification>(userId).Where(x => x.IsVisible).OrderByDescending(x => x.CreatedAt).Take(100)
             .Select(x => new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null)).ToArrayAsync(ct);
         var preference = state.Preference;
         var sessionsByTask = state.Sessions.ToLookup(x => x.TaskId);
@@ -95,7 +95,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
             state.Sessions.Where(s => tasksById.ContainsKey(s.TaskId)).Select(s => new SessionView(s.Id, s.TaskId, tasksById[s.TaskId].Name,
                 s.Start, s.End, s.Status.ToString(), s.IsLocked, (int)((s.ActualSeconds + (s.SegmentStartedAt is { } at ? Math.Max(0, (Now - at).TotalSeconds) : 0)) / 60),
                 s.ActualSeconds + (long)(s.SegmentStartedAt is { } since ? Math.Max(0, (Now - since).TotalSeconds) : 0),
-                s.SegmentStartedAt, s.ReasonCode)).ToArray(), notifications, new(ns.InAppEnabled, ns.DeadlineLeadHours, ns.SessionReminderLeadMinutes, ns.WorkloadWarningLevel), ["history-v2", "recovery"]);
+                s.SegmentStartedAt, s.ReasonCode)).ToArray(), notifications, new(ns.InAppEnabled, ns.DeadlineLeadHours, ns.SessionReminderLeadMinutes, ns.WorkloadWarningLevel, ns.EmailEnabled), ["history-v2", "recovery"]);
     }
     public Task UpdateProfileAsync(Guid userId, ProfileInput input, CancellationToken ct) => Mutate(userId, async () =>
     {

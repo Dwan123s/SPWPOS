@@ -41,6 +41,10 @@ public sealed class EmailService(IOptions<EmailSettings> emailOptions, IOptions<
         return SendAsync(email, subjectTitle, text, html, ct);
     }
 
+    public Task SendReminderAsync(string email, string title, string message, CancellationToken ct) =>
+        SendAsync(email, title, $"{message}\n\nMở PLANORA để xem công việc và lịch làm việc. Bạn có thể tắt nhắc qua email trong Cài đặt → Thông báo.",
+            $"<html lang=\"vi\"><body><h1>PLANORA</h1><h2>{WebUtility.HtmlEncode(title)}</h2><p>{WebUtility.HtmlEncode(message)}</p><p>Mở PLANORA để xem công việc và lịch làm việc.</p><p>Bạn có thể tắt nhắc qua email trong Cài đặt → Thông báo.</p></body></html>", ct);
+
     private async Task SendAsync(string email, string subject, string text, string? html, CancellationToken ct)
     {
         var message = new MimeMessage();

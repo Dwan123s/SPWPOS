@@ -313,6 +313,10 @@ export function NotificationCenter({ workspace }) {
             )}
             <dl className="notice-settings-list">
               <div>
+                <dt>Nhắc qua email</dt>
+                <dd>{settings.emailEnabled ? "Đang bật" : "Đang tắt"}</dd>
+              </div>
+              <div>
                 <dt>Trước hạn chót</dt>
                 <dd>{settings.deadlineLeadHours ?? 24} giờ</dd>
               </div>

@@ -22,9 +22,20 @@ public sealed partial class WorkspaceService
     private async Task AddNotification(Guid uid, string kind, string title, string message, string key, Guid? taskId, CancellationToken ct, Guid? sessionId = null, Guid? planId = null)
     {
         var settings = await db.NotificationSettings.SingleOrDefaultAsync(x => x.UserId == uid, ct);
-        if (settings is { InAppEnabled: false }) return;
-        if (db.InAppNotifications.Local.Any(x => x.UserId == uid && x.DedupeKey == key) || await Mine<InAppNotification>(uid).AnyAsync(x => x.DedupeKey == key, ct)) return;
-        db.InAppNotifications.Add(new() { UserId = uid, Kind = kind, Title = title, Message = message, DedupeKey = key, TaskId = taskId, SessionId = sessionId, PlanId = planId, ScheduledFor = Now, CreatedAt = Now });
+        var visible = settings?.InAppEnabled != false;
+        var emailPending = settings?.EmailEnabled == true && kind is "DEADLINE" or "SESSION_REMINDER";
+        if (!visible && !emailPending) return;
+        var existing = db.InAppNotifications.Local.FirstOrDefault(x => x.UserId == uid && x.DedupeKey == key)
+            ?? await Mine<InAppNotification>(uid).SingleOrDefaultAsync(x => x.DedupeKey == key, ct);
+        if (existing is not null)
+        {
+            // Opting into email must also cover reminders that are already due in the inbox.
+            if (emailPending && existing.EmailSentAt is null && existing.EmailAttempts == 0 && !existing.EmailPending)
+            { existing.EmailPending = true; existing.NextEmailAttemptAt = Now; existing.Title = title; existing.Message = message; }
+            return;
+        }
+        db.InAppNotifications.Add(new() { UserId = uid, Kind = kind, Title = title, Message = message, DedupeKey = key, TaskId = taskId, SessionId = sessionId, PlanId = planId, ScheduledFor = Now, CreatedAt = Now,
+            IsVisible = visible, EmailPending = emailPending, NextEmailAttemptAt = emailPending ? Now : null });
     }
     public Task EnsureNotificationsAsync(Guid uid, CancellationToken ct) => Mutate(uid, async () =>
     {
@@ -34,9 +45,9 @@ public sealed partial class WorkspaceService
         { session.Status = WorkSessionStatus.Missed; missed = true; }
         if (missed) (await Preference(uid, ct)).Revision = Guid.NewGuid();
         foreach (var task in state.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled && x.Deadline < Now.AddHours(settings.DeadlineLeadHours)))
-            await AddNotification(uid, "DEADLINE", "Công việc sắp đến hạn", task.Name + " cần được xử lý trước deadline.", $"deadline:{task.Id}:{task.Deadline.UtcTicks}", task.Id, ct);
+            await AddNotification(uid, "DEADLINE", "Công việc sắp đến hạn", task.Name + " · Hạn: " + TimeZoneInfo.ConvertTime(task.Deadline, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd/MM/yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"deadline:{task.Id}:{task.Deadline.UtcTicks}", task.Id, ct);
         foreach (var session in state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && x.Start >= Now && x.Start <= Now.AddMinutes(settings.SessionReminderLeadMinutes)))
-            await AddNotification(uid, "SESSION_REMINDER", "Sắp đến phiên làm việc", state.Tasks.FirstOrDefault(x => x.Id == session.TaskId)?.Name ?? "Phiên làm việc", $"session:{session.Id}:{session.Start.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
+            await AddNotification(uid, "SESSION_REMINDER", "Sắp đến phiên làm việc", (state.Tasks.FirstOrDefault(x => x.Id == session.TaskId)?.Name ?? "Phiên làm việc") + " · Bắt đầu: " + TimeZoneInfo.ConvertTime(session.Start, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd/MM/yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"session:{session.Id}:{session.Start.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
         var analysis = engine.Analyze(state, new(Now, 7), Now);
         static int Level(string value) => value.ToUpperInvariant() switch { "MODERATE" => 1, "HIGH" => 2, "OVERLOAD" => 3, _ => 0 };
         if (Level(analysis.RiskLevel) >= Level(settings.WorkloadWarningLevel))
@@ -52,8 +63,11 @@ public sealed partial class WorkspaceService
     public Task<AdminUserView[]> SearchUsersAsync(string? search, CancellationToken ct)
     {
         var term = (search ?? "").Trim(); Require(term.Length <= 100, "VALIDATION_ERROR", "Từ khóa quá dài.");
-        return db.Users.AsNoTracking().Where(x => term == "" || x.Email!.Contains(term) || x.FirstName.Contains(term) || x.LastName.Contains(term))
-            .OrderBy(x => x.Email).Take(100).Select(x => new AdminUserView(x.Id, x.Email!, x.FirstName, x.LastName, x.IsActive, x.EmailConfirmed, x.LastLoginAt)).ToArrayAsync(ct);
+        return db.Users.AsNoTracking().Where(x => term == "" || x.Email!.Contains(term) || x.FirstName.Contains(term) || x.LastName.Contains(term) || x.UserName!.Contains(term))
+            .OrderBy(x => x.Email).Take(100).Select(x => new AdminUserView(x.Id, x.Email!, x.FirstName, x.LastName, x.IsActive, x.EmailConfirmed, x.LastLoginAt,
+                x.UserName, x.CreatedAt, db.WorkTasks.Count(t => t.UserId == x.Id && !t.IsDeleted),
+                db.WorkTasks.Count(t => t.UserId == x.Id && !t.IsDeleted && t.Status == WorkTaskStatus.Completed),
+                db.RefreshTokens.Count(t => t.UserId == x.Id && t.RevokedAt == null && t.ExpiresAt > Now))).ToArrayAsync(ct);
     }
     public Task SetUserActiveAsync(Guid adminId, Guid targetId, bool active, CancellationToken ct, string? reason = null) => Mutate(adminId, async () =>
     {
@@ -108,6 +122,7 @@ public sealed class WorkspaceNotificationWorker(IServiceScopeFactory scopes, Not
                         var workspace = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
                         await workspace.EnsureNotificationsAsync(uid, stoppingToken);
                         await workspace.ScanRecoveryAsync(uid, stoppingToken);
+                        await scope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Email.ReminderNotificationService>().SendPendingAsync(uid, stoppingToken);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
                     catch (Exception e)

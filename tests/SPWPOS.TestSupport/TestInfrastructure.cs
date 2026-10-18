@@ -23,6 +23,12 @@ public sealed class TestEmailService : IEmailService
     public ConcurrentDictionary<(string Email, OtpPurpose Purpose), string> Inbox { get; } = new();
     public int Notifications { get; private set; }
     public bool FailDelivery { get; set; }
+    public List<(string Email, string Title, string Message)> Reminders { get; } = [];
+    public Task SendReminderAsync(string email, string title, string message, CancellationToken ct)
+    {
+        if (FailDelivery) throw new IOException("Test transport failure.");
+        Reminders.Add((email, title, message)); return Task.CompletedTask;
+    }
     public Task SendEmailVerificationOtpAsync(string email, string otp, CancellationToken ct) => Send(email, otp, OtpPurpose.EmailVerification);
     public Task SendForgotPasswordOtpAsync(string email, string otp, CancellationToken ct) => Send(email, otp, OtpPurpose.ForgotPassword);
     public Task SendChangePasswordOtpAsync(string email, string otp, CancellationToken ct) => Send(email, otp, OtpPurpose.ChangePassword);

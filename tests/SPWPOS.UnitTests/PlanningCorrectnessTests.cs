@@ -4,6 +4,22 @@ namespace SPWPOS.UnitTests;
 
 public sealed class PlanningCorrectnessTests
 {
+    [Fact]
+    public void Selected_task_uses_only_Monday_free_windows_in_Vietnam_and_preserves_other_work()
+    {
+        var now = new DateTimeOffset(2026, 10, 19, 0, 0, 0, TimeSpan.Zero); // Monday 07:00 in Vietnam.
+        var selected = new WorkTask { Name = "Selected", EstimatedMinutes = 180, Deadline = now.AddHours(12), MinimumSessionMinutes = 25, IsHardDeadline = true };
+        var other = new WorkTask { Name = "Other", EstimatedMinutes = 60, Deadline = now.AddHours(12) };
+        var occupied = new WorkSession { TaskId = other.Id, Start = now.AddHours(1), End = now.AddHours(2) };
+        var state = new PlanningState([selected, other], [], [new() { DayOfWeek = 1, StartMinute = 420, EndMinute = 540 }, new() { DayOfWeek = 1, StartMinute = 900, EndMinute = 1020 }], [], [], [occupied],
+            new() { TimeZoneId = "Asia/Ho_Chi_Minh", MaximumDailyMinutes = 480, MaximumSessionMinutes = 120, BreakMinutes = 0, PreferredStartMinute = 420, PreferredEndMinute = 1020 });
+        var plan = engine.Generate(state, new(now, 1, [selected.Id], true, UseCapacityFactor: false), now);
+        Assert.Empty(plan.Warnings);
+        Assert.Contains(plan.Sessions, s => s.Id == occupied.Id && s.Preserved);
+        var sessions = plan.Sessions.Where(s => s.TaskId == selected.Id).ToArray();
+        Assert.Equal(180, sessions.Sum(s => (s.End - s.Start).TotalMinutes));
+        Assert.All(sessions, s => Assert.True(s.Start >= now && s.End <= now.AddHours(1) || s.Start >= now.AddHours(8) && s.End <= now.AddHours(10)));
+    }
     private static readonly DateTimeOffset Now = new(2026, 10, 15, 8, 0, 0, TimeSpan.Zero);
     private readonly PlanningEngine engine = new();
     private static WorkTask Work(string name, int minutes = 60) => new() { Name = name, EstimatedMinutes = minutes, MinimumSessionMinutes = 25, Deadline = Now.AddHours(10), IsHardDeadline = true };

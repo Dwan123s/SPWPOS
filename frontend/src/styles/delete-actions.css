@@ -52,13 +52,35 @@
   right: 4px;
 }
 .glass-workspace .task-row {
-  grid-template-columns: minmax(0, 1fr) 115px 125px 90px 58px 44px;
+  grid-template-columns: minmax(0, 1fr) 100px 105px 80px 48px 88px;
   gap: 14px;
 }
 .task-row-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+}
+.task-row > div {
+  min-width: 0;
+}
+.task-row .title-button {
+  width: 100%;
+}
+.task-row .task-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.task-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 0;
+  font-size: 12px;
+  color: var(--muted);
 }
 :is(.planning-console, #modal) .task-delete-button {
   width: 44px;
@@ -73,7 +95,7 @@
 }
 @media (max-width: 1020px) {
   .glass-workspace .task-row {
-    grid-template-columns: minmax(0, 1fr) 90px 78px 58px 44px;
+    grid-template-columns: minmax(0, 1fr) 90px 78px 48px 88px;
   }
 }
 @media (max-width: 800px) {
@@ -82,7 +104,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .glass-workspace .task-row:not(.task-heading) > div:first-child {
-    padding-right: 50px;
+    padding-right: 94px;
   }
   .task-row-actions {
     position: absolute;

@@ -13,6 +13,7 @@ public sealed class NotificationSetting
 {
     public Guid UserId { get; set; }
     public bool InAppEnabled { get; set; } = true;
+    public bool EmailEnabled { get; set; }
     public int DeadlineLeadHours { get; set; } = 24;
     public int SessionReminderLeadMinutes { get; set; } = 10;
     public string WorkloadWarningLevel { get; set; } = "HIGH";

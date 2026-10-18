@@ -21,12 +21,14 @@ import {
   profile,
 } from "./fixtures.js";
 
-let calls, currentWorkspace, failTaskDelete;
+let calls, currentWorkspace, failTaskDelete, failPlan, planWarnings;
 beforeEach(() => {
   resetFixtures();
   currentWorkspace = workspace();
   calls = [];
   failTaskDelete = false;
+  failPlan = false;
+  planWarnings = [];
   Object.assign(state, {
     workspace: null,
     insights: null,
@@ -148,7 +150,15 @@ beforeEach(() => {
       }
       if (url === "/api/workspace/profile" && options.method === "PUT")
         Object.assign(currentWorkspace.profile, body);
-      if (url === "/api/plans") data = plan;
+      if (url === "/api/plans") {
+        if (failPlan)
+          return {
+            ok: false,
+            status: 503,
+            json: async () => ({ error: { message: "Planning unavailable" } }),
+          };
+        data = { ...plan, warnings: planWarnings };
+      }
       if (url === "/api/tasks/capture")
         data = {
           source: "Rules",
@@ -829,6 +839,61 @@ it("creates a task and retains filters while updating the React result list", as
   expect(request.body.name).toBe("Kiểm tra React workflow");
   expect(request.body.splittable).toBe(true);
   expect(request.body.priority).toBe(2);
+  await waitFor(() =>
+    expect(calls.some((c) => c.url === `/api/plans/${plan.id}/apply`)).toBe(
+      true,
+    ),
+  );
+  expect(
+    calls.find((c) => c.url === "/api/plans").body.affectedTaskIds,
+  ).toEqual(["created-task"]);
+});
+
+it("schedules a selected task and previews capacity warnings without applying them", async () => {
+  mount();
+  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await navigate("tasks", "Công việc");
+  planWarnings = [
+    {
+      taskId: "task-1",
+      taskName: currentWorkspace.tasks[1].name,
+      code: "INSUFFICIENT_CAPACITY",
+      message: "Không đủ giờ rảnh",
+      unscheduledMinutes: 30,
+    },
+  ];
+  await userEvent.click(
+    screen.getByRole("button", {
+      name: `Xếp lịch công việc ${currentWorkspace.tasks[1].name}`,
+    }),
+  );
+  await screen.findByText(/Không đủ giờ rảnh/);
+  expect(
+    calls.find((c) => c.url === "/api/plans").body.affectedTaskIds,
+  ).toEqual(["task-1"]);
+  expect(calls.some((c) => c.url.endsWith("/apply"))).toBe(false);
+});
+
+it("keeps the created task when automatic scheduling fails", async () => {
+  mount();
+  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await navigate("tasks", "Công việc");
+  failPlan = true;
+  await userEvent.click(screen.getByRole("button", { name: "Thêm công việc" }));
+  await userEvent.type(
+    screen.getByLabelText("Tên công việc"),
+    "Saved despite planning failure",
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Tạo công việc", exact: true }),
+  );
+  await screen.findByText(/Công việc đã lưu. Chưa xếp được lịch/);
+  expect(
+    screen.getByRole("button", { name: "Saved despite planning failure" }),
+  ).toBeTruthy();
+  expect(
+    calls.filter((c) => c.url === "/api/tasks" && c.options.method === "POST"),
+  ).toHaveLength(1);
 });
 it("adds and removes availability rows without losing unsaved time values", async () => {
   mount();

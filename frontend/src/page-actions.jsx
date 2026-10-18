@@ -55,6 +55,8 @@ export function adminUsers(users) {
           <th>Người dùng</th>
           <th>Email</th>
           <th>Trạng thái</th>
+          <th>Công việc</th>
+          <th>Hoạt động tài khoản</th>
           <th>Thao tác</th>
         </tr>
       </thead>
@@ -64,6 +66,7 @@ export function adminUsers(users) {
             <tr>
               <td>
                 {u.firstName} {u.lastName}
+                {u.userName && <small className="muted"> @{u.userName}</small>}
               </td>
               <td>{u.email}</td>
               <td>
@@ -72,6 +75,22 @@ export function adminUsers(users) {
                   u.isActive ? "green" : "red",
                 )}{" "}
                 {badge(u.emailConfirmed ? "Đã xác minh" : "Chưa xác minh")}
+              </td>
+              <td>
+                {u.completedTasks ?? 0} / {u.totalTasks ?? 0} hoàn thành
+              </td>
+              <td>
+                <div>
+                  {u.lastLoginAt
+                    ? `Đăng nhập: ${dateFmt(u.lastLoginAt)} ${timeFmt(u.lastLoginAt)}`
+                    : "Chưa đăng nhập"}
+                </div>
+                {u.createdAt && (
+                  <small className="muted">Tạo: {dateFmt(u.createdAt)}</small>
+                )}
+                <div>
+                  <small>{u.activeLoginSessions ?? 0} phiên đăng nhập</small>
+                </div>
               </td>
               <td>
                 {button(
@@ -92,6 +111,11 @@ export function adminUsers(users) {
               </td>
             </tr>
           )),
+        )}
+        {!users.length && (
+          <tr>
+            <td colSpan="6">Không tìm thấy tài khoản phù hợp.</td>
+          </tr>
         )}
       </tbody>
     </table>

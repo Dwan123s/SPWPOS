@@ -47,7 +47,7 @@ export function adminPage() {
           <input
             className="filter search"
             name="search"
-            placeholder="Tìm theo email hoặc tên"
+            placeholder="Tìm theo email, tên hoặc tên đăng nhập"
             maxLength="100"
             aria-label="Tìm người dùng"
           />

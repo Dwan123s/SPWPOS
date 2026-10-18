@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailService>(provider => provider.GetRequiredService<EmailService>());
         services.AddScoped<IEmailConnectionCheck>(provider => provider.GetRequiredService<EmailService>());
         services.AddScoped<PasswordNotificationService>();
+        services.AddScoped<ReminderNotificationService>();
         services.AddHostedService<PasswordNotificationWorker>();
         services.AddScoped<ISecurityAuditService, SecurityAuditService>();
         services.AddScoped<AccountRateLimiter>();

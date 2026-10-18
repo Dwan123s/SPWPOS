@@ -60,5 +60,7 @@ public static class WorkspaceModel
         var notification = Owned<InAppNotification>(b); notification.Property(x => x.Kind).HasMaxLength(60); notification.Property(x => x.Title).HasMaxLength(200);
         notification.Property(x => x.Message).HasMaxLength(1000); notification.Property(x => x.DedupeKey).HasMaxLength(200);
         notification.HasIndex(x => new { x.UserId, x.DedupeKey }).IsUnique(); notification.HasIndex(x => new { x.UserId, x.CreatedAt });
+        notification.Property(x => x.IsVisible).HasDefaultValue(true);
+        notification.HasIndex(x => new { x.UserId, x.EmailPending, x.NextEmailAttemptAt });
     }
 }

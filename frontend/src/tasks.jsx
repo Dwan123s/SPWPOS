@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Select, Slot, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
 import {
@@ -20,6 +21,14 @@ import {
 import { api } from "./api.js";
 export const taskById = (id) => state.workspace.tasks.find((t) => t.id === id);
 export function taskRows(tasks) {
+  return <TaskList tasks={tasks} />;
+}
+function TaskList({ tasks }) {
+  const signature = tasks.map((task) => task.id).join(",");
+  const [paging, setPaging] = useState({ signature, page: 0 });
+  const page = paging.signature === signature ? paging.page : 0;
+  const pages = Math.ceil(tasks.length / 12);
+  const visible = tasks.slice(page * 12, (page + 1) * 12);
   return tasks.length ? (
     <>
       <div className="task-row task-heading">
@@ -31,13 +40,14 @@ export function taskRows(tasks) {
         <span className="sr-only">Thao tác</span>
       </div>
       {nodeList(
-        tasks.map((t) => (
+        visible.map((t) => (
           <div className="task-row" key={t.id}>
             <div>
               <button
                 className="title-button"
                 data-action="task-detail"
                 data-id={t.id}
+                title={t.name}
               >
                 <div className="task-name">
                   {t.parentId ? "↳ " : ""}
@@ -85,6 +95,18 @@ export function taskRows(tasks) {
               )}
             </div>
             <div className="task-row-actions">
+              {!["Completed", "Cancelled"].includes(t.status) && (
+                <button
+                  type="button"
+                  className="btn ghost icon-only"
+                  data-action="schedule-task"
+                  data-id={t.id}
+                  aria-label={`Xếp lịch công việc ${t.name}`}
+                  title="Xếp vào giờ rảnh"
+                >
+                  {icon("calendar")}
+                </button>
+              )}
               <button
                 type="button"
                 className="btn ghost icon-only task-delete-button"
@@ -98,6 +120,32 @@ export function taskRows(tasks) {
             </div>
           </div>
         )),
+      )}
+      {pages > 1 && (
+        <nav className="task-pagination" aria-label="Phân trang công việc">
+          <button
+            type="button"
+            className="btn ghost small"
+            disabled={page === 0}
+            aria-label="Trang trước"
+            onClick={() => setPaging({ signature, page: page - 1 })}
+          >
+            Trước
+          </button>
+          <span aria-live="polite">
+            Trang {page + 1} / {pages} · {page * 12 + 1}–
+            {Math.min((page + 1) * 12, tasks.length)} / {tasks.length}
+          </span>
+          <button
+            type="button"
+            className="btn ghost small"
+            disabled={page + 1 >= pages}
+            aria-label="Trang sau"
+            onClick={() => setPaging({ signature, page: page + 1 })}
+          >
+            Sau
+          </button>
+        </nav>
       )}
     </>
   ) : (
@@ -279,6 +327,19 @@ export function taskForm(task = {}, parentId = null) {
           </label>
         </div>
       </details>
+      {!task.id && (
+        <label className="checkbox spaced">
+          <input
+            type="checkbox"
+            name="scheduleAfterSave"
+            defaultChecked={
+              !!state.workspace.availability?.length ||
+              state.workspace.exceptions?.some((item) => item.isAvailable)
+            }
+          />
+          Tự xếp vào giờ rảnh sau khi tạo
+        </label>
+      )}
       <div className="form-error" />
       <div className="form-actions">
         {button("Hủy", "close-modal", "ghost")}
