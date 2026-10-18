@@ -1,0 +1,211 @@
+{
+  "capturedAt": "2026-10-18T15:26:57.3648367Z",
+  "databaseName": "SPWPOS",
+  "tables": 45,
+  "columns": 356,
+  "foreignKeys": 69,
+  "renderer": "sharp",
+  "rendererVersion": "0.35.5",
+  "images": [
+    {
+      "file": "map.png",
+      "language": "en",
+      "kind": "grouped-map",
+      "width": 10800,
+      "height": 8200,
+      "tables": 45,
+      "foreignKeys": 69,
+      "columnCoverage": "up-to-eight-preview-columns-per-table"
+    },
+    {
+      "file": "map.preview.png",
+      "language": "en",
+      "kind": "preview",
+      "width": 1800,
+      "height": 1367,
+      "tables": 45,
+      "foreignKeys": 69,
+      "columnCoverage": "up-to-eight-preview-columns-per-table"
+    },
+    {
+      "file": "complete.png",
+      "language": "en",
+      "kind": "all-columns",
+      "width": 4550,
+      "height": 15098,
+      "tables": 45,
+      "foreignKeys": 69,
+      "columnCoverage": "all-captured-columns"
+    },
+    {
+      "file": "accounts.png",
+      "language": "en",
+      "kind": "function-detail",
+      "width": 1322,
+      "height": 5614,
+      "tables": 15,
+      "foreignKeys": 15,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "time.png",
+      "language": "en",
+      "kind": "function-detail",
+      "width": 1094,
+      "height": 2302,
+      "tables": 5,
+      "foreignKeys": 4,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "tasks.png",
+      "language": "en",
+      "kind": "function-detail",
+      "width": 2230,
+      "height": 1506,
+      "tables": 5,
+      "foreignKeys": 8,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "planning.png",
+      "language": "en",
+      "kind": "function-detail",
+      "width": 3474,
+      "height": 2840,
+      "tables": 11,
+      "foreignKeys": 21,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "intelligence.png",
+      "language": "en",
+      "kind": "function-detail",
+      "width": 1676,
+      "height": 2594,
+      "tables": 9,
+      "foreignKeys": 11,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "notifications.png",
+      "language": "en",
+      "kind": "function-detail",
+      "width": 1192,
+      "height": 1788,
+      "tables": 7,
+      "foreignKeys": 6,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "assistant.png",
+      "language": "en",
+      "kind": "function-detail",
+      "width": 1062,
+      "height": 2996,
+      "tables": 5,
+      "foreignKeys": 4,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "map.vi.png",
+      "language": "vi",
+      "kind": "grouped-map",
+      "width": 10800,
+      "height": 8200,
+      "tables": 45,
+      "foreignKeys": 69,
+      "columnCoverage": "up-to-eight-preview-columns-per-table"
+    },
+    {
+      "file": "map.vi.preview.png",
+      "language": "vi",
+      "kind": "preview",
+      "width": 1800,
+      "height": 1367,
+      "tables": 45,
+      "foreignKeys": 69,
+      "columnCoverage": "up-to-eight-preview-columns-per-table"
+    },
+    {
+      "file": "complete.vi.png",
+      "language": "vi",
+      "kind": "all-columns",
+      "width": 4550,
+      "height": 15098,
+      "tables": 45,
+      "foreignKeys": 69,
+      "columnCoverage": "all-captured-columns"
+    },
+    {
+      "file": "accounts.vi.png",
+      "language": "vi",
+      "kind": "function-detail",
+      "width": 1322,
+      "height": 5614,
+      "tables": 15,
+      "foreignKeys": 15,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "time.vi.png",
+      "language": "vi",
+      "kind": "function-detail",
+      "width": 1094,
+      "height": 2302,
+      "tables": 5,
+      "foreignKeys": 4,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "tasks.vi.png",
+      "language": "vi",
+      "kind": "function-detail",
+      "width": 2230,
+      "height": 1506,
+      "tables": 5,
+      "foreignKeys": 8,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "planning.vi.png",
+      "language": "vi",
+      "kind": "function-detail",
+      "width": 3474,
+      "height": 2840,
+      "tables": 11,
+      "foreignKeys": 21,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "intelligence.vi.png",
+      "language": "vi",
+      "kind": "function-detail",
+      "width": 1676,
+      "height": 2594,
+      "tables": 9,
+      "foreignKeys": 11,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "notifications.vi.png",
+      "language": "vi",
+      "kind": "function-detail",
+      "width": 1192,
+      "height": 1788,
+      "tables": 7,
+      "foreignKeys": 6,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    },
+    {
+      "file": "assistant.vi.png",
+      "language": "vi",
+      "kind": "function-detail",
+      "width": 1062,
+      "height": 2996,
+      "tables": 5,
+      "foreignKeys": 4,
+      "columnCoverage": "all-group-columns-with-primary-key-context-tables"
+    }
+  ]
+}

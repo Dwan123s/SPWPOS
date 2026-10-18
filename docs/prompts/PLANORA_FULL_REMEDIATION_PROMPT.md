@@ -9,8 +9,8 @@ Bạn là kỹ sư chịu trách nhiệm trực tiếp triển khai và kiểm c
 Repository hiện có ASP.NET Core/C#, EF Core/SQL Server, React/Vite/Tailwind. AI đang dùng Gemini qua Google Cloud Vertex AI; trợ lý tên NORA, có mascot cú xanh. Xác minh phiên bản và cấu trúc thực tế trước khi sửa.
 
 Nếu có trong repository, đọc:
-- `docs/SYSTEM_REVIEW_2026-10-15.md`.
-- `docs/PLANORA_REMEDIATION_PLAN_2026-10-15.md`.
+- `docs/reviews/SYSTEM_REVIEW_2026-10-15.md`.
+- `docs/plans/PLANORA_REMEDIATION_PLAN_2026-10-15.md`.
 - README, AGENTS.md áp dụng, tài liệu auth/AI/planning/voice và CI hiện tại.
 
 Bản mô tả này tự chứa phạm vi cần thực hiện. Tài liệu cũ là nguồn bằng chứng, không thay thế việc đọc code hiện tại. Một số lỗi có thể đã được sửa sau đánh giá: xác nhận lại để không sửa trùng hoặc làm mất thay đổi mới.
@@ -30,7 +30,7 @@ Bản mô tả này tự chứa phạm vi cần thực hiện. Tài liệu cũ l
 
 ## 3. Kiểm kê, baseline và tiến độ
 
-Tạo `docs/PLANORA_FIX_PROGRESS.md`, liệt kê mọi yêu cầu trong prompt và F01–F17. Mỗi mục có: trạng thái, reproduction, file liên quan, acceptance, migration, kết quả kiểm thử và phần còn thiếu.
+Tạo `docs/plans/PLANORA_FIX_PROGRESS.md`, liệt kê mọi yêu cầu trong prompt và F01–F17. Mỗi mục có: trạng thái, reproduction, file liên quan, acceptance, migration, kết quả kiểm thử và phần còn thiếu.
 
 Trạng thái gồm NOT_STARTED, IN_PROGRESS, DONE, IMPLEMENTED_PENDING_EXTERNAL_VERIFICATION, BLOCKED_EXTERNAL. DONE chỉ dùng khi đã đạt acceptance bằng bằng chứng mới.
 

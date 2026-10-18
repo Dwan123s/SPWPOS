@@ -68,9 +68,9 @@ Script build React/Tailwind, chuẩn bị cấu hình development, khởi độn
 | Swagger | https://localhost:7043/swagger |
 | Mailpit — hộp thư OTP development | http://localhost:8025/ |
 
-Nếu certificate đã được thiết lập, thêm `-SkipCertificateTrust` vào lệnh khởi động. Cấu hình SMTP hiện có được giữ khi restart; xem [hướng dẫn Gmail SMTP](docs/GMAIL_SMTP.md) để gửi email thật.
+Nếu certificate đã được thiết lập, thêm `-SkipCertificateTrust` vào lệnh khởi động. Cấu hình SMTP hiện có được giữ khi restart; xem [hướng dẫn Gmail SMTP](docs/integrations/GMAIL_SMTP.md) để gửi email thật.
 
-Để bật nút Google, làm theo [hướng dẫn thiết lập Firebase Authentication](docs/FIREBASE_GOOGLE_LOGIN.md). Firebase Admin xác minh token tại server; ứng dụng vẫn dùng database và phiên cookie hiện tại.
+Để bật nút Google, làm theo [hướng dẫn thiết lập Firebase Authentication](docs/integrations/FIREBASE_GOOGLE_LOGIN.md). Firebase Admin xác minh token tại server; ứng dụng vẫn dùng database và phiên cookie hiện tại.
 
 SQL Server development dùng `127.0.0.1,11433` trên Windows; container vẫn dùng port `1433`. Cổng host riêng tránh xung đột với SQL Server đã cài trên máy. Script cập nhật connection string và giữ nguyên credential cùng volume dữ liệu hiện có.
 
@@ -101,7 +101,7 @@ Khi sửa backend C# (ví dụ DTO hoặc quy tắc mật khẩu), dừng API đ
 
 `appsettings.example.json` mô tả các nhóm cấu hình. Khóa JWT/OTP, connection string và credential SMTP/AI được lưu bằng **User Secrets** trong development hoặc environment variables/secret manager khi triển khai.
 
-Script development tự tạo các secret cần thiết. Không đưa giá trị thật vào `appsettings.json`, `.env` được theo dõi bởi Git hoặc tài liệu. AI và admin bootstrap là tùy chọn; hướng dẫn cấu hình nằm trong [hướng dẫn hệ thống](docs/SYSTEM_GUIDE.md).
+Script development tự tạo các secret cần thiết. Không đưa giá trị thật vào `appsettings.json`, `.env` được theo dõi bởi Git hoặc tài liệu. AI và admin bootstrap là tùy chọn; hướng dẫn cấu hình nằm trong [hướng dẫn hệ thống](docs/guides/SYSTEM_GUIDE.md).
 
 ## Cấu trúc dự án
 
@@ -157,16 +157,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-BeforeMer
 
 ## Tài liệu
 
-- [Getting Started: nghiên cứu, thiết kế và luồng trước đăng nhập](docs/GETTING_STARTED_RESEARCH.md)
-- [Hướng dẫn cho người dùng và tutorial 4 bước](docs/USER_GUIDE.md)
-- [Hướng dẫn sử dụng và cấu hình hệ thống](docs/SYSTEM_GUIDE.md)
-- [Tên đăng nhập và đăng nhập bằng email](docs/USERNAME_LOGIN.md)
-- [Ghi chú và agent tự xếp lịch](docs/NOTES_AGENT_GUIDE.md)
-- [Chat agent và tự điều chỉnh khi thay đổi thời gian](docs/PLANNING_AGENT_GUIDE.md)
-- [Cấu hình Gemini trên Google Cloud và kiểm tra kết nối](docs/GOOGLE_CLOUD_AI.md)
-- [Kế hoạch nâng cấp PLANORA qua bốn giai đoạn](docs/PLANORA_UPGRADE_PLAN.md)
-- [Cấu hình Gmail SMTP](docs/GMAIL_SMTP.md)
-- [Use cases](docs/USE_CASE_COVERAGE.md) và [mô hình dữ liệu UML](docs/UML_ALIGNMENT.md)
-- [Thiết kế bảo mật](docs/SECURITY.md)
-- [Phân tích kiến trúc và xác minh .NET 8](docs/NET8_MIGRATION_2026-10-06.md)
-- [Frontend React/Tailwind và quy trình build](docs/REACT_MIGRATION_2026-10-06.md)
+- [Mục lục tài liệu / Documentation index](docs/README.md)
+- [Thư viện ảnh sơ đồ database — English / Tiếng Việt](docs/database/current/images/README.md)
+- [Sơ đồ database hiện tại — sinh tự động từ SQL Server](docs/database/current/index.html) và [lệnh tạo lại](scripts/database-diagram/README.md)
+- [Getting Started: nghiên cứu, thiết kế và luồng trước đăng nhập](docs/design/GETTING_STARTED_RESEARCH.md)
+- [Hướng dẫn cho người dùng và tutorial 4 bước](docs/guides/USER_GUIDE.md)
+- [Hướng dẫn sử dụng và cấu hình hệ thống](docs/guides/SYSTEM_GUIDE.md)
+- [Tên đăng nhập và đăng nhập bằng email](docs/features/USERNAME_LOGIN.md)
+- [Ghi chú và agent tự xếp lịch](docs/features/NOTES_AGENT_GUIDE.md)
+- [Chat agent và tự điều chỉnh khi thay đổi thời gian](docs/features/PLANNING_AGENT_GUIDE.md)
+- [Cấu hình Gemini trên Google Cloud và kiểm tra kết nối](docs/integrations/GOOGLE_CLOUD_AI.md)
+- [Kế hoạch nâng cấp PLANORA qua bốn giai đoạn](docs/plans/PLANORA_UPGRADE_PLAN.md)
+- [Cấu hình Gmail SMTP](docs/integrations/GMAIL_SMTP.md)
+- [Use cases](docs/development/USE_CASE_COVERAGE.md) và [mô hình dữ liệu UML](docs/database/UML_ALIGNMENT.md)
+- [Thiết kế bảo mật](docs/development/SECURITY.md)
+- [Phân tích kiến trúc và xác minh .NET 8](docs/development/NET8_MIGRATION_2026-10-06.md)
+- [Frontend React/Tailwind và quy trình build](docs/development/REACT_MIGRATION_2026-10-06.md)

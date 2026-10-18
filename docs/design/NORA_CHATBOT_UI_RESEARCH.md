@@ -53,4 +53,4 @@ Build frontend production đạt. Kiểm tra NORA gồm định dạng an toàn,
 
 Ảnh: `artifacts/nora-professional-empty-*.png`, `artifacts/nora-professional-chat-*.png`, `artifacts/nora-professional-plan-*.png`. Demo chuyển động: `artifacts/nora-redesign-motion-demo.webm`. Metadata kiểm tra: `artifacts/nora-streaming-browser-results.json`, `artifacts/nora-voice-browser-results.json`.
 
-Xem thêm [streaming](../NORA_CHAT_RESEARCH.md), [voice](../NORA_VOICE.md), [asset/prompt mascot](../NORA_MASCOT_FRAMES.md).
+Xem thêm [streaming](NORA_CHAT_RESEARCH.md), [voice](../features/NORA_VOICE.md), [asset/prompt mascot](NORA_MASCOT_FRAMES.md).

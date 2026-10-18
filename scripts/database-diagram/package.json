@@ -1,0 +1,13 @@
+{
+  "name": "planora-database-diagram",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test render.test.mjs",
+    "export:images": "node export-images.mjs"
+  },
+  "dependencies": {
+    "@viz-js/viz": "3.25.0",
+    "sharp": "0.35.5"
+  }
+}

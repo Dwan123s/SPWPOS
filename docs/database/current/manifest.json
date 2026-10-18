@@ -1,0 +1,119 @@
+{
+  "databaseName": "SPWPOS",
+  "serverName": "05003d8ed79e",
+  "capturedAt": "2026-10-18T15:26:57.3648367Z",
+  "tables": 45,
+  "columns": 356,
+  "foreignKeys": 69,
+  "interactiveLayout": "functional-groups-side-ports-v4",
+  "languages": [
+    "en",
+    "vi"
+  ],
+  "functionalGroups": [
+    {
+      "id": "accounts",
+      "title": "Accounts & security",
+      "titleVi": "Tài khoản và bảo mật",
+      "tables": 15
+    },
+    {
+      "id": "time",
+      "title": "Availability & preferences",
+      "titleVi": "Thời gian rảnh và tùy chọn",
+      "tables": 4
+    },
+    {
+      "id": "tasks",
+      "title": "Tasks & categories",
+      "titleVi": "Công việc và danh mục",
+      "tables": 4
+    },
+    {
+      "id": "planning",
+      "title": "Planning & execution",
+      "titleVi": "Lập kế hoạch và thực thi",
+      "tables": 9
+    },
+    {
+      "id": "intelligence",
+      "title": "Intelligence & workload",
+      "titleVi": "Phân tích và khối lượng công việc",
+      "tables": 6
+    },
+    {
+      "id": "notifications",
+      "title": "Notifications & operations",
+      "titleVi": "Thông báo và vận hành",
+      "tables": 3
+    },
+    {
+      "id": "assistant",
+      "title": "Notes & AI assistant",
+      "titleVi": "Ghi chú và trợ lý AI",
+      "tables": 4
+    }
+  ],
+  "interactiveMap": "index.html",
+  "routing": "layout.json",
+  "compactExport": "map.svg",
+  "imageGallery": "images/README.md",
+  "renderer": "@viz-js/viz",
+  "graphvizVersion": "14.1.3",
+  "views": [
+    {
+      "id": "overview",
+      "title": "All tables - relationship overview",
+      "tables": 45,
+      "foreignKeys": 69
+    },
+    {
+      "id": "complete",
+      "title": "All tables - complete columns",
+      "tables": 45,
+      "foreignKeys": 69
+    },
+    {
+      "id": "accounts",
+      "title": "Accounts & security",
+      "tables": 15,
+      "foreignKeys": 15
+    },
+    {
+      "id": "time",
+      "title": "Availability & preferences",
+      "tables": 5,
+      "foreignKeys": 4
+    },
+    {
+      "id": "tasks",
+      "title": "Tasks & categories",
+      "tables": 5,
+      "foreignKeys": 8
+    },
+    {
+      "id": "planning",
+      "title": "Planning & execution",
+      "tables": 11,
+      "foreignKeys": 21
+    },
+    {
+      "id": "intelligence",
+      "title": "Intelligence & workload",
+      "tables": 9,
+      "foreignKeys": 11
+    },
+    {
+      "id": "notifications",
+      "title": "Notifications & operations",
+      "tables": 7,
+      "foreignKeys": 6
+    },
+    {
+      "id": "assistant",
+      "title": "Notes & AI assistant",
+      "tables": 5,
+      "foreignKeys": 4
+    }
+  ]
+}
