@@ -51,12 +51,13 @@ public sealed class AgentInterpreterTests
         var error = await Assert.ThrowsAsync<AuthException>(() => Interpreter(client).InterpretAsync("Họp", "{}", [], "UTC", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken));
         Assert.Equal(503, error.StatusCode);
     }
-    [Theory] [InlineData("missing")] [InlineData("offset")] [InlineData("unknown")]
+    [Theory] [InlineData("missing")] [InlineData("offset")] [InlineData("unknown")] [InlineData("eventType")]
     public async Task Malformed_schema_or_offset_is_rejected(string mode)
     {
         var output = mode switch {
             "missing" => Payload.Replace("\"repeatWeeks\":1", "\"irrelevant\":1"),
             "offset" => Payload.Replace("14:00:00+07:00", "14:00:00"),
+            "eventType" => Payload.Replace("\"MEETING\"", "\"STUDY\""),
             _ => Payload.Replace("\"reschedule\":false", "\"reschedule\":false,\"userId\":\"other\"")
         };
         using var provider = new Provider(output); using var client = new HttpClient(provider);

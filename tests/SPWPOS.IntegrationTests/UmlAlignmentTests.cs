@@ -18,6 +18,7 @@ public sealed class UmlAlignmentTests
         var plan = (await Send(client, HttpMethod.Post, "/api/plans", new PlanInput(factory.Clock.GetUtcNow(), 1))).GetProperty("data");
         await Send(client, HttpMethod.Post, $"/api/plans/{plan.GetProperty("id").GetGuid()}/apply");
         var sid = plan.GetProperty("sessions")[0].GetProperty("id").GetGuid();
+        factory.Clock.Advance(plan.GetProperty("sessions")[0].GetProperty("start").GetDateTimeOffset() - factory.Clock.GetUtcNow());
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/start"); factory.Clock.Advance(TimeSpan.FromHours(25));
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/pause"); factory.Clock.Advance(TimeSpan.FromHours(3));
         var resumed = await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/resume", expected: HttpStatusCode.Conflict);
@@ -65,6 +66,7 @@ public sealed class UmlAlignmentTests
         var plan = (await Send(client, HttpMethod.Post, "/api/plans", new PlanInput(now, 1))).GetProperty("data");
         await Send(client, HttpMethod.Post, $"/api/plans/{plan.GetProperty("id").GetGuid()}/apply");
         var sid = plan.GetProperty("sessions")[0].GetProperty("id").GetGuid();
+        factory.Clock.Advance(plan.GetProperty("sessions")[0].GetProperty("start").GetDateTimeOffset() - factory.Clock.GetUtcNow());
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/start"); factory.Clock.Advance(TimeSpan.FromMinutes(20));
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/pause"); factory.Clock.Advance(TimeSpan.FromMinutes(10));
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/resume"); factory.Clock.Advance(TimeSpan.FromMinutes(10));

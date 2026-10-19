@@ -43,6 +43,7 @@ public sealed class WorkspaceFlowTests
         var planId = proposal.GetProperty("id").GetGuid(); await Send(client, HttpMethod.Post, $"/api/plans/{planId}/apply");
         await Send(client, HttpMethod.Post, $"/api/plans/{planId}/apply", expected: HttpStatusCode.Conflict);
         var sid = proposal.GetProperty("sessions")[0].GetProperty("id").GetGuid();
+        factory.Clock.Advance(proposal.GetProperty("sessions")[0].GetProperty("start").GetDateTimeOffset() - factory.Clock.GetUtcNow());
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/start"); factory.Clock.Advance(TimeSpan.FromMinutes(20));
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/pause"); factory.Clock.Advance(TimeSpan.FromMinutes(10));
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/resume"); factory.Clock.Advance(TimeSpan.FromMinutes(10));

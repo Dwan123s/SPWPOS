@@ -47,6 +47,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [Security / Bảo mật](development/SECURITY.md)
 - [Team development plan / Kế hoạch nhóm](development/TEAM_DEVELOPMENT_PLAN.md)
 - [Verification record / Hồ sơ kiểm chứng](development/VERIFICATION.md)
+- [NORA automated sandbox / Chạy và xuất kết quả kiểm thử NORA](development/NORA_SANDBOX.md)
 - [Use-case coverage / Phạm vi use case](development/USE_CASE_COVERAGE.md)
 - [.NET 8 migration](development/NET8_MIGRATION_2026-10-06.md)
 - [React migration](development/REACT_MIGRATION_2026-10-06.md)
@@ -70,6 +71,10 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [Remediation prompt](prompts/PLANORA_FULL_REMEDIATION_PROMPT.md)
 - [System review, 15 October](reviews/SYSTEM_REVIEW_2026-10-15.md) · [UI review, 15 October](reviews/UI_REVIEW_2026-10-15.md)
 - [NORA response quality, 18 October](reviews/NORA_REQUEST_RESPONSE_QUALITY_REPORT_2026-10-18.md) · [Original screenshots](evidence/nora-quality-2026-10-18/)
+- [NORA guardrail and scheduling test prompts, 19 October / Bộ prompt kiểm thử NORA](reviews/NORA_GUARDRAIL_AND_SCHEDULING_TEST_PACK_2026-10-19.md)
+- [NORA automated sandbox evaluation, 19 October / Kết quả đánh giá sandbox](reviews/NORA_SANDBOX_EVALUATION_2026-10-19.md)
+- [NORA sandbox fixes and verification, 19 October / Bản vá và kiểm chứng](reviews/NORA_SANDBOX_PATCH_VERIFICATION_2026-10-19.md)
+- [NORA guardrails integration, 19 October / Tích hợp guardrail với main](reviews/NORA_GUARDRAILS_INTEGRATION_2026-10-19.md)
 - [Notes review, 18 October / Đánh giá phần Ghi chú](reviews/NOTE_REVIEW_2026-10-18.md)
 - [Earlier system review](reviews/SYSTEM_REVIEW.md) · [5 October review](reviews/REVIEW_2026-10-05.md) · [5 October fixes](reviews/FIX_2026-10-05.md)
 
