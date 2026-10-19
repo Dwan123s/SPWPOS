@@ -217,6 +217,7 @@ export function eventModal(event = {}) {
               MEETING: "Cuộc họp",
               CLASS: "Lớp học",
               APPOINTMENT: "Cuộc hẹn",
+              WORK: "Công việc",
               OTHER: "Khác",
             }).map(([code, label]) => (
               <option
@@ -293,7 +294,9 @@ export function exceptionModal(e = {}) {
               Bận
             </option>
             <option value="true" selected={e.isAvailable}>
-              Rảnh thêm
+              {e.overridesWeeklyAvailability
+                ? "Giờ rảnh duy nhất trong ngày"
+                : "Rảnh thêm"}
             </option>
           </Select>
         </label>

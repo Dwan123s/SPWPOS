@@ -169,6 +169,118 @@ async function ready() {
     target: { value: "Xếp báo cáo" },
   });
 }
+
+it("keeps the explanation and the verified outcome visible after saving and reloading history", async () => {
+  result.reply = "Mình ưu tiên hồ sơ trước để bạn còn thời gian kiểm tra.";
+  result.outcome = "Đã lưu lịch: Xử lý hồ sơ [WORK], 20/10/2026 12:00–12:45.";
+  const first = render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  await screen.findByText(result.outcome);
+  expect(screen.getByText(result.reply)).toBeTruthy();
+  first.unmount();
+  render(<AgentPage />);
+  await screen.findByText(result.outcome);
+  expect(screen.getByText(result.reply)).toBeTruthy();
+});
+
+it("recovers a saved request from history after the stream connection fails", async () => {
+  const fallback = globalThis.fetch;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url, options = {}) => {
+      if (url === "/api/agent/turns/stream") {
+        const body = JSON.parse(options.body);
+        turns = [
+          {
+            ...result,
+            requestId: body.requestId,
+            conversationId: body.conversationId,
+          },
+        ];
+        throw new TypeError("Failed to fetch");
+      }
+      return fallback(url, options);
+    }),
+  );
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  await screen.findByText(result.reply);
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.queryByText("Kết nối bị gián đoạn")).toBeNull();
+  expect(screen.getAllByText("Đã lưu lịch").length).toBeGreaterThan(0);
+});
+
+it.each([true, false])(
+  "replaces an optimistic streamed draft after a server overlap rejection (history available: %s)",
+  async (historyAvailable) => {
+    const fallback = globalThis.fetch;
+    let rejected = false;
+    const conflict =
+      "Cuộc họp trùng Đi làm 13:30–17:00. Chưa lưu thay đổi; hãy chọn giờ khác.";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url, options = {}) => {
+        if (url === "/api/agent/turns/stream") {
+          const body = JSON.parse(options.body);
+          rejected = true;
+          turns = [
+            {
+              ...result,
+              conversationId: body.conversationId,
+              requestId: body.requestId,
+              text: body.text,
+              status: "FAILED",
+              reply: conflict,
+              errorCode: "FIXED_EVENT_OVERLAP",
+              canUndo: false,
+              changes: [],
+              plan: null,
+            },
+          ];
+          const encoder = new TextEncoder();
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: "delta", delta: "Lịch trình sẽ được cập nhật." })}\n\n`,
+                  ),
+                );
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: "error", code: "FIXED_EVENT_OVERLAP", message: conflict })}\n\n`,
+                  ),
+                );
+                controller.close();
+              },
+            }),
+            { headers: { "content-type": "text/event-stream" } },
+          );
+        }
+        if (url === "/api/agent/turns" && rejected && !historyAvailable)
+          throw new Error("history unavailable");
+        return fallback(url, options);
+      }),
+    );
+    render(<AgentPage />);
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+    await screen.findByText(conflict);
+    await waitFor(() =>
+      expect(screen.queryByText("Lịch trình sẽ được cập nhật.")).toBeNull(),
+    );
+    expect(screen.queryByText("Kết nối bị gián đoạn")).toBeNull();
+    expect(
+      screen.getAllByText(/Chưa lưu|chưa được lưu/).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("Đã lưu lịch")).toBeNull();
+    await waitFor(() => expect(screen.getAllByText(conflict)).toHaveLength(1));
+    if (historyAvailable) expect(screen.queryByRole("alert")).toBeNull();
+    else expect(screen.getByRole("alert").textContent).toContain(conflict);
+  },
+);
 it("sends a clear request, shows actual schedule in the account timezone and permits undo", async () => {
   const changed = vi.fn(async () => {});
   render(<AgentPage onWorkspaceChanged={changed} />);
@@ -423,11 +535,184 @@ it("opens the specific plan selected from an older reply instead of showing the 
   const cards = screen.getAllByRole("button", {
     name: /Kế hoạch của bạn.*phiên/,
   });
+  expect(screen.queryByRole("dialog", { name: "Kế hoạch của bạn" })).toBeNull();
   fireEvent.click(cards[0]);
-  const panel = screen.getByRole("complementary", { name: "Kế hoạch của bạn" });
+  const panel = screen.getByRole("dialog", { name: "Kế hoạch của bạn" });
   expect(panel.textContent).toContain("Kế hoạch trước");
   expect(panel.textContent).not.toContain("Kế hoạch sau");
   expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
+});
+it("retries an initial connection failure without leaving the Nora page", async () => {
+  let offline = true;
+  const fallback = globalThis.fetch;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url, options = {}) =>
+      offline && url === "/api/agent/capabilities"
+        ? {
+            ok: false,
+            status: 503,
+            json: async () => ({
+              error: { message: "Trợ lý tạm thời chưa khả dụng." },
+            }),
+          }
+        : fallback(url, options),
+    ),
+  );
+  render(<AgentPage />);
+  await screen.findByText("Trợ lý tạm thời chưa khả dụng.");
+  offline = false;
+  fireEvent.click(screen.getByRole("button", { name: "Thử kết nối lại" }));
+  await ready();
+  expect(screen.getByRole("button", { name: "Gửi yêu cầu" }).disabled).toBe(
+    false,
+  );
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+it("explains a clipboard failure instead of leaving an unresponsive copy control", async () => {
+  turns = [{ ...result, conversationId: "chat" }];
+  const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      writeText: async () => {
+        throw new Error("denied");
+      },
+    },
+  });
+  try {
+    render(<AgentPage />);
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Sao chép phản hồi" }));
+    expect(await screen.findByText(/Không thể sao chép tự động/)).toBeTruthy();
+    expect(screen.queryByText("Đã sao chép")).toBeNull();
+  } finally {
+    if (previous) Object.defineProperty(navigator, "clipboard", previous);
+    else delete navigator.clipboard;
+  }
+});
+it("updates the active title after rename and enables an archived conversation only after restore", async () => {
+  turns = [{ ...result, conversationId: "chat", text: "Yêu cầu gốc" }];
+  let row = {
+    id: "chat",
+    title: "Kế hoạch tuần",
+    archived: false,
+    version: "v1",
+    turnCount: 1,
+  };
+  const fallback = globalThis.fetch;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (raw, options = {}) => {
+      const url = new URL(raw, "https://localhost");
+      if (
+        url.pathname === "/api/agent/conversations/chat" &&
+        options.method === "PUT"
+      ) {
+        row = { ...row, ...JSON.parse(options.body), version: "v2" };
+        return { ok: true, json: async () => ({ data: row }) };
+      }
+      if (url.pathname === "/api/agent/conversations")
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              items:
+                row.archived === (url.searchParams.get("archived") === "true")
+                  ? [row]
+                  : [],
+              nextCursor: null,
+            },
+          }),
+        };
+      return fallback(raw, options);
+    }),
+  );
+  const view = render(<AgentPage />);
+  await ready();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Tùy chọn Kế hoạch tuần" }),
+  );
+  fireEvent.click(screen.getByRole("menuitem", { name: "Đổi tên" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Tên hội thoại" }), {
+    target: { value: "Kế hoạch mới" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu tên" }));
+  await waitFor(() =>
+    expect(
+      view.container.querySelector(".nora-chat-title").textContent,
+    ).toContain("Kế hoạch mới"),
+  );
+  const options = await screen.findByRole("button", {
+    name: "Tùy chọn Kế hoạch mới",
+  });
+  await waitFor(() => expect(options.disabled).toBe(false));
+  fireEvent.click(options);
+  fireEvent.click(
+    screen.getByRole("menuitem", { name: "Lưu trữ", exact: true }),
+  );
+  await waitFor(() => expect(row.archived).toBe(true));
+  fireEvent.click(screen.getByRole("tab", { name: "Đã lưu trữ" }));
+  const archived = await screen.findByRole("button", {
+    name: "Kế hoạch mới",
+    exact: true,
+  });
+  await waitFor(() => expect(archived.disabled).toBe(false));
+  fireEvent.click(archived);
+  await screen.findByRole("button", { name: "Khôi phục hội thoại" });
+  expect(screen.getByLabelText("Yêu cầu của bạn").disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Khôi phục hội thoại" }));
+  await waitFor(() =>
+    expect(screen.getByLabelText("Yêu cầu của bạn").disabled).toBe(false),
+  );
+  expect(row.archived).toBe(false);
+  expect(
+    view.container.querySelector(".nora-chat-title").textContent,
+  ).toContain("Kế hoạch mới");
+});
+it("keeps the current conversation and deletion confirmation when the server rejects deletion", async () => {
+  turns = [
+    {
+      ...result,
+      id: "turn-1",
+      conversationId: "test-conv",
+      text: "Kế hoạch tuần",
+      reply: "Nội dung cần giữ",
+    },
+  ];
+  const fallback = globalThis.fetch;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url, options = {}) =>
+      options.method === "DELETE"
+        ? {
+            ok: false,
+            status: 503,
+            json: async () => ({
+              error: { message: "Chưa xóa được hội thoại. Hãy thử lại." },
+            }),
+          }
+        : fallback(url, options),
+    ),
+  );
+  render(<AgentPage />);
+  await ready();
+  await screen.findByText("Nội dung cần giữ");
+  fireEvent.click(screen.getByRole("button", { name: "Xóa cuộc trò chuyện" }));
+  fireEvent.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
+  await screen.findByText("Chưa xóa được hội thoại. Hãy thử lại.");
+  expect(screen.getByText("Nội dung cần giữ")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Xóa vĩnh viễn" })).toBeTruthy();
+});
+it("dismisses a deletion confirmation when starting a different conversation", async () => {
+  turns = [{ ...result, conversationId: "test-conv", text: "Kế hoạch tuần" }];
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Xóa cuộc trò chuyện" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Hội thoại mới", exact: true }),
+  );
+  expect(screen.queryByRole("button", { name: "Xóa vĩnh viễn" })).toBeNull();
 });
 it("renders circular send button with nora-send-button class and supports deleting the current conversation", async () => {
   turns = [
@@ -447,13 +732,12 @@ it("renders circular send button with nora-send-button class and supports deleti
   const sendBtn = screen.getByRole("button", { name: "Gửi yêu cầu" });
   expect(sendBtn.className).toContain("nora-send-button");
   const delBtn = screen.getByRole("button", { name: "Xóa cuộc trò chuyện" });
-  expect(delBtn).toBeTruthy();
+  expect(delBtn.textContent).toBe("");
   fireEvent.click(delBtn);
-  expect(
-    screen.getByText(/Bạn có chắc muốn xóa toàn bộ cuộc trò chuyện này\?/),
-  ).toBeTruthy();
+  const dialog = screen.getByRole("alertdialog", {
+    name: "Xóa cuộc trò chuyện?",
+  });
+  expect(dialog.textContent).toContain("Xếp lịch kiểm tra");
   fireEvent.click(screen.getByRole("button", { name: "Hủy" }));
-  expect(
-    screen.queryByText(/Bạn có chắc muốn xóa toàn bộ cuộc trò chuyện này\?/),
-  ).toBeNull();
+  expect(screen.queryByRole("alertdialog")).toBeNull();
 });

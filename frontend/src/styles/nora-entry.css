@@ -1,6 +1,396 @@
 @import "./nora-chat.css" layer(components);
 
 @layer components {
+  .nora-studio {
+    --nora-header-height: 56px;
+    grid-template-rows: var(--nora-header-height) minmax(0, 1fr);
+  }
+  .nora-chat-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px;
+    height: auto;
+    min-height: 44px;
+    max-height: none;
+    align-items: start;
+  }
+  .nora-chat-item-btn {
+    min-height: 44px;
+    height: auto;
+    padding: 10px;
+    font-size: 13px;
+  }
+  .nora-chat-item-more {
+    position: static;
+    translate: none;
+    opacity: 1;
+    width: 36px;
+    height: 44px;
+    color: #526b85;
+  }
+  .nora-chat-item .nora-menu-popover {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    min-width: 0;
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    box-shadow:
+      0 12px 32px rgb(18 41 65 / 16%),
+      0 2px 8px rgb(18 41 65 / 8%);
+    animation: nora-menu-expand 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes nora-menu-expand {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scaleY(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+    }
+  }
+  .nora-studio .nora-toolbar-delete-btn {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 10px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #c92a42;
+  }
+  .nora-studio .nora-toolbar-delete-btn:hover:not(:disabled) {
+    background: transparent;
+    border: 0;
+    color: #a3162c;
+    box-shadow: none;
+  }
+  .nora-studio .nora-toolbar-delete-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .nora-delete-dialog {
+    position: fixed;
+    margin: 0;
+    inset: auto;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 22px;
+    border: 1px solid #dce8f5;
+    border-radius: 18px;
+    background: #fff;
+    color: #253e59;
+    box-shadow: 0 24px 80px rgb(18 41 65 / 22%);
+    font-family: inherit;
+    animation: nora-delete-enter 160ms ease-out both;
+  }
+  .nora-delete-dialog::backdrop {
+    background: rgb(18 41 65 / 28%);
+  }
+  .nora-delete-dialog-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .nora-delete-dialog h2 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.4;
+  }
+  .nora-delete-dialog p {
+    margin: 12px 0 20px;
+    font-size: 14px;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+  .nora-delete-dialog button {
+    cursor: pointer;
+    font: inherit;
+  }
+  .nora-delete-dialog-close {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #526b85;
+  }
+  .nora-delete-dialog-close svg {
+    width: 16px;
+    height: 16px;
+  }
+  .nora-delete-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .nora-delete-dialog-actions button {
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid #c8d8e8;
+    border-radius: 24px;
+    background: #fff;
+    color: #36516f;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .nora-delete-dialog-actions .is-danger {
+    background: #c92a42;
+    border-color: #c92a42;
+    color: #fff;
+  }
+  .nora-delete-dialog-actions .is-danger:hover:not(:disabled) {
+    background: #a3162c;
+  }
+  .nora-delete-dialog button:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+  .nora-delete-dialog button:focus-visible,
+  .nora-menu-popover button:focus-visible {
+    outline: 2px solid #0866dc;
+    outline-offset: -3px;
+  }
+  .nora-delete-dialog .nora-delete-dialog-error {
+    color: #a3162c;
+  }
+  @keyframes nora-delete-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nora-chat-item .nora-menu-popover,
+    .nora-delete-dialog {
+      animation: none;
+    }
+  }
+  .nora-menu-popover [role="menuitem"] {
+    min-height: 38px;
+    font-size: 13px;
+  }
+  .nora-chat-item :is(button, input):focus-visible {
+    outline-offset: -3px;
+  }
+  .nora-studio .agent-user-message {
+    padding-right: 52px;
+    min-height: 48px;
+    box-sizing: border-box;
+  }
+  .nora-studio .agent-user-message p {
+    padding-right: 0;
+  }
+  .nora-studio .nora-edit-request {
+    width: 36px;
+    height: 36px;
+    top: 6px;
+    right: 6px;
+  }
+  .nora-studio .agent-other-field {
+    min-height: 40px;
+    border: 1px solid #c5ddf5;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font: inherit;
+    background: white;
+  }
+  .nora-inline-rename {
+    grid-column: 1 / -1;
+    min-height: 44px;
+    height: auto;
+    box-sizing: border-box;
+  }
+  .nora-inline-rename :is(input, button) {
+    min-height: 36px;
+  }
+  .nora-history-group h2 {
+    font-size: 12px;
+    color: #526b85;
+  }
+  .nora-history-tabs [role="tab"] {
+    min-height: 40px;
+  }
+  .nora-studio .agent-composer {
+    position: relative;
+  }
+  .nora-composer-info {
+    position: static;
+  }
+  .nora-composer-info summary {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    width: auto;
+    height: 36px;
+    padding: 0 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #486482;
+  }
+  .nora-composer-help {
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    width: auto;
+    max-width: none;
+    max-height: min(340px, calc(100dvh - var(--nora-header-height) - 170px));
+    overflow: auto;
+    overscroll-behavior: contain;
+    font-size: 12px;
+  }
+  .nora-composer-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+    color: #526b85;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .nora-composer-meta .is-near-limit {
+    color: #a24a0a;
+    font-weight: 600;
+  }
+  .nora-copy-error {
+    display: block;
+    margin-top: 8px;
+    color: #9b4050;
+    font-size: 12px;
+  }
+  .nora-archived-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    background: #edf5fc;
+    color: #365b7f;
+    flex-wrap: wrap;
+  }
+  .nora-archived-notice p {
+    margin: 0;
+    font-size: 13px;
+  }
+  .nora-studio :is(button, a, summary, input, textarea):focus-visible {
+    outline: 2px solid #0866dc;
+    outline-offset: 2px;
+  }
+  .nora-studio .nora-chat-item :is(button, input):focus-visible {
+    outline-offset: -3px;
+  }
+  .nora-plan-backdrop {
+    position: absolute;
+    inset: var(--nora-header-height) 0 0;
+    z-index: 7;
+    border: 0;
+    background: rgb(18 41 65 / 20%);
+    backdrop-filter: blur(2px);
+  }
+  @media (max-width: 1080px) {
+    .nora-studio .nora-history-rail,
+    .nora-studio .nora-history-rail[data-open="true"],
+    .nora-studio .agent-context {
+      grid-column: 1 / -1;
+      grid-row: 1 / -1;
+      top: var(--nora-header-height);
+      height: calc(100% - var(--nora-header-height));
+    }
+    .nora-history-backdrop {
+      top: var(--nora-header-height);
+    }
+  }
+  @media (max-width: 800px) {
+    .nora-studio {
+      --nora-header-height: 52px;
+    }
+    .nora-studio .nora-header button,
+    .nora-studio .nora-rail-close,
+    .nora-studio .nora-plan-close {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .nora-chat-item {
+      grid-template-columns: minmax(0, 1fr) 44px;
+    }
+    .nora-chat-item-more {
+      width: 44px;
+    }
+    .nora-menu-popover [role="menuitem"],
+    .nora-inline-rename :is(input, button),
+    .nora-confirm-btn,
+    .nora-history-tabs [role="tab"] {
+      min-height: 44px;
+    }
+    .nora-studio .nora-composer-info summary,
+    .nora-studio .nora-mic-button,
+    .nora-studio .nora-stop-button {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .nora-studio .agent-composer .nora-send-button {
+      width: 44px !important;
+      height: 44px !important;
+    }
+    .nora-studio .nora-edit-request {
+      width: 44px;
+      height: 44px;
+      top: 2px;
+      right: 2px;
+    }
+    .nora-studio .agent-chip-btn,
+    .nora-studio .agent-other-field,
+    .nora-studio .agent-other-input-wrap button,
+    .nora-studio .agent-response > .actions button,
+    .nora-studio .nora-copy-button {
+      min-height: 44px;
+    }
+  }
+  @media (max-width: 520px) {
+    .nora-studio .nora-toolbar-delete-btn {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 10px;
+    }
+    .nora-toolbar-delete-btn span {
+      display: none;
+    }
+    .nora-studio .agent-toggle {
+      font-size: 12px;
+    }
+    .nora-studio .agent-other-row {
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .nora-composer-info summary span {
+      display: none;
+    }
+    .nora-composer-meta > span:first-child {
+      display: none;
+    }
+    .nora-composer-meta {
+      justify-content: flex-end;
+    }
+  }
+  .agent-verified-outcome {
+    border-top: 1px solid #d8e6f4;
+    margin-top: 12px;
+    padding-top: 12px;
+  }
   .nora-usage {
     flex-shrink: 0;
     margin: 0 14px 14px;

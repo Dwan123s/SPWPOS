@@ -7,6 +7,7 @@ import { noteAppearanceStyle } from "./note-appearance.js";
 
 const priorities = ["", "Thấp", "Vừa", "Cao", "Khẩn"];
 const types = {
+  WORK: "Công việc",
   OTHER: "Khác",
   PROGRAMMING: "Lập trình",
   WRITING: "Viết nội dung",

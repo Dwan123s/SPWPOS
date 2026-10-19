@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import { api } from "./api.js";
 import { icon, state } from "./ui.jsx";
 import { groupConversations } from "./nora-chat-ui.jsx";
@@ -98,6 +99,7 @@ export function ConversationLibrary({
   disabled,
   onChoose,
   onRemoved,
+  onUpdated,
 }) {
   const [query, setQuery] = useState("");
   const [archived, setArchived] = useState(false);
@@ -110,6 +112,72 @@ export function ConversationLibrary({
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [action, setAction] = useState("");
+  const library = useRef(null);
+  const menu = useRef(null);
+  const [menuPosition, setMenuPosition] = useState({});
+  const focusLast = useRef(false);
+  const previousEdit = useRef(null);
+  function focusTrigger(id) {
+    [...(library.current?.querySelectorAll("[data-conversation-menu]") || [])]
+      .find((button) => button.dataset.conversationMenu === id)
+      ?.focus();
+  }
+  function closeMenu(id) {
+    setMenuOpenId(null);
+    focusTrigger(id);
+  }
+  useEffect(() => {
+    const current = items.find((row) => row.id === selected);
+    if (current) onUpdated?.(current);
+  }, [items, selected, onUpdated]);
+  useLayoutEffect(() => {
+    if (!menuOpenId || !menu.current) return;
+    const node = menu.current;
+    const trigger = [
+      ...library.current.querySelectorAll("[data-conversation-menu]"),
+    ].find((button) => button.dataset.conversationMenu === menuOpenId);
+    if (!trigger) return;
+    node.showPopover?.();
+    const anchor = trigger.getBoundingClientRect();
+    const width = Math.min(220, window.innerWidth - 16);
+    const height = node.offsetHeight;
+    const above = anchor.bottom + 6 + height > window.innerHeight - 8;
+    setMenuPosition({
+      left: Math.max(
+        8,
+        Math.min(window.innerWidth - width - 8, anchor.right - width),
+      ),
+      top: Math.max(8, above ? anchor.top - height - 6 : anchor.bottom + 6),
+      width,
+      transformOrigin: above ? "bottom right" : "top right",
+    });
+    const close = (event) => {
+      if (!node.contains(event.target)) setMenuOpenId(null);
+    };
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    const controls = node.querySelectorAll('[role="menuitem"]');
+    (focusLast.current
+      ? controls?.[controls.length - 1]
+      : controls?.[0]
+    )?.focus();
+    return () => {
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menuOpenId]);
+  useEffect(() => {
+    if (previousEdit.current && !editingId) focusTrigger(previousEdit.current);
+    previousEdit.current = editingId;
+  }, [editingId]);
+  function switchTab(archive) {
+    setArchived(archive);
+    setCursor(null);
+    setMenuOpenId(null);
+    setConfirmDeleteId(null);
+    setEditingId(null);
+  }
 
   useEffect(() => {
     let active = true;
@@ -142,21 +210,16 @@ export function ConversationLibrary({
 
   // Close floating popovers when clicking outside
   useEffect(() => {
-    if (!menuOpenId && !confirmDeleteId) return;
+    if (!menuOpenId) return;
     const closeAll = (e) => {
-      if (
-        e.target.closest?.(
-          ".nora-menu-popover, .nora-inline-delete-box, .nora-chat-item-more",
-        )
-      ) {
+      if (e.target.closest?.(".nora-menu-popover, .nora-chat-item-more")) {
         return;
       }
       setMenuOpenId(null);
-      setConfirmDeleteId(null);
     };
     document.addEventListener("click", closeAll);
     return () => document.removeEventListener("click", closeAll);
-  }, [menuOpenId, confirmDeleteId]);
+  }, [menuOpenId]);
 
   async function more() {
     setLoading(true);
@@ -179,24 +242,45 @@ export function ConversationLibrary({
 
   async function edit(row, title, archive) {
     setLoading(true);
+    setAction(
+      row.archived === archive
+        ? "Đang lưu tên…"
+        : archive
+          ? "Đang lưu trữ…"
+          : "Đang khôi phục…",
+    );
     setError("");
     try {
-      await api(`/api/agent/conversations/${row.id}`, "PUT", {
+      const updated = await api(`/api/agent/conversations/${row.id}`, "PUT", {
         title,
         archived: archive,
         version: row.version,
       });
+      setItems((old) =>
+        old.flatMap((item) =>
+          item.id !== row.id
+            ? [item]
+            : updated.archived === archived
+              ? [updated]
+              : [],
+        ),
+      );
+      onUpdated?.(updated);
       setRevision((x) => x + 1);
-      if (archive && row.id === selected) onRemoved();
+      if (archive && row.id === selected) onRemoved?.(row.id);
+      return true;
     } catch (e) {
       setError(e.message);
+      return false;
     } finally {
       setLoading(false);
+      setAction("");
     }
   }
 
   async function remove(row) {
     setLoading(true);
+    setAction("Đang xóa hội thoại…");
     setError("");
     try {
       await api(
@@ -206,14 +290,19 @@ export function ConversationLibrary({
       setRevision((x) => x + 1);
       setItems((old) => old.filter((x) => x.id !== row.id));
       onRemoved?.(row.id);
+      return true;
     } catch (e) {
       setError(e.message);
+      return false;
     } finally {
       setLoading(false);
+      setAction("");
     }
   }
 
   async function download(row) {
+    setLoading(true);
+    setAction("Đang xuất hội thoại…");
     setError("");
     try {
       const data = await api(`/api/agent/conversations/${row.id}/export`);
@@ -234,6 +323,9 @@ export function ConversationLibrary({
       setTimeout(() => URL.revokeObjectURL(href), 1000);
     } catch (e) {
       setError(e.message);
+    } finally {
+      setLoading(false);
+      setAction("");
     }
   }
 
@@ -243,30 +335,52 @@ export function ConversationLibrary({
       : groupRows(items);
 
   return (
-    <div className="nora-conversations-wrapper">
+    <div className="nora-conversations-wrapper" ref={library}>
       <label className="nora-history-search">
         {icon("search")}
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setLoading(true);
+            setCursor(null);
+            setMenuOpenId(null);
+          }}
           maxLength={100}
           placeholder="Tìm hội thoại…"
           aria-label="Tìm hội thoại"
         />
       </label>
 
-      {/* ChatGPT-style tabs: Gần đây / Đã lưu trữ */}
-      <div className="nora-history-tabs" role="tablist">
+      <div
+        className="nora-history-tabs"
+        role="tablist"
+        aria-label="Danh sách hội thoại"
+        onKeyDown={(event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
+            return;
+          event.preventDefault();
+          const next =
+            event.key === "Home"
+              ? false
+              : event.key === "End"
+                ? true
+                : !archived;
+          switchTab(next);
+          event.currentTarget
+            .querySelectorAll('[role="tab"]')
+            [next ? 1 : 0]?.focus();
+        }}
+      >
         <button
           type="button"
           role="tab"
+          id="nora-recent-tab"
+          aria-controls="nora-conversation-results"
+          tabIndex={archived ? -1 : 0}
           aria-selected={!archived}
           className={`nora-tab-pill${!archived ? " is-active" : ""}`}
-          onClick={() => {
-            setArchived(false);
-            setMenuOpenId(null);
-            setConfirmDeleteId(null);
-          }}
+          onClick={() => switchTab(false)}
           disabled={disabled}
         >
           Gần đây
@@ -274,20 +388,19 @@ export function ConversationLibrary({
         <button
           type="button"
           role="tab"
+          id="nora-archived-tab"
+          aria-controls="nora-conversation-results"
+          tabIndex={archived ? 0 : -1}
           aria-selected={archived}
           className={`nora-tab-pill${archived ? " is-active" : ""}`}
-          onClick={() => {
-            setArchived(true);
-            setMenuOpenId(null);
-            setConfirmDeleteId(null);
-          }}
+          onClick={() => switchTab(true)}
           disabled={disabled}
         >
           Đã lưu trữ
         </button>
       </div>
 
-      {error && (
+      {error && !confirmDeleteId && (
         <div className="nora-history-error" role="alert">
           <span>{error}</span>
           <button type="button" onClick={() => setRevision((x) => x + 1)}>
@@ -296,7 +409,13 @@ export function ConversationLibrary({
         </div>
       )}
 
-      <div className="nora-conversation-list" aria-busy={loading}>
+      <div
+        className="nora-conversation-list"
+        id="nora-conversation-results"
+        role="tabpanel"
+        aria-labelledby={archived ? "nora-archived-tab" : "nora-recent-tab"}
+        aria-busy={loading}
+      >
         {grouped.map((group) => (
           <section key={group.name} className="nora-history-group">
             <h2>{group.name}</h2>
@@ -305,71 +424,45 @@ export function ConversationLibrary({
                 key={row.id}
                 className={`nora-chat-item${row.id === selected ? " is-selected" : ""}${menuOpenId === row.id ? " has-menu-open" : ""}${confirmDeleteId === row.id ? " is-deleting" : ""}`}
               >
-                {confirmDeleteId === row.id ? (
-                  <div
-                    className="nora-inline-delete-box"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span className="nora-inline-delete-text">
-                      Xóa cuộc trò chuyện?
-                    </span>
-                    <div className="nora-inline-delete-actions">
-                      <button
-                        type="button"
-                        className="nora-confirm-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmDeleteId(null);
-                        }}
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        type="button"
-                        className="nora-confirm-btn is-danger"
-                        disabled={disabled || loading}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          await remove(row);
-                          setConfirmDeleteId(null);
-                        }}
-                      >
-                        Xóa
-                      </button>
-                    </div>
-                  </div>
-                ) : editingId === row.id ? (
+                {editingId === row.id ? (
                   <form
                     className="nora-inline-rename"
-                    onSubmit={(e) => {
+                    onSubmit={async (e) => {
                       e.preventDefault();
                       const val = editingTitle.trim();
                       if (val) {
-                        edit(row, val, row.archived);
-                        setEditingId(null);
+                        if (await edit(row, val, row.archived))
+                          setEditingId(null);
                       }
                     }}
                   >
                     <input
                       type="text"
+                      aria-label="Tên hội thoại"
+                      disabled={disabled || loading}
                       value={editingTitle}
                       onChange={(e) => setEditingTitle(e.target.value)}
                       autoFocus
                       maxLength={120}
                       onKeyDown={(e) => {
-                        if (e.key === "Escape") setEditingId(null);
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setEditingId(null);
+                        }
                       }}
                     />
                     <button
                       type="submit"
                       aria-label="Lưu tên"
-                      disabled={disabled || loading}
+                      disabled={disabled || loading || !editingTitle.trim()}
                     >
                       {icon("check")}
                     </button>
                     <button
                       type="button"
                       aria-label="Hủy"
+                      disabled={loading}
                       onClick={() => setEditingId(null)}
                     >
                       {icon("close")}
@@ -382,7 +475,7 @@ export function ConversationLibrary({
                       disabled={disabled || loading}
                       aria-current={row.id === selected ? "true" : undefined}
                       className="nora-chat-item-btn"
-                      onClick={() => onChoose(row.id, row.archived)}
+                      onClick={() => onChoose(row.id, row.archived, false, row)}
                       aria-label={row.title}
                       title={row.title}
                     >
@@ -394,12 +487,30 @@ export function ConversationLibrary({
                     <button
                       type="button"
                       className="nora-chat-item-more"
+                      data-conversation-menu={row.id}
+                      aria-haspopup="menu"
+                      aria-controls={
+                        menuOpenId === row.id
+                          ? `nora-menu-${row.id}`
+                          : undefined
+                      }
                       aria-label={`Tùy chọn ${row.title}`}
                       aria-expanded={menuOpenId === row.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         setConfirmDeleteId(null);
+                        focusLast.current = false;
                         setMenuOpenId(menuOpenId === row.id ? null : row.id);
+                      }}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key === "ArrowDown" ||
+                          event.key === "ArrowUp"
+                        ) {
+                          event.preventDefault();
+                          focusLast.current = event.key === "ArrowUp";
+                          setMenuOpenId(row.id);
+                        }
                       }}
                       disabled={disabled || loading}
                     >
@@ -408,6 +519,7 @@ export function ConversationLibrary({
                         width="16"
                         height="16"
                         fill="currentColor"
+                        aria-hidden="true"
                       >
                         <circle cx="5" cy="12" r="2" />
                         <circle cx="12" cy="12" r="2" />
@@ -417,14 +529,62 @@ export function ConversationLibrary({
                   </>
                 )}
 
-                {/* ChatGPT-style Floating Menu */}
                 {menuOpenId === row.id && confirmDeleteId !== row.id && (
                   <div
+                    ref={menu}
+                    popover={
+                      typeof HTMLElement.prototype.showPopover === "function"
+                        ? "manual"
+                        : undefined
+                    }
                     className="nora-menu-popover"
+                    style={menuPosition}
+                    id={`nora-menu-${row.id}`}
+                    role="menu"
+                    aria-label={`Tùy chọn hội thoại ${row.title}`}
                     onClick={(e) => e.stopPropagation()}
+                    onBlur={(event) => {
+                      if (
+                        event.relatedTarget &&
+                        !event.currentTarget.contains(event.relatedTarget)
+                      )
+                        setMenuOpenId(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        closeMenu(row.id);
+                      }
+                      if (
+                        !["ArrowDown", "ArrowUp", "Home", "End"].includes(
+                          event.key,
+                        )
+                      )
+                        return;
+                      event.preventDefault();
+                      const controls = [
+                        ...event.currentTarget.querySelectorAll(
+                          '[role="menuitem"]',
+                        ),
+                      ];
+                      const index = controls.indexOf(document.activeElement);
+                      const next =
+                        event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? controls.length - 1
+                            : (index +
+                                (event.key === "ArrowUp" ? -1 : 1) +
+                                controls.length) %
+                              controls.length;
+                      controls[next]?.focus();
+                    }}
                   >
                     <button
                       type="button"
+                      role="menuitem"
+                      disabled={disabled || loading}
                       onClick={() => {
                         setEditingId(row.id);
                         setEditingTitle(row.title);
@@ -435,6 +595,8 @@ export function ConversationLibrary({
                     </button>
                     <button
                       type="button"
+                      role="menuitem"
+                      disabled={disabled || loading}
                       onClick={() => {
                         edit(row, row.title, !row.archived);
                         setMenuOpenId(null);
@@ -444,6 +606,8 @@ export function ConversationLibrary({
                     </button>
                     <button
                       type="button"
+                      role="menuitem"
+                      disabled={disabled || loading}
                       onClick={() => {
                         download(row);
                         setMenuOpenId(null);
@@ -453,9 +617,13 @@ export function ConversationLibrary({
                     </button>
                     <button
                       type="button"
+                      role="menuitem"
+                      disabled={disabled || loading}
                       className="is-danger"
                       onClick={(e) => {
                         e.stopPropagation();
+                        setError("");
+                        focusTrigger(row.id);
                         setConfirmDeleteId(row.id);
                         setMenuOpenId(null);
                       }}
@@ -480,9 +648,24 @@ export function ConversationLibrary({
         )}
       </div>
 
+      {confirmDeleteId && items.find((row) => row.id === confirmDeleteId) && (
+        <ConversationDeleteDialog
+          title={items.find((row) => row.id === confirmDeleteId).title}
+          busy={loading}
+          error={error}
+          onCancel={() => {
+            setConfirmDeleteId(null);
+            setError("");
+          }}
+          onConfirm={async () => {
+            const row = items.find((row) => row.id === confirmDeleteId);
+            if (row && (await remove(row))) setConfirmDeleteId(null);
+          }}
+        />
+      )}
       {loading && (
         <p className="nora-history-loading" role="status">
-          Đang tải hội thoại…
+          {action || "Đang tải hội thoại…"}
         </p>
       )}
       {cursor && (

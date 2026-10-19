@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./styles/nora-entry.css";
+import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import { api } from "./api.js";
 import { state, icon } from "./ui.jsx";
 import { NoraAvatar, NoraMotionControl } from "./nora-mascot.jsx";
@@ -8,6 +9,7 @@ import {
   LegacyConversationLibrary,
 } from "./conversations.jsx";
 import { sendAgentStream } from "./agent-stream.js";
+import { agentFailure } from "./agent-failure.js";
 import { NoraProgress } from "./nora-progress.jsx";
 import { useVoiceInput } from "./voice-input.js";
 import {
@@ -79,6 +81,7 @@ function extractOptions(turn) {
 function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
   const [otherText, setOtherText] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const sessions = turn.plan?.sessions?.filter((item) => !item.preserved) || [];
   const options = turn.question ? extractOptions(turn) : [];
   return (
@@ -91,7 +94,8 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
           type="button"
           disabled={busy}
           onClick={() => onEdit(turn.text)}
-          aria-label="Chỉnh sửa yêu cầu"
+          aria-label="Sửa và gửi lại yêu cầu"
+          title="Chép vào ô nhập để sửa và gửi thành yêu cầu mới"
         >
           {icon("edit")}
         </button>
@@ -119,6 +123,27 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
           </details>
         )}
         <NoraReply text={turn.reply} />
+        {turn.outcome && (
+          <section
+            className="agent-verified-outcome"
+            aria-label="Kết quả đã kiểm tra"
+          >
+            <NoraReply text={turn.outcome} />
+          </section>
+        )}
+        {!!turn.warnings?.length && (
+          <ul className="agent-warnings">
+            {turn.warnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+        )}
+        {turn.status === "FAILED" && (
+          <small role="status">
+            {agentFailure({ code: turn.errorCode }).label} · Yêu cầu này chưa
+            được lưu.
+          </small>
+        )}
         {turn.question && (
           <div className="agent-clarification-box">
             <p className="agent-question">{turn.question}</p>
@@ -190,7 +215,7 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
           <button
             type="button"
             className="nora-plan-card"
-            onClick={() => onViewPlan(turn)}
+            onClick={(event) => onViewPlan(turn, event.currentTarget)}
           >
             <span className="nora-plan-card-icon">{icon("calendar")}</span>
             <span>
@@ -248,13 +273,6 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
             </ul>
           </details>
         )}
-        {!!turn.warnings?.length && (
-          <ul className="agent-warnings">
-            {turn.warnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
-            ))}
-          </ul>
-        )}
         {turn.status === "BLOCKED" && (
           <div className="agent-blocked-tip">
             {icon("spark")}{" "}
@@ -303,15 +321,22 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
             type="button"
             className="nora-copy-button"
             onClick={async () => {
+              setCopyError(false);
               try {
                 await navigator.clipboard.writeText(
-                  [turn.reply, turn.question, ...(turn.warnings || [])]
+                  [
+                    turn.reply,
+                    turn.outcome,
+                    turn.question,
+                    ...(turn.warnings || []),
+                  ]
                     .filter(Boolean)
                     .join("\n\n"),
                 );
                 setCopied(true);
               } catch {
                 setCopied(false);
+                setCopyError(true);
               }
             }}
             aria-label="Sao chép phản hồi"
@@ -320,6 +345,12 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
             <span>{copied ? "Đã sao chép" : "Sao chép"}</span>
           </button>
         </div>
+        {copyError && (
+          <small className="nora-copy-error" role="status">
+            Không thể sao chép tự động. Bạn có thể chọn nội dung phản hồi để sao
+            chép.
+          </small>
+        )}
       </div>
     </article>
   );
@@ -328,6 +359,7 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
 export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const [turns, setTurns] = useState([]);
   const [capabilities, setCapabilities] = useState(null);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [conversationId, setConversationId] = useState(null);
   const [text, setText] = useState("");
   const [autoApply, setAutoApply] = useState(true);
@@ -339,6 +371,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const [processes, setProcesses] = useState({});
   const [messageCursor, setMessageCursor] = useState(null);
   const [conversationArchived, setConversationArchived] = useState(false);
+  const [conversationDetails, setConversationDetails] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const [wide, setWide] = useState(
@@ -353,8 +386,17 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const followBottom = useRef(true);
   const retry = useRef(null);
   const requestField = useRef(null);
+  const drawerTrigger = useRef(null);
   const historyPanel = useRef(null);
   const mounted = useRef(true);
+  const updateConversation = useCallback(
+    (row) => {
+      if (row.id !== conversationId) return;
+      setConversationDetails(row);
+      setConversationArchived(row.archived);
+    },
+    [conversationId],
+  );
   const accountKey = `planora:agent:${state.workspace?.profile?.id || "current"}`;
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1081px)");
@@ -365,7 +407,11 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   }, []);
   const voice = useVoiceInput({
     text,
-    enabled: !busy && !loading && capabilities?.voiceAvailable,
+    enabled:
+      !busy &&
+      !loading &&
+      !conversationArchived &&
+      capabilities?.voiceAvailable,
     onPreview: (value) => setText(value),
     onTranscript: (value) => {
       setText(value);
@@ -375,6 +421,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   useEffect(() => {
     if (voice.completed) requestField.current?.focus();
   }, [voice.completed]);
+  useEffect(() => {
+    const field = requestField.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${Math.min(field.scrollHeight, 160)}px`;
+  }, [text]);
   useEffect(() => {
     mounted.current = true;
     (async () => {
@@ -407,7 +459,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       mounted.current = false;
       streamAbort.current?.abort();
     };
-  }, [accountKey]);
+  }, [accountKey, connectionAttempt]);
   useEffect(() => {
     if (conversationId)
       try {
@@ -431,6 +483,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     ).trim();
     if (
       busy ||
+      conversationArchived ||
       voice.isActive() ||
       !messageText ||
       !conversationId ||
@@ -496,14 +549,31 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       setPending(null);
       if (!overrideText) setText("");
       retry.current = null;
-      if (result.status === "APPLIED") await onWorkspaceChanged();
-      const history = await api("/api/agent/turns");
-      if (mounted.current) setTurns(history);
+      try {
+        if (result.status === "APPLIED") await onWorkspaceChanged();
+        const history = await api("/api/agent/turns");
+        if (mounted.current) setTurns(history);
+      } catch {
+        if (mounted.current)
+          setError(
+            result.status === "APPLIED"
+              ? "Yêu cầu đã được lưu. Chưa tải lại được giao diện; hãy làm mới để xem lịch mới."
+              : "Đã nhận kết quả. Chưa tải lại được lịch sử hội thoại.",
+          );
+      }
     } catch (failure) {
       if (mounted.current) {
         setPending((previous) =>
           previous
-            ? { ...previous, cancelled: controller.signal.aborted }
+            ? {
+                ...previous,
+                cancelled: controller.signal.aborted,
+                failure: agentFailure(failure),
+                reply:
+                  !controller.signal.aborted && failure.code
+                    ? ""
+                    : previous.reply,
+              }
             : null,
         );
         setError(
@@ -511,31 +581,34 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             ? "Đã dừng nhận phản hồi. Kiểm tra lịch sử trước khi gửi lại; yêu cầu đã lưu sẽ vẫn được giữ."
             : failure.message,
         );
-        if (controller.signal.aborted) {
-          try {
-            const history = await api("/api/agent/turns");
-            if (mounted.current) {
-              setTurns(history);
-              if (
-                history.some(
-                  (turn) =>
-                    turn.requestId === body.requestId &&
-                    turn.status !== "PROCESSING",
-                )
+        try {
+          const history = await api("/api/agent/turns");
+          if (mounted.current) {
+            setTurns(history);
+            if (
+              history.some(
+                (turn) =>
+                  turn.requestId === body.requestId &&
+                  turn.status !== "PROCESSING",
               )
-                setPending(null);
-              if (
-                history.some(
-                  (turn) =>
-                    turn.requestId === body.requestId &&
-                    turn.status === "APPLIED",
-                )
-              )
-                await onWorkspaceChanged();
+            ) {
+              setPending(null);
+              retry.current = null;
+              setError("");
             }
-          } catch {
-            /* Retry keeps the original request ID. */
+            if (
+              history.some(
+                (turn) =>
+                  turn.requestId === body.requestId &&
+                  turn.status === "APPLIED",
+              )
+            ) {
+              setError("");
+              await onWorkspaceChanged();
+            }
           }
+        } catch {
+          /* Retry keeps the original request ID when no final turn is available. */
         }
       }
     } finally {
@@ -581,11 +654,19 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     retry.current = null;
     requestField.current?.focus();
   }
-  async function chooseConversation(id, archived = false, fresh = false) {
+  async function chooseConversation(
+    id,
+    archived = false,
+    fresh = false,
+    details = null,
+  ) {
     voice.cancel();
     voice.clearError();
     setConversationId(id);
+    setConversationDetails(details);
     setConversationArchived(archived);
+    setConfirmDeleteCurrent(false);
+    setPlanOpen(false);
     setMessageCursor(null);
     setText("");
     setPending(null);
@@ -616,30 +697,60 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   function newConversation() {
     chooseConversation(crypto.randomUUID(), false, true);
   }
+  async function findCurrentConversation() {
+    if (conversationDetails?.id === conversationId) return conversationDetails;
+    let cursor = null;
+    const visited = new Set();
+    do {
+      const page = await api(
+        `/api/agent/conversations?archived=${conversationArchived}&search=&pageSize=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      );
+      const found = page.items?.find((row) => row.id === conversationId);
+      if (found) return found;
+      cursor = page.nextCursor;
+      if (cursor && visited.has(cursor)) break;
+      visited.add(cursor);
+    } while (cursor);
+    throw new Error(
+      "Chưa xác định được hội thoại. Hãy tải lại danh sách rồi thử lại.",
+    );
+  }
+  async function restoreCurrentConversation() {
+    setBusy(true);
+    setError("");
+    try {
+      const found = await findCurrentConversation();
+      const updated = await api(`/api/agent/conversations/${found.id}`, "PUT", {
+        title: found.title,
+        archived: false,
+        version: found.version,
+      });
+      updateConversation(updated);
+    } catch (failure) {
+      setConversationDetails(null);
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function deleteCurrentConversation() {
     setBusy(true);
     setError("");
     try {
-      const page = await api(`/api/agent/conversations?search=&pageSize=50`);
-      const found = page.items?.find((c) => c.id === conversationId);
-      if (found) {
-        await api(
-          `/api/agent/conversations/${conversationId}?version=${found.version}`,
-          "DELETE",
-        );
-      }
+      const found = await findCurrentConversation();
+      await api(
+        `/api/agent/conversations/${found.id}?version=${found.version}`,
+        "DELETE",
+      );
       setTurns((old) =>
         old.filter((turn) => turn.conversationId !== conversationId),
       );
       newConversation();
-    } catch {
-      setTurns((old) =>
-        old.filter((turn) => turn.conversationId !== conversationId),
-      );
-      newConversation();
+    } catch (failure) {
+      setConversationDetails(null);
+      setError(failure.message);
     } finally {
       setBusy(false);
-      setConfirmDeleteCurrent(false);
     }
   }
   async function olderMessages() {
@@ -666,25 +777,44 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     }
   }
   useEffect(() => {
-    if (!historyOpen) return;
-    document
-      .getElementById("nora-history-list")
-      ?.querySelector("input")
-      ?.focus();
+    if (wide || (!historyOpen && !planOpen)) return;
+    const panel = document.getElementById(
+      historyOpen ? "nora-history-list" : "nora-plan-panel",
+    );
+    if (!panel) return;
+    const previous = drawerTrigger.current || document.activeElement;
+    const controls = () =>
+      [
+        ...panel.querySelectorAll(
+          "input:not(:disabled),button:not(:disabled),a[href],summary",
+        ),
+      ].filter((item) => item.tabIndex !== -1);
+    const focusPanel = () => {
+      if (!panel.contains(document.activeElement)) controls()[0]?.focus();
+    };
+    let focusTask;
+    const focusFrame = requestAnimationFrame(() => {
+      focusTask = setTimeout(focusPanel, 0);
+    });
+    const entered = (event) => {
+      if (event.target === panel) focusPanel();
+    };
+    panel.addEventListener("transitionend", entered);
+    panel.addEventListener("animationend", entered);
     const close = (event) => {
       if (event.key === "Escape") {
+        event.preventDefault();
         setHistoryOpen(false);
-        document.querySelector(".nora-history-toggle")?.focus();
+        setPlanOpen(false);
       }
       if (event.key === "Tab") {
-        const controls = [
-          ...document
-            .getElementById("nora-history-list")
-            .querySelectorAll("input,button:not(:disabled)"),
-        ];
-        const first = controls[0],
-          last = controls.at(-1);
-        if (event.shiftKey && document.activeElement === first) {
+        const items = controls();
+        const first = items[0],
+          last = items.at(-1);
+        if (!panel.contains(document.activeElement)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
+        } else if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
           last?.focus();
         } else if (!event.shiftKey && document.activeElement === last) {
@@ -694,9 +824,23 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       }
     };
     window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [historyOpen]);
-  const selectedTitle = current[0]?.text || "Hội thoại mới";
+    return () => {
+      clearTimeout(focusTask);
+      cancelAnimationFrame(focusFrame);
+      panel.removeEventListener("transitionend", entered);
+      panel.removeEventListener("animationend", entered);
+      window.removeEventListener("keydown", close);
+      if (previous?.isConnected) previous.focus?.();
+    };
+  }, [historyOpen, planOpen, wide]);
+  useEffect(() => {
+    if (wide) setHistoryOpen(false);
+    else setPlanOpen(false);
+  }, [wide]);
+  const selectedTitle =
+    (conversationDetails?.id === conversationId && conversationDetails.title) ||
+    current[0]?.text ||
+    "Hội thoại mới";
   const latestPlan = [...current]
     .reverse()
     .find((turn) => turn.plan?.sessions?.some((session) => !session.preserved));
@@ -709,7 +853,9 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       ?.filter((session) => !session.preserved)
       .toSorted((a, b) => new Date(a.start) - new Date(b.start)) || [];
   useEffect(() => {
-    setPlanOpen(Boolean(latestPlan));
+    setPlanOpen(
+      Boolean(latestPlan) && window.matchMedia("(min-width: 1081px)").matches,
+    );
     setPlanTurnId(latestPlan?.id || null);
   }, [latestPlan?.id]);
 
@@ -744,7 +890,11 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       className={`agent-layout nora-studio${visiblePlan && planOpen ? " is-plan-open" : ""}${historyCollapsed ? " is-history-collapsed" : ""}`}
       data-motion-state="running"
     >
-      <header className="nora-header" data-nora-reveal>
+      <header
+        className="nora-header"
+        data-nora-reveal
+        inert={!wide && (historyOpen || planOpen)}
+      >
         <div className="nora-header-identity">
           <button
             type="button"
@@ -769,11 +919,14 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             aria-expanded={wide ? !historyCollapsed : historyOpen}
             aria-controls="nora-history-list"
             disabled={busy || voice.active}
-            onClick={() =>
-              wide
-                ? setHistoryCollapsed(!historyCollapsed)
-                : setHistoryOpen(!historyOpen)
-            }
+            onClick={(event) => {
+              drawerTrigger.current = event.currentTarget;
+              if (wide) setHistoryCollapsed(!historyCollapsed);
+              else {
+                setPlanOpen(false);
+                setHistoryOpen(!historyOpen);
+              }
+            }}
           >
             {icon("panel")}
           </button>
@@ -818,7 +971,11 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
               className="nora-plan-toggle"
               aria-expanded={planOpen}
               aria-controls="nora-plan-panel"
-              onClick={() => setPlanOpen(!planOpen)}
+              onClick={(event) => {
+                drawerTrigger.current = event.currentTarget;
+                setHistoryOpen(false);
+                setPlanOpen(!planOpen);
+              }}
             >
               {icon("calendar")}Kế hoạch
             </button>
@@ -839,6 +996,8 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         data-open={historyOpen}
         inert={wide ? historyCollapsed : !historyOpen}
         aria-label="Hội thoại NORA"
+        role={!wide && historyOpen ? "dialog" : undefined}
+        aria-modal={!wide && historyOpen ? true : undefined}
       >
         <div className="nora-rail-title">
           <span>Hội thoại</span>
@@ -866,9 +1025,10 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         {capabilities?.features?.includes("conversation-lifecycle") ? (
           <ConversationLibrary
             selected={conversationId}
-            refresh={`${turns.length}:${turns.at(-1)?.id}:${turns.at(-1)?.status}`}
+            refresh={`${turns.length}:${turns.at(-1)?.id}:${turns.at(-1)?.status}:${conversationDetails?.version}`}
             disabled={busy || loading || voice.active}
             onChoose={chooseConversation}
+            onUpdated={updateConversation}
             onRemoved={(deletedId) => {
               const idToRemove = deletedId || conversationId;
               setTurns((old) =>
@@ -896,11 +1056,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         className="card agent-main"
         aria-label="Trò chuyện với NORA"
         data-nora-reveal
+        inert={!wide && (historyOpen || planOpen)}
       >
         <div className="agent-toolbar">
           <div className="nora-toolbar-title-wrap">
             <span className="nora-chat-title" title={selectedTitle}>
-              {icon("chat")} {selectedTitle.slice(0, 55)}
+              {icon("chat")} {selectedTitle}
             </span>
             <span className="nora-chat-meta">
               {current.length
@@ -917,48 +1078,40 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                   title="Xóa toàn bộ cuộc trò chuyện này"
                   aria-label="Xóa cuộc trò chuyện"
                   disabled={busy || loading}
-                  onClick={() => setConfirmDeleteCurrent(true)}
+                  onClick={() => {
+                    setError("");
+                    setConfirmDeleteCurrent(true);
+                  }}
                 >
                   {icon("trash")}
-                  <span>Xóa cuộc trò chuyện</span>
                 </button>
               </div>
             )}
         </div>
         {confirmDeleteCurrent && (
-          <div className="nora-delete-banner" role="alert">
-            <div className="nora-delete-banner-text">
-              {icon("alertCircle")}
-              <span>
-                Bạn có chắc muốn xóa toàn bộ cuộc trò chuyện này? Toàn bộ tin
-                nhắn sẽ bị xóa vĩnh viễn.
-              </span>
-            </div>
-            <div className="nora-delete-banner-actions">
-              <button
-                type="button"
-                className="nora-banner-cancel-btn"
-                onClick={() => setConfirmDeleteCurrent(false)}
-                disabled={busy}
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                className="nora-banner-confirm-btn"
-                onClick={deleteCurrentConversation}
-                disabled={busy}
-              >
-                {busy ? "Đang xóa…" : "Xóa vĩnh viễn"}
-              </button>
-            </div>
-          </div>
+          <ConversationDeleteDialog
+            title={selectedTitle}
+            busy={busy}
+            error={error}
+            onCancel={() => {
+              setConfirmDeleteCurrent(false);
+              setError("");
+            }}
+            onConfirm={deleteCurrentConversation}
+          />
         )}
         {conversationArchived && (
-          <p className="reason">
-            Hội thoại đã lưu trữ. Khôi phục trong mục Quản lý để gửi thêm yêu
-            cầu.
-          </p>
+          <div className="nora-archived-notice" role="status">
+            <p>Hội thoại đã lưu trữ. Khôi phục để tiếp tục trò chuyện.</p>
+            <button
+              type="button"
+              className="btn secondary small"
+              disabled={busy || loading}
+              onClick={restoreCurrentConversation}
+            >
+              Khôi phục hội thoại
+            </button>
+          </div>
         )}
         {messageCursor && (
           <button
@@ -1043,7 +1196,8 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                   onAction={act}
                   onReply={(replyText) => send(null, replyText)}
                   onEdit={editRequest}
-                  onViewPlan={(turn) => {
+                  onViewPlan={(turn, trigger) => {
+                    drawerTrigger.current = trigger;
                     setPlanTurnId(turn.id);
                     setPlanOpen(true);
                   }}
@@ -1088,12 +1242,29 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             rảnh và Công việc.
           </p>
         )}
-        {error && (
+        {error && !confirmDeleteCurrent && (
           <p className="form-error" role="alert">
             {error}
+            {!capabilities && (
+              <button
+                type="button"
+                className="btn secondary small"
+                onClick={() => {
+                  setError("");
+                  setLoading(true);
+                  setConnectionAttempt((value) => value + 1);
+                }}
+              >
+                Thử kết nối lại
+              </button>
+            )}
           </p>
         )}
-        <form className="agent-composer" onSubmit={send}>
+        <form
+          className="agent-composer"
+          onSubmit={send}
+          aria-label="Gửi yêu cầu cho NORA"
+        >
           <label htmlFor="agent-request" className="field">
             <span className="nora-sr-only">Yêu cầu của bạn</span>
             <textarea
@@ -1103,8 +1274,13 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
               value={text}
               maxLength={2000}
               rows={1}
-              disabled={busy || loading || voice.active}
-              placeholder="NORA ơi, giúp mình lên lịch…"
+              aria-describedby="nora-composer-hint nora-request-count"
+              disabled={busy || loading || voice.active || conversationArchived}
+              placeholder={
+                conversationArchived
+                  ? "Khôi phục hội thoại để gửi yêu cầu mới…"
+                  : "NORA ơi, giúp mình lên lịch…"
+              }
               onChange={(event) => setText(event.target.value)}
               onKeyDown={(event) => {
                 if (
@@ -1145,10 +1321,11 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                 }}
               >
                 <summary
-                  aria-label="Thông tin về yêu cầu"
-                  title="Thông tin về yêu cầu"
+                  aria-label="Tùy chọn gửi yêu cầu"
+                  title="Tùy chọn gửi yêu cầu"
                 >
-                  {icon("alertCircle")}
+                  {icon("settings")}
+                  <span>Tùy chọn</span>
                 </summary>
                 <div className="nora-composer-help">
                   {capabilities?.features?.includes("planning-policy") && (
@@ -1187,41 +1364,46 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                     từng cụm lời nói. Khi dừng, Google Cloud hoàn thiện bản chép
                     lời. PLANORA không lưu bản ghi; bạn xem lại văn bản rồi gửi.
                   </p>
-                  <div>
-                    <span>Enter gửi · Shift + Enter xuống dòng</span>
-                    <span>{text.length}/2000</span>
-                  </div>
+                  {!capabilities?.voiceAvailable && (
+                    <p>
+                      Nhập giọng nói chưa được cấu hình. Bạn có thể nhập yêu cầu
+                      bằng bàn phím.
+                    </p>
+                  )}
                 </div>
               </details>
-              <button
-                type="button"
-                className={`nora-mic-button${voice.phase === "recording" ? " is-recording" : ""}`}
-                aria-label={
-                  voice.phase === "recording"
-                    ? "Dừng ghi và chuyển thành chữ"
-                    : "Nhập bằng giọng nói"
-                }
-                aria-pressed={voice.phase === "recording"}
-                title={
-                  !voice.supported
-                    ? "Trình duyệt này chưa hỗ trợ ghi âm. Hãy dùng Chrome, Edge hoặc Safari mới trên HTTPS."
-                    : !capabilities?.voiceAvailable
-                      ? "Chuyển giọng nói cần Gemini hoặc Google Cloud được cấu hình."
+              {capabilities?.voiceAvailable && (
+                <button
+                  type="button"
+                  className={`nora-mic-button${voice.phase === "recording" ? " is-recording" : ""}`}
+                  aria-label={
+                    voice.phase === "recording"
+                      ? "Dừng ghi và chuyển thành chữ"
                       : "Nhập bằng giọng nói"
-                }
-                disabled={
-                  busy ||
-                  loading ||
-                  !capabilities?.voiceAvailable ||
-                  !voice.supported ||
-                  (voice.active && voice.phase !== "recording")
-                }
-                onClick={() =>
-                  voice.phase === "recording" ? voice.stop() : voice.start()
-                }
-              >
-                {icon(voice.phase === "recording" ? "stop" : "mic")}
-              </button>
+                  }
+                  aria-pressed={voice.phase === "recording"}
+                  title={
+                    !voice.supported
+                      ? "Trình duyệt này chưa hỗ trợ ghi âm. Hãy dùng Chrome, Edge hoặc Safari mới trên HTTPS."
+                      : !capabilities?.voiceAvailable
+                        ? "Chuyển giọng nói cần Gemini hoặc Google Cloud được cấu hình."
+                        : "Nhập bằng giọng nói"
+                  }
+                  disabled={
+                    busy ||
+                    conversationArchived ||
+                    loading ||
+                    !capabilities?.voiceAvailable ||
+                    !voice.supported ||
+                    (voice.active && voice.phase !== "recording")
+                  }
+                  onClick={() =>
+                    voice.phase === "recording" ? voice.stop() : voice.start()
+                  }
+                >
+                  {icon(voice.phase === "recording" ? "stop" : "mic")}
+                </button>
+              )}
               {busy && pending ? (
                 <button
                   type="button"
@@ -1240,6 +1422,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                   title="Gửi yêu cầu"
                   disabled={
                     busy ||
+                    conversationArchived ||
                     voice.active ||
                     loading ||
                     !capabilities?.aiAvailable ||
@@ -1253,6 +1436,17 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                 </button>
               )}
             </div>
+          </div>
+          <div className="nora-composer-meta">
+            <span id="nora-composer-hint">
+              Enter gửi · Shift + Enter xuống dòng
+            </span>
+            <span
+              id="nora-request-count"
+              className={text.length >= 1900 ? "is-near-limit" : ""}
+            >
+              {text.length}/2000 ký tự
+            </span>
           </div>
           {voice.active && (
             <div className="nora-voice-status" role="status">
@@ -1278,12 +1472,22 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           )}
         </form>
       </section>
+      {visiblePlan && planOpen && !wide && (
+        <button
+          type="button"
+          className="nora-plan-backdrop"
+          aria-label="Đóng kế hoạch"
+          onClick={() => setPlanOpen(false)}
+        />
+      )}
       {visiblePlan && planOpen && (
         <aside
           id="nora-plan-panel"
           className="agent-context"
           aria-label="Kế hoạch của bạn"
           data-nora-reveal
+          role={wide ? undefined : "dialog"}
+          aria-modal={wide ? undefined : true}
         >
           <button
             className="nora-plan-close"
@@ -1296,7 +1500,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           {visiblePlan && (
             <section
               className="nora-plan-artifact"
-              aria-label="Kế hoạch vừa tạo"
+              aria-label="Chi tiết kế hoạch"
             >
               <div className="nora-context-heading">
                 <span>{icon("calendar")}Kế hoạch của bạn</span>
@@ -1316,6 +1520,13 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                 )}{" "}
                 phút
               </p>
+              {visiblePlan.status !== "APPLIED" && (
+                <p className="nora-plan-state-hint">
+                  {visiblePlan.status === "UNDONE"
+                    ? "Đây là lịch sử của yêu cầu đã hoàn tác."
+                    : "Đây là bản đề xuất; các phiên này chưa được lưu."}
+                </p>
+              )}
               <ol>
                 {plannedSessions.map((session, index) => (
                   <li key={session.id}>

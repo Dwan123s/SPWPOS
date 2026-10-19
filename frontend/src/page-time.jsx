@@ -79,7 +79,11 @@ export function timePage() {
                   <strong>
                     {e.date}
                     {" · "}
-                    {e.isAvailable ? "Rảnh" : "Bận"}
+                    {e.isAvailable
+                      ? e.overridesWeeklyAvailability
+                        ? "Chỉ rảnh trong khoảng này"
+                        : "Rảnh"
+                      : "Bận"}
                   </strong>
                   <p>
                     {timeValue(e.startMinute)}

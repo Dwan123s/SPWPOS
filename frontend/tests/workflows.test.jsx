@@ -12,7 +12,7 @@ import { App } from "../src/App.jsx";
 import { update } from "../src/store.js";
 import { state } from "../src/ui.jsx";
 import { renderAuth, authSetup } from "../src/auth.jsx";
-import { planModal } from "../src/calendar.jsx";
+import { eventModal, planModal } from "../src/calendar.jsx";
 import {
   workspace,
   insights,
@@ -939,6 +939,33 @@ it("removes an avatar while preserving unsaved profile fields before save", asyn
     ).toBe("Tên mới"),
   );
 });
+it("saves a fixed work shift with the WORK category from the calendar form", async () => {
+  mount();
+  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  const start = new Date(Date.now() + 86400000);
+  const end = new Date(start.getTime() + 4 * 3600000);
+  act(() =>
+    eventModal({
+      name: "Đi làm",
+      start: start.toISOString(),
+      end: end.toISOString(),
+    }),
+  );
+  const user = userEvent.setup();
+  await user.selectOptions(screen.getByLabelText("Loại sự kiện"), "WORK");
+  await user.click(
+    screen.getByRole("button", { name: "Lưu sự kiện", exact: true }),
+  );
+  await waitFor(() =>
+    expect(
+      calls.find(
+        (call) =>
+          call.url === "/api/time/events" && call.options.method === "POST",
+      )?.body.eventType,
+    ).toBe("WORK"),
+  );
+});
+
 it("guides an empty daily schedule to input before offering planning", async () => {
   currentWorkspace.tasks = [];
   currentWorkspace.sessions = [];

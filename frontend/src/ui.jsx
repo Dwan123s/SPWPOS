@@ -85,6 +85,7 @@ export const riskLabels = {
   Overload: "Quá tải",
 };
 export const typeLabels = {
+  WORK: "Công việc",
   OTHER: "Chung",
   PROGRAMMING: "Lập trình",
   WRITING: "Viết / báo cáo",

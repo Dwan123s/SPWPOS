@@ -53,7 +53,9 @@ export function NoraProgress({ pending, busy }) {
                 : "Đang xử lý"
               : pending.cancelled
                 ? "Đã dừng"
-                : "Chưa hoàn tất"}
+                : pending.failure?.category === "validation"
+                  ? "Chưa thực hiện"
+                  : "Chưa hoàn tất"}
           </span>
         </div>
         <div
@@ -82,7 +84,7 @@ export function NoraProgress({ pending, busy }) {
                 ? phase?.message || "Đang kết nối với NORA"
                 : pending.cancelled
                   ? "Đã dừng nhận phản hồi"
-                  : "Kết nối bị gián đoạn"}
+                  : pending.failure?.label || "Yêu cầu chưa hoàn tất"}
             </span>
             <small>{elapsed}s</small>
             <span className="nora-process-chevron" aria-hidden="true">
@@ -150,6 +152,13 @@ export function NoraProgress({ pending, busy }) {
           <small className="nora-draft-caption">
             Phản hồi đang được soạn. Kết quả lịch sẽ xuất hiện sau khi kiểm tra
             xong.
+          </small>
+        )}
+        {!busy && (
+          <small className="nora-draft-caption" role="status">
+            {pending.reply && <>Phản hồi trên là bản nháp chưa hoàn tất. </>}
+            {pending.failure?.saveStatus ||
+              "Chưa nhận được kết quả xác nhận; hãy kiểm tra lịch sử."}
           </small>
         )}
       </div>
