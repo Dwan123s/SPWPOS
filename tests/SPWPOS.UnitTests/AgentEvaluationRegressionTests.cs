@@ -108,4 +108,51 @@ public sealed partial class PlanningAgentTests
         Assert.Contains("13/11/2026", result.Reply); Assert.DoesNotContain("2025", result.Reply);
         Assert.DoesNotContain("Tất cả công việc đã đủ lịch", result.Reply); Assert.Empty(result.Changes);
     }
+
+    [Fact] public async Task Unscheduled_dependency_is_blocked_even_when_the_planner_proposes_no_session_changes()
+    {
+        var ai = new AgentAiTestDouble();
+        await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        var deadline = h.Clock.GetUtcNow().AddHours(10);
+        var first = await Work(h, s => s.SaveTaskAsync(user.Id, null, new("Đọc đề", "", deadline, 60), Ct));
+        var second = await Work(h, s => s.SaveTaskAsync(user.Id, null, new("Viết bài", "", deadline, 60), Ct));
+        await h.DbAsync(async db => { db.TaskDependencies.Add(new() { UserId = user.Id, TaskId = second, PredecessorId = first }); await db.SaveChangesAsync(Ct); });
+        ai.Response = _ => AgentAiTestDouble.Empty() with { ScheduleTaskIds = [second] };
+        var result = await Agent(h, s => s.SendAgentTurnAsync(user.Id, Request("Chỉ xếp Viết bài, không xếp Đọc đề."), Ct));
+        Assert.Equal("BLOCKED", result.Status); Assert.Contains(result.Plan!.Warnings, x => x.Code == "DEPENDENCY_UNSCHEDULED");
+        Assert.Equal(0, await h.DbAsync(db => db.WorkSessions.CountAsync(Ct))); Assert.False(result.CanUndo);
+    }
+
+    [Theory]
+    [InlineData("Báo cáo cần 90 phút, hạn chót 18:00 ngày 14/10/2026.", 90, "90 phút", "18:00 ngày 14/10/2026", "APPLIED")]
+    [InlineData("Báo cáo 45 phút, hạn chót 18:00 ngày 14/10/2026.", 45, "45 phót", "hạn chót 18:00 ngày 14/10/2026", "APPLIED")]
+    [InlineData("Báo cáo. Mình rảnh 90 phút, hạn chót 18:00 ngày 14/10/2026.", 90, "", "hạn chót 18:00 ngày 14/10/2026", "NEEDS_INPUT")]
+    [InlineData("Báo cáo 45 phút, ngày thực hiện 14/10/2026 lúc 18:00.", 45, "45 phút", "18:00", "NEEDS_INPUT")]
+    public async Task Source_grounding_recovers_only_explicit_task_duration_and_deadline_clauses(string request, int minutes,
+        string durationEvidence, string deadlineEvidence, string expected)
+    {
+        var ai = new AgentAiTestDouble { Response = _ => AgentAiTestDouble.Empty() with { Tasks = [new(null, "Báo cáo",
+            DateTimeOffset.Parse("2026-10-14T18:00:00Z"), minutes, 2, "WRITING", true,
+            DurationEvidence: durationEvidence, DeadlineEvidence: deadlineEvidence, WorkWindowEvidence: "")] } };
+        await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        var result = await Agent(h, s => s.SendAgentTurnAsync(user.Id, Request(request), Ct));
+        Assert.Equal(expected, result.Status);
+        Assert.Equal(expected == "APPLIED" ? 1 : 0, await h.DbAsync(db => db.WorkTasks.CountAsync(Ct)));
+    }
+
+    [Fact] public async Task Context_distinguishes_daily_capacity_on_two_dates_and_anchors_next_week()
+    {
+        var ai = new AgentAiTestDouble();
+        await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        h.Clock.Advance(DateTimeOffset.Parse("2026-10-26T02:00:00Z") - h.Clock.GetUtcNow());
+        await Work(h, s => s.SetAvailabilityAsync(user.Id, new([new(1, 1140, 1320), new(2, 1140, 1320)]), Ct));
+        await Work(h, s => s.SetPreferenceAsync(user.Id, new("Asia/Ho_Chi_Minh", 15, 60, 15, 1140, 1320, MaximumDailyMinutes: 120), Ct));
+        await Agent(h, s => s.SendAgentTurnAsync(user.Id, Request("Kiểm tra giờ rảnh hai ngày tới."), Ct));
+        using var context = JsonDocument.Parse(ai.Context);
+        Assert.True(context.RootElement.TryGetProperty("currentCalendarCapacity", out var capacity));
+        var days = capacity.GetProperty("perDate").EnumerateArray().Take(2).ToArray();
+        Assert.Equal(new[] { "2026-10-26", "2026-10-27" }, days.Select(x => x.GetProperty("date").GetString()));
+        Assert.All(days, x => Assert.Equal(120, x.GetProperty("schedulableMinutes").GetInt32()));
+        Assert.Equal("2026-11-02", context.RootElement.GetProperty("clock").GetProperty("nextWeekStart").GetString());
+    }
 }

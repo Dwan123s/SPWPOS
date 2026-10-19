@@ -59,12 +59,14 @@ public static class SandboxScriptedResponses
             var deadline = DateTimeOffset.Parse(target.Deadline, CultureInfo.InvariantCulture);
             if (existing is not null && existing.EstimatedMinutes == target.Minutes && existing.Deadline == deadline &&
                 (target.Priority is null || target.Priority == existing.Priority) && (target.Splittable is null || target.Splittable == existing.Splittable)) scheduleIds.Add(existing.Id);
-            else tasks.Add(new(existing?.Id, existing?.Name ?? target.Match, deadline, target.Minutes, target.Priority, existing is null ? "STUDY" : "", target.Splittable ?? true));
+            else tasks.Add(new(existing?.Id, existing?.Name ?? target.Match, deadline, target.Minutes, target.Priority, existing is null ? "STUDY" : "", target.Splittable ?? true,
+                target.WorkWindowStart is { } from ? DateTimeOffset.Parse(from, CultureInfo.InvariantCulture) : null,
+                target.WorkWindowEnd is { } to ? DateTimeOffset.Parse(to, CultureInfo.InvariantCulture) : null));
         }
         var meetings = expected.Events.Select(target => {
             var start = DateTimeOffset.Parse(target.Start, CultureInfo.InvariantCulture); var end = DateTimeOffset.Parse(target.End, CultureInfo.InvariantCulture);
             var existing = state.Events.SingleOrDefault(x => SandboxOracle.Fold(x.Name).Contains(SandboxOracle.Fold(target.Match), StringComparison.Ordinal) && x.Start.Date == start.Date);
-            return new AgentEventCommand(existing?.Name ?? target.Match, start, end, EventType: existing?.EventType ?? "OTHER", ExistingId: existing?.Id);
+            return new AgentEventCommand(existing?.Name ?? target.Match, start, end, EventType: target.EventType ?? existing?.EventType ?? "OTHER", ExistingId: existing?.Id);
         }).ToArray();
         if (id == "D11") meetings = [new("Cuộc hẹn mới", SandboxEnvironment.At(0, 19), SandboxEnvironment.At(0, 20))];
         return empty with { Tasks = tasks.ToArray(), ScheduleTaskIds = scheduleIds.ToArray(), Events = meetings };

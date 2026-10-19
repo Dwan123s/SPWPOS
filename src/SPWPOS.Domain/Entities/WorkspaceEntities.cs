@@ -19,6 +19,8 @@ public sealed class WorkTask : OwnedRecord
     public Guid? CategoryId { get; set; }
     public Guid? ParentId { get; set; }
     public DateTimeOffset Deadline { get; set; }
+    public DateTimeOffset? WorkWindowStart { get; set; }
+    public DateTimeOffset? WorkWindowEnd { get; set; }
     public int Priority { get; set; } = 2;
     public WorkTaskStatus Status { get; set; }
     public int Progress { get; set; }
@@ -50,6 +52,7 @@ public sealed class WeeklyAvailability : OwnedRecord
 }
 public sealed class AvailabilityException : OwnedRecord
 {
+    public bool OverridesWeeklyAvailability { get; set; }
     public DateOnly Date { get; set; }
     public int StartMinute { get; set; }
     public int EndMinute { get; set; }

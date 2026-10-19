@@ -34,7 +34,7 @@ public sealed partial class TaskInterpreter(HttpClient http, IConfiguration conf
             throw new AuthException("NOTE_AI_NOT_CONFIGURED", "AI cho ghi chú chưa được cấu hình. Vui lòng thiết lập Gemini trên server; bạn vẫn có thể lưu ghi chú.", 503);
         var result = await Ask($"Extract up to 12 actionable work tasks from this note, in its original language. " +
             $"Current UTC time: {now:O}; user timezone: {timeZoneId}. Resolve relative deadlines in that timezone. " +
-            "Use taskType OTHER, PROGRAMMING, WRITING, STUDY, MEETING_PREP, DESIGN or ADMIN. " +
+            "Use taskType WORK, OTHER, PROGRAMMING, WRITING, STUDY, MEETING_PREP, DESIGN or ADMIN. Use WORK for generic professional work. " +
             "Do not turn availability, appointments, reflections, or instructions to the agent into work tasks. " +
             "Return an empty tasks array if there are no actionable tasks. If duration or deadline is missing, " +
             "use 60 minutes and seven days from now; these are suggestions for review. " +

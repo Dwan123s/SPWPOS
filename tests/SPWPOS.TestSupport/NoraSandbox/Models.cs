@@ -14,8 +14,8 @@ public static class SandboxJson
 public sealed record SandboxOptions(string RepositoryRoot, string OutputDirectory, string Mode = "Offline",
     string Suite = "Smoke", string[]? CaseIds = null, int Repeats = 1, int MaxCalls = 30, int TimeoutSeconds = 60);
 public sealed record SandboxTaskExpectation(string Match, int Minutes, string Deadline, bool? Splittable = null,
-    int? Priority = null, bool Scheduled = true, string? Id = null);
-public sealed record SandboxEventExpectation(string Match, string Start, string End);
+    int? Priority = null, bool Scheduled = true, string? Id = null, string? WorkWindowStart = null, string? WorkWindowEnd = null);
+public sealed record SandboxEventExpectation(string Match, string Start, string End, string? EventType = null);
 public sealed record SandboxFreeExpectation(string Date, int StartMinute, int EndMinute);
 public sealed record SandboxExpectation {
     public string[] Statuses { get; init; } = ["APPLIED"];

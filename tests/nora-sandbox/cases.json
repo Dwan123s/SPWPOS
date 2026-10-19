@@ -1272,7 +1272,7 @@
   },
   {
     "id": "E08",
-    "title": "Work window riêng chưa được hỗ trợ",
+    "title": "Giữ khung thực hiện riêng vào đúng tối thứ Năm",
     "fixture": "B",
     "smoke": true,
     "automation": "Service",
@@ -1282,10 +1282,19 @@
         "prompt": "Mình muốn ôn tiếng Anh đúng tối thứ Năm 29/10/2026 trong 45 phút, hạn chót 21:00 hôm đó. Không học vào ngày khác.",
         "expected": {
           "statuses": [
-            "NEEDS_INPUT",
-            "ANSWERED"
+            "APPLIED"
           ],
-          "unchanged": true
+          "unchanged": false,
+          "taskCount": 1,
+          "tasks": [
+            {
+              "match": "tiếng Anh",
+              "minutes": 45,
+              "deadline": "2026-10-29T21:00:00+07:00",
+              "workWindowStart": "2026-10-29T18:00:00+07:00",
+              "workWindowEnd": "2026-10-30T00:00:00+07:00"
+            }
+          ]
         },
         "operation": "Send"
       }
@@ -1774,7 +1783,7 @@
   },
   {
     "id": "S02",
-    "title": "Giữ thứ Năm qua làm rõ và xử lý giới hạn work window",
+    "title": "Giữ thứ Năm qua làm rõ, lập lịch và kiểm tra khung thực hiện",
     "fixture": "B",
     "smoke": false,
     "automation": "Service",
@@ -1795,27 +1804,38 @@
         "prompt": "Khoảng 45 phút thôi, mình muốn học xong trước 21:00 tối thứ Năm đó. Không chuyển sang ngày khác.",
         "expected": {
           "statuses": [
-            "NEEDS_INPUT",
-            "ANSWERED"
+            "APPLIED"
           ],
-          "unchanged": true
+          "unchanged": false,
+          "taskCount": 1,
+          "tasks": [
+            {
+              "match": "tiếng Anh",
+              "minutes": 45,
+              "deadline": "2026-10-29T21:00:00+07:00",
+              "workWindowStart": "2026-10-29T18:00:00+07:00",
+              "workWindowEnd": "2026-10-30T00:00:00+07:00"
+            }
+          ]
         },
         "operation": "Send"
       },
       {
-        "prompt": "Vậy tạo một sự kiện cố định Ôn tiếng Anh từ 19:00 đến 19:45 thứ Năm 29/10/2026. Mình đồng ý dùng sự kiện thay vì task.",
+        "prompt": "Kiểm tra việc Ôn tiếng Anh đã được xếp đủ 45 phút đúng tối thứ Năm 29/10/2026, xong trước 21:00 chưa. Chỉ giải thích các phiên đang lưu, không sửa lịch.",
         "expected": {
           "statuses": [
-            "APPLIED"
+            "ANSWERED"
           ],
-          "unchanged": false,
-          "eventCount": 1,
-          "taskCount": 0,
-          "events": [
+          "unchanged": true,
+          "eventCount": 0,
+          "taskCount": 1,
+          "tasks": [
             {
               "match": "tiếng Anh",
-              "start": "2026-10-29T19:00:00+07:00",
-              "end": "2026-10-29T19:45:00+07:00"
+              "minutes": 45,
+              "deadline": "2026-10-29T21:00:00+07:00",
+              "workWindowStart": "2026-10-29T18:00:00+07:00",
+              "workWindowEnd": "2026-10-30T00:00:00+07:00"
             }
           ]
         },
@@ -2368,6 +2388,39 @@
             "PREVIEW"
           ],
           "unchanged": true
+        },
+        "operation": "Send"
+      }
+    ]
+  },
+  {
+    "id": "S07",
+    "title": "Đi học buổi sáng rồi đi làm buổi chiều ngày mai",
+    "fixture": "B",
+    "smoke": false,
+    "automation": "Service",
+    "limitation": "Screenshot regression from 19 October; relative dates use the sandbox clock on 26 October. Offline mode supplies valid event categories; Live mode tests model classification.",
+    "steps": [
+      {
+        "prompt": "ngày mai lên lịch cho tôi đi học từ 7h đến 12h sáng",
+        "expected": {
+          "statuses": ["APPLIED"],
+          "taskCount": 0,
+          "eventCount": 1,
+            "events": [{"match": "học", "start": "2026-10-27T07:00:00+07:00", "end": "2026-10-27T12:00:00+07:00", "eventType": "CLASS"}]
+        },
+        "operation": "Send"
+      },
+      {
+        "prompt": "lên lịch chiều mai tôi đi làm từ 13h -17h",
+        "expected": {
+          "statuses": ["APPLIED"],
+          "taskCount": 0,
+          "eventCount": 2,
+          "events": [
+            {"match": "học", "start": "2026-10-27T07:00:00+07:00", "end": "2026-10-27T12:00:00+07:00", "eventType": "CLASS"},
+            {"match": "làm", "start": "2026-10-27T13:00:00+07:00", "end": "2026-10-27T17:00:00+07:00", "eventType": "WORK"}
+          ]
         },
         "operation": "Send"
       }

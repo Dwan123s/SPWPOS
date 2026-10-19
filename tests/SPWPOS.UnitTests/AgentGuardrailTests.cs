@@ -139,7 +139,7 @@ public sealed partial class PlanningAgentTests
     // T06: later answers must know a prior task request failed, without raw error leakage.
     [Fact] public async Task Failed_requests_remain_in_followup_context_as_unsaved_work()
     {
-        var ai = new AgentAiTestDouble { Response = now => Report(now) with { Tasks = [new(null, "Slide", now.AddDays(1), 90, 2, "DESIGN", true)] } };
+        var ai = new AgentAiTestDouble { Response = now => Report(now) with { Tasks = [new(null, "Slide", now.AddDays(-1), 90, 2, "WRITING", true)] } };
         await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
         await Assert.ThrowsAsync<AuthException>(() => Agent(h, s => s.SendAgentTurnAsync(user.Id, Request("Tạo slide 90 phút"), Ct)));
         ai.Response = _ => AgentAiTestDouble.Empty();
@@ -166,7 +166,7 @@ public sealed partial class PlanningAgentTests
         await Agent(h, s => s.SendAgentTurnAsync(user.Id, Request(), Ct));
 
         using var context = JsonDocument.Parse(ai.Context);
-        var codes = context.RootElement.GetProperty("taskTypes").EnumerateArray().Select(x => x.GetProperty("code").GetString()).ToArray();
+        var codes = context.RootElement.GetProperty("activeTaskTypes").EnumerateArray().Select(x => x.GetString()).ToArray();
         Assert.Contains("CUSTOM", codes); Assert.Contains("STUDY", codes); Assert.DoesNotContain("ADMIN", codes); Assert.DoesNotContain("DESIGN", codes);
     }
 

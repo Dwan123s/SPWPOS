@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using SPWPOS.Application.Authentication;
@@ -10,7 +11,7 @@ namespace SPWPOS.UnitTests;
 public sealed class AgentInterpreterTests
 {
     private const string Payload = """
-        {"reply":"Thêm cuộc họp","question":"","options":[],"replaceWeeklyAvailability":false,"weeklySlots":[],"exceptions":[],
+        {"reply":"Thêm cuộc họp","resultKind":"MUTATION","question":"","options":[],"replaceWeeklyAvailability":false,"weeklySlots":[],"exceptions":[],
          "events":[{"name":"Họp","start":"2026-10-15T14:00:00+07:00","end":"2026-10-15T16:00:00+07:00","description":"","eventType":"MEETING","repeatWeeks":1,"existingId":null}],
          "tasks":[],"scheduleTaskIds":[],"reschedule":false,"horizonDays":14}
         """;
@@ -51,39 +52,103 @@ public sealed class AgentInterpreterTests
         var error = await Assert.ThrowsAsync<AuthException>(() => Interpreter(client).InterpretAsync("Họp", "{}", [], "UTC", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken));
         Assert.Equal(503, error.StatusCode);
     }
-    [Theory] [InlineData("missing")] [InlineData("offset")] [InlineData("unknown")] [InlineData("eventType")]
+    [Theory] [InlineData("missing")] [InlineData("offset")] [InlineData("unknown")]
+    [InlineData("categoryNumber")] [InlineData("categoryObject")] [InlineData("categoryBoolean")]
     public async Task Malformed_schema_or_offset_is_rejected(string mode)
     {
         var output = mode switch {
             "missing" => Payload.Replace("\"repeatWeeks\":1", "\"irrelevant\":1"),
             "offset" => Payload.Replace("14:00:00+07:00", "14:00:00"),
-            "eventType" => Payload.Replace("\"MEETING\"", "\"STUDY\""),
+            "categoryNumber" => Payload.Replace("\"eventType\":\"MEETING\"", "\"eventType\":42"),
+            "categoryObject" => Payload.Replace("\"eventType\":\"MEETING\"", "\"eventType\":{}"),
+            "categoryBoolean" => Payload.Replace("\"eventType\":\"MEETING\"", "\"eventType\":false"),
             _ => Payload.Replace("\"reschedule\":false", "\"reschedule\":false,\"userId\":\"other\"")
         };
-        using var provider = new Provider(output); using var client = new HttpClient(provider);
+        using var provider = new Provider(output.Replace("\"MEETING\"", "\"UNSUPPORTED\"")); using var client = new HttpClient(provider);
         var error = await Assert.ThrowsAsync<AuthException>(() => Interpreter(client).InterpretAsync("Họp", "{}", [], "UTC", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken));
         Assert.Equal("AGENT_AI_INVALID_RESPONSE", error.Code);
     }
-
-    [Theory] [InlineData("CUSTOM", true)] [InlineData("DESIGN", false)] [InlineData("ADMIN", false)]
-    public async Task Task_category_must_match_the_active_context_enum(string code, bool supported)
+    [Theory] [InlineData("CUSTOM_ACTIVE", true)] [InlineData("DESIGN", false)]
+    public async Task Task_type_schema_uses_only_active_runtime_codes(string type, bool supported)
     {
-        var output = Payload.Replace("\"tasks\":[]", "\"tasks\":" + JsonSerializer.Serialize(new[] {
-            new { taskId = (Guid?)null, name = "Slide", deadline = "2026-10-15T22:00:00+07:00",
-                estimatedMinutes = 90, priority = 2, taskType = code, splittable = true }
-        }));
-        using var provider = new Provider(output); using var client = new HttpClient(provider);
-        const string context = """{"taskTypes":[{"code":"CUSTOM","displayName":"Custom work"},{"code":"STUDY","displayName":"Study"}]}""";
-        var interpret = () => Interpreter(client).InterpretAsync("Tạo slide 90 phút", context, [], "UTC",
-            DateTimeOffset.Parse("2026-10-14T06:00:00Z"), TestContext.Current.CancellationToken);
-
-        if (supported) Assert.Equal("CUSTOM", Assert.Single((await interpret()).Tasks).TaskType);
-        else Assert.Equal("AGENT_AI_INVALID_RESPONSE", (await Assert.ThrowsAsync<AuthException>(interpret)).Code);
-
+        var task = """
+            {"taskId":null,"name":"Slide","deadline":"2026-10-21T22:00:00+07:00","estimatedMinutes":90,"priority":2,"taskType":"TYPE_CODE","splittable":true,
+             "workWindowStart":null,"workWindowEnd":null,"durationEvidence":"90 phút","deadlineEvidence":"xong trước 22h ngày 21/10","workWindowEvidence":""}
+            """.Replace("TYPE_CODE", type);
+        var output = System.Text.Json.Nodes.JsonNode.Parse(Payload)!;
+        output["events"] = new System.Text.Json.Nodes.JsonArray();
+        output["tasks"] = System.Text.Json.Nodes.JsonNode.Parse("[" + task + "]");
+        using var provider = new Provider(output.ToJsonString()); using var client = new HttpClient(provider);
+        var call = Interpreter(client).InterpretAsync("Slide 90 phút, xong trước 22h ngày 21/10", """{"activeTaskTypes":["CUSTOM_ACTIVE","OTHER"]}""", [], "Asia/Ho_Chi_Minh", DateTimeOffset.Parse("2026-10-19T01:00:00Z"), TestContext.Current.CancellationToken);
+        Assert.Equal(supported ? type : "OTHER", Assert.Single((await call).Tasks).TaskType);
         using var request = JsonDocument.Parse(provider.Body);
         var codes = request.RootElement.GetProperty("generationConfig").GetProperty("responseFormat").GetProperty("text").GetProperty("schema")
-            .GetProperty("properties").GetProperty("tasks").GetProperty("items").GetProperty("properties").GetProperty("taskType")
-            .GetProperty("enum").EnumerateArray().Select(x => x.GetString()).ToArray();
-        Assert.Contains("CUSTOM", codes); Assert.DoesNotContain("DESIGN", codes); Assert.DoesNotContain("ADMIN", codes);
+            .GetProperty("properties").GetProperty("tasks").GetProperty("items").GetProperty("properties").GetProperty("taskType").GetProperty("enum").EnumerateArray().Select(x => x.GetString()).ToArray();
+        Assert.Contains("CUSTOM_ACTIVE", codes); Assert.DoesNotContain("DESIGN", codes);
+    }
+    private static JsonObject CategoryPayload(string kind, string? category, bool editing)
+    {
+        var payload = JsonNode.Parse(Payload)!.AsObject();
+        JsonObject item;
+        if (kind == "event") item = payload["events"]![0]!.AsObject();
+        else
+        {
+            payload["events"] = new JsonArray();
+            item = JsonNode.Parse("""
+                {"taskId":null,"name":"Slide","deadline":"2026-10-21T22:00:00+07:00","estimatedMinutes":90,"priority":2,"taskType":"OTHER","splittable":true,
+                 "workWindowStart":null,"workWindowEnd":null,"durationEvidence":"90 phút","deadlineEvidence":"xong trước 22h ngày 21/10","workWindowEvidence":""}
+                """)!.AsObject();
+            payload["tasks"] = new JsonArray(item);
+        }
+        var field = kind == "event" ? "eventType" : "taskType";
+        if (category == "[missing]") item.Remove(field); else item[field] = category;
+        if (editing) item[kind == "event" ? "existingId" : "taskId"] = Guid.NewGuid().ToString();
+        return payload;
+    }
+
+    [Theory]
+    [InlineData("event", "WORK", false, "WORK")]
+    [InlineData("event", "UNSUPPORTED", false, "OTHER")]
+    [InlineData("event", "CLASS", false, "CLASS")]
+    [InlineData("event", "", false, "OTHER")]
+    [InlineData("event", null, false, "OTHER")]
+    [InlineData("event", "[missing]", false, "OTHER")]
+    [InlineData("event", "[missing]", true, "")]
+    [InlineData("event", "WORK", true, "WORK")]
+    [InlineData("task", "WORK", false, "WORK")]
+    [InlineData("task", "UNSUPPORTED", false, "OTHER")]
+    [InlineData("task", "CUSTOM_ACTIVE", false, "CUSTOM_ACTIVE")]
+    [InlineData("task", "", false, "OTHER")]
+    [InlineData("task", null, false, "OTHER")]
+    [InlineData("task", "[missing]", false, "OTHER")]
+    [InlineData("task", "[missing]", true, "")]
+    [InlineData("task", "WORK", true, "WORK")]
+    public async Task Agent_categories_fall_back_to_other_and_omitted_edit_categories_preserve_the_existing_value(string kind, string? category, bool editing, string expected)
+    {
+        using var provider = new Provider(CategoryPayload(kind, category, editing).ToJsonString()); using var client = new HttpClient(provider);
+        var result = await Interpreter(client).InterpretAsync("Xếp lịch ngày mai", """{"activeTaskTypes":["CUSTOM_ACTIVE","WORK","OTHER"]}""", [], "UTC", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken);
+        Assert.Equal(expected, kind == "event" ? Assert.Single(result.Events).EventType : Assert.Single(result.Tasks).TaskType);
+        if (kind == "event")
+        {
+            Assert.Equal(DateTimeOffset.Parse("2026-10-15T14:00:00+07:00"), result.Events[0].Start);
+            Assert.Equal(DateTimeOffset.Parse("2026-10-15T16:00:00+07:00"), result.Events[0].End);
+        }
+    }
+
+    [Fact] public async Task Unknown_task_category_cannot_use_an_inactive_other_fallback()
+    {
+        using var provider = new Provider(CategoryPayload("task", "WORK", false).ToJsonString()); using var client = new HttpClient(provider);
+        var error = await Assert.ThrowsAsync<AuthException>(() => Interpreter(client).InterpretAsync("Slide 90 phút", """{"activeTaskTypes":["CUSTOM_ACTIVE"]}""", [], "UTC", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken));
+        Assert.Equal("AGENT_AI_INVALID_RESPONSE", error.Code);
+    }
+    [Theory] [InlineData("lúc 6 giờ", "06:00 sáng", "18:00 chiều/tối")]
+    [InlineData("lúc sáu giờ rưỡi", "06:30 sáng", "18:30 chiều/tối")]
+    [InlineData("trước 8h15", "08:15 sáng", "20:15 chiều/tối")]
+    public async Task Ambiguous_clock_is_clarified_without_any_provider_call(string text, string morning, string evening)
+    {
+        using var provider = new Provider(); using var client = new HttpClient(provider);
+        var result = await Interpreter(client).InterpretAsync("Có hẹn " + text, "{}", [], "Asia/Ho_Chi_Minh", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken);
+        Assert.Equal("CLARIFICATION", result.ResultKind); Assert.Equal(new[] { morning, evening }, result.Options);
+        Assert.Empty(result.Events); Assert.Empty(result.Tasks); Assert.False(result.Reschedule); Assert.Null(provider.Url);
     }
 }

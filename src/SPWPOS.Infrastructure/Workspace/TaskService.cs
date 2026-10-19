@@ -32,6 +32,7 @@ public sealed partial class WorkspaceService
             task.Name = input.Name.Trim(); task.Description = input.Description ?? ""; task.Deadline = input.Deadline;
             task.EstimatedMinutes = input.EstimatedMinutes; task.Priority = input.Priority; task.TaskType = type; task.IsHardDeadline = input.IsHardDeadline;
             task.Splittable = input.Splittable; task.MinimumSessionMinutes = input.MinimumSessionMinutes; task.CategoryId = input.CategoryId; task.ParentId = input.ParentId; task.UpdatedAt = Now;
+            Require(task.WorkWindowStart is null || task.Deadline > task.WorkWindowStart, "TASK_WORK_WINDOW", "Deadline mới phải sau thời điểm bắt đầu khung thực hiện đã lưu.", 409);
         }
         else
         {

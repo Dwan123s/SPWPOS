@@ -33,6 +33,19 @@ public sealed class WorkspaceFlowTests
         (await Send(client, HttpMethod.Post, "/api/tasks", new TaskInput(name, "", now.AddDays(1), 60))).GetProperty("data").GetProperty("id").GetGuid();
     internal static async Task SetupTime(HttpClient client) => _ = await Send(client, HttpMethod.Put, "/api/time/availability",
         new WeeklyInput(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()));
+    [Theory] [InlineData("task")] [InlineData("event")]
+    public async Task Work_category_is_available_through_the_manual_creation_api(string kind)
+    {
+        await using var factory = new ApiFactory(); using var client = await factory.ClientAsync(); await Authorize(factory, client);
+        var now = factory.Clock.GetUtcNow();
+        if (kind == "task")
+            await Send(client, HttpMethod.Post, "/api/tasks", new TaskInput("Công việc", "", now.AddDays(2), 60, TaskType: "WORK"));
+        else
+            await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Đi làm", now.AddDays(1), now.AddDays(1).AddHours(4), EventType: "WORK"));
+        var workspace = (await Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        var item = Assert.Single(workspace.GetProperty(kind == "task" ? "tasks" : "events").EnumerateArray());
+        Assert.Equal("WORK", item.GetProperty(kind == "task" ? "taskType" : "eventType").GetString());
+    }
     [Fact] public async Task Create_plan_apply_execute_observe_and_scenario_does_not_persist()
     {
         await using var factory = new ApiFactory(); using var client = await factory.ClientAsync(); await Authorize(factory, client); await SetupTime(client);
@@ -43,6 +56,7 @@ public sealed class WorkspaceFlowTests
         var planId = proposal.GetProperty("id").GetGuid(); await Send(client, HttpMethod.Post, $"/api/plans/{planId}/apply");
         await Send(client, HttpMethod.Post, $"/api/plans/{planId}/apply", expected: HttpStatusCode.Conflict);
         var sid = proposal.GetProperty("sessions")[0].GetProperty("id").GetGuid();
+        factory.Clock.Advance(proposal.GetProperty("sessions")[0].GetProperty("start").GetDateTimeOffset() - factory.Clock.GetUtcNow());
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/start"); factory.Clock.Advance(TimeSpan.FromMinutes(20));
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/pause"); factory.Clock.Advance(TimeSpan.FromMinutes(10));
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/resume"); factory.Clock.Advance(TimeSpan.FromMinutes(10));

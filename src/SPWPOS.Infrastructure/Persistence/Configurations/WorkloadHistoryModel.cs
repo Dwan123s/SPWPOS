@@ -25,7 +25,7 @@ public static class WorkloadHistoryModel
         types.HasData(new TaskTypeDefinition { Code = "PROGRAMMING", DisplayName = "Programming" },
             new TaskTypeDefinition { Code = "WRITING", DisplayName = "Writing" }, new TaskTypeDefinition { Code = "STUDY", DisplayName = "Study" },
             new TaskTypeDefinition { Code = "MEETING_PREP", DisplayName = "Meeting preparation" }, new TaskTypeDefinition { Code = "ADMIN", DisplayName = "Admin / chores" },
-            new TaskTypeDefinition { Code = "OTHER", DisplayName = "Other" });
+            new TaskTypeDefinition { Code = "WORK", DisplayName = "Work" }, new TaskTypeDefinition { Code = "OTHER", DisplayName = "Other" });
         b.Entity<WorkTask>().HasOne<TaskTypeDefinition>().WithMany().HasForeignKey(x => x.TaskType).OnDelete(DeleteBehavior.Restrict);
         b.Entity<WorkTask>().Property(x => x.CreationSource).HasMaxLength(16);
         b.Entity<FixedEvent>().Property(x => x.Description).HasMaxLength(1000); b.Entity<FixedEvent>().Property(x => x.EventType).HasMaxLength(12);

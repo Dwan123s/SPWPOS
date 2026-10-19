@@ -45,7 +45,7 @@ public static class SandboxExport
         foreach (var group in report.Cases.GroupBy(x => x.Status)) md.AppendLine($"- {group.Key}: {group.Count()}");
         md.AppendLine("\n| Case | Repeat | Automatic checks | Response review | Steps |\n|---|---:|---|---|---:|");
         foreach (var item in report.Cases) md.AppendLine($"| {item.Id} | {item.Repeat} | {item.Status} | {item.ResponseReview} | {item.Turns.Length} |");
-        var csv = new StringBuilder("caseId,repeat,fixture,status,responseReview,step,operation,resultStatus,errorCode,elapsedMs,actualChanges,failedChecks,prompt,reply,question\n");
+        var csv = new StringBuilder("caseId,repeat,fixture,status,responseReview,step,operation,resultStatus,errorCode,elapsedMs,actualChanges,failedChecks,prompt,reply,verifiedOutcome,question\n");
         foreach (var item in report.Cases)
         {
             md.AppendLine($"\n## {item.Id} — {Text(item.Title)} (repeat {item.Repeat})\n\nFixture: {item.Fixture} · result: **{item.Status}**");
@@ -60,6 +60,11 @@ public static class SandboxExport
                 if (turn.ErrorCode is not null && turn.PersistedTurn is not null) md.AppendLine("\nRetained stored turn status: " + turn.PersistedTurn.Status + " (not a new successful operation).");
                 md.AppendLine("\nReply:\n");
                 foreach (var line in (turn.ErrorMessage ?? turn.Result?.Reply ?? "No public reply returned.").Split('\n')) md.AppendLine("> " + Text(line));
+                if (!string.IsNullOrWhiteSpace(turn.Result?.Outcome))
+                {
+                    md.AppendLine("\nVerified outcome:\n");
+                    foreach (var line in turn.Result.Outcome.Split('\n')) md.AppendLine("> " + Text(line));
+                }
                 if (!string.IsNullOrWhiteSpace(turn.Result?.Question)) md.AppendLine("\nQuestion: " + Text(turn.Result.Question));
                 md.AppendLine("\nChecks:\n");
                 foreach (var check in turn.Checks) md.AppendLine($"- {(check.Passed ? "PASS" : "FAIL")}{(check.Critical ? " [invariant]" : "")} `{check.Name}`: {Text(check.Detail)}");
@@ -77,7 +82,7 @@ public static class SandboxExport
                     md.AppendLine($"| {Text(meeting.Name)} | {TimeZoneInfo.ConvertTime(meeting.Start, zone):yyyy-MM-dd HH:mm zzz} | {TimeZoneInfo.ConvertTime(meeting.End, zone):yyyy-MM-dd HH:mm zzz} |");
                 var row = new[] { item.Id, item.Repeat.ToString(CultureInfo.InvariantCulture), item.Fixture, item.Status, item.ResponseReview, (i+1).ToString(CultureInfo.InvariantCulture),
                     turn.Operation, turn.ErrorCode is not null ? "REJECTED / ERROR" : turn.Result?.Status ?? "", turn.ErrorCode ?? "", turn.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture), turn.Actions.Length.ToString(CultureInfo.InvariantCulture),
-                    string.Join("; ", turn.Checks.Where(x => !x.Passed).Select(x => x.Name)), turn.Prompt, turn.ErrorMessage ?? turn.Result?.Reply ?? "", turn.Result?.Question ?? "" };
+                    string.Join("; ", turn.Checks.Where(x => !x.Passed).Select(x => x.Name)), turn.Prompt, turn.ErrorMessage ?? turn.Result?.Reply ?? "", turn.Result?.Outcome ?? "", turn.Result?.Question ?? "" };
                 csv.AppendLine(string.Join(',', row.Select(Csv)));
             }
         }

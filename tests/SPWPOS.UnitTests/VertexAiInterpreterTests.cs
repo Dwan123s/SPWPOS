@@ -15,7 +15,7 @@ namespace SPWPOS.UnitTests;
 public sealed class VertexAiInterpreterTests
 {
     private const string Command = """
-        {"reply":"Thêm cuộc họp","question":"","options":[],"replaceWeeklyAvailability":false,"weeklySlots":[],"exceptions":[],
+        {"reply":"Thêm cuộc họp","resultKind":"MUTATION","question":"","options":[],"replaceWeeklyAvailability":false,"weeklySlots":[],"exceptions":[],
         "events":[{"name":"Họp","start":"2026-10-15T14:00:00+07:00","end":"2026-10-15T16:00:00+07:00","description":"","eventType":"MEETING","repeatWeeks":1,"existingId":null}],
         "tasks":[],"scheduleTaskIds":[],"reschedule":false,"horizonDays":14}
         """;
@@ -236,16 +236,19 @@ public sealed class VertexAiInterpreterTests
         }
         return builder.ToString();
     }
-    [Fact] public async Task Streaming_cloud_reply_is_incremental_handles_escapes_and_never_emits_model_thoughts_or_commands()
+    [Theory] [InlineData("MEETING", "MEETING")] [InlineData("WORK", "WORK")] [InlineData("UNSUPPORTED", "OTHER")]
+    public async Task Streaming_cloud_reply_is_incremental_handles_escapes_and_never_emits_model_thoughts_or_commands(string category, string expected)
     {
         var json = System.Text.Json.Nodes.JsonNode.Parse(Command)!;
         const string reply = "Mình sẽ chuẩn bị \"báo cáo\".\nLịch của bạn phù hợp 🦉.";
         json["reply"] = reply;
+        json["events"]![0]!["eventType"] = category;
         using var provider = new Provider(errorBody: StreamBody(json.ToJsonString())); using var http = new HttpClient(provider);
         var deltas = new List<string>();
         var result = await Interpreter(http).InterpretStreamingAsync("Họp ngày mai", "{}", [], "Asia/Ho_Chi_Minh", DateTimeOffset.UtcNow,
             (delta, _) => { deltas.Add(delta); return Task.CompletedTask; }, TestContext.Current.CancellationToken);
         Assert.Equal(reply, result.Reply); Assert.Equal(reply, string.Concat(deltas)); Assert.True(deltas.Count > 1);
+        Assert.Equal(expected, Assert.Single(result.Events).EventType);
         Assert.Equal("/v1/publishers/google/models/gemini-3.5-flash-lite:streamGenerateContent", provider.Url!.AbsolutePath);
         Assert.Equal("?key=cloud-key&alt=sse", provider.Url.Query); Assert.Equal("cloud-key", provider.Key);
         Assert.DoesNotContain("private-model-thought", string.Concat(deltas)); Assert.DoesNotContain("events", string.Concat(deltas));

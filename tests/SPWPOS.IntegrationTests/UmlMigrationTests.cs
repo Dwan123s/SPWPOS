@@ -11,6 +11,47 @@ namespace SPWPOS.IntegrationTests;
 public sealed class UmlMigrationTests
 {
     public static bool SqlServerAvailable => SqlServerConcurrencyTests.SqlServerAvailable;
+    [Theory(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
+    [InlineData(false)] [InlineData(true)]
+    public async Task Work_category_upgrade_adds_the_default_without_overwriting_existing_configuration(bool existing)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync();
+        await using var scope = factory.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261018172132_NoraSchedulingConstraints", ct);
+        // This is the factory's disposable database; no user calendar is read.
+        await db.TaskTypes.Where(x => x.Code == "WORK").ExecuteDeleteAsync(ct);
+        if (existing)
+        {
+            db.TaskTypes.Add(new() { Code = "WORK", DisplayName = "Existing work", IsActive = false });
+            await db.SaveChangesAsync(ct); db.ChangeTracker.Clear();
+        }
+        await migrator.MigrateAsync(null, ct);
+        var category = await db.TaskTypes.AsNoTracking().SingleAsync(x => x.Code == "WORK", ct);
+        Assert.Equal(existing ? "Existing work" : "Work", category.DisplayName); Assert.Equal(!existing, category.IsActive);
+    }
+    [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
+    public async Task Nora_constraints_upgrade_preserves_old_tasks_and_additive_availability()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync();
+        await WorkspaceFlowTests.Authorize(factory, client);
+        await using var scope = factory.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var migrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray(); var index = Array.FindIndex(migrations, x => x.EndsWith("_NoraSchedulingConstraints", StringComparison.Ordinal)); Assert.True(index > 0);
+        var migrator = db.GetService<IMigrator>(); await migrator.MigrateAsync(migrations[index - 1], ct);
+        var uid = await db.Users.Select(x => x.Id).SingleAsync(ct); var id = Guid.NewGuid(); var exceptionId = Guid.NewGuid(); var now = factory.Clock.GetUtcNow();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO WorkTasks(Id,UserId,Name,Description,Deadline,Priority,Status,Progress,EstimatedMinutes,TaskType,IsHardDeadline,CreationSource,Splittable,MinimumSessionMinutes,IsDeleted,CreatedAt,UpdatedAt)
+            VALUES({id},{uid},'Legacy study','',{now.AddDays(3)},2,0,0,45,'STUDY',1,'MANUAL',1,25,0,{now},{now});
+            INSERT INTO AvailabilityExceptions(Id,UserId,Date,StartMinute,EndMinute,IsAvailable,Note)
+            VALUES({exceptionId},{uid},{new DateOnly(2026,10,23)},1200,1260,1,'Legacy extra availability');
+            """, ct);
+        await migrator.MigrateAsync(null, ct);
+        var task = await db.WorkTasks.AsNoTracking().SingleAsync(ct); Assert.Equal(id, task.Id); Assert.Equal(45, task.EstimatedMinutes);
+        Assert.Null(task.WorkWindowStart); Assert.Null(task.WorkWindowEnd);
+        var exception = await db.AvailabilityExceptions.AsNoTracking().SingleAsync(ct); Assert.Equal(exceptionId, exception.Id); Assert.False(exception.OverridesWeeklyAvailability);
+    }
     [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
     public async Task Conversation_upgrade_backfills_each_owner_and_keeps_turns_unchanged()
     {

@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using SPWPOS.Application.Workspace;
 using SPWPOS.TestSupport;
+using Microsoft.EntityFrameworkCore;
+using SPWPOS.Infrastructure.Persistence;
+using System.Text.Json;
 namespace SPWPOS.IntegrationTests;
 
 public sealed class AgentApiTests
@@ -15,6 +18,26 @@ public sealed class AgentApiTests
         public AgentAiTestDouble Ai { get; } = new();
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         { base.ConfigureWebHost(builder); builder.ConfigureServices(s => s.AddSingleton<ITaskInterpreter>(Ai)); }
+    }
+
+    [Fact] public async Task A_streamed_overlap_rejection_is_unsaved_and_its_history_replaces_the_provisional_success_text()
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync(); await WorkspaceFlowTests.Authorize(f, client);
+        var day = f.Clock.GetUtcNow().AddDays(1);
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Đi làm", day, day.AddHours(4), EventType: "WORK"));
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Reply = "Lịch trình sẽ được cập nhật.", Events = [new("Cuộc họp", day.AddHours(1), day.AddHours(2), EventType: "MEETING")] };
+        var request = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Thêm cuộc họp ngày mai", true);
+        using var response = await client.PostAsJsonAsync("/api/agent/turns/stream", request, Ct);
+        var frames = (await response.Content.ReadAsStringAsync(Ct)).Split('\n').Where(x => x.StartsWith("data: ")).Select(x => JsonDocument.Parse(x[6..]).RootElement.Clone()).ToArray();
+        var error = Assert.Single(frames, x => x.GetProperty("type").GetString() == "error");
+        Assert.Equal("FIXED_EVENT_OVERLAP", error.GetProperty("code").GetString()); Assert.Contains("Đi làm", error.GetProperty("message").GetString());
+        Assert.DoesNotContain(frames, x => x.GetProperty("type").GetString() == "result");
+        var history = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/agent/turns")).GetProperty("data");
+        var turn = Assert.Single(history.EnumerateArray()); Assert.Equal("FAILED", turn.GetProperty("status").GetString());
+        Assert.Equal(error.GetProperty("message").GetString(), turn.GetProperty("reply").GetString());
+        Assert.DoesNotContain("Lịch trình sẽ được cập nhật", turn.GetProperty("reply").GetString());
+        var workspace = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Equal("Đi làm", Assert.Single(workspace.GetProperty("events").EnumerateArray()).GetProperty("name").GetString());
     }
     [Fact] public async Task Agent_routes_require_authentication_and_validate_requests()
     {
@@ -34,7 +57,6 @@ public sealed class AgentApiTests
     {
         await using var f = new Factory(); using var client = await f.ClientAsync();
         await WorkspaceFlowTests.Authorize(f, client); await WorkspaceFlowTests.SetupTime(client);
-        // The account defaults to Vietnam time; tomorrow must follow its calendar even after UTC 17:00.
         var tomorrow = new DateTimeOffset(f.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).Date.AddDays(1).AddHours(8), TimeSpan.FromHours(7));
         f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Họp", tomorrow, tomorrow.AddHours(1), EventType: "MEETING")] };
         var input = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Họp ngày mai", false);
@@ -72,5 +94,26 @@ public sealed class AgentApiTests
         var workspace = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data"); Assert.Single(workspace.GetProperty("events").EnumerateArray());
         await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{id}/undo");
         workspace = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data"); Assert.Empty(workspace.GetProperty("events").EnumerateArray());
+    }
+    [Fact] public async Task Apply_revalidates_task_work_window_even_if_stored_preview_was_altered()
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync();
+        await WorkspaceFlowTests.Authorize(f, client); await WorkspaceFlowTests.SetupTime(client);
+        var day = new DateTimeOffset(f.Clock.GetUtcNow().UtcDateTime.Date.AddDays(2), TimeSpan.Zero);
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Tasks = [new(null, "English", day.AddHours(21), 45, 2, "STUDY", true, day.AddHours(18), day.AddHours(22))] };
+        var result = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns", new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Schedule English", false))).GetProperty("data");
+        var id = result.GetProperty("id").GetGuid(); Assert.Equal("PREVIEW", result.GetProperty("status").GetString());
+        await using (var scope = f.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(); var turn = await db.AgentTurns.SingleAsync(x => x.Id == id, Ct);
+            var view = JsonSerializer.Deserialize<AgentTurnView>(turn.ResultJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            var session = Assert.Single(view.Plan!.Sessions);
+            turn.ResultJson = JsonSerializer.Serialize(view with { Plan = view.Plan with { Sessions = [session with { Start = session.Start.AddDays(-1), End = session.End.AddDays(-1) }] } }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await db.SaveChangesAsync(Ct);
+        }
+        var failure = await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{id}/apply", null, HttpStatusCode.Conflict);
+        Assert.Equal("TASK_WORK_WINDOW", failure.GetProperty("error").GetProperty("code").GetString());
+        var workspace = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Empty(workspace.GetProperty("tasks").EnumerateArray()); Assert.Empty(workspace.GetProperty("sessions").EnumerateArray());
     }
 }

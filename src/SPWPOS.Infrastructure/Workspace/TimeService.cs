@@ -50,7 +50,7 @@ public sealed partial class WorkspaceService
     {
         Require(!string.IsNullOrWhiteSpace(input.Name) && input.Name.Length <= 200 && input.Start < input.End && (input.End - input.Start).TotalDays <= 31 &&
             input.RepeatWeeks is >= 1 and <= 12 && input.Description is not null && input.Description.Length <= 1000 &&
-            input.EventType is "MEETING" or "CLASS" or "APPOINTMENT" or "OTHER", "VALIDATION_ERROR", "Sự kiện hoặc số tuần lặp không hợp lệ.");
+            input.EventType is "MEETING" or "CLASS" or "APPOINTMENT" or "WORK" or "OTHER", "VALIDATION_ERROR", "Sự kiện hoặc số tuần lặp không hợp lệ.");
         var zone = PlanningEngine.Zone(preference.TimeZoneId);
         var start = TimeZoneInfo.ConvertTime(input.Start, zone).DateTime; var end = TimeZoneInfo.ConvertTime(input.End, zone).DateTime;
         return Enumerable.Range(0, input.RepeatWeeks).Select(index =>
@@ -67,8 +67,9 @@ public sealed partial class WorkspaceService
     {
         foreach (var item in events)
         {
-            Require(!state.Events.Concat(events.Where(x => x.Id != item.Id)).Any(x => x.Id != excludeId && x.Start < item.End && item.Start < x.End),
-                "FIXED_EVENT_OVERLAP", "Sự kiện trùng với một sự kiện cố định khác. Hãy chọn cách xử lý xung đột.", 409);
+            var conflict = state.Events.Concat(events.Where(x => x.Id != item.Id)).FirstOrDefault(x => x.Id != excludeId && x.Start < item.End && item.Start < x.End);
+            Require(conflict is null, "FIXED_EVENT_OVERLAP", conflict is null ? "Sự kiện bị trùng lịch."
+                : $"Sự kiện trùng với “{conflict.Name}” ({LocalWindow(conflict.Start, conflict.End, state.Preference)}). Chưa lưu thay đổi. Hãy chọn giờ khác hoặc chỉnh sự kiện đang trùng.", 409);
             Require(!state.Sessions.Any(x => x.Start < item.End && item.Start < x.End &&
                 (x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && (x.IsLocked || x.Start < Now))),
                 "LOCKED_SESSION_CONFLICT", "Sự kiện trùng với phiên đã khóa hoặc đang thực hiện.", 409);
@@ -92,6 +93,9 @@ public sealed partial class WorkspaceService
     }, ct);
     private void ValidateProtectedSessions(PlanningState state)
     {
+        foreach (var session in state.Sessions.Where(x => x.End > Now && (x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && x.IsLocked)))
+            Require(PlanningEngine.InsideWorkWindow(state.Tasks.Single(x => x.Id == session.TaskId), session.Start, session.End),
+                "LOCKED_SESSION_CONFLICT", "Khung giờ thực hiện mới xung đột với phiên đã khóa hoặc đang thực hiện.", 409);
         foreach (var active in state.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused ||
             x.Status == WorkSessionStatus.Scheduled && x.End > Now && x.Start < Now))
             Require(!state.Events.Any(x => x.Start < active.End && active.Start < x.End) &&
@@ -141,6 +145,7 @@ public sealed partial class WorkspaceService
         var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
         var future = state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && !x.IsLocked && x.Start >= Now).ToArray();
         var affected = future.Where(x => !engine.FreeSlots(state, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End) ||
+            !PlanningEngine.InsideWorkWindow(state.Tasks.Single(t => t.Id == x.TaskId), x.Start, x.End) ||
             (x.End - x.Start).TotalMinutes > state.Preference.MaximumSessionMinutes ||
             (x.End - x.Start).TotalMinutes < Math.Max(state.Preference.MinimumSessionMinutes, state.Tasks.Single(t => t.Id == x.TaskId).MinimumSessionMinutes))
             .Select(x => x.TaskId).ToHashSet();

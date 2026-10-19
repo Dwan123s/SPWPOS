@@ -476,6 +476,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<bool>("OverridesWeeklyAvailability")
+                        .HasColumnType("bit");
+
                     b.Property<int>("StartMinute")
                         .HasColumnType("int");
 
@@ -1622,6 +1625,12 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            Code = "WORK",
+                            DisplayName = "Work",
+                            IsActive = true
+                        },
+                        new
+                        {
                             Code = "OTHER",
                             DisplayName = "Other",
                             IsActive = true
@@ -1895,6 +1904,12 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("WorkWindowEnd")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("WorkWindowStart")
+                        .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
 

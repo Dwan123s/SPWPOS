@@ -15,7 +15,7 @@ public static class SandboxOracle
         "AGENT_AI_MODEL_UNAVAILABLE" or "AGENT_AI_QUOTA_EXCEEDED" or "AGENT_AI_TIMEOUT" or "AGENT_AI_INVALID_RESPONSE" or "AI_DAILY_LIMIT" or "AI_CONCURRENT_LIMIT";
     public static bool SafeRejection(string? code) => code is "AGENT_INVALID_INTENT" or "VALIDATION_ERROR" or "INVALID_TASK_TYPE" or
         "LOCKED_SESSION_CONFLICT" or "FIXED_EVENT_OVERLAP" or "DEADLINE_CONFLICT" or "AGENT_HORIZON_CONFLICT" or
-        "AGENT_PREVIEW_EXPIRED" or "AGENT_STALE" or "AGENT_REQUEST_REUSED" or "NOT_FOUND" or "AGENT_UNDO_STALE" or "AGENT_UNDO_STARTED";
+        "AGENT_PREVIEW_EXPIRED" or "AGENT_STALE" or "AGENT_REQUEST_REUSED" or "NOT_FOUND" or "AGENT_UNDO_STALE" or "AGENT_UNDO_STARTED" or "TASK_WORK_WINDOW";
 
     public static SandboxChange[] Diff(SandboxSnapshot before, SandboxSnapshot after)
     {
@@ -46,9 +46,11 @@ public static class SandboxOracle
     public static bool[] FreeMinutes(SandboxSnapshot state, DateOnly date)
     {
         var minutes = new bool[1440];
-        foreach (var slot in state.Weekly.Where(x => x.DayOfWeek == (int)date.DayOfWeek))
+        var datedFree = state.Exceptions.Where(x => x.Date == date && x.IsAvailable).ToArray();
+        var exclusive = datedFree.Any(x => x.OverridesWeeklyAvailability);
+        foreach (var slot in state.Weekly.Where(x => !exclusive && x.DayOfWeek == (int)date.DayOfWeek))
             for (var i = Math.Max(0, slot.StartMinute); i < Math.Min(1440, slot.EndMinute); i++) minutes[i] = true;
-        foreach (var slot in state.Exceptions.Where(x => x.Date == date && x.IsAvailable))
+        foreach (var slot in datedFree.Where(x => !exclusive || x.OverridesWeeklyAvailability))
             for (var i = Math.Max(0, slot.StartMinute); i < Math.Min(1440, slot.EndMinute); i++) minutes[i] = true;
         foreach (var slot in state.Exceptions.Where(x => x.Date == date && !x.IsAvailable))
             for (var i = Math.Max(0, slot.StartMinute); i < Math.Min(1440, slot.EndMinute); i++) minutes[i] = false;
@@ -80,6 +82,10 @@ public static class SandboxOracle
             var task = matches[0];
             Check("task-duration:" + target.Match, task.EstimatedMinutes == target.Minutes, $"Expected {target.Minutes}; actual {task.EstimatedMinutes}.");
             Check("task-deadline:" + target.Match, task.Deadline == DateTimeOffset.Parse(target.Deadline, CultureInfo.InvariantCulture), $"Actual {task.Deadline:O}.");
+            if (target.WorkWindowStart is { } from) Check("task-window-start:" + target.Match,
+                task.WorkWindowStart == DateTimeOffset.Parse(from, CultureInfo.InvariantCulture), $"Actual {task.WorkWindowStart:O}.", true);
+            if (target.WorkWindowEnd is { } to) Check("task-window-end:" + target.Match,
+                task.WorkWindowEnd == DateTimeOffset.Parse(to, CultureInfo.InvariantCulture), $"Actual {task.WorkWindowEnd:O}.", true);
             if (target.Splittable is { } split) Check("task-continuity:" + target.Match, task.Splittable == split, $"Expected splittable={split}; actual {task.Splittable}.");
             if (target.Priority is { } priority) Check("task-priority:" + target.Match, task.Priority == priority, $"Expected {priority}; actual {task.Priority}.");
             if (target.Scheduled)
@@ -91,8 +97,9 @@ public static class SandboxOracle
         }
         foreach (var target in expected.Events)
             Check("exact-event:" + target.Match, after.Events.Any(x => Fold(x.Name).Contains(Fold(target.Match), StringComparison.Ordinal) &&
-                x.Start == DateTimeOffset.Parse(target.Start, CultureInfo.InvariantCulture) && x.End == DateTimeOffset.Parse(target.End, CultureInfo.InvariantCulture)),
-                $"Expected {target.Start} -> {target.End}.");
+                x.Start == DateTimeOffset.Parse(target.Start, CultureInfo.InvariantCulture) && x.End == DateTimeOffset.Parse(target.End, CultureInfo.InvariantCulture) &&
+                (target.EventType is null || x.EventType == target.EventType)),
+                $"Expected {target.Start} -> {target.End}." + (target.EventType is null ? "" : $" Category: {target.EventType}."));
         foreach (var descriptor in expected.Preserve)
         {
             var pair = descriptor.Split(':', 2); var match = Fold(pair[1]);
@@ -130,6 +137,8 @@ public static class SandboxOracle
             Check("session-length:" + session.Id, length >= Math.Max(after.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) && length <= after.Preference.MaximumSessionMinutes,
                 $"Actual {length} minutes.", true);
             Check("session-deadline:" + session.Id, !task.IsHardDeadline || session.End <= task.Deadline, "Hard deadline enforced.", true);
+            Check("session-work-window:" + session.Id, (task.WorkWindowStart is null || session.Start >= task.WorkWindowStart) &&
+                (task.WorkWindowEnd is null || session.End <= task.WorkWindowEnd), "Allowed execution window enforced independently.", true);
             Check("session-future:" + session.Id, session.Start >= now, "New work must start in the future.", true);
             Check("session-active-task:" + session.Id, !task.IsDeleted && task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled, "No completed/cancelled/deleted work.", true);
             Check("session-event-overlap:" + session.Id, !after.Events.Any(x => x.Start < session.End && session.Start < x.End), "No fixed-event overlap.", true);

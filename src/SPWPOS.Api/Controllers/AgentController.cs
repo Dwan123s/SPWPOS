@@ -8,7 +8,8 @@ namespace SPWPOS.Api.Controllers;
 [Route("api/agent"), Tags("Planning Agent")]
 public sealed class AgentController(IPlanningAgentService service, ILogger<AgentController> logger, IAgentVoiceTranscriber voice) : WorkspaceController
 {
-    [HttpGet("capabilities")] public IActionResult Capabilities() { var caps = service.GetAgentCapabilities(); return Data(new { caps.AiAvailable, caps.MaxTasks, caps.Provider, VoiceAvailable = voice.VoiceAvailable, Features = new[] { "conversation-lifecycle", "usage-ledger", "planning-policy" } }); }
+    [HttpGet("capabilities")] public IActionResult Capabilities() { var caps = service.GetAgentCapabilities(); return Data(new { caps.AiAvailable, caps.MaxTasks, caps.Provider, VoiceAvailable = voice.VoiceAvailable,
+        PolicyVersion = "2026-10-19.4", Features = new[] { "conversation-lifecycle", "usage-ledger", "planning-policy", "work-category", "verified-outcomes", "scoped-event-replanning", "bounded-clarification-recovery", "concise-confirmations" } }); }
     [HttpGet("usage")] public async Task<IActionResult> Usage([FromServices] IAiUsageService usage, CancellationToken ct) => Data(await usage.SummaryAsync(UserId, ct));
     [HttpGet("turns")] public async Task<IActionResult> History(CancellationToken ct) => Data(await service.GetAgentTurnsAsync(UserId, ct));
     [HttpGet("conversations")] public async Task<IActionResult> Conversations(CancellationToken ct, string? search = null, bool archived = false, string? cursor = null, int pageSize = 30) => Data(await service.GetConversationsAsync(UserId, search, archived, cursor, pageSize, ct));

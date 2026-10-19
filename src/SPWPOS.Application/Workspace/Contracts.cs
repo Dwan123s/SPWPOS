@@ -16,7 +16,8 @@ public sealed record TaskInput(
 public sealed record TaskView(Guid Id, string Name, string Description, DateTimeOffset Deadline, int EstimatedMinutes,
     int AdjustedMinutes, int RemainingMinutes, int ActualMinutes, int PlannedMinutes, int Priority, string TaskType,
     bool Splittable, int MinimumSessionMinutes, Guid? CategoryId, Guid? ParentId, string Status, int Progress,
-    DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, Guid[] Dependencies, bool IsHardDeadline = false, string CreationSource = "MANUAL");
+    DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, Guid[] Dependencies, bool IsHardDeadline = false, string CreationSource = "MANUAL",
+    DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
 public sealed record CategoryView(Guid Id, string Name, string Color);
@@ -28,9 +29,9 @@ public sealed record AvailabilityInput([Range(0, 6)] int DayOfWeek, [Range(0, 14
 public sealed record WeeklyInput([Required, MaxLength(28)] AvailabilityInput[] Slots);
 public sealed record ExceptionInput(DateOnly Date, [Range(0, 1439)] int StartMinute,
     [Range(1, 1440)] int EndMinute, bool IsAvailable, [StringLength(300)] string Note = "");
-public sealed record ExceptionView(Guid Id, DateOnly Date, int StartMinute, int EndMinute, bool IsAvailable, string Note);
+public sealed record ExceptionView(Guid Id, DateOnly Date, int StartMinute, int EndMinute, bool IsAvailable, string Note, bool OverridesWeeklyAvailability = false);
 public sealed record EventInput([Required, StringLength(200)] string Name, DateTimeOffset Start, DateTimeOffset End,
-    [StringLength(1000)] string Description = "", [RegularExpression("^(MEETING|CLASS|APPOINTMENT|OTHER)$")] string EventType = "OTHER",
+    [StringLength(1000)] string Description = "", [RegularExpression("^(MEETING|CLASS|APPOINTMENT|WORK|OTHER)$")] string EventType = "OTHER",
     [Range(1, 12)] int RepeatWeeks = 1);
 public sealed record EventView(Guid Id, string Name, DateTimeOffset Start, DateTimeOffset End, string Description = "", string EventType = "OTHER");
 public sealed record PreferenceInput([Required, StringLength(100)] string TimeZoneId,

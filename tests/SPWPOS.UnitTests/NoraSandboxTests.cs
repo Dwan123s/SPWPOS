@@ -12,7 +12,7 @@ public sealed class NoraSandboxTests
     private static AgentTurnView Result(string status = "APPLIED") => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
         "Yêu cầu mẫu", "Kết quả mẫu", status, "", null, [], [], Now);
 
-    [Theory] [InlineData("overlap")] [InlineData("deadline")] [InlineData("outside-free-time")] [InlineData("duration")]
+    [Theory] [InlineData("overlap")] [InlineData("deadline")] [InlineData("outside-free-time")] [InlineData("duration")] [InlineData("work-window")]
     public void Exported_schedule_violations_are_detected_independently_of_the_planning_engine(string defect)
     {
         var before = State();
@@ -22,12 +22,24 @@ public sealed class NoraSandboxTests
         var session = new WorkSession { TaskId = task.Id, Start = start, End = start.AddMinutes(defect == "duration" ? 90 : 60) };
         if (defect == "deadline") task.Deadline = start.AddMinutes(30);
         if (defect == "duration") task.Deadline = Now.AddHours(13);
+        if (defect == "work-window") { task.Deadline = Now.AddHours(13); task.WorkWindowStart = Now.AddHours(11); task.WorkWindowEnd = Now.AddHours(12); }
         var after = before with { Tasks = [task], Sessions = [session], Events = defect == "overlap"
             ? [new() { Name = "Họp", Start = start, End = start.AddMinutes(30) }] : [] };
 
         var checks = SandboxOracle.Evaluate(new(), Result(), null, before, after, Now);
 
         Assert.Contains(checks, x => !x.Passed && x.Critical);
+    }
+
+    [Fact] public void Exclusive_date_availability_replaces_weekly_and_additive_free_hours_in_the_oracle()
+    {
+        var state = State() with { Exceptions = [
+            new() { Date = new(2026, 10, 26), StartMinute = 900, EndMinute = 960, IsAvailable = true },
+            new() { Date = new(2026, 10, 26), StartMinute = 1200, EndMinute = 1260, IsAvailable = true, OverridesWeeklyAvailability = true },
+            new() { Date = new(2026, 10, 26), StartMinute = 1215, EndMinute = 1230, IsAvailable = false }] };
+        var minutes = SandboxOracle.FreeMinutes(state, new(2026, 10, 26));
+        Assert.False(minutes[900]); Assert.False(minutes[1140]); Assert.True(minutes[1200]); Assert.False(minutes[1215]);
+        Assert.True(minutes[1230]); Assert.False(minutes[1260]); Assert.Equal(45, minutes.Count(x => x));
     }
 
     [Fact] public void A_read_only_result_that_changed_the_database_fails_even_if_the_reply_says_nothing_changed()
@@ -85,6 +97,15 @@ public sealed class NoraSandboxTests
         throw new InvalidOperationException("Cannot locate test repository.");
     }
 
+    [Theory] [InlineData("WORK", true)] [InlineData("OTHER", false)]
+    public void Event_category_expectations_detect_a_work_shift_saved_as_other(string category, bool valid)
+    {
+        var before = State(); var start = Now.AddHours(4); var end = start.AddHours(4);
+        var after = before with { Events = [new() { Name = "Đi làm", Start = start, End = end, EventType = category }] };
+        var checks = SandboxOracle.Evaluate(new() { Events = [new("Đi làm", start.ToString("O"), end.ToString("O"), "WORK")] }, Result(), null, before, after, Now);
+        Assert.Equal(valid, checks.All(x => x.Passed));
+    }
+
     [Fact] public async Task Offline_runner_exercises_real_service_actions_exports_evidence_and_obeys_the_call_cap()
     {
         var directory = Directory.CreateTempSubdirectory("nora-sandbox-test-").FullName;
@@ -99,6 +120,8 @@ public sealed class NoraSandboxTests
             Assert.Equal("Offline", json.RootElement.GetProperty("mode").GetString());
             Assert.Contains("Saved work sessions", await File.ReadAllTextAsync(Path.Combine(directory, "report.md"), TestContext.Current.CancellationToken));
             Assert.Contains("actualChanges", await File.ReadAllTextAsync(Path.Combine(directory, "turns.csv"), TestContext.Current.CancellationToken));
+            Assert.Contains("verifiedOutcome", await File.ReadAllTextAsync(Path.Combine(directory, "turns.csv"), TestContext.Current.CancellationToken));
+            Assert.Contains("Verified outcome", await File.ReadAllTextAsync(Path.Combine(directory, "report.md"), TestContext.Current.CancellationToken));
             var rejected = report.Cases.Single(x => x.Id == "H03").Turns[1];
             Assert.Equal("AGENT_REQUEST_REUSED", rejected.ErrorCode);
             Assert.Null(rejected.Result);
