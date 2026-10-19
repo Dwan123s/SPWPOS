@@ -6,7 +6,7 @@ using SPWPOS.Domain.Entities;
 using SPWPOS.TestSupport;
 namespace SPWPOS.UnitTests;
 
-public sealed class PlanningAgentTests
+public sealed partial class PlanningAgentTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     private static readonly Guid Conversation = Guid.NewGuid();

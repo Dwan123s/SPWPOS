@@ -39,6 +39,7 @@ public sealed partial class WorkspaceService
         Task Phase(string stage, string message) => publish?.Invoke(new("phase", stage, message), ct) ?? Task.CompletedTask;
         Require(input.ConversationId != Guid.Empty && input.RequestId != Guid.Empty && !string.IsNullOrWhiteSpace(input.Text) && input.Text.Length <= 2000,
             "VALIDATION_ERROR", "Nhập yêu cầu tối đa 2000 ký tự và mã hội thoại hợp lệ.");
+        var autoApply = input.AutoApply && !PreviewOnly(input.Text);
         await Phase("READING", "Đang đọc lịch và giờ rảnh của bạn");
         // Reserve the idempotency key before calling AI, then release the account lock.
         var reserved = await Mutate(uid, async () =>
@@ -74,7 +75,7 @@ public sealed partial class WorkspaceService
         if (!reserved.Process)
         {
             var saved = TurnView(reserved.Turn);
-            return input.AutoApply && saved.Status == "PREVIEW" ? await ApplyAgentTurnAsync(uid, saved.Id, ct) : saved;
+            return autoApply && saved.Status == "PREVIEW" ? await ApplyAgentTurnAsync(uid, saved.Id, ct) : saved;
         }
         var turnId = reserved.Turn.Id;
         try
@@ -84,7 +85,9 @@ public sealed partial class WorkspaceService
             var state = await State(uid, ct); var revision = state.Preference.Revision;
             var historyRows = await Mine<AgentTurn>(uid).AsNoTracking().Where(x => x.ConversationId == input.ConversationId && x.Id != turnId &&
                 x.Status != "PROCESSING" && x.Status != "DELETED").OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(8).ToArrayAsync(ct);
-            var history = historyRows.Reverse().Select(x => new AgentMessage(x.Text, TurnView(x).Reply + " " + TurnView(x).Question, x.Status)).ToArray();
+            var history = historyRows.Reverse().Select(x => new AgentMessage(x.Text,
+                x.Status == "FAILED" ? "Yêu cầu thất bại; chưa lưu thay đổi từ yêu cầu này. Kiểm tra dữ liệu hiện tại trước khi trả lời."
+                    : TurnView(x).Reply + " " + TurnView(x).Question, x.Status)).ToArray();
             var latest = historyRows.FirstOrDefault();
             var pending = latest?.Status == "NEEDS_INPUT" && latest.CommandJson.Length > 0
                 ? JsonSerializer.Deserialize<AgentIntent>(latest.CommandJson, AgentJson)?.Pending : null;
@@ -105,6 +108,7 @@ public sealed partial class WorkspaceService
                 Require(current.Preference.Revision == revision, "AGENT_STALE", "Lịch vừa thay đổi trong khi AI xử lý. Hãy thử lại với dữ liệu mới.", 409);
                 ValidateIntent(intent, true);
                 intent = NormalizeAgentIntent(intent, input.Text, current, pending);
+                intent = GroundAgentDates(intent, input.Text, current.Preference, Now);
                 ValidateIntent(intent);
                 turn.ExpectedRevision = revision; turn.CommandJson = JsonSerializer.Serialize(intent, AgentJson); turn.ExpiresAt = Now.AddMinutes(30);
                 if (intent.Question.Length > 0)
@@ -145,18 +149,17 @@ public sealed partial class WorkspaceService
                 }
                 turn.ChangesJson = JsonSerializer.Serialize(changes, AgentJson);
                 var blockedDetail = warnings.Length > 0 ? $" ({string.Join("; ", warnings)})" : "";
-                var replyMessage = hasChanges
-                    ? (blocked
-                        ? $"Chưa thể lưu toàn bộ yêu cầu vì lịch chưa khả thi{blockedDetail}. Gợi ý: bạn có thể mở thêm giờ rảnh, nới lỏng deadline hoặc chia nhỏ công việc."
-                        : "Đã kiểm tra yêu cầu. Các thay đổi bên dưới đang chờ áp dụng.")
+                var replyMessage = blocked
+                    ? $"Chưa thể lưu toàn bộ yêu cầu vì lịch chưa khả thi{blockedDetail}. Lịch chưa thay đổi. Bạn muốn điều chỉnh điều kiện nào?"
+                    : hasChanges ? "Đã kiểm tra yêu cầu. Các thay đổi bên dưới đang chờ áp dụng."
                     : affected.Length > 0 || intent.Events.Length > 0 || intent.Tasks.Length > 0 || intent.Exceptions.Length > 0 || intent.ReplaceWeeklyAvailability
                         ? "Lịch hiện tại đã đúng với yêu cầu; không có thay đổi cần lưu."
-                        : GroundedReadOnlyReply(intent, input.Text, current, history);
+                        : ScopedReadOnlyReply(intent, input.Text, current, history, contextNotices);
                 return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text,
                     replyMessage,
-                    hasChanges ? (blocked ? "BLOCKED" : "PREVIEW") : "ANSWERED", "", hasChanges ? plan : null, summary, warnings.Concat(contextNotices).ToArray(), turn.CreatedAt));
+                    blocked ? "BLOCKED" : hasChanges ? "PREVIEW" : "ANSWERED", "", hasChanges || blocked ? plan : null, summary, warnings.Concat(contextNotices).ToArray(), turn.CreatedAt));
             }, ct, false);
-            if (input.AutoApply && view.Status == "PREVIEW")
+            if (autoApply && view.Status == "PREVIEW")
             {
                 await Phase("SAVING", "Đang lưu lịch đã kiểm tra");
                 return await ApplyAgentTurnAsync(uid, view.Id, ct);
@@ -195,9 +198,8 @@ public sealed partial class WorkspaceService
         Require(intent.Tasks.All(x => x is not null) && intent.Events.All(x => x is not null) && intent.Exceptions.All(x => x is not null) && intent.WeeklySlots.All(x => x is not null),
             "AGENT_INVALID_INTENT", "AI trả danh sách thay đổi chưa hợp lệ; lịch chưa thay đổi.", 503);
         if (shapeOnly) return;
-        var kind = intent.Question.Length > 0 ? "CLARIFICATION" : intent.ReplaceWeeklyAvailability || intent.Exceptions.Length > 0 || intent.Events.Length > 0 || intent.Tasks.Length > 0 || intent.ScheduleTaskIds.Length > 0 || intent.Reschedule ? "MUTATION" : "ANSWER";
+        var kind = intent.Question.Length > 0 ? "CLARIFICATION" : HasAgentActions(intent) ? "MUTATION" : "ANSWER";
         Require(intent.ResultKind is null || intent.ResultKind == kind, "AGENT_INVALID_INTENT", "Trạng thái câu trả lời không khớp với yêu cầu thay đổi; lịch chưa thay đổi.", 503);
-        Require(intent.ReplaceWeeklyAvailability || intent.WeeklySlots.Length == 0, "AGENT_INVALID_INTENT", "Yêu cầu lịch tuần chưa xác định cách cập nhật.", 503);
         Require(intent.Question.Length == 0 || !intent.ReplaceWeeklyAvailability && intent.WeeklySlots.Length == 0 && intent.Exceptions.Length == 0 && intent.Events.Length == 0 && intent.Tasks.Length == 0 && intent.ScheduleTaskIds.Length == 0 && !intent.Reschedule,
             "AGENT_INVALID_INTENT", "Yêu cầu cần làm rõ không được kèm thay đổi dữ liệu.", 503);
     }
@@ -206,7 +208,7 @@ public sealed partial class WorkspaceService
     {
         var summary = new List<AgentChangeView>();
         WeeklyAvailability[]? weekly = null;
-        if (intent.ReplaceWeeklyAvailability)
+        if (intent.ReplaceWeeklyAvailability || intent.WeeklySlots.Length > 0)
         {
             foreach (var slot in intent.WeeklySlots) { Require(slot is not null && slot.DayOfWeek is >= 0 and <= 6, "VALIDATION_ERROR", "Ngày trong tuần không hợp lệ."); Window(slot.StartMinute, slot.EndMinute); }
             foreach (var group in intent.WeeklySlots.GroupBy(x => x.DayOfWeek))
@@ -215,12 +217,14 @@ public sealed partial class WorkspaceService
                 Require(!ordered.Zip(ordered.Skip(1)).Any(x => x.First.EndMinute > x.Second.StartMinute), "AVAILABILITY_OVERLAP", "Các khoảng rảnh hàng tuần trùng nhau.");
             }
             weekly = intent.WeeklySlots.Select(x => new WeeklyAvailability { UserId = uid, DayOfWeek = x.DayOfWeek, StartMinute = x.StartMinute, EndMinute = x.EndMinute }).ToArray();
+            if (!intent.ReplaceWeeklyAvailability)
+                weekly = weekly.Concat(state.Availability.Where(x => !intent.WeeklySlots.Any(slot => slot.DayOfWeek == x.DayOfWeek)).Select(Copy)).ToArray();
             static string WeeklyText(IEnumerable<WeeklyAvailability> slots) => string.Join("; ", slots.OrderBy(x => x.DayOfWeek).ThenBy(x => x.StartMinute)
                 .Select(x => $"{(x.DayOfWeek == 0 ? "Chủ nhật" : "Thứ " + (x.DayOfWeek + 1))} {x.StartMinute / 60:00}:{x.StartMinute % 60:00}–{x.EndMinute / 60:00}:{x.EndMinute % 60:00}"));
             summary.Add(new("AVAILABILITY", "Lịch rảnh hàng tuần", WeeklyText(state.Availability), WeeklyText(weekly)));
             if (WeeklyText(state.Availability) == WeeklyText(weekly)) { weekly = null; summary.RemoveAt(summary.Count - 1); }
         }
-        var exceptions = new List<AvailabilityException>();
+        var exceptions = new List<AvailabilityException>(); var editedExceptionIds = new HashSet<Guid>();
         foreach (var item in intent.Exceptions)
         {
             Require(item is not null && item.Note is not null && item.Note.Length <= 300,
@@ -230,7 +234,7 @@ public sealed partial class WorkspaceService
             Window(item.StartMinute, item.EndMinute);
             var original = item.ExistingId is { } existingId ? state.Exceptions.SingleOrDefault(x => x.Id == existingId) : null;
             Require(item.ExistingId is null || original is not null, "NOT_FOUND", "Ngoại lệ không thuộc tài khoản.", 404);
-            Require(item.ExistingId is null || !exceptions.Any(x => x.Id == item.ExistingId), "VALIDATION_ERROR", "Ngoại lệ bị chỉnh sửa nhiều lần trong cùng yêu cầu.");
+            Require(item.ExistingId is null || editedExceptionIds.Add(item.ExistingId.Value), "VALIDATION_ERROR", "Ngoại lệ bị chỉnh sửa nhiều lần trong cùng yêu cầu.");
             if (item.ExistingId is null && state.Exceptions.Concat(exceptions).Any(x => x.Date == item.Date && x.StartMinute == item.StartMinute && x.EndMinute == item.EndMinute && x.IsAvailable == item.IsAvailable && x.Note == item.Note)) continue;
             var change = new AvailabilityException { Id = item.ExistingId ?? Guid.NewGuid(), UserId = uid, Date = item.Date, StartMinute = item.StartMinute, EndMinute = item.EndMinute, IsAvailable = item.IsAvailable, Note = item.Note };
             change.OverridesWeeklyAvailability = item.IsAvailable && (original?.OverridesWeeklyAvailability == true ||
@@ -247,7 +251,7 @@ public sealed partial class WorkspaceService
         {
             summary.Add(new("EXCEPTION", "Thay thế khung rảnh cũ", $"{previous.Date:yyyy-MM-dd} {previous.StartMinute / 60:00}:{previous.StartMinute % 60:00}–{previous.EndMinute / 60:00}:{previous.EndMinute % 60:00}", "Chỉ sử dụng khung giờ mới trong ngày này."));
         }
-        var events = new List<FixedEvent>();
+        var events = new List<FixedEvent>(); var editedEventIds = new HashSet<Guid>();
         foreach (var item in intent.Events)
         {
             Require(item is not null, "VALIDATION_ERROR", "Sự kiện không hợp lệ.");
@@ -255,7 +259,7 @@ public sealed partial class WorkspaceService
             Require(item.Start <= Now.AddDays(30), "VALIDATION_ERROR", "Sự kiện mới chỉ được lên lịch trong vòng 30 ngày tới.");
             var original = item.ExistingId is { } existingId ? state.Events.SingleOrDefault(x => x.Id == existingId) : null;
             Require(item.ExistingId is null || original is not null, "NOT_FOUND", "Sự kiện không thuộc tài khoản.", 404);
-            Require(item.ExistingId is null || original!.Start > Now && item.RepeatWeeks == 1 && !events.Any(x => x.Id == item.ExistingId), "VALIDATION_ERROR", "Chỉ sửa một lần xuất hiện chưa bắt đầu.");
+            Require(item.ExistingId is null || original!.Start > Now && item.RepeatWeeks == 1 && editedEventIds.Add(item.ExistingId.Value), "VALIDATION_ERROR", "Chỉ sửa một lần xuất hiện chưa bắt đầu.");
             var occurrences = EventOccurrences(uid, new(item.Name, item.Start, item.End, item.Description, item.EventType, item.RepeatWeeks), state.Preference);
             if (item.ExistingId is null && occurrences.All(occurrence => state.Events.Any(x => x.Name == occurrence.Name && x.Start == occurrence.Start && x.End == occurrence.End && x.Description == occurrence.Description && x.EventType == occurrence.EventType))) continue;
             if (item.ExistingId is { } occurrenceId) occurrences[0].Id = occurrenceId;
@@ -264,11 +268,11 @@ public sealed partial class WorkspaceService
             events.AddRange(occurrences);
             foreach (var occurrence in occurrences) summary.Add(new("EVENT", occurrence.Name, original is null ? "" : LocalWindow(original.Start, original.End, state.Preference), LocalWindow(occurrence.Start, occurrence.End, state.Preference)));
         }
-        var taskChanges = new List<WorkTask>(); var affected = intent.ScheduleTaskIds.ToHashSet();
+        var taskChanges = new List<WorkTask>(); var affected = intent.ScheduleTaskIds.ToHashSet(); var editedTaskIds = new HashSet<Guid>();
         Require(affected.All(id => state.Tasks.Any(x => x.Id == id && x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled)), "NOT_FOUND", "Công việc không thuộc tài khoản hoặc đã kết thúc.", 404);
         foreach (var item in intent.Tasks)
         {
-            Require(item is not null && item.Name is not null && item.TaskType is not null && !taskChanges.Any(x => item.TaskId == x.Id), "VALIDATION_ERROR", "Công việc bị lặp hoặc không hợp lệ.");
+            Require(item is not null && item.Name is not null && item.TaskType is not null && (item.TaskId is null || editedTaskIds.Add(item.TaskId.Value)), "VALIDATION_ERROR", "Công việc bị lặp hoặc không hợp lệ.");
             WorkTask task;
             if (item.TaskId is { } id)
             {
@@ -302,6 +306,8 @@ public sealed partial class WorkspaceService
             "TASK_LIMIT", "Tối đa 500 công việc đang hoạt động.");
         var candidate = state with { Availability = weekly ?? state.Availability, Exceptions = state.Exceptions.Where(x => !exceptions.Any(e => e.Id == x.Id) && !removedExceptions.Any(e => e.Id == x.Id)).Concat(exceptions).ToArray(),
             Events = state.Events.Where(x => !events.Any(e => e.Id == x.Id)).Concat(events).ToArray(), Tasks = state.Tasks.Where(x => !taskChanges.Any(t => t.Id == x.Id)).Concat(taskChanges).ToArray() };
+        if (weekly is null && exceptions.Count == 0 && removedExceptions.Length == 0 && events.Count == 0 && taskChanges.Count == 0 && affected.Count == 0 && !intent.Reschedule)
+            return (new(null, [], [], []), candidate, [], []);
         ValidateProtectedSessions(candidate);
         foreach (var session in candidate.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && x.IsLocked))
         {

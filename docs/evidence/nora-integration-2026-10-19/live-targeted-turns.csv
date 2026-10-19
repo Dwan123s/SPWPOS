@@ -1,0 +1,22 @@
+caseId,repeat,fixture,status,responseReview,step,operation,resultStatus,errorCode,elapsedMs,actualChanges,failedChecks,prompt,reply,question
+"D14","1","DAYS","FAIL","REVIEW_REQUIRED","1","Send","NEEDS_INPUT","","2208","0","expected-outcome; task-identity:ôn thi","Mình cần 180 phút ôn thi, được chia phiên, hạn chót 22:00 ngày 27/10/2026. Giữ giới hạn phút mỗi ngày, độ dài phiên và giờ nghỉ.","Yêu cầu ôn thi 180 phút với hạn chót 22:00 ngày 27/10/2026 vượt quá giới hạn dung lượng khả dụng trong thời gian yêu cầu (mỗi ngày tối đa 120 phút). Bạn có muốn chia nhỏ thời gian ôn thi ra nhiều ngày hơn hoặc điều chỉnh giới hạn ngày không?","Tổng thời gian ôn thi (180 phút) vượt quá giới hạn 120 phút mỗi ngày trong khoảng thời gian từ nay đến hạn chót. Bạn muốn phân bổ thời gian ôn thi này như thế nào?"
+"D14","2","DAYS","FAIL","REVIEW_REQUIRED","1","Send","NEEDS_INPUT","","2024","0","expected-outcome; task-identity:ôn thi","Mình cần 180 phút ôn thi, được chia phiên, hạn chót 22:00 ngày 27/10/2026. Giữ giới hạn phút mỗi ngày, độ dài phiên và giờ nghỉ.","Tuy nhiên, tổng dung lượng khả dụng trong khoảng thời gian này vượt quá giới hạn 120 phút mỗi ngày của bạn. Bạn có muốn điều chỉnh thời hạn hoặc chia nhỏ khối lượng công việc này ra không?","Tổng thời gian cần ôn thi (180 phút) vượt quá giới hạn khả dụng trong các ngày tới (120 phút/ngày). Bạn muốn xử lý thế nào?"
+"D14","3","DAYS","FAIL","REVIEW_REQUIRED","1","Send","NEEDS_INPUT","","2348","0","expected-outcome; task-identity:ôn thi","Mình cần 180 phút ôn thi, được chia phiên, hạn chót 22:00 ngày 27/10/2026. Giữ giới hạn phút mỗi ngày, độ dài phiên và giờ nghỉ.","Tôi đã tiếp nhận yêu cầu 180 phút ôn thi có hạn chót vào 22:00 ngày 27/10/2026. Tuy nhiên, giới hạn mỗi ngày hiện tại của bạn là 120 phút và tổng dung lượng khả dụng trong 2 ngày (26 và 27 tháng 10) là vừa đủ 240 phút (mỗi ngày 120 phút), nhưng hệ thống cần thời gian nghỉ giữa các phiên nên toàn bộ 180 phút không thể hoàn thành trong giới hạn ngày. Bạn có muốn điều chỉnh giới hạn mỗi ngày lên hoặc chia nhỏ lịch trình dài hơn không?","Giới hạn thời gian tối đa mỗi ngày của bạn hiện là 120 phút, không đủ để hoàn thành 180 phút ôn thi kèm thời gian nghỉ trong khoảng thời gian đến 27/10/2026. Bạn muốn tăng giới hạn mỗi ngày hay kéo dài thời gian hoàn thành?"
+"E08","1","B","ERROR","NOT_EVALUATED","1","Send","REJECTED / ERROR","AGENT_AI_INVALID_RESPONSE","2040","0","expected-outcome; task-count; task-identity:tiếng Anh","Mình muốn ôn tiếng Anh đúng tối thứ Năm 29/10/2026 trong 45 phút, hạn chót 21:00 hôm đó. Không học vào ngày khác.","AI chưa trả về yêu cầu hợp lệ. Hãy thử lại hoặc diễn đạt rõ ngày giờ; lịch chưa thay đổi.",""
+"E08","2","B","PASS","REVIEW_REQUIRED","1","Send","APPLIED","","2945","4","","Mình muốn ôn tiếng Anh đúng tối thứ Năm 29/10/2026 trong 45 phút, hạn chót 21:00 hôm đó. Không học vào ngày khác.","Đã lưu các thay đổi:
+Ôn tiếng Anh: 45 phút · hạn 29/10/2026 21:00 (cứng) · ưu tiên 2 · liên tục · thực hiện 29/10/2026 18:00 → 30/10/2026 00:00
+Phiên làm việc:
+29/10/2026 19:00 → 29/10/2026 19:45",""
+"E08","3","B","PASS","REVIEW_REQUIRED","1","Send","APPLIED","","1863","4","","Mình muốn ôn tiếng Anh đúng tối thứ Năm 29/10/2026 trong 45 phút, hạn chót 21:00 hôm đó. Không học vào ngày khác.","Đã lưu các thay đổi:
+Ôn tiếng Anh: 45 phút · hạn 29/10/2026 21:00 (cứng) · ưu tiên 2 · liên tục · thực hiện 29/10/2026 18:00 → 30/10/2026 00:00
+Phiên làm việc:
+29/10/2026 19:00 → 29/10/2026 19:45",""
+"G02","1","B","PASS","REVIEW_REQUIRED","1","Send","APPLIED","","1713","2","","Thứ Hai tuần sau mình họp 18:00–19:00, chỉ một buổi. Thêm giúp mình.","Đã lưu các thay đổi:
+Họp: 02/11/2026 18:00 → 02/11/2026 19:00
+Không có phiên làm việc cần chuyển.",""
+"G02","2","B","PASS","REVIEW_REQUIRED","1","Send","APPLIED","","1787","2","","Thứ Hai tuần sau mình họp 18:00–19:00, chỉ một buổi. Thêm giúp mình.","Đã lưu các thay đổi:
+Họp: 02/11/2026 18:00 → 02/11/2026 19:00
+Không có phiên làm việc cần chuyển.",""
+"G02","3","B","PASS","REVIEW_REQUIRED","1","Send","APPLIED","","1610","2","","Thứ Hai tuần sau mình họp 18:00–19:00, chỉ một buổi. Thêm giúp mình.","Đã lưu các thay đổi:
+Họp: 02/11/2026 18:00 → 02/11/2026 19:00
+Không có phiên làm việc cần chuyển.",""

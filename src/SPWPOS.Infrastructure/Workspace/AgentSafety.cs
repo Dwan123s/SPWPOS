@@ -26,6 +26,32 @@ public sealed partial class WorkspaceService
         return match.Groups[2].Value == "phut" ? count : count * 60 + (text.Contains("ruoi") ? 30 : 0);
     }
 
+    private static string? GroundDurationQuote(AgentTaskCommand item, string source)
+    {
+        if (SourceQuote(item.DurationEvidence, source) && QuotedMinutes(item.DurationEvidence) == item.EstimatedMinutes)
+            return item.DurationEvidence;
+        // Recover only a literal duration directly attached to this exact task name.
+        // Available hours elsewhere in the request are never task-duration evidence.
+        var matches = Regex.Matches(source, Regex.Escape(item.Name) +
+            @"\s*(?:(?:cần|trong|tổng cộng|khoảng|dự kiến|mất)\s+){0,3}(?<duration>\d{1,4}\s*(?:phút|tiếng|giờ)(?:\s+rưỡi)?)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+        return matches.Cast<Match>().Select(x => x.Groups["duration"].Value)
+            .FirstOrDefault(x => QuotedMinutes(x) == item.EstimatedMinutes);
+    }
+
+    private static bool GroundDeadlineQuote(string quote, string source)
+    {
+        if (!SourceQuote(quote, source)) return false;
+        const string marker = @"\b(truoc|han|deadline|xong|hoan thanh|before|due)\b";
+        if (ChatMatch(quote, marker).Success) return true;
+        // A short verbatim time quote may omit the immediately preceding deadline label.
+        // Keep the label and quote in the same clause; do not borrow one across punctuation.
+        for (var index = source.IndexOf(quote, StringComparison.OrdinalIgnoreCase); index >= 0;
+            index = source.IndexOf(quote, index + quote.Length, StringComparison.OrdinalIgnoreCase))
+            if (ChatMatch(source[..index], marker + @"[^.!?;,\r\n]{0,80}$").Success) return true;
+        return false;
+    }
+
     private TimeSlot? RequestedWorkWindow(string text, WorkPreference preference, DateTimeOffset? reference = null)
     {
         var period = ChatMatch(text, @"\b(toi|sang|chieu)\s+(?:thu\b|ngay\b|\d|mai\b|hom\b|do\b)");
@@ -75,7 +101,7 @@ public sealed partial class WorkspaceService
         var first = intent.Tasks.FirstOrDefault();
         AgentIntent Ask(string question, string[]? options = null) => intent with
         {
-            Reply = "Mình cần xác nhận thêm trước khi thay đổi lịch.", Question = question, Options = options ?? [],
+            Reply = ClarificationReply(intent.Reply), Question = question, Options = options ?? [],
             ResultKind = "CLARIFICATION",
             ReplaceWeeklyAvailability = false, WeeklySlots = [], Exceptions = [], Events = [], Tasks = [], ScheduleTaskIds = [], Reschedule = false,
             Pending = new(pending?.OriginalText ?? request, first?.TaskId ?? pending?.TaskId,
@@ -94,14 +120,17 @@ public sealed partial class WorkspaceService
             var original = item.TaskId is { } id ? state.Tasks.SingleOrDefault(x => x.Id == id) : null;
             var task = item;
             if (item.TaskId is null && (item.EstimatedMinutes is null || item.Deadline is null && window is null))
-                return Ask(item.EstimatedMinutes is null ? "Bạn muốn dành bao nhiêu phút cho công việc này?" : "Bạn cần hoàn thành công việc trước ngày, giờ nào?");
+                return Ask(item.EstimatedMinutes is null ? $"Bạn bổ sung thời lượng (phút) cho “{item.Name}” nhé?" : $"Bạn bổ sung hạn hoàn thành (ngày, giờ) cho “{item.Name}” nhé?");
             // Non-null evidence is required by the live provider schema. Null is
             // reserved for older persisted commands/adapters, not a model escape.
-            if (item.DurationEvidence is not null && item.EstimatedMinutes is not null &&
-                (!SourceQuote(item.DurationEvidence, source) || QuotedMinutes(item.DurationEvidence) != item.EstimatedMinutes))
-                return Ask("Bạn muốn dành bao nhiêu phút cho công việc này? Mình chưa lưu thời lượng chưa được xác nhận.");
+            if (item.DurationEvidence is not null && item.EstimatedMinutes is not null)
+            {
+                var duration = GroundDurationQuote(item, source);
+                if (duration is null) return Ask("Bạn muốn dành bao nhiêu phút cho công việc này? Mình chưa lưu thời lượng chưa được xác nhận.");
+                task = task with { DurationEvidence = duration };
+            }
             if (item.DeadlineEvidence is not null && item.Deadline is not null &&
-                (!SourceQuote(item.DeadlineEvidence, source) || !ChatMatch(item.DeadlineEvidence, @"\b(truoc|han|deadline|xong|hoan thanh|before|due)\b").Success))
+                !GroundDeadlineQuote(item.DeadlineEvidence, source))
                 return Ask("Bạn cần hoàn thành công việc trước ngày, giờ nào? Ngày thực hiện và deadline được giữ riêng.");
             if (window is not null)
             {
@@ -132,6 +161,13 @@ public sealed partial class WorkspaceService
             tasks.Add(task);
         }
         return intent with { Tasks = tasks.ToArray(), Pending = null };
+    }
+
+    private string ScopedReadOnlyReply(AgentIntent intent, string request, PlanningState state, AgentMessage[] history, string[] notices)
+    {
+        if (notices.Length > 0 && RequestMatches(MatchText(request), @"\b(?:toan bo|tat ca|all)\b").Count > 0)
+            return string.Join(" ", notices) + " Chưa đủ dữ liệu để kết luận cho toàn bộ công việc. Hãy nêu tên công việc hoặc thu hẹp phạm vi cần kiểm tra.";
+        return GroundedReadOnlyReply(intent, request, state, history);
     }
 
     private string GroundedReadOnlyReply(AgentIntent intent, string request, PlanningState state, AgentMessage[] history)
