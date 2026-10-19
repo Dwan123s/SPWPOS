@@ -148,13 +148,17 @@ if (args.Contains("--check-schema", StringComparer.Ordinal))
     await app.DisposeAsync();
     return;
 }
-if (args.Contains("--check-ai", StringComparer.Ordinal) || args.Contains("--check-ai-stream", StringComparer.Ordinal) || args.Contains("--check-ai-voice", StringComparer.Ordinal))
+if (args.Contains("--check-ai", StringComparer.Ordinal) || args.Contains("--check-ai-stream", StringComparer.Ordinal) || args.Contains("--check-ai-voice", StringComparer.Ordinal) || args.Contains("--check-ai-quality", StringComparer.Ordinal))
 {
     try
     {
         using var checkScope = app.Services.CreateScope();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(75));
-        if (args.Contains("--check-ai-voice", StringComparer.Ordinal))
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(args.Contains("--check-ai-quality", StringComparer.Ordinal) ? 120 : 75));
+        if (args.Contains("--check-ai-quality", StringComparer.Ordinal))
+            await SPWPOS.Infrastructure.Workspace.LiveAiCheck.RunQualityAsync(
+                checkScope.ServiceProvider.GetRequiredService<SPWPOS.Application.Workspace.ITaskInterpreter>(),
+                checkScope.ServiceProvider.GetRequiredService<TimeProvider>(), timeout.Token);
+        else if (args.Contains("--check-ai-voice", StringComparer.Ordinal))
         {
             var fileIndex = Array.IndexOf(args, "--voice-file");
             if (fileIndex < 0 || fileIndex + 1 >= args.Length) throw new InvalidOperationException("Voice test file is required.");

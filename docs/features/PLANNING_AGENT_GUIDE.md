@@ -27,9 +27,10 @@ Ba gợi ý mẫu chỉ điền và focus ô nhập; không gọi AI hoặc lưu
 - Lượt thất bại được đưa vào tối đa 8 lượt ngữ cảnh gần nhất bằng thông báo cố định rằng yêu cầu chưa lưu; không gửi lại chi tiết lỗi thô. AI phải đối chiếu công việc và phiên thực tế trước khi xác nhận deadline.
 - Câu trả lời không có lệnh thay đổi không chạy kiểm tra/xếp lại các xung đột đã có. Sửa lịch tuần, ngoại lệ, sự kiện hoặc công việc với giá trị không đổi không tạo bản xem trước, thay revision hay cung cấp hoàn tác. Các lệnh sửa lặp cùng ID vẫn bị từ chối.
 - Hướng dẫn AI yêu cầu giữ các điều kiện của lượt trước, hỏi lại giờ sáng/chiều chưa rõ, không tự đặt thời lượng/deadline và không tự nới giờ rảnh hoặc chia yêu cầu liên tục. Các quy tắc diễn giải này vẫn phụ thuộc vào khả năng tuân thủ của model.
-- Công cụ task hiện **chưa hỗ trợ khung thực hiện riêng**, ví dụ “chỉ học tối thứ Năm”. Ngữ cảnh khai báo giới hạn này; AI phải giải thích và hỏi về sự kiện cố định hoặc việc người dùng chấp nhận chỉ ràng buộc deadline, không tự đổi ngày thực hiện thành deadline. Khung thực hiện chưa được bổ sung vào planner/persistence trong thay đổi này.
+- Công việc hỗ trợ **khung thực hiện riêng**, ví dụ “chỉ học tối thứ Năm”. Khung thực hiện được lưu riêng với deadline và được kiểm tra khi lập lịch, sửa phiên hoặc bắt đầu làm việc. Lượt làm rõ phải giữ nguyên ngày/khung giờ đã xác nhận. Khi chỉ có khung thực hiện và chưa có deadline, điểm kết thúc khung chỉ là giới hạn lập lịch, không được coi là deadline cứng do người dùng đặt.
+- Bằng chứng thời lượng/deadline được đối chiếu với nội dung người dùng. Backend có thể lấy lại thời lượng ghi ngay sau đúng tên công việc và nhận ra nhãn deadline đứng ngay trước đoạn giờ được trích; không lấy giờ rảnh làm thời lượng và không lấy ngày thực hiện làm deadline.
 
-Kiểm thử hồi quy dùng phản hồi AI được kiểm soát và database SQLite trong bộ test, không gọi AI thật hoặc thay đổi lịch người dùng. Chúng kiểm chứng guardrail backend; chưa chứng minh độ tuân thủ của model thật. [Báo cáo gốc ngày 18/10](../reviews/NORA_REQUEST_RESPONSE_QUALITY_REPORT_2026-10-18.md) giữ nguyên bằng chứng trước sửa.
+Kiểm thử hồi quy dùng phản hồi AI được kiểm soát và database SQLite. Sandbox có chế độ offline và chế độ gọi AI thật với dữ liệu giả; không thay đổi lịch người dùng. [Kiểm chứng bản tích hợp](../reviews/NORA_GUARDRAILS_INTEGRATION_2026-10-19.md) ghi kết quả riêng với [báo cáo gốc ngày 18/10](../reviews/NORA_REQUEST_RESPONSE_QUALITY_REPORT_2026-10-18.md).
 
 ### Các bước
 
@@ -72,6 +73,8 @@ Chat dùng chung `AiSettings` và TaskInterpreter với ghi chú (VertexAI/Gemin
 Nếu AI chưa cấu hình, lịch sử vẫn đọc được và form vẫn dùng được; nút gửi yêu cầu bị khóa. Lỗi provider không chuyển sang phân tích quy tắc và không thay đổi lịch. Các yêu cầu AI được ghi vào job history; hội thoại có giới hạn 2000 yêu cầu/tài khoản, giao diện tải 100 yêu cầu mới nhất và AI dùng tối đa 8 lượt gần nhất của hội thoại hiện tại.
 
 Migration mới: `20261014132803_AddPlanningAgent`, thêm AgentTurns, MaximumDailyMinutes (480) và AutoReschedule (true). Khởi động lại bằng quy trình development hiện có để build và cập nhật database. Nếu chỉ build source mà chưa chạy migration, API chat chưa dùng được với database cũ.
+
+Khung thực hiện riêng và giờ rảnh duy nhất theo ngày dùng migration `20261018172132_NoraSchedulingConstraints` đã có trên main. Bản tích hợp guardrail không thêm migration mới.
 
 Nội dung yêu cầu, lịch và task cần thiết được gửi đến provider AI. Không gửi email, hồ sơ đăng nhập, token hay credential. Khóa AI chỉ ở server. Kiểm thử dùng provider giả, không gọi AI thật.
 

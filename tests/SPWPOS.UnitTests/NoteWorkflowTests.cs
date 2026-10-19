@@ -151,4 +151,72 @@ public sealed class NoteWorkflowTests
         var error = await Assert.ThrowsAsync<AuthException>(() => Call(h, service => service.ImportNoteAsync(user.Id, note.Id, new(note.Version, old.Tasks), Ct)));
         Assert.Equal("NOTE_AI_REQUIRED", error.Code); Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
     }
+
+    [Fact]
+    public async Task Delete_note_works()
+    {
+        await using var h = await CreateHarnessAsync(); var user = await h.RegisterAsync();
+        var note = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Delete me", "Nội dung"), Ct));
+        await Call(h, async s => { await s.DeleteNoteAsync(user.Id, note.Id, note.Version, Ct); return true; });
+        Assert.Empty(await h.DbAsync(db => db.PlanningNotes.ToArrayAsync(Ct)));
+    }
+
+    [Fact]
+    public async Task Delete_scheduled_note_works()
+    {
+        await using var h = await CreateHarnessAsync(); var user = await h.RegisterAsync();
+        await Call(h, async s => { await s.SetAvailabilityAsync(user.Id,
+            new(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()), Ct); return true; });
+        var note = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Scheduled", "Viết báo cáo 60 phút"), Ct));
+        var result = await Call(h, s => s.ScheduleNoteAsync(user.Id, note.Id, new(note.Version, false, 7), Ct));
+        await Call(h, async s => { await s.DeleteNoteAsync(user.Id, note.Id, result.Note.Version, Ct); return true; });
+        Assert.Empty(await h.DbAsync(db => db.PlanningNotes.ToArrayAsync(Ct)));
+    }
+
+    private sealed class DynamicInterpreter : ITaskInterpreter
+    {
+        public int Count { get; set; } = 1;
+        public NoteAgentCapabilities Capabilities => new(true, Provider: "Gemini");
+        public Task<NoteAnalysis> AnalyzeNoteAsync(string text, bool useAi, string timeZoneId, DateTimeOffset now, CancellationToken ct)
+        {
+            TaskInput[] tasks = Count == 2
+                ? [new("Báo cáo", "", now.AddDays(2), 120, TaskType: "WRITING"), new("Ôn bài", "", now.AddDays(2), 90, TaskType: "STUDY")]
+                : [new("Báo cáo", "", now.AddDays(2), 60, TaskType: "WRITING")];
+            return Task.FromResult(new NoteAnalysis(tasks, "Gemini", [], false));
+        }
+        public Task<TaskSuggestion> CaptureAsync(CaptureInput input, string timeZoneId, DateTimeOffset now, CancellationToken ct) => throw new NotSupportedException();
+        public Task<BreakdownView> BreakdownAsync(TaskInput input, bool useAi, CancellationToken ct) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task Converted_note_can_be_edited_and_rescheduled_to_sync_calendar()
+    {
+        var interpreter = new DynamicInterpreter { Count = 1 };
+        await using var h = await ServiceHarness.CreateAsync(services => services.AddSingleton<ITaskInterpreter>(interpreter));
+        var user = await h.RegisterAsync();
+        await Call(h, async s => { await s.SetAvailabilityAsync(user.Id,
+            new(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()), Ct); return true; });
+
+        // 1. Initial note creation and auto-schedule
+        var note = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Lên kế hoạch", "Viết báo cáo 60 phút"), Ct));
+        var firstResult = await Call(h, s => s.ScheduleNoteAsync(user.Id, note.Id, new(note.Version, false, 7), Ct));
+        Assert.True(firstResult.Plan.IsApplied);
+        Assert.Single(firstResult.Note.CreatedTaskIds);
+        Assert.Single(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+
+        // 2. User edits the note and saves it
+        interpreter.Count = 2;
+        var edited = await Call(h, s => s.SaveNoteAsync(user.Id, note.Id, new("Kế hoạch cập nhật", "Viết báo cáo và ôn bài", firstResult.Note.Version), Ct));
+        Assert.Null(edited.PlanId);
+        Assert.Equal("Kế hoạch cập nhật", edited.Title);
+
+        // 3. User clicks "Cập nhật công việc & lịch trình"
+        var secondResult = await Call(h, s => s.ScheduleNoteAsync(user.Id, note.Id, new(edited.Version, false, 7), Ct));
+        Assert.True(secondResult.Plan.IsApplied);
+        Assert.Equal(2, secondResult.Note.CreatedTaskIds.Length);
+        Assert.Equal(2, (await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct))).Length);
+        var sessions = await h.DbAsync(db => db.WorkSessions.AsNoTracking().ToArrayAsync(Ct));
+        Assert.Contains(sessions, s => s.TaskId == secondResult.Note.CreatedTaskIds[0]);
+        Assert.Contains(sessions, s => s.TaskId == secondResult.Note.CreatedTaskIds[1]);
+    }
 }

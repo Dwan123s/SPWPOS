@@ -74,6 +74,10 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [NORA guardrail and scheduling test prompts, 19 October / Bộ prompt kiểm thử NORA](reviews/NORA_GUARDRAIL_AND_SCHEDULING_TEST_PACK_2026-10-19.md)
 - [NORA automated sandbox evaluation, 19 October / Kết quả đánh giá sandbox](reviews/NORA_SANDBOX_EVALUATION_2026-10-19.md)
 - [NORA sandbox fixes and verification, 19 October / Bản vá và kiểm chứng](reviews/NORA_SANDBOX_PATCH_VERIFICATION_2026-10-19.md)
+- [NORA guardrails integration, 19 October / Tích hợp guardrail với main](reviews/NORA_GUARDRAILS_INTEGRATION_2026-10-19.md)
+- [Nora UI/UX audit and interaction fixes, 19 October](reviews/NORA_UI_UX_AUDIT_2026-10-19.md)
+- [Nora first-pass screenshot findings, 19 October](reviews/NORA_UI_UX_FIRST_PASS_FINDINGS_2026-10-19.md)
+- [Nora UI/UX team handoff inventory](reviews/NORA_UI_UX_HANDOFF.md)
 - [Notes review, 18 October / Đánh giá phần Ghi chú](reviews/NOTE_REVIEW_2026-10-18.md)
 - [Earlier system review](reviews/SYSTEM_REVIEW.md) · [5 October review](reviews/REVIEW_2026-10-05.md) · [5 October fixes](reviews/FIX_2026-10-05.md)
 

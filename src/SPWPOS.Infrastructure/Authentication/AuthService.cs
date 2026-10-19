@@ -118,10 +118,19 @@ public sealed partial class AuthService(
         {
             await LimitAsync(lockKey, "login", 10, 1, null, ct);
             var user = await FindLoginQuery(identifier, normalizedIdentifier).SingleOrDefaultAsync(ct);
-            if (user is null || !user.IsActive)
+            if (user is null)
             {
                 hasher.VerifyHashedPassword(new ApplicationUser(), timing.DummyHash, request.Password);
                 throw Credentials();
+            }
+            if (!user.IsActive)
+            {
+                var lockLog = await db.AccountStatusLogs.AsNoTracking()
+                    .Where(x => x.UserId == user.Id && x.Action == "LOCK")
+                    .OrderByDescending(x => x.CreatedAt)
+                    .FirstOrDefaultAsync(ct);
+                var reason = !string.IsNullOrWhiteSpace(lockLog?.Reason) ? lockLog.Reason : "Vi phạm quy định của hệ thống";
+                throw new AuthException("ACCOUNT_DISABLED", $"Bạn đã bị khóa tài khoản vì lí do : {reason}", 403);
             }
             if (user.LockoutEnd > clock.GetUtcNow()) throw new AuthException("ACCOUNT_LOCKED", "Account is temporarily locked. Please try again later.", 423);
             if (user.PasswordHash is null)

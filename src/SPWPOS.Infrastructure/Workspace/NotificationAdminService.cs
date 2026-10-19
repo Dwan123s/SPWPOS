@@ -86,7 +86,34 @@ public sealed partial class WorkspaceService
         }
         target!.IsActive = active; target.UpdatedAt = Now; target.SecurityStamp = Guid.NewGuid().ToString();
         Require((reason?.Length ?? 0) <= 500, "VALIDATION_ERROR", "Lý do tối đa 500 ký tự.");
-        db.AccountStatusLogs.Add(new() { UserId = targetId, AdminId = adminId, Action = active ? "UNLOCK" : "LOCK", Reason = reason?.Trim(), CreatedAt = Now });
+        var effectiveReason = string.IsNullOrWhiteSpace(reason) ? (active ? "Mở khóa bởi quản trị viên" : "Vi phạm quy định sử dụng dịch vụ") : reason.Trim();
+        db.AccountStatusLogs.Add(new() { UserId = targetId, AdminId = adminId, Action = active ? "UNLOCK" : "LOCK", Reason = effectiveReason, CreatedAt = Now });
+        if (!active)
+        {
+            db.InAppNotifications.Add(new()
+            {
+                UserId = targetId,
+                Kind = "ACCOUNT_LOCKED",
+                Title = "Tài khoản bị khóa",
+                Message = $"Bạn đã bị khóa tài khoản vì lí do : {effectiveReason}",
+                DedupeKey = $"account-locked:{targetId}:{Now.ToUnixTimeSeconds()}",
+                CreatedAt = Now,
+                ScheduledFor = Now,
+                IsVisible = true
+            });
+            if (!string.IsNullOrWhiteSpace(target.Email) && email is not null)
+            {
+                try
+                {
+                    await email.SendReminderAsync(
+                        target.Email,
+                        "Tài khoản của bạn đã bị khóa",
+                        $"Chào bạn,\n\nTài khoản PLANORA của bạn đã bị khóa bởi quản trị viên vì lí do:\n{effectiveReason}\n\nNếu bạn cho rằng đây là sự nhầm lẫn, vui lòng liên hệ quản trị viên để được hỗ trợ.",
+                        ct);
+                }
+                catch { }
+            }
+        }
         if (active) { target.LockoutEnd = null; target.AccessFailedCount = 0; }
         foreach (var token in await db.RefreshTokens.Where(x => x.UserId == targetId && x.RevokedAt == null).ToArrayAsync(ct)) token.RevokedAt = Now;
         db.SecurityAuditLogs.Add(new() { UserId = targetId, EventType = active ? SPWPOS.Domain.Enums.SecurityEventType.ADMIN_ACCOUNT_UNLOCKED : SPWPOS.Domain.Enums.SecurityEventType.ADMIN_ACCOUNT_LOCKED, CreatedAt = Now, IsSuccessful = true, Metadata = "administrator=" + adminId });

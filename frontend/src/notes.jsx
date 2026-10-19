@@ -259,7 +259,7 @@ export function NotesPage({ onWorkspaceChanged }) {
           Number(horizonDays) > 30
         )
           throw new Error("Chọn phạm vi xếp lịch từ 1 đến 30 ngày.");
-        const saved = imported ? note : await save();
+        const saved = await save();
         try {
           const result = await api(`/api/notes/${saved.id}/schedule`, "POST", {
             version: saved.version,
@@ -543,8 +543,9 @@ export function NotesPage({ onWorkspaceChanged }) {
         </>
       }
       onDelete={(target = note) => {
-        if (busy || !target.id) return;
-        const saved = notes.find((item) => item.id === target.id) || target;
+        const currentTarget = target?.id ? target : note;
+        if (busy || !currentTarget?.id) return;
+        const saved = notes.find((item) => item.id === currentTarget.id) || currentTarget;
         if (
           !window.confirm(
             `Xóa ghi chú “${saved.title}”?\n${saved.id === note.id && dirty ? "Các thay đổi chưa lưu trong ghi chú này cũng sẽ bị xóa.\n" : ""}Các công việc và lịch đã tạo vẫn được giữ.`,
@@ -552,8 +553,9 @@ export function NotesPage({ onWorkspaceChanged }) {
         )
           return;
         run("Đang xóa ghi chú…", async () => {
+          const versionParam = saved.version ? `?version=${encodeURIComponent(saved.version)}` : "";
           await api(
-            `/api/notes/${saved.id}?version=${encodeURIComponent(saved.version)}`,
+            `/api/notes/${saved.id}${versionParam}`,
             "DELETE",
           );
           if (!alive.current) return;

@@ -1,5 +1,6 @@
 using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using SPWPOS.Application.Authentication;
 using SPWPOS.Application.Authentication.DTOs;
 using SPWPOS.Domain.Entities;
@@ -27,6 +28,7 @@ public sealed partial class AuthService
                 // Never attach Google to an unverified registration with a potentially attacker-chosen password.
                 if (!existing.EmailConfirmed)
                     throw new AuthException("GOOGLE_ACCOUNT_UNVERIFIED", "Email này đã đăng ký nhưng chưa xác minh. Hãy xác minh email của tài khoản trước khi đăng nhập Google.", 409);
+                await EnsureActiveAsync(existing, ct);
                 EnsureAvailable(existing);
                 if (existing.LockoutEnd > clock.GetUtcNow()) throw new AuthException("ACCOUNT_LOCKED", "Tài khoản đang tạm khóa.", 423);
                 var logins = await users.GetLoginsAsync(existing);
@@ -78,6 +80,7 @@ public sealed partial class AuthService
     }
     private async Task<TokenResponse> CompleteGoogleLoginAsync(ApplicationUser user, RequestContext context, CancellationToken ct)
     {
+        await EnsureActiveAsync(user, ct);
         EnsureAvailable(user);
         if (user.LockoutEnd > clock.GetUtcNow()) throw new AuthException("ACCOUNT_LOCKED", "Tài khoản đang tạm khóa.", 423);
         user.AccessFailedCount = 0; user.LockoutEnd = null;
@@ -94,5 +97,17 @@ public sealed partial class AuthService
             identity.Email.Length > 254 || !MailAddress.TryCreate(identity.Email.Trim(), out var address) ||
             !string.Equals(address.Address, identity.Email.Trim(), StringComparison.OrdinalIgnoreCase))
             throw new AuthException("GOOGLE_IDENTITY_INVALID", "Cần tài khoản Google có email đã xác minh.", 401);
+    }
+    private async Task EnsureActiveAsync(ApplicationUser user, CancellationToken ct)
+    {
+        if (!user.IsActive)
+        {
+            var lockLog = await db.AccountStatusLogs.AsNoTracking()
+                .Where(x => x.UserId == user.Id && x.Action == "LOCK")
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+            var reason = !string.IsNullOrWhiteSpace(lockLog?.Reason) ? lockLog.Reason : "Vi phạm quy định của hệ thống";
+            throw new AuthException("ACCOUNT_DISABLED", $"Bạn đã bị khóa tài khoản vì lí do : {reason}", 403);
+        }
     }
 }

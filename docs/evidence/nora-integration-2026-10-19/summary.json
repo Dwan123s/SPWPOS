@@ -1,0 +1,2417 @@
+[
+  {
+    "run": "integrated-offline-final-2026-10-19",
+    "schemaVersion": "1.1",
+    "mode": "Offline",
+    "startedAt": "2026-10-19T07:18:19.42919+07:00",
+    "finishedAt": "2026-10-19T07:18:34.2776814+07:00",
+    "provider": "Scripted",
+    "model": null,
+    "callsUsed": 93,
+    "runtimeSha256": {
+      "SPWPOS.TestSupport.dll": "6C9A4A82C4ACDA543CD841FA9F589AE27F392DAAC3F51687A116036FA59D44FC",
+      "SPWPOS.Infrastructure.dll": "23BD7CC6C32358C8DEFA06E8D2ECA7F981401A3FB55885FB051DB13916FB63C7",
+      "SPWPOS.Application.dll": "FD4139BCE7EEFA295BEEFE2920C2D374A284071871716008FD8575FA40142A94",
+      "catalog.json": "E77D3785BAC14E4EC7860E04EC81958BB7C630621246CD8BFA025DE2CB56876D"
+    },
+    "counts": [
+      {
+        "status": "NOT_RUN",
+        "count": 6
+      },
+      {
+        "status": "PASS",
+        "count": 80
+      }
+    ],
+    "outcomes": [
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A07",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A08",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B07",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B08",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B09",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C07",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C08",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C09",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C10",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D07",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D08",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "LOCKED_SESSION_CONFLICT"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D09",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "LOCKED_SESSION_CONFLICT"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D10",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D11",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "FIXED_EVENT_OVERLAP"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D12",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D13",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D14",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E07",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E08",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E09",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "NOT_FOUND"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "INVALID_TASK_TYPE"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F07",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F08",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "VALIDATION_ERROR"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "VALIDATION_ERROR"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "AGENT_AI_TIMEOUT"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "AGENT_REQUEST_REUSED"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "H04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "AGENT_STALE"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H05",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "AGENT_PREVIEW_EXPIRED"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H06",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H07",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "AGENT_UNDO_STALE"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H08",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "INVALID_TASK_TYPE"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H09",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H10",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "H11",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H12",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "V01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "V02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "V03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "V04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      }
+    ]
+  },
+  {
+    "run": "integrated-live-grounded-2026-10-19",
+    "schemaVersion": "1.1",
+    "mode": "Live",
+    "startedAt": "2026-10-19T07:11:01.4473233+07:00",
+    "finishedAt": "2026-10-19T07:13:47.5906447+07:00",
+    "provider": "VertexAI",
+    "model": "gemini-3.5-flash-lite",
+    "callsUsed": 93,
+    "runtimeSha256": {
+      "SPWPOS.TestSupport.dll": "0F3A9D2F48EFF5650CADDE12B51A59F4748397E196092526C06E01F4B039442A",
+      "SPWPOS.Infrastructure.dll": "D7C2241A0D46973B407025A1FEE2F993468BBE32D5804F2CD9E119516FCBF885",
+      "SPWPOS.Application.dll": "FD4139BCE7EEFA295BEEFE2920C2D374A284071871716008FD8575FA40142A94",
+      "catalog.json": "E77D3785BAC14E4EC7860E04EC81958BB7C630621246CD8BFA025DE2CB56876D"
+    },
+    "counts": [
+      {
+        "status": "ERROR",
+        "count": 1
+      },
+      {
+        "status": "FAIL",
+        "count": 2
+      },
+      {
+        "status": "NOT_RUN",
+        "count": 6
+      },
+      {
+        "status": "PASS",
+        "count": 77
+      }
+    ],
+    "outcomes": [
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A04",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A07",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "A08",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B04",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B07",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B08",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "B09",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C04",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C07",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C08",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C09",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "C10",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D04",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D07",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D08",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "LOCKED_SESSION_CONFLICT"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D09",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "LOCKED_SESSION_CONFLICT"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D10",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D11",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "FIXED_EVENT_OVERLAP"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D12",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "D13",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "FAIL",
+        "id": "D14",
+        "failedChecks": [
+          {
+            "name": "expected-outcome",
+            "detail": "Expected APPLIED; actual NEEDS_INPUT."
+          },
+          {
+            "name": "task-identity:ôn thi",
+            "detail": "Expected one task matching ôn thi; actual 0."
+          }
+        ],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E04",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E07",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "AGENT_AI_INVALID_RESPONSE"
+        ],
+        "repeat": 1,
+        "status": "ERROR",
+        "id": "E08",
+        "failedChecks": [
+          {
+            "name": "expected-outcome",
+            "detail": "Expected APPLIED; actual AGENT_AI_INVALID_RESPONSE."
+          },
+          {
+            "name": "task-count",
+            "detail": "Expected 1; actual 0."
+          },
+          {
+            "name": "task-identity:tiếng Anh",
+            "detail": "Expected one task matching tiếng Anh; actual 0."
+          }
+        ],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "E09",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F04",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F07",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "VALIDATION_ERROR"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "F08",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "FAIL",
+        "id": "G02",
+        "failedChecks": [
+          {
+            "name": "expected-outcome",
+            "detail": "Expected APPLIED; actual NEEDS_INPUT."
+          },
+          {
+            "name": "event-count",
+            "detail": "Expected 1; actual 0."
+          },
+          {
+            "name": "exact-event:họp",
+            "detail": "Expected 2026-11-02T18:00:00+07:00 -> 2026-11-02T19:00:00+07:00."
+          }
+        ],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "VALIDATION_ERROR"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "AGENT_INVALID_INTENT"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G04",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S04",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "AGENT_AI_TIMEOUT"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "S06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H01",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "AGENT_REQUEST_REUSED"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H03",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "H04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [
+          "AGENT_STALE"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H05",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "AGENT_PREVIEW_EXPIRED"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H06",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H07",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "AGENT_UNDO_STALE"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H08",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "INVALID_TASK_TYPE"
+        ],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H09",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H10",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "H11",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "H12",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "V01",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "V02",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "V03",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "NOT_RUN",
+        "id": "V04",
+        "failedChecks": [],
+        "responseReview": "NOT_EVALUATED"
+      }
+    ]
+  },
+  {
+    "run": "integrated-context-targeted-2026-10-19",
+    "schemaVersion": "1.1",
+    "mode": "Live",
+    "startedAt": "2026-10-19T07:15:57.88571+07:00",
+    "finishedAt": "2026-10-19T07:16:18.4313472+07:00",
+    "provider": "VertexAI",
+    "model": "gemini-3.5-flash-lite",
+    "callsUsed": 9,
+    "runtimeSha256": {
+      "SPWPOS.TestSupport.dll": "6C9A4A82C4ACDA543CD841FA9F589AE27F392DAAC3F51687A116036FA59D44FC",
+      "SPWPOS.Infrastructure.dll": "23BD7CC6C32358C8DEFA06E8D2ECA7F981401A3FB55885FB051DB13916FB63C7",
+      "SPWPOS.Application.dll": "FD4139BCE7EEFA295BEEFE2920C2D374A284071871716008FD8575FA40142A94",
+      "catalog.json": "E77D3785BAC14E4EC7860E04EC81958BB7C630621246CD8BFA025DE2CB56876D"
+    },
+    "counts": [
+      {
+        "status": "ERROR",
+        "count": 1
+      },
+      {
+        "status": "FAIL",
+        "count": 3
+      },
+      {
+        "status": "PASS",
+        "count": 5
+      }
+    ],
+    "outcomes": [
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "FAIL",
+        "id": "D14",
+        "failedChecks": [
+          {
+            "name": "expected-outcome",
+            "detail": "Expected APPLIED; actual NEEDS_INPUT."
+          },
+          {
+            "name": "task-identity:ôn thi",
+            "detail": "Expected one task matching ôn thi; actual 0."
+          }
+        ],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 2,
+        "status": "FAIL",
+        "id": "D14",
+        "failedChecks": [
+          {
+            "name": "expected-outcome",
+            "detail": "Expected APPLIED; actual NEEDS_INPUT."
+          },
+          {
+            "name": "task-identity:ôn thi",
+            "detail": "Expected one task matching ôn thi; actual 0."
+          }
+        ],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 3,
+        "status": "FAIL",
+        "id": "D14",
+        "failedChecks": [
+          {
+            "name": "expected-outcome",
+            "detail": "Expected APPLIED; actual NEEDS_INPUT."
+          },
+          {
+            "name": "task-identity:ôn thi",
+            "detail": "Expected one task matching ôn thi; actual 0."
+          }
+        ],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [
+          "AGENT_AI_INVALID_RESPONSE"
+        ],
+        "repeat": 1,
+        "status": "ERROR",
+        "id": "E08",
+        "failedChecks": [
+          {
+            "name": "expected-outcome",
+            "detail": "Expected APPLIED; actual AGENT_AI_INVALID_RESPONSE."
+          },
+          {
+            "name": "task-count",
+            "detail": "Expected 1; actual 0."
+          },
+          {
+            "name": "task-identity:tiếng Anh",
+            "detail": "Expected one task matching tiếng Anh; actual 0."
+          }
+        ],
+        "responseReview": "NOT_EVALUATED"
+      },
+      {
+        "errors": [],
+        "repeat": 2,
+        "status": "PASS",
+        "id": "E08",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 3,
+        "status": "PASS",
+        "id": "E08",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 1,
+        "status": "PASS",
+        "id": "G02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 2,
+        "status": "PASS",
+        "id": "G02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      },
+      {
+        "errors": [],
+        "repeat": 3,
+        "status": "PASS",
+        "id": "G02",
+        "failedChecks": [],
+        "responseReview": "REVIEW_REQUIRED"
+      }
+    ]
+  },
+  {
+    "run": "integrated-offline-rebased-2026-10-19",
+    "schemaVersion": "1.1",
+    "mode": "Offline",
+    "startedAt": "2026-10-19T07:23:16.1758105+07:00",
+    "finishedAt": "2026-10-19T07:23:27.811326+07:00",
+    "provider": "Scripted",
+    "model": null,
+    "callsUsed": 93,
+    "runtimeSha256": {
+      "SPWPOS.TestSupport.dll": "9D2958EDDD1E4D40305E09BD31DE86E0E2997F5DD63A8AAF74B691F9D87F6CCA",
+      "SPWPOS.Infrastructure.dll": "3A29124AFC218E18AA6BD2E20CEC42FED3DC9669305258BD28200CF6B9733EE8",
+      "SPWPOS.Application.dll": "0EB96B5DA200B88FBA3627FF76A418F40D2936B7FDFF0591DF6D8392DC95F8AE",
+      "catalog.json": "E77D3785BAC14E4EC7860E04EC81958BB7C630621246CD8BFA025DE2CB56876D"
+    },
+    "counts": [
+      {
+        "status": "NOT_RUN",
+        "count": 6
+      },
+      {
+        "status": "PASS",
+        "count": 80
+      }
+    ],
+    "outcomes": [
+      {
+        "failedChecks": [],
+        "id": "A01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "A02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "A03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "A04",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "A05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "A06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "A07",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "A08",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B04",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B07",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B08",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "B09",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C04",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C07",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C08",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C09",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "C10",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D04",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D07",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D08",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D09",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "LOCKED_SESSION_CONFLICT"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "D10",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "LOCKED_SESSION_CONFLICT"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "D11",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D12",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "FIXED_EVENT_OVERLAP"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "D13",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "D14",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E04",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E07",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E08",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "E09",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "F01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "F02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "F03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "NOT_FOUND"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "F04",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "F05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "F06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "F07",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "INVALID_TASK_TYPE"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "F08",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "G01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "G02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "G03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "VALIDATION_ERROR"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "G04",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "VALIDATION_ERROR"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "G05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "G06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "S01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "S02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "S03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "S04",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "S05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "AGENT_AI_TIMEOUT"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "S06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "H01",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "H02",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "H03",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "AGENT_REQUEST_REUSED"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "H04",
+        "status": "NOT_RUN",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "H05",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "AGENT_STALE"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "H06",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "AGENT_PREVIEW_EXPIRED"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "H07",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "H08",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "AGENT_UNDO_STALE"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "H09",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": [
+          "INVALID_TASK_TYPE"
+        ]
+      },
+      {
+        "failedChecks": [],
+        "id": "H10",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "H11",
+        "status": "NOT_RUN",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "H12",
+        "status": "PASS",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "V01",
+        "status": "NOT_RUN",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "V02",
+        "status": "NOT_RUN",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "V03",
+        "status": "NOT_RUN",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      },
+      {
+        "failedChecks": [],
+        "id": "V04",
+        "status": "NOT_RUN",
+        "responseReview": "NOT_EVALUATED",
+        "repeat": 1,
+        "errors": []
+      }
+    ]
+  }
+]

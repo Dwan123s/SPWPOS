@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using SPWPOS.Application.Authentication;
+using SPWPOS.Application.Authentication.Interfaces;
 using SPWPOS.Application.Workspace;
 using SPWPOS.Domain.Entities;
 using SPWPOS.Infrastructure.Persistence;
 namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEngine engine, TimeProvider clock,
-    ITaskInterpreter interpreter, IAiUsageService aiUsage) : IWorkspaceService, IPlanningAgentService
+    ITaskInterpreter interpreter, IAiUsageService aiUsage, IEmailService? email = null) : IWorkspaceService, IPlanningAgentService
 {
     private DateTimeOffset Now => clock.GetUtcNow();
     private static void Require([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string code, string message, int status = 400)
