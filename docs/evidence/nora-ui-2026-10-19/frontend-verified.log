@@ -1,0 +1,12 @@
+
+ RUN  v5.0.3 C:/Users/Admin/source/repos/SPWPOS/frontend
+
+
+ Test Files  30 passed (30)
+      Tests  247 passed (247)
+   Start at  19:46:46
+   Duration  64.27s (tests 58%, environment 32%, setup 6%, transform 2%, import 1%)
+
+Environment  jsdom was created 30 times · 39.44s total, 32% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments

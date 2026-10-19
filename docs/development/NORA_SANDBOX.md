@@ -2,6 +2,8 @@
 
 The runner executes the actual NORA service, interpreter contract and planning engine against a **fresh in-memory SQLite database per scenario**. Each conversation sequence shares its own database; independent cases do not share calendar state. The clock and fixtures use the week beginning 26 October 2026, regardless of the computer's current date.
 
+The integrated catalog contains 87 scenarios, including S07, the morning-class/afternoon-work-shift screenshot regression. S07 requires a CLASS event followed by a WORK event at the exact requested times. WORK is a built-in task and event category; unsupported agent categories fall back to active OTHER without bypassing scheduling validation. E08 and S02 are updated for main's implemented work windows. E08 now requires a task scheduled on the requested evening; S02 clarifies duration, saves the bounded task, then checks it without further writes. Independent checks enforce saved execution windows and date-specific exclusive availability overrides. Earlier evaluation reports describe the catalog at their recorded revisions, where these work windows were unsupported.
+
 It does not start the web server, connect to the configured SQL Server database, start hosted workers, send email, or use your signed-in calendar. Live mode loads only `AiSettings` from API appsettings, the existing API User Secrets assembly and environment variables. Authentication/SQL/SMTP settings are synthetic test configuration; email transport is fake.
 
 ## Run
@@ -45,6 +47,8 @@ Every run writes these UTF-8 files:
 
 Schema 1.1 separates a rejected operation's client-safe `errorMessage` and retained `persistedTurn` from a newly returned `result`. For earlier schema 1.0 files, `errorCode` takes precedence over a retained turn's APPLIED/PREVIEW status. Runtime assembly and catalog SHA-256 values identify the code/data actually used. CSV text is escaped to avoid interpreting model output as a spreadsheet formula; JSON preserves the original strings.
 
+New results retain the useful public explanation in `reply` and the backend's verified save summary in `outcome`. Markdown labels the latter `Verified outcome`; CSV exposes it as `verifiedOutcome`. Review both against the actual database actions. A draft model reply is not evidence that a request was saved. A clarification about a category or explicitly qualified clock range can trigger one additional interpreter attempt with server-resolved facts; both attempts count toward the sandbox cap and normal application AI usage limits.
+
 Reports checkpoint after each completed step/case. An interrupted process can leave a `RUNNING` case and partial evidence; those entries are not passes. A failed prerequisite stops the rest of that sequence, which is reported in the case reason. The CLI exits nonzero for FAIL/ERROR, while keeping all exports available. NOT_RUN entries require reading the reason: they can mean unsupported automation, cancellation, call cap or infrastructure circuit breaker.
 
 Credentials, provider request URLs, HTTP headers, raw provider error bodies and exception messages are not exported. Structured model **public** output and fictional calendar context are exported for evaluation. Private model reasoning is neither requested nor recorded. Keep real personal data out of fixtures if you extend the catalog.
@@ -61,7 +65,7 @@ An unusable provider response is **ERROR**, even when the calendar stayed unchan
 
 ## Coverage and limits
 
-The [86-scenario prompt pack](../reviews/NORA_GUARDRAIL_AND_SCHEDULING_TEST_PACK_2026-10-19.md) is represented in [the machine-readable catalog](../../tests/nora-sandbox/cases.json). This runner automates the **primary service-level variant of 80 scenarios**: 64 independent cases, 6 sequences and 10 lifecycle scenarios. H04 (coordinated concurrent requests), H11 (HTTP streaming/transport/UI fault behavior) and V01–V04 (browser/audio) are explicitly not automated here. They still appear in catalog/coverage output and become NOT_RUN when selected in All.
+The [original 86-scenario prompt pack](../reviews/NORA_GUARDRAIL_AND_SCHEDULING_TEST_PACK_2026-10-19.md), plus incident regression S07, is represented in [the machine-readable catalog](../../tests/nora-sandbox/cases.json). This runner automates the **primary service-level variant of 81 scenarios**: 64 independent cases, 7 sequences and 10 lifecycle scenarios. H04 (coordinated concurrent requests), H11 (HTTP streaming/transport/UI fault behavior) and V01–V04 (browser/audio) are explicitly not automated here. They still appear in catalog/coverage output and become NOT_RUN when selected in All.
 
 Some catalog entries automate one documented variant: D10 Running but not Paused; E09 weekly no-op; G01 the Vietnamese timezone; G05 task truncation; G06 seeded history rather than nine extra paid calls; H08 stale undo; H10 mixed intent. Their `limitation` fields identify remaining variants. Do not claim the whole family passed from one variant.
 
