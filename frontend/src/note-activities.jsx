@@ -34,12 +34,14 @@ function fieldIssues(activity) {
     )
       errors.end = "Giờ kết thúc phải sau giờ bắt đầu.";
   } else {
-    if (
-      !Number.isInteger(activity.estimatedMinutes) ||
-      activity.estimatedMinutes < 5 ||
-      activity.estimatedMinutes > 43200
-    )
-      errors.estimatedMinutes = "Nhập thời lượng từ 5 đến 43200 phút.";
+    if (activity.estimatedMinutes == null)
+      errors.estimatedMinutes = "Bổ sung thời lượng công việc.";
+    else if (!Number.isInteger(activity.estimatedMinutes))
+      errors.estimatedMinutes = "Nhập thời lượng bằng số phút nguyên.";
+    else if (activity.estimatedMinutes < 5)
+      errors.estimatedMinutes = "Thời lượng cần ít nhất 5 phút.";
+    else if (activity.estimatedMinutes > 43200)
+      errors.estimatedMinutes = "Thời lượng quá dài (tối đa 720 giờ).";
     if (!activity.start && invalidDate(activity.deadline))
       errors.deadline = "Bổ sung hạn chót hoặc giờ bắt đầu.";
     if (activity.start && invalidDate(activity.start))
@@ -73,6 +75,28 @@ function fieldIssues(activity) {
   return errors;
 }
 const issue = (activity) => Object.values(fieldIssues(activity))[0] || "";
+// Legacy analysis messages are unstructured. Only retire a missing-field remark
+// when it names a now-valid activity and contains no other scheduling concern.
+function resolvedRemark(message, drafts, originals) {
+  const text = message.toLocaleLowerCase();
+  if (!/missing|no estimated|no duration|thiếu|chưa có/.test(text))
+    return false;
+  if (!/duration|deadline|end time|thời lượng|hạn chót|kết thúc/.test(text))
+    return false;
+  if (
+    /conflict|overlap|availability|depend|xung đột|trùng|giờ rảnh|phụ thuộc/.test(
+      text,
+    )
+  )
+    return false;
+  const matches = originals.flatMap((activity, index) =>
+    activity.name?.trim() &&
+    text.includes(activity.name.trim().toLocaleLowerCase())
+      ? [index]
+      : [],
+  );
+  return matches.length > 0 && matches.every((index) => !issue(drafts[index]));
+}
 export function NoteActivitiesReview({
   note,
   busy,
@@ -101,11 +125,19 @@ export function NoteActivitiesReview({
     workspace?.preference?.planningHorizonDays || 14,
   );
   const [editError, setEditError] = useState("");
+  const [allowRequestedHours, setAllowRequestedHours] = useState(false);
   const previewHeading = useRef(null);
   const selected = drafts.filter((x) => x.selected);
   const incomplete = selected.filter(issue);
+  const analysisMessages = (note.analysis.messages || []).filter(
+    (message) => !resolvedRemark(message, drafts, note.analysis.activities),
+  );
   const countEvents = selected.filter((x) => x.kind === "EVENT").length;
   const countTasks = selected.length - countEvents;
+  const fixedTasks = selected.filter((x) => x.kind === "TASK" && x.start);
+  const needsGeneralHours = selected.some(
+    (x) => x.kind === "TASK" && (!x.start || !allowRequestedHours),
+  );
   const blocked = !!busy || dirty || !hasAiAnalysis;
   const update = (index, field, value) => {
     setDrafts((items) =>
@@ -354,11 +386,16 @@ export function NoteActivitiesReview({
             );
           })}
         </fieldset>
-        {!!note.analysis.messages?.length && (
+        {!!analysisMessages.length && (
           <details className="note-analysis-explanation">
-            <summary>Lưu ý từ ghi chú</summary>
+            <summary>Nhận xét từ lần phân tích ban đầu</summary>
+            <p className="reason">
+              Các nhận xét này dựa trên ghi chú ban đầu, chưa phản ánh chỉnh sửa
+              của bạn. Thông tin còn thiếu hoặc chưa hợp lệ được hiển thị ngay
+              dưới từng ô nhập.
+            </p>
             <ul>
-              {note.analysis.messages.map((text, i) => (
+              {analysisMessages.map((text, i) => (
                 <li key={i}>{text}</li>
               ))}
             </ul>
@@ -388,6 +425,27 @@ export function NoteActivitiesReview({
             Nội dung đã thay đổi. Phân tích lại ghi chú trước khi xem lịch.
           </p>
         )}
+        {!proposal && fixedTasks.length > 0 && (
+          <label className="note-activity-ack">
+            <input
+              type="checkbox"
+              checked={allowRequestedHours}
+              disabled={blocked}
+              onChange={(e) => {
+                setAllowRequestedHours(e.target.checked);
+                onReviewDirty(true);
+              }}
+            />
+            Cho phép dùng giờ bắt đầu đã chọn cho lần này, kể cả ngoài giờ rảnh
+            thường lệ.
+          </label>
+        )}
+        {allowRequestedHours && (
+          <p className="reason">
+            Giờ rảnh bổ sung chỉ được lưu cho ngày đã chọn khi bạn xác nhận
+            lịch.
+          </p>
+        )}
         {!proposal && (
           <div className="note-proposal-footer">
             <label className="note-horizon">
@@ -411,7 +469,7 @@ export function NoteActivitiesReview({
                 ? `${incomplete.length} hoạt động cần bổ sung thông tin.`
                 : "Chưa tạo sự kiện, công việc hoặc lưu lịch. Bạn xác nhận sau khi xem đề xuất."}
             </p>
-            {!hasTime && countTasks > 0 && (
+            {!hasTime && needsGeneralHours && (
               <button
                 className="btn secondary"
                 disabled={blocked}
@@ -429,7 +487,7 @@ export function NoteActivitiesReview({
                 !Number.isInteger(horizon) ||
                 horizon < 1 ||
                 horizon > 30 ||
-                (countTasks > 0 && !hasTime) ||
+                (needsGeneralHours && !hasTime) ||
                 (note.analysis.needsReview && !reviewed)
               }
               onClick={async () => {
@@ -439,6 +497,7 @@ export function NoteActivitiesReview({
                   ),
                   horizonDays: horizon,
                   reviewedConditions: reviewed,
+                  allowRequestedTimeOutsideAvailability: allowRequestedHours,
                 });
                 if (result) {
                   setProposal(result);
@@ -489,6 +548,22 @@ export function NoteActivitiesReview({
                     </li>
                   ))}
                 </ul>
+                {proposal.warnings.some(
+                  (x) => x.code === "NOTE_OUTSIDE_AVAILABILITY",
+                ) &&
+                  !allowRequestedHours && (
+                    <button
+                      className="btn secondary"
+                      disabled={blocked}
+                      onClick={() => {
+                        setAllowRequestedHours(true);
+                        setProposal(null);
+                        onReviewDirty(true);
+                      }}
+                    >
+                      Dùng giờ đã chọn cho lần này
+                    </button>
+                  )}
               </div>
             )}
             <div className="card note-activity-confirm">

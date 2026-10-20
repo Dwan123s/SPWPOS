@@ -13,8 +13,9 @@ public sealed record NoteActivity(string Kind, string Name, string Description =
     DateTimeOffset? Deadline = null, int Priority = 2, bool IsHardDeadline = false,
     int RepeatWeeks = 1, string Question = "");
 public sealed record NoteActivityPlanInput(Guid Version, [Required, MinLength(1), MaxLength(12)] NoteActivity[] Activities,
-    [Range(1, 30)] int HorizonDays = 14, bool ReviewedConditions = false);
-public sealed record NotePlanContext(Guid NoteId, Guid NoteVersion, NoteActivity[] Activities, Guid[] TaskIds, EventView[] Events);
+    [Range(1, 30)] int HorizonDays = 14, bool ReviewedConditions = false, bool AllowRequestedTimeOutsideAvailability = false);
+public sealed record NotePlanContext(Guid NoteId, Guid NoteVersion, NoteActivity[] Activities, Guid[] TaskIds, EventView[] Events,
+    bool AllowRequestedTimeOutsideAvailability = false);
 public sealed record NoteApplyInput(Guid Version);
 public sealed record NoteAgentCapabilities(bool AiAvailable, int MaxTasks = 12, string Provider = "OpenAI");
 public sealed record NoteView(Guid Id, string Title, string Content, Guid Version,

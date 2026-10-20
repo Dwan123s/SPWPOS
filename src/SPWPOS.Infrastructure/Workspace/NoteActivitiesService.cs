@@ -18,7 +18,8 @@ public sealed partial class WorkspaceService
         var state = await State(uid, ct);
         var tasks = await NoteTasks(uid, input.Activities, state, ct);
         var events = NoteEvents(uid, input.Activities, state);
-        var candidate = NoteCandidate(state, tasks, events);
+        var oneOffHours = input.AllowRequestedTimeOutsideAvailability ? NoteRequestedHours(uid, tasks, state.Preference) : [];
+        var candidate = NoteCandidate(state with { Exceptions = state.Exceptions.Concat(oneOffHours).ToArray() }, tasks, events);
         var affected = tasks.Select(x => x.Id).Concat(TimeConflictTaskIds(candidate)).Distinct().ToArray();
         var start = Now.AddMinutes(5);
         Require(!candidate.Sessions.Any(x => affected.Contains(x.TaskId) && x.Status == WorkSessionStatus.Scheduled &&
@@ -26,10 +27,12 @@ public sealed partial class WorkspaceService
             !engine.FreeSlots(candidate, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End)),
             "NOTE_HORIZON_CONFLICT", "Có phiên bị ảnh hưởng ngoài phạm vi xem trước. Chỉnh phạm vi hoặc lịch trước khi tiếp tục.", 409);
         var plan = engine.Generate(candidate, new(start, input.HorizonDays, affected, true, "NEW_TASK", false, false), Now);
+        plan = ExplainNoteAvailability(plan, candidate, tasks);
         var proposal = new PlanProposal { UserId = uid, CreatedAt = Now, ExpiresAt = Now.AddMinutes(30), Revision = state.Preference.Revision,
             Kind = "RESCHEDULE", TriggerEvent = "NEW_TASK", HorizonStart = plan.Start, HorizonEnd = plan.End };
         plan = plan with { Id = proposal.Id, Kind = proposal.Kind, NoteContext = new(noteId, note.Version, input.Activities,
-            tasks.Select(x => x.Id).ToArray(), events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType)).ToArray()) };
+            tasks.Select(x => x.Id).ToArray(), events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType)).ToArray(),
+            input.AllowRequestedTimeOutsideAvailability) };
         // The proposal stores drafts only. Task/event/session rows are created together after confirmation.
         proposal.PayloadJson = JsonSerializer.Serialize(plan);
         db.PlanProposals.Add(proposal);
@@ -59,7 +62,9 @@ public sealed partial class WorkspaceService
         var events = context.Events.Select(x => new FixedEvent { Id = x.Id, UserId = uid, Name = x.Name,
             Description = x.Description, EventType = x.EventType, Start = x.Start, End = x.End }).ToArray();
         Require(events.All(x => x.Start >= Now), "PLAN_EXPIRED", "Có hoạt động đã bắt đầu. Xem trước lại để cập nhật.", 409);
-        var candidate = NoteCandidate(state, tasks, events);
+        var oneOffHours = context.AllowRequestedTimeOutsideAvailability ? NoteRequestedHours(uid, tasks, state.Preference) : [];
+        var candidate = NoteCandidate(state with { Exceptions = state.Exceptions.Concat(oneOffHours).ToArray() }, tasks, events);
+        db.AvailabilityExceptions.AddRange(oneOffHours);
         db.WorkTasks.AddRange(tasks);
         db.FixedEvents.AddRange(events.Where(x => !state.Events.Any(e => e.Id == x.Id)));
         await db.SaveChangesAsync(ct);
@@ -80,6 +85,47 @@ public sealed partial class WorkspaceService
         Require(analysis?.Activities is not null && analysis.Source is "OpenAI" or "Gemini" or "VertexAI",
             "NOTE_NOT_ANALYZED", "Phân tích ghi chú trước khi xem lịch.", 409);
     }
+
+    private static AvailabilityException[] NoteRequestedHours(Guid uid, WorkTask[] tasks, WorkPreference preference)
+    {
+        var zone = PlanningEngine.Zone(preference.TimeZoneId);
+        var hours = new List<AvailabilityException>();
+        foreach (var task in tasks.Where(x => x.WorkWindowStart is not null && x.WorkWindowEnd is not null))
+        {
+            var from = TimeZoneInfo.ConvertTime(task.WorkWindowStart!.Value, zone);
+            var to = TimeZoneInfo.ConvertTime(task.WorkWindowEnd!.Value, zone);
+            for (var date = DateOnly.FromDateTime(from.Date); date <= DateOnly.FromDateTime(to.Date); date = date.AddDays(1))
+            {
+                var first = date == DateOnly.FromDateTime(from.Date) ? from.Hour * 60 + from.Minute : 0;
+                var last = date == DateOnly.FromDateTime(to.Date) ? to.Hour * 60 + to.Minute : 1440;
+                if (last > first) hours.Add(new AvailabilityException { UserId = uid, Date = date, StartMinute = first,
+                    EndMinute = last, IsAvailable = true, Note = "Giờ thực hiện đã xác nhận từ ghi chú" });
+            }
+        }
+        return hours.ToArray();
+    }
+
+    private PlanView ExplainNoteAvailability(PlanView plan, PlanningState state, WorkTask[] tasks) => plan with
+    {
+        Warnings = plan.Warnings.Select(warning =>
+        {
+            var task = tasks.FirstOrDefault(x => x.Id == warning.TaskId);
+            if (warning.Code != "INSUFFICIENT_CAPACITY" || task?.WorkWindowStart is not { } from || task.WorkWindowEnd is not { } to)
+                return warning;
+            // Check availability alone so event conflicts are never offered an availability override.
+            var hoursOnly = state with { Events = [] };
+            if (engine.FreeSlots(hoursOnly, from, to).Sum(x => (x.End - x.Start).TotalMinutes) >= task.EstimatedMinutes)
+                return warning;
+            var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
+            var localStart = TimeZoneInfo.ConvertTime(from, zone); var localEnd = TimeZoneInfo.ConvertTime(to, zone);
+            if (state.Exceptions.Where(x => !x.IsAvailable).Any(x =>
+                PlanningEngine.At(x.Date, x.StartMinute, zone) < to && PlanningEngine.At(x.Date, x.EndMinute, zone) > from))
+                return warning with { Code = "NOTE_UNAVAILABLE_TIME",
+                    Message = $"Khung giờ {localStart:dd/MM HH:mm}–{localEnd:HH:mm} trùng thời gian đã đánh dấu không rảnh. Chọn giờ khác hoặc chỉnh thời gian không rảnh rồi xem lại lịch." };
+            return warning with { Code = "NOTE_OUTSIDE_AVAILABILITY",
+                Message = $"Khung giờ {localStart:dd/MM HH:mm}–{localEnd:HH:mm} nằm ngoài giờ rảnh đã thiết lập. Cho phép dùng giờ đã chọn cho lần này hoặc chỉnh giờ rảnh rồi xem lại lịch." };
+        }).ToArray()
+    };
 
     private async Task<WorkTask[]> NoteTasks(Guid uid, NoteActivity[] activities, PlanningState state, CancellationToken ct)
     {

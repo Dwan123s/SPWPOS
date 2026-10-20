@@ -41,11 +41,12 @@ const activities = [
     question: "Bạn cần bao lâu để làm báo cáo RDS?",
   },
 ];
-let calls, note, failApply;
+let calls, note, failApply, outsideHours;
 beforeEach(() => {
   localStorage.clear();
   calls = [];
   failApply = false;
+  outsideHours = false;
   state.workspace = {
     profile: { id: "account" },
     tasks: [],
@@ -81,7 +82,18 @@ beforeEach(() => {
           id: "p1",
           start: "2026-10-20T12:10:00Z",
           end: "2026-11-03T12:10:00Z",
-          warnings: [],
+          warnings:
+            outsideHours && !body.allowRequestedTimeOutsideAvailability
+              ? [
+                  {
+                    taskName: "Báo cáo RDS",
+                    code: "NOTE_OUTSIDE_AVAILABILITY",
+                    message:
+                      "Khung giờ 21/10 20:30–21:00 nằm ngoài giờ rảnh đã thiết lập.",
+                    unscheduledMinutes: 30,
+                  },
+                ]
+              : [],
           sessions: body.activities.some((x) => x.kind === "TASK")
             ? [
                 {
@@ -99,6 +111,8 @@ beforeEach(() => {
               ? ["t1"]
               : [],
             activities: body.activities,
+            allowRequestedTimeOutsideAvailability:
+              body.allowRequestedTimeOutsideAvailability,
           },
         };
       else if (url.endsWith("/apply")) {
@@ -133,6 +147,77 @@ async function open() {
     await screen.findByRole("button", { name: "Thời gian biểu" }),
   );
 }
+it("offers one-off requested hours after an availability warning without applying until confirmed", async () => {
+  outsideHours = true;
+  note.analysis.activities = activities.map((x) =>
+    x.kind === "TASK" ? { ...x, estimatedMinutes: 30 } : x,
+  );
+  await open();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  expect(
+    (await screen.findByRole("button", { name: "Lưu sự kiện & công việc" }))
+      .disabled,
+  ).toBe(true);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Dùng giờ đã chọn cho lần này" }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  expect(
+    (await screen.findByRole("button", { name: "Lưu sự kiện & công việc" }))
+      .disabled,
+  ).toBe(false);
+  expect(
+    calls.filter((x) => x.url.endsWith("/proposals")).at(-1).body
+      .allowRequestedTimeOutsideAvailability,
+  ).toBe(true);
+  expect(
+    screen.getByText(
+      "Giờ rảnh bổ sung chỉ được lưu cho ngày đã chọn khi bạn xác nhận lịch.",
+    ),
+  ).toBeTruthy();
+  expect(calls.some((x) => x.url.endsWith("/apply"))).toBe(false);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Lưu sự kiện & công việc" }),
+  );
+  await screen.findByText("Đã lưu 4 hoạt động vào lịch.");
+});
+it("distinguishes original analysis remarks from current field errors after editing", async () => {
+  const original =
+    "The task 'Báo cáo RDS' has a start time but no estimated duration or end time.";
+  const alternate =
+    "The task 'Báo cáo RDS' starts at 20h30 but its duration or completion deadline is missing.";
+  note.analysis.messages = [original, alternate, "Kiểm tra giờ rảnh buổi tối."];
+  await open();
+  expect(screen.getByText("Nhận xét từ lần phân tích ban đầu")).toBeTruthy();
+  const duration = screen.getByRole("spinbutton", {
+    name: "Thời lượng Báo cáo RDS (phút)",
+  });
+  fireEvent.change(duration, { target: { value: "30" } });
+  expect(duration.getAttribute("aria-invalid")).toBeNull();
+  expect(screen.queryByText("Bổ sung thời lượng công việc.")).toBeNull();
+  expect(
+    screen.getByText(
+      "Các nhận xét này dựa trên ghi chú ban đầu, chưa phản ánh chỉnh sửa của bạn. Thông tin còn thiếu hoặc chưa hợp lệ được hiển thị ngay dưới từng ô nhập.",
+    ),
+  ).toBeTruthy();
+  expect(screen.queryByText(original)).toBeNull();
+  expect(screen.queryByText(alternate)).toBeNull();
+  expect(screen.getByText("Kiểm tra giờ rảnh buổi tối.")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }).disabled,
+  ).toBe(false);
+  fireEvent.change(duration, { target: { value: "43201" } });
+  expect(screen.getByText("Thời lượng quá dài (tối đa 720 giờ).")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }).disabled,
+  ).toBe(true);
+  fireEvent.change(duration, { target: { value: "2" } });
+  expect(screen.getByText("Thời lượng cần ít nhất 5 phút.")).toBeTruthy();
+});
 it("replaces a stale AI question with a deadline error and clears it when the deadline is corrected", async () => {
   note.analysis = {
     ...note.analysis,
@@ -230,7 +315,7 @@ it("keeps all four activities, requests the missing report duration, and saves o
   expect(within(review).getByText("20:30", { exact: false })).toBeTruthy();
   const preview = screen.getByRole("button", { name: "Xem lịch đề xuất" });
   expect(preview.disabled).toBe(true);
-  expect(screen.getByText("Nhập thời lượng từ 5 đến 43200 phút.")).toBeTruthy();
+  expect(screen.getByText("Bổ sung thời lượng công việc.")).toBeTruthy();
   fireEvent.change(
     screen.getByRole("spinbutton", { name: "Thời lượng Báo cáo RDS (phút)" }),
     { target: { value: "60" } },

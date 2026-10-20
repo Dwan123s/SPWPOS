@@ -64,6 +64,32 @@ public sealed class NoteActivitiesTests
         Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
         Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
     }
+    [Fact] public async Task Requested_Wednesday_evening_requires_explicit_one_off_availability_and_saves_it_atomically()
+    {
+        var (h, uid, note) = await Setup(); await using var lifetime = h;
+        await Call(h, async s => { await s.SetAvailabilityAsync(uid, new([new(2, 420, 1080)]), Ct); return true; });
+        var zone = PlanningEngine.Zone("Asia/Ho_Chi_Minh");
+        var nextDay = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(h.Clock.GetUtcNow(), zone).DateTime).AddDays(1);
+        while (nextDay.DayOfWeek != DayOfWeek.Wednesday) nextDay = nextDay.AddDays(1);
+        var day = PlanningEngine.At(nextDay, 0, zone);
+        var activities = new[] { new NoteActivity("TASK", "Báo cáo RDS", Type: "WRITING",
+            Start: day.AddHours(20.5), EstimatedMinutes: 30, Deadline: day.AddHours(22.5)) };
+        var blocked = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, activities), Ct));
+        Assert.Contains(blocked.Warnings, x => x.Code == "NOTE_OUTSIDE_AVAILABILITY" && x.UnscheduledMinutes == 30);
+        var plan = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id,
+            new(note.Version, activities, AllowRequestedTimeOutsideAvailability: true), Ct));
+        Assert.Empty(plan.Warnings);
+        Assert.Equal(activities[0].Start, Assert.Single(plan.Sessions).Start);
+        Assert.Empty(await h.DbAsync(db => db.AvailabilityExceptions.ToArrayAsync(Ct)));
+        await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, plan.Id, new(note.Version), Ct));
+        var exception = Assert.Single(await h.DbAsync(db => db.AvailabilityExceptions.ToArrayAsync(Ct)));
+        Assert.Equal(1230, exception.StartMinute); Assert.Equal(1260, exception.EndMinute);
+        Assert.False(exception.OverridesWeeklyAvailability);
+        Assert.Equal(2, Assert.Single(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(Ct))).DayOfWeek);
+        Assert.Single(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
+        await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, plan.Id, new(note.Version), Ct));
+        Assert.Single(await h.DbAsync(db => db.AvailabilityExceptions.ToArrayAsync(Ct)));
+    }
     [Fact] public async Task Stale_calendar_and_edited_notes_cannot_apply_an_old_proposal()
     {
         var (h, uid, note) = await Setup(); await using var lifetime = h;
@@ -76,6 +102,30 @@ public sealed class NoteActivitiesTests
             s => s.ApplyNoteActivitiesAsync(uid, note.Id, plan.Id, new(note.Version), Ct)))).Code);
         Assert.Single(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
         Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+    }
+    [Theory]
+    [InlineData("UNAVAILABLE")]
+    [InlineData("EVENT")]
+    [InlineData("DAILY_LIMIT")]
+    public async Task One_off_hours_do_not_override_blocked_time_events_or_daily_limits(string constraint)
+    {
+        var (h, uid, note) = await Setup(); await using var lifetime = h;
+        var activity = Activities(h.Clock.GetUtcNow())[3] with { EstimatedMinutes = 30 };
+        if (constraint == "UNAVAILABLE")
+            await Call(h, s => s.SaveExceptionAsync(uid, null, new(DateOnly.FromDateTime(activity.Start!.Value.UtcDateTime), 1230, 1260, false, "Blocked"), Ct));
+        if (constraint == "EVENT")
+            await Call(h, s => s.SaveEventAsync(uid, null, new("Existing meeting", activity.Start!.Value, activity.Start.Value.AddMinutes(30)), Ct));
+        if (constraint == "DAILY_LIMIT")
+            await h.DbAsync(async db => { (await db.WorkPreferences.SingleAsync(Ct)).MaximumDailyMinutes = 25; await db.SaveChangesAsync(Ct); });
+        var plan = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id,
+            new(note.Version, [activity], AllowRequestedTimeOutsideAvailability: true), Ct));
+        Assert.Contains(plan.Warnings, x => x.UnscheduledMinutes > 0);
+        if (constraint == "UNAVAILABLE") Assert.Contains(plan.Warnings, x => x.Code == "NOTE_UNAVAILABLE_TIME");
+        Assert.Equal("NOTE_PLAN_INCOMPLETE", (await Assert.ThrowsAsync<AuthException>(() => Call(h,
+            s => s.ApplyNoteActivitiesAsync(uid, note.Id, plan.Id, new(note.Version), Ct)))).Code);
+        Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+        Assert.Empty(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
+        Assert.Equal(constraint == "UNAVAILABLE" ? 1 : 0, await h.DbAsync(db => db.AvailabilityExceptions.CountAsync(Ct)));
     }
     [Fact] public async Task Events_only_note_reuses_an_existing_event_and_requires_note_specific_confirmation()
     {
