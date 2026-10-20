@@ -66,9 +66,12 @@ export function NotesPage({ onWorkspaceChanged }) {
     state.workspace?.preference?.planningHorizonDays || 14,
   );
   const locked = useRef(false);
+  const activityReviewDirty = useRef(false);
   const alive = useRef(true);
   const imported = !!note.createdTaskIds?.length;
-  const hasAiAnalysis = ["Gemini", "OpenAI", "VertexAI"].includes(note.analysis?.source);
+  const hasAiAnalysis = ["Gemini", "OpenAI", "VertexAI"].includes(
+    note.analysis?.source,
+  );
   const dirty =
     !!note.id &&
     notes.some(
@@ -127,6 +130,7 @@ export function NotesPage({ onWorkspaceChanged }) {
   }, []);
 
   const select = (item) => {
+    activityReviewDirty.current = false;
     setSelectionTarget(null);
     setAppearance(readNoteAppearance(appearanceAccount, item.id));
     setNote(item);
@@ -151,7 +155,8 @@ export function NotesPage({ onWorkspaceChanged }) {
         JSON.stringify(
           note.analysis.tasks.map((task) => ({ ...task, selected: true })),
         );
-    if (contentChanged || reviewChanged) setSelectionTarget(item);
+    if (contentChanged || reviewChanged || activityReviewDirty.current)
+      setSelectionTarget(item);
     else select(item);
   };
   useEffect(() => {
@@ -179,7 +184,7 @@ export function NotesPage({ onWorkspaceChanged }) {
     setMessage("");
     setFailedAction(null);
     try {
-      await operation();
+      return await operation();
     } catch (e) {
       if (alive.current) {
         setError(aiMessages[e.code] || e.message);
@@ -229,19 +234,25 @@ export function NotesPage({ onWorkspaceChanged }) {
         if (alive.current) {
           remember(result);
           if (
-            result.analysis.tasks.length &&
+            (result.analysis.tasks.length ||
+              result.analysis.activities?.length) &&
             ["Gemini", "OpenAI", "VertexAI"].includes(result.analysis.source)
           )
             completeGuideStep(0, result.id);
           setDrafts(
             result.analysis.tasks.map((task) => ({ ...task, selected: true })),
           );
-          setStage(result.analysis.tasks.length ? "review" : "write");
+          activityReviewDirty.current = false;
+          setStage(
+            result.analysis.tasks.length || result.analysis.activities?.length
+              ? "review"
+              : "write",
+          );
           requestAnimationFrame(() =>
             document.getElementById("note-analysis-title")?.focus(),
           );
           setMessage(
-            result.analysis.tasks.length
+            result.analysis.tasks.length || result.analysis.activities?.length
               ? "Đây là kết quả xem trước. Chưa tạo công việc hoặc lưu lịch; bạn có thể chỉnh các việc bên dưới."
               : "Chưa tìm thấy công việc. Bổ sung việc cần làm rồi phân tích lại.",
           );
@@ -295,6 +306,7 @@ export function NotesPage({ onWorkspaceChanged }) {
             const recovered = latest.find((n) => n.id === saved.id);
             if (recovered) {
               setNote(recovered);
+              if (recovered.analysis?.activities) setStage("review");
               setDrafts(
                 (recovered.analysis?.tasks || []).map((task) => ({
                   ...task,
@@ -412,6 +424,26 @@ export function NotesPage({ onWorkspaceChanged }) {
     setDrafts((items) =>
       items.map((d, i) => (i === index ? { ...d, [key]: value } : d)),
     );
+  const prepareActivities = (input) =>
+    run("Đang kiểm tra sự kiện và công việc…", () =>
+      api(`/api/notes/${note.id}/proposals`, "POST", {
+        ...input,
+        version: note.version,
+      }),
+    );
+  const applyActivities = (planId) =>
+    run("Đang lưu sự kiện và công việc…", async () => {
+      const result = await api(
+        `/api/notes/${note.id}/proposals/${planId}/apply`,
+        "POST",
+        { version: note.version },
+      );
+      if (!alive.current) return;
+      remember(result.note);
+      activityReviewDirty.current = false;
+      await onWorkspaceChanged();
+      return result;
+    });
 
   return (
     <NoteStudio
@@ -424,6 +456,11 @@ export function NotesPage({ onWorkspaceChanged }) {
         saveNoteAppearance(appearanceAccount, note.id, next);
       }}
       drafts={drafts}
+      prepareActivities={prepareActivities}
+      applyActivities={applyActivities}
+      onActivityReviewDirty={(value) => {
+        activityReviewDirty.current = value;
+      }}
       agent={agent}
       imported={imported}
       busy={busy}
@@ -545,7 +582,8 @@ export function NotesPage({ onWorkspaceChanged }) {
       onDelete={(target = note) => {
         const currentTarget = target?.id ? target : note;
         if (busy || !currentTarget?.id) return;
-        const saved = notes.find((item) => item.id === currentTarget.id) || currentTarget;
+        const saved =
+          notes.find((item) => item.id === currentTarget.id) || currentTarget;
         if (
           !window.confirm(
             `Xóa ghi chú “${saved.title}”?\n${saved.id === note.id && dirty ? "Các thay đổi chưa lưu trong ghi chú này cũng sẽ bị xóa.\n" : ""}Các công việc và lịch đã tạo vẫn được giữ.`,
@@ -553,11 +591,10 @@ export function NotesPage({ onWorkspaceChanged }) {
         )
           return;
         run("Đang xóa ghi chú…", async () => {
-          const versionParam = saved.version ? `?version=${encodeURIComponent(saved.version)}` : "";
-          await api(
-            `/api/notes/${saved.id}${versionParam}`,
-            "DELETE",
-          );
+          const versionParam = saved.version
+            ? `?version=${encodeURIComponent(saved.version)}`
+            : "";
+          await api(`/api/notes/${saved.id}${versionParam}`, "DELETE");
           if (!alive.current) return;
           clearNoteAppearance(appearanceAccount, saved.id);
           setNotes((items) => items.filter((item) => item.id !== saved.id));

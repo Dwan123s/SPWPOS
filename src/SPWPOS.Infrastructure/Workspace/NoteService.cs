@@ -86,6 +86,7 @@ public sealed partial class WorkspaceService
         CheckNoteVersion(note, input.Version);
         Require(note.AnalysisJson.Length > 0, "NOTE_NOT_ANALYZED", "Phân tích ghi chú trước khi tạo công việc.");
         var analysis = JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson)!;
+        Require(analysis.Activities is null, "NOTE_NEEDS_REVIEW", "Xem trước và xác nhận cả sự kiện và công việc từ ghi chú.", 409);
         Require(analysis.Source is "OpenAI" or "Gemini" or "VertexAI", "NOTE_AI_REQUIRED", "Phân tích lại ghi chú bằng AI trước khi tạo công việc.", 409);
         Require(input.Tasks is { Length: >= 1 and <= 12 }, "VALIDATION_ERROR", "Chọn từ 1 đến 12 công việc.");
         var activeCount = await Mine<WorkTask>(uid).CountAsync(x => !x.IsDeleted && x.Status != WorkTaskStatus.Completed && x.Status != WorkTaskStatus.Cancelled, ct);
@@ -151,6 +152,7 @@ public sealed partial class WorkspaceService
         if (note.Analysis is null || note.Analysis.Tasks.Length == 0 || note.CreatedTaskIds.Length == 0)
         {
             note = await AnalyzeNoteAsync(uid, id, new(input.Version, true), ct);
+            Require(note.Analysis!.Activities is null, "NOTE_NEEDS_REVIEW", "Kiểm tra sự kiện, thời lượng và lịch đề xuất trước khi lưu từ ghi chú.");
             Require(!note.Analysis!.NeedsReview, "NOTE_NEEDS_REVIEW",
                 "Ghi chú có ngày không hợp lệ hoặc điều kiện giờ rảnh/phụ thuộc chưa được thiết lập. Xem kết quả phân tích, cập nhật Thời gian & tùy chọn hoặc Công việc rồi sửa ghi chú trước khi tự xếp lịch.");
             Require(note.Analysis!.Tasks.Length > 0, "NOTE_NO_TASKS", "Chưa tìm thấy công việc. Bổ sung việc cần làm trong ghi chú.");

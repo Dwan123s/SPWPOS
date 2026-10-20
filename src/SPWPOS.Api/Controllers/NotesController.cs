@@ -14,4 +14,6 @@ public sealed class NotesController(IWorkspaceService service) : WorkspaceContro
     [HttpPost("{id:guid}/analyze")] public async Task<IActionResult> Analyze(Guid id, NoteAnalysisInput input, CancellationToken ct) => Data(await service.AnalyzeNoteAsync(UserId, id, input, ct));
     [HttpPost("{id:guid}/tasks")] public async Task<IActionResult> Import(Guid id, NoteImportInput input, CancellationToken ct) => Data(await service.ImportNoteAsync(UserId, id, input, ct));
     [HttpPost("{id:guid}/schedule")] public async Task<IActionResult> Schedule(Guid id, NoteScheduleInput input, CancellationToken ct) => Data(await service.ScheduleNoteAsync(UserId, id, input, ct));
+    [HttpPost("{id:guid}/proposals")] public async Task<IActionResult> PreviewActivities(Guid id, NoteActivityPlanInput input, CancellationToken ct) => Data(await service.PreviewNoteActivitiesAsync(UserId, id, input, ct));
+    [HttpPost("{id:guid}/proposals/{planId:guid}/apply")] public async Task<IActionResult> ApplyActivities(Guid id, Guid planId, NoteApplyInput input, CancellationToken ct) => Data(await service.ApplyNoteActivitiesAsync(UserId, id, planId, input, ct));
 }

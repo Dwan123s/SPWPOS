@@ -835,17 +835,17 @@
   font-size: 10px;
   color: #776b4c;
 }
-.note-preview-entry.existing .note-preview-event {
+.note-preview-entry.note-entry-existing .note-preview-event {
   background: #edf4fb;
   border-color: #7fa8ce;
 }
-.note-preview-entry.existing .note-preview-event strong {
+.note-preview-entry.note-entry-existing .note-preview-event strong {
   color: #304c6f;
 }
-.note-preview-entry.existing .note-preview-event > span {
+.note-preview-entry.note-entry-existing .note-preview-event > span {
   color: #547294;
 }
-.note-preview-entry.fixed .note-preview-event {
+.note-preview-entry.note-entry-fixed .note-preview-event {
   background: #f2f3f6;
   border-color: #969dab;
 }

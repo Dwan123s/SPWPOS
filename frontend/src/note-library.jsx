@@ -2,6 +2,8 @@ import { useState } from "react";
 import { dateFmt, icon } from "./ui.jsx";
 
 export function noteState(note) {
+  if (note.planId && note.analysis?.activities)
+    return { key: "created", label: "Đã lưu lịch" };
   if (note.createdTaskIds?.length)
     return { key: "created", label: "Đã tạo việc" };
   if (note.analysis) return { key: "reviewed", label: "Đã kiểm tra" };

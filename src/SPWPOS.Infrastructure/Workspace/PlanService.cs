@@ -56,6 +56,7 @@ public sealed partial class WorkspaceService
         Require(!proposal.IsApplied && proposal.Status == "PROPOSED" && proposal.ExpiresAt > Now, "PLAN_EXPIRED", "Kế hoạch đã dùng hoặc hết hạn. Hãy tạo lại.", 409);
         Require(proposal.Revision == state.Preference.Revision, "PLAN_STALE", "Dữ liệu đã thay đổi. Hãy tạo lại kế hoạch.", 409);
         var plan = JsonSerializer.Deserialize<PlanView>(proposal.PayloadJson)!;
+        Require(plan.NoteContext is null, "NOTE_PLAN_CONFIRMATION_REQUIRED", "Lưu đề xuất này từ màn hình ghi chú để tạo đủ sự kiện và công việc.", 409);
         await ApplyPlanCoreAsync(uid, proposal, plan, state, ct);
     }, ct);
     private async Task ApplyPlanCoreAsync(Guid uid, PlanProposal proposal, PlanView plan, PlanningState state, CancellationToken ct)

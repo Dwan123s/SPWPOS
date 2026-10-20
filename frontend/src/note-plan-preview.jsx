@@ -7,6 +7,8 @@ export function NotePlanPreview({
   horizonDays,
   chosenDate,
   onChooseDate,
+  confirmation = false,
+  headingRef,
 }) {
   const [chosen, setChosen] = useState(null);
   const sessions = result.proposedPlan.sessions || [];
@@ -22,8 +24,13 @@ export function NotePlanPreview({
   const requestedDate = chosenDate ?? chosen;
   const date = dates.includes(requestedDate)
     ? requestedDate
-    : dates.find((value) =>
-        sessions.some((session) => dayKey(session.start) === value),
+    : dates.find(
+        (value) =>
+          sessions.some((session) => dayKey(session.start) === value) ||
+          (confirmation &&
+            (workspace?.events || []).some(
+              (event) => dayKey(event.start) === value,
+            )),
       ) || dates[0];
   const names = new Map([
     ...(workspace?.tasks || []).map((task) => [task.id, task.name]),
@@ -51,7 +58,9 @@ export function NotePlanPreview({
       <div className="note-preview-heading">
         <div>
           <span className="note-section-kicker">VIỆC CẠNH LỊCH</span>
-          <h3>{icon("calendar")} Lịch dự kiến</h3>
+          <h3 ref={headingRef} tabIndex={headingRef ? -1 : undefined}>
+            {icon("calendar")} Lịch dự kiến
+          </h3>
         </div>
         <span className="note-preview-badge">Chưa lưu</span>
       </div>
@@ -75,7 +84,7 @@ export function NotePlanPreview({
       <div className="note-preview-agenda">
         {entries.map((entry, index) => (
           <article
-            className={`note-preview-entry ${entry.kind}`}
+            className={`note-preview-entry note-entry-${entry.kind}`}
             key={entry.id || `${entry.taskId}-${index}`}
           >
             <div className="note-preview-hours">
@@ -106,8 +115,15 @@ export function NotePlanPreview({
         )}
       </div>
       <p className="note-preview-footnote">
-        Đây là lịch thử. Chọn <strong>Tạo công việc & xem lịch</strong> để lấy
-        bản đề xuất và xác nhận lưu. Lịch có thể thay đổi theo thời điểm tạo.
+        {confirmation ? (
+          "Đây là lịch đề xuất, chưa lưu. Chọn Lưu sự kiện & công việc để xác nhận."
+        ) : (
+          <>
+            Đây là lịch thử. Chọn <strong>Tạo công việc & xem lịch</strong> để
+            lấy bản đề xuất và xác nhận lưu. Lịch có thể thay đổi theo thời điểm
+            tạo.
+          </>
+        )}
       </p>
     </section>
   );

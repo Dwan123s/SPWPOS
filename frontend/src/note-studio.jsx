@@ -4,6 +4,7 @@ import { NoteImpact } from "./note-impact.jsx";
 import { NoteLibrary, noteState } from "./note-library.jsx";
 import { NoteWritingTools } from "./note-writing-tools.jsx";
 import { noteAppearanceStyle } from "./note-appearance.js";
+import { NoteActivitiesReview } from "./note-activities.jsx";
 
 const priorities = ["", "Thấp", "Vừa", "Cao", "Khẩn"];
 const types = {
@@ -48,6 +49,9 @@ export function NoteStudio({
   navigationPrompt,
   appearance,
   setAppearance,
+  prepareActivities,
+  applyActivities,
+  onActivityReviewDirty,
 }) {
   const [focusMode, setFocusMode] = useState(false);
   const editor = useRef(null);
@@ -256,7 +260,9 @@ export function NoteStudio({
                     <button
                       type="button"
                       className="btn primary"
-                      disabled={!agent?.aiAvailable || !note.content.trim() || !!busy}
+                      disabled={
+                        !agent?.aiAvailable || !note.content.trim() || !!busy
+                      }
                       onClick={() => requestSchedule("auto")}
                     >
                       {icon("calendar")} Cập nhật công việc &amp; lịch trình
@@ -292,8 +298,8 @@ export function NoteStudio({
                   />
                 </label>
                 <p className="reason spaced">
-                  AI tạo công việc và áp dụng lịch ngay. Thông tin thiếu được
-                  gợi ý 60 phút và hạn chót sau 7 ngày.
+                  Ghi chú có sự kiện hoặc thông tin còn thiếu sẽ mở bước kiểm
+                  tra trước khi lưu lịch.
                 </p>
                 <button
                   type="button"
@@ -309,8 +315,11 @@ export function NoteStudio({
           {imported && (
             <div className="note-sync-banner info spaced">
               <p>
-                {icon("check")} Ghi chú đã tạo {note.createdTaskIds.length} công việc trong hệ thống.
-                Bạn có thể sửa nội dung và bấm <strong>Lưu ghi chú</strong>, hoặc bấm <strong>Cập nhật công việc &amp; lịch trình</strong> để đồng bộ sang lịch.
+                {icon("check")} Ghi chú đã tạo {note.createdTaskIds.length} công
+                việc trong hệ thống. Bạn có thể sửa nội dung và bấm{" "}
+                <strong>Lưu ghi chú</strong>, hoặc bấm{" "}
+                <strong>Cập nhật công việc &amp; lịch trình</strong> để đồng bộ
+                sang lịch.
               </p>
               <div className="form-actions spaced">
                 <button
@@ -352,13 +361,25 @@ export function NoteStudio({
                   TỪ GHI CHÚ ĐẾN KẾ HOẠCH
                 </span>
                 <h2 id="note-analysis-title" ref={reviewHeading} tabIndex={-1}>
-                  {imported ? "Công việc đã được lưu" : "Xem trước công việc"}
+                  {note.analysis.activities
+                    ? note.planId
+                      ? "Lịch đã được lưu"
+                      : "Xem trước lịch & công việc"
+                    : imported
+                      ? "Công việc đã được lưu"
+                      : "Xem trước công việc"}
                 </h2>
                 <p>
-                  Phân tích bằng {note.analysis.source} ·{" "}
-                  {imported
-                    ? "Lịch chỉ được lưu khi bạn xác nhận."
-                    : "Chọn việc cần làm, chỉnh thời lượng và kiểm tra lịch."}
+                  {note.analysis.activities ? (
+                    "Kiểm tra đủ hoạt động, bổ sung thông tin còn thiếu và xác nhận lịch."
+                  ) : (
+                    <>
+                      Phân tích bằng {note.analysis.source} ·{" "}
+                      {imported
+                        ? "Lịch chỉ được lưu khi bạn xác nhận."
+                        : "Chọn việc cần làm, chỉnh thời lượng và kiểm tra lịch."}
+                    </>
+                  )}
                 </p>
               </div>
               <button
@@ -372,189 +393,208 @@ export function NoteStudio({
                 {icon("edit")} <span>Sửa ghi chú</span>
               </button>
             </div>
-            <div className="note-review-grid">
-              <form
-                className="card note-review-tasks"
-                noValidate
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  requestSchedule("proposal");
-                }}
-              >
-                <div className="note-task-list-heading">
-                  <h3>
-                    {imported
-                      ? `${drafts.length} việc đã lưu`
-                      : `${drafts.filter((task) => task.selected).length}/${drafts.length} việc được chọn`}
-                  </h3>
-                  <span>
-                    {minutes(
-                      drafts
-                        .filter((task) => task.selected)
-                        .reduce(
-                          (sum, task) =>
-                            sum + Number(task.estimatedMinutes || 0),
-                          0,
-                        ),
-                    )}
-                  </span>
-                </div>
-                {!drafts.length && (
-                  <p className="info">
-                    Chưa có gợi ý công việc. Kiểm tra nội dung và phân tích lại.
-                  </p>
-                )}
-                <fieldset
-                  className="note-fields"
-                  disabled={!!busy || imported || dirty || !hasAiAnalysis}
-                  hidden={imported}
+            {note.analysis.activities ? (
+              <NoteActivitiesReview
+                key={`${note.id}/${note.version}`}
+                note={note}
+                busy={busy}
+                dirty={dirty}
+                hasAiAnalysis={hasAiAnalysis}
+                workspace={workspace}
+                hasTime={hasTime}
+                onSetTime={onSetTime}
+                prepare={prepareActivities}
+                apply={applyActivities}
+                onReviewDirty={onActivityReviewDirty}
+              />
+            ) : (
+              <div className="note-review-grid">
+                <form
+                  className="card note-review-tasks"
+                  noValidate
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    requestSchedule("proposal");
+                  }}
                 >
-                  {drafts.map((task, index) => (
-                    <NoteDraftRow
-                      key={index}
-                      task={task}
-                      index={index}
-                      update={updateDraft}
-                    />
-                  ))}
-                </fieldset>
-                {imported && (
-                  <div className="note-created-tasks">
-                    {drafts.map((task, index) => (
-                      <article key={index}>
-                        <strong>{task.name}</strong>
-                        <p>
-                          {minutes(task.estimatedMinutes)} · Hạn{" "}
-                          {dateFmt(task.deadline, {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </article>
-                    ))}
-                  </div>
-                )}
-                {!!note.analysis.messages?.length && (
-                  <details className="note-analysis-explanation">
-                    <summary>
-                      {note.analysis.messages.length} lưu ý từ ghi chú
-                    </summary>
-                    <ul>
-                      {note.analysis.messages.map((text, index) => (
-                        <li key={index}>{text}</li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-                {note.analysis.needsReview && (
-                  <p className="warning spaced">
-                    AI chưa thể tự áp dụng các điều kiện trong ghi chú. Kiểm tra
-                    lưu ý, giờ rảnh và phụ thuộc trước khi lưu lịch.
-                  </p>
-                )}
-                {!hasAiAnalysis && !imported && (
-                  <p className="warning spaced">
-                    Kết quả này chưa được phân tích bằng AI. Sửa ghi chú rồi
-                    chọn Xem trước công việc để cập nhật.
-                  </p>
-                )}
-                {!note.planId && (
-                  <div className="note-proposal-footer">
-                    <label className="note-horizon">
-                      Xếp trong{" "}
-                      <input
-                        aria-label="Số ngày xếp lịch"
-                        type="number"
-                        min={1}
-                        max={30}
-                        value={horizonDays}
-                        disabled={!!busy}
-                        onChange={(event) => setHorizonDays(event.target.value)}
-                      />{" "}
-                      ngày tới
-                    </label>
-                    <p
-                      id="note-proposal-help"
-                      className={
-                        proposalIssue ? "warning spaced" : "reason spaced"
-                      }
-                    >
-                      {proposalIssue ||
-                        (!hasTime
-                          ? "Bạn sẽ chọn giờ rảnh trước khi tạo công việc và lịch đề xuất."
-                          : "Công việc sẽ được tạo; bạn xem và xác nhận lịch ở bước tiếp theo.")}
-                    </p>
-                    <button
-                      type="submit"
-                      className="btn primary"
-                      aria-describedby="note-proposal-help"
-                      disabled={!!busy || !!proposalIssue}
-                    >
+                  <div className="note-task-list-heading">
+                    <h3>
                       {imported
-                        ? "Xem lịch đề xuất"
-                        : "Tạo công việc & xem lịch"}{" "}
-                      {icon("arrow")}
-                    </button>
+                        ? `${drafts.length} việc đã lưu`
+                        : `${drafts.filter((task) => task.selected).length}/${drafts.length} việc được chọn`}
+                    </h3>
+                    <span>
+                      {minutes(
+                        drafts
+                          .filter((task) => task.selected)
+                          .reduce(
+                            (sum, task) =>
+                              sum + Number(task.estimatedMinutes || 0),
+                            0,
+                          ),
+                      )}
+                    </span>
                   </div>
-                )}
-                {note.planId && (
-                  <div className="form-actions">
-                    <a className="btn primary" href="#today">
-                      Mở Hôm nay để làm việc
-                    </a>
-                  </div>
-                )}
-                {imported && !note.planId && (
-                  <button
-                    type="button"
-                    className="btn ghost small spaced"
-                    disabled={!!busy}
-                    onClick={() => requestSchedule("auto")}
-                  >
-                    Tiếp tục tự xếp lịch
-                  </button>
-                )}
-              </form>
-              <div className="note-review-context">
-                <NoteImpact
-                  drafts={drafts}
-                  horizonDays={horizonDays}
-                  hasTime={hasTime}
-                  enabled={
-                    reviewing && !busy && !imported && !dirty && hasAiAnalysis
-                  }
-                  workspace={workspace}
-                  onSetTime={onSetTime}
-                  showPreview
-                />
-                {imported && (
-                  <div className="card note-preview-placeholder">
-                    {icon("calendar")}
-                    <h3>Tiếp tục với lịch của bạn</h3>
-                    <p>
-                      Các công việc đã được lưu. Mở lịch đề xuất để kiểm tra và
-                      chọn Lưu lịch này.
+                  {!drafts.length && (
+                    <p className="info">
+                      Chưa có gợi ý công việc. Kiểm tra nội dung và phân tích
+                      lại.
                     </p>
-                    <a className="btn secondary" href="#calendar">
-                      Mở lịch làm việc
-                    </a>
-                  </div>
-                )}
-                {!imported &&
-                  (dirty ||
-                    !hasAiAnalysis ||
-                    !drafts.some((task) => task.selected)) && (
-                    <div className="card note-preview-placeholder">
-                      {icon("calendar")}
-                      <h3>Lịch hiện ở đây sau khi kiểm tra</h3>
-                      <p>
-                        Chọn công việc và phân tích nội dung mới nhất để xem
-                        lịch thử.
-                      </p>
+                  )}
+                  <fieldset
+                    className="note-fields"
+                    disabled={!!busy || imported || dirty || !hasAiAnalysis}
+                    hidden={imported}
+                  >
+                    {drafts.map((task, index) => (
+                      <NoteDraftRow
+                        key={index}
+                        task={task}
+                        index={index}
+                        update={updateDraft}
+                      />
+                    ))}
+                  </fieldset>
+                  {imported && (
+                    <div className="note-created-tasks">
+                      {drafts.map((task, index) => (
+                        <article key={index}>
+                          <strong>{task.name}</strong>
+                          <p>
+                            {minutes(task.estimatedMinutes)} · Hạn{" "}
+                            {dateFmt(task.deadline, {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </article>
+                      ))}
                     </div>
                   )}
+                  {!!note.analysis.messages?.length && (
+                    <details className="note-analysis-explanation">
+                      <summary>
+                        {note.analysis.messages.length} lưu ý từ ghi chú
+                      </summary>
+                      <ul>
+                        {note.analysis.messages.map((text, index) => (
+                          <li key={index}>{text}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  {note.analysis.needsReview && (
+                    <p className="warning spaced">
+                      AI chưa thể tự áp dụng các điều kiện trong ghi chú. Kiểm
+                      tra lưu ý, giờ rảnh và phụ thuộc trước khi lưu lịch.
+                    </p>
+                  )}
+                  {!hasAiAnalysis && !imported && (
+                    <p className="warning spaced">
+                      Kết quả này chưa được phân tích bằng AI. Sửa ghi chú rồi
+                      chọn Xem trước công việc để cập nhật.
+                    </p>
+                  )}
+                  {!note.planId && (
+                    <div className="note-proposal-footer">
+                      <label className="note-horizon">
+                        Xếp trong{" "}
+                        <input
+                          aria-label="Số ngày xếp lịch"
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={horizonDays}
+                          disabled={!!busy}
+                          onChange={(event) =>
+                            setHorizonDays(event.target.value)
+                          }
+                        />{" "}
+                        ngày tới
+                      </label>
+                      <p
+                        id="note-proposal-help"
+                        className={
+                          proposalIssue ? "warning spaced" : "reason spaced"
+                        }
+                      >
+                        {proposalIssue ||
+                          (!hasTime
+                            ? "Bạn sẽ chọn giờ rảnh trước khi tạo công việc và lịch đề xuất."
+                            : "Công việc sẽ được tạo; bạn xem và xác nhận lịch ở bước tiếp theo.")}
+                      </p>
+                      <button
+                        type="submit"
+                        className="btn primary"
+                        aria-describedby="note-proposal-help"
+                        disabled={!!busy || !!proposalIssue}
+                      >
+                        {imported
+                          ? "Xem lịch đề xuất"
+                          : "Tạo công việc & xem lịch"}{" "}
+                        {icon("arrow")}
+                      </button>
+                    </div>
+                  )}
+                  {note.planId && (
+                    <div className="form-actions">
+                      <a className="btn primary" href="#today">
+                        Mở Hôm nay để làm việc
+                      </a>
+                    </div>
+                  )}
+                  {imported && !note.planId && (
+                    <button
+                      type="button"
+                      className="btn ghost small spaced"
+                      disabled={!!busy}
+                      onClick={() => requestSchedule("auto")}
+                    >
+                      Tiếp tục tự xếp lịch
+                    </button>
+                  )}
+                </form>
+                <div className="note-review-context">
+                  <NoteImpact
+                    drafts={drafts}
+                    horizonDays={horizonDays}
+                    hasTime={hasTime}
+                    enabled={
+                      reviewing && !busy && !imported && !dirty && hasAiAnalysis
+                    }
+                    workspace={workspace}
+                    onSetTime={onSetTime}
+                    showPreview
+                  />
+                  {imported && (
+                    <div className="card note-preview-placeholder">
+                      {icon("calendar")}
+                      <h3>Tiếp tục với lịch của bạn</h3>
+                      <p>
+                        Các công việc đã được lưu. Mở lịch đề xuất để kiểm tra
+                        và chọn Lưu lịch này.
+                      </p>
+                      <a className="btn secondary" href="#calendar">
+                        Mở lịch làm việc
+                      </a>
+                    </div>
+                  )}
+                  {!imported &&
+                    (dirty ||
+                      !hasAiAnalysis ||
+                      !drafts.some((task) => task.selected)) && (
+                      <div className="card note-preview-placeholder">
+                        {icon("calendar")}
+                        <h3>Lịch hiện ở đây sau khi kiểm tra</h3>
+                        <p>
+                          Chọn công việc và phân tích nội dung mới nhất để xem
+                          lịch thử.
+                        </p>
+                      </div>
+                    )}
+                </div>
               </div>
-            </div>
+            )}
           </section>
         )}
       </div>
