@@ -2,6 +2,7 @@ import { useOutsideDismiss } from "./popup-dismissal.jsx";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { icon } from "./ui.jsx";
+import "./styles/confirmation-dialog.css";
 
 export function ConversationDeleteDialog({
   title,
@@ -9,6 +10,9 @@ export function ConversationDeleteDialog({
   error,
   onCancel,
   onConfirm,
+  headingText = "Xóa cuộc trò chuyện?",
+  descriptionContent,
+  containerSelector = ".agent-main",
 }) {
   const dialog = useRef(null);
   const cancel = useRef(null);
@@ -21,7 +25,7 @@ export function ConversationDeleteDialog({
     const node = dialog.current;
     function place() {
       const area = document
-        .querySelector(".agent-main")
+        .querySelector(containerSelector)
         ?.getBoundingClientRect();
       const width = Math.min(420, window.innerWidth - 32);
       setPosition({
@@ -37,7 +41,11 @@ export function ConversationDeleteDialog({
           16,
           Math.min(
             window.innerHeight - node.offsetHeight - 16,
-            (area ? area.top + area.height / 2 : window.innerHeight / 2) -
+            (area
+              ? (Math.max(0, area.top) +
+                  Math.min(window.innerHeight, area.bottom)) /
+                2
+              : window.innerHeight / 2) -
               node.offsetHeight / 2,
           ),
         ),
@@ -99,7 +107,7 @@ export function ConversationDeleteDialog({
       }}
     >
       <div className="nora-delete-dialog-heading">
-        <h2 id={heading}>Xóa cuộc trò chuyện?</h2>
+        <h2 id={heading}>{headingText}</h2>
         <button
           type="button"
           className="nora-delete-dialog-close"
@@ -111,8 +119,13 @@ export function ConversationDeleteDialog({
         </button>
       </div>
       <p id={description}>
-        Cuộc trò chuyện <strong>{title}</strong> sẽ bị xóa vĩnh viễn. Bạn không
-        thể hoàn tác thao tác này. Các mục đã lưu trong lịch vẫn được giữ.
+        {descriptionContent || (
+          <>
+            Cuộc trò chuyện <strong>{title}</strong> sẽ bị xóa vĩnh viễn. Bạn
+            không thể hoàn tác thao tác này. Các mục đã lưu trong lịch vẫn được
+            giữ.
+          </>
+        )}
       </p>
       {error && (
         <p className="nora-delete-dialog-error" role="alert">

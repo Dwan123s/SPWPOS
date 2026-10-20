@@ -65,11 +65,14 @@ export function showModal(title, subtitle, body) {
 export function hideModal() {
   update({ modal: null });
 }
+export function dismissToast(id) {
+  update({ toasts: snapshot.toasts.filter((t) => t.id !== id) });
+}
 export function notify(message, type = "") {
   const id = crypto.randomUUID();
   update({ toasts: [...snapshot.toasts, { id, message, type }] });
   setTimeout(
-    () => update({ toasts: snapshot.toasts.filter((t) => t.id !== id) }),
+    () => dismissToast(id),
     6000,
   );
 }

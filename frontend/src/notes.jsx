@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import "./styles/notes-entry.css";
 import { api } from "./api.js";
-import { state } from "./ui.jsx";
+import { state, toast } from "./ui.jsx";
 import { planModal } from "./calendar.jsx";
 import { Loading } from "./loading.jsx";
 import { getGuide, completeGuideStep } from "./onboarding.js";
 import { NoteStudio } from "./note-studio.jsx";
+import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import {
   clearNoteAppearance,
   normalizeNoteAppearance,
@@ -58,6 +59,8 @@ export function NotesPage({ onWorkspaceChanged }) {
   const [message, setMessage] = useState("");
   const [failedAction, setFailedAction] = useState(null);
   const [selectionTarget, setSelectionTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
   const selectionPrompt = useRef(null);
   const [libraryOpen, setLibraryOpen] = useState(
     () => !window.matchMedia("(max-width: 800px)").matches,
@@ -446,163 +449,199 @@ export function NotesPage({ onWorkspaceChanged }) {
     });
 
   return (
-    <NoteStudio
-      notes={notes}
-      note={note}
-      appearance={appearance}
-      setAppearance={(value) => {
-        const next = normalizeNoteAppearance(value);
-        setAppearance(next);
-        saveNoteAppearance(appearanceAccount, note.id, next);
-      }}
-      drafts={drafts}
-      prepareActivities={prepareActivities}
-      applyActivities={applyActivities}
-      onActivityReviewDirty={(value) => {
-        activityReviewDirty.current = value;
-      }}
-      agent={agent}
-      imported={imported}
-      busy={busy}
-      dirty={dirty}
-      hasAiAnalysis={hasAiAnalysis}
-      hasTime={hasTime}
-      horizonDays={horizonDays}
-      setHorizonDays={setHorizonDays}
-      libraryOpen={libraryOpen}
-      setLibraryOpen={setLibraryOpen}
-      select={requestSelect}
-      setNote={setNote}
-      analyze={analyze}
-      requestSchedule={requestSchedule}
-      updateDraft={updateDraft}
-      proposalIssue={proposalIssue}
-      workspace={state.workspace}
-      stage={stage}
-      setStage={setStage}
-      navigationPrompt={
-        selectionTarget && (
-          <div
-            className="note-switch-prompt"
-            ref={selectionPrompt}
-            tabIndex={-1}
-            role="alert"
-            aria-labelledby="note-switch-title"
-          >
-            <div>
-              <strong id="note-switch-title">Có thay đổi chưa lưu</strong>
-              <p>
-                Nội dung ghi chú hoặc công việc gợi ý đang được chỉnh sửa.
-                Chuyển ghi chú sẽ bỏ các thay đổi này.
-              </p>
-            </div>
-            <div className="actions">
-              <button
-                type="button"
-                className="btn secondary small"
-                onClick={() => {
-                  setSelectionTarget(null);
-                  requestAnimationFrame(() =>
-                    document
-                      .querySelector(
-                        stage === "review"
-                          ? "#note-analysis-title"
-                          : ".note-title-field input",
-                      )
-                      ?.focus(),
-                  );
-                }}
-              >
-                Tiếp tục chỉnh sửa
-              </button>
-              <button
-                type="button"
-                className="btn danger small"
-                onClick={() => select(selectionTarget)}
-              >
-                Bỏ thay đổi và chuyển
-              </button>
-            </div>
-          </div>
-        )
-      }
-      saveDraft={() =>
-        run("Đang lưu ghi chú…", async () => {
-          await save();
-          setMessage("Đã lưu bản nháp. Chưa tạo công việc hoặc thay đổi lịch.");
-        })
-      }
-      onSetTime={() => setPendingSchedule("impact")}
-      availability={
-        pendingSchedule && (
-          <NoteAvailabilitySetup
-            busy={!!busy}
-            timeZone={
-              state.workspace?.preference?.timeZoneId || "Asia/Ho_Chi_Minh"
+    <>
+      {deleteTarget && (
+        <ConversationDeleteDialog
+          title={deleteTarget.title}
+          headingText="Xóa ghi chú?"
+          containerSelector=".note-studio"
+          busy={!!busy}
+          error={deleteError}
+          descriptionContent={
+            <>
+              Ghi chú <strong>{deleteTarget.title}</strong> sẽ bị xóa vĩnh viễn.{" "}
+              {deleteTarget.id === note.id &&
+                dirty &&
+                "Các thay đổi chưa lưu trong ghi chú này cũng sẽ bị xóa. "}
+              Các công việc và lịch đã tạo vẫn được giữ.
+            </>
+          }
+          onCancel={() => {
+            if (!busy) {
+              setDeleteTarget(null);
+              setDeleteError("");
             }
-            onSave={saveAvailability}
-            onCancel={() => setPendingSchedule(null)}
-          />
-        )
-      }
-      feedback={
-        <>
-          {busy && <Loading label={busy} />}
-          {message && (
-            <p role="status" className="note-feedback info">
-              {message}
-            </p>
-          )}
-          {agentResult && <AgentResult result={agentResult} />}
-          {error && (
-            <div role="alert" className="form-error note-feedback">
-              {error}
-              {failedAction && (
-                <div className="form-actions">
-                  <button
-                    type="button"
-                    className="btn secondary small"
-                    disabled={!!busy}
-                    onClick={() =>
-                      failedAction === "analysis"
-                        ? analyze()
-                        : requestSchedule(
-                            failedAction === "auto" ? "auto" : "proposal",
-                          )
-                    }
-                  >
-                    Thử lại
-                  </button>
-                </div>
-              )}
+          }}
+          onConfirm={() => {
+            if (busy) return;
+            const saved = deleteTarget;
+            setDeleteError("");
+            run("Đang xóa ghi chú…", async () => {
+              try {
+                const versionParam = saved.version
+                  ? `?version=${encodeURIComponent(saved.version)}`
+                  : "";
+                await api(`/api/notes/${saved.id}${versionParam}`, "DELETE");
+                if (!alive.current) return;
+                clearNoteAppearance(appearanceAccount, saved.id);
+                setNotes((items) =>
+                  items.filter((item) => item.id !== saved.id),
+                );
+                if (note.id === saved.id) select(blank());
+                setDeleteTarget(null);
+                toast(`Đã xóa ghi chú “${saved.title}”.`);
+              } catch (e) {
+                if (alive.current) setDeleteError(e.message);
+              }
+            });
+          }}
+        />
+      )}
+      <NoteStudio
+        notes={notes}
+        note={note}
+        appearance={appearance}
+        setAppearance={(value) => {
+          const next = normalizeNoteAppearance(value);
+          setAppearance(next);
+          saveNoteAppearance(appearanceAccount, note.id, next);
+        }}
+        drafts={drafts}
+        prepareActivities={prepareActivities}
+        applyActivities={applyActivities}
+        onActivityReviewDirty={(value) => {
+          activityReviewDirty.current = value;
+        }}
+        agent={agent}
+        imported={imported}
+        busy={busy}
+        dirty={dirty}
+        hasAiAnalysis={hasAiAnalysis}
+        hasTime={hasTime}
+        horizonDays={horizonDays}
+        setHorizonDays={setHorizonDays}
+        libraryOpen={libraryOpen}
+        setLibraryOpen={setLibraryOpen}
+        select={requestSelect}
+        setNote={setNote}
+        analyze={analyze}
+        requestSchedule={requestSchedule}
+        updateDraft={updateDraft}
+        proposalIssue={proposalIssue}
+        workspace={state.workspace}
+        stage={stage}
+        setStage={setStage}
+        navigationPrompt={
+          selectionTarget && (
+            <div
+              className="note-switch-prompt"
+              ref={selectionPrompt}
+              tabIndex={-1}
+              role="alert"
+              aria-labelledby="note-switch-title"
+            >
+              <div>
+                <strong id="note-switch-title">Có thay đổi chưa lưu</strong>
+                <p>
+                  Nội dung ghi chú hoặc công việc gợi ý đang được chỉnh sửa.
+                  Chuyển ghi chú sẽ bỏ các thay đổi này.
+                </p>
+              </div>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="btn secondary small"
+                  onClick={() => {
+                    setSelectionTarget(null);
+                    requestAnimationFrame(() =>
+                      document
+                        .querySelector(
+                          stage === "review"
+                            ? "#note-analysis-title"
+                            : ".note-title-field input",
+                        )
+                        ?.focus(),
+                    );
+                  }}
+                >
+                  Tiếp tục chỉnh sửa
+                </button>
+                <button
+                  type="button"
+                  className="btn danger small"
+                  onClick={() => select(selectionTarget)}
+                >
+                  Bỏ thay đổi và chuyển
+                </button>
+              </div>
             </div>
-          )}
-        </>
-      }
-      onDelete={(target = note) => {
-        const currentTarget = target?.id ? target : note;
-        if (busy || !currentTarget?.id) return;
-        const saved =
-          notes.find((item) => item.id === currentTarget.id) || currentTarget;
-        if (
-          !window.confirm(
-            `Xóa ghi chú “${saved.title}”?\n${saved.id === note.id && dirty ? "Các thay đổi chưa lưu trong ghi chú này cũng sẽ bị xóa.\n" : ""}Các công việc và lịch đã tạo vẫn được giữ.`,
           )
-        )
-          return;
-        run("Đang xóa ghi chú…", async () => {
-          const versionParam = saved.version
-            ? `?version=${encodeURIComponent(saved.version)}`
-            : "";
-          await api(`/api/notes/${saved.id}${versionParam}`, "DELETE");
-          if (!alive.current) return;
-          clearNoteAppearance(appearanceAccount, saved.id);
-          setNotes((items) => items.filter((item) => item.id !== saved.id));
-          if (note.id === saved.id) select(blank());
-          setMessage(`Đã xóa ghi chú “${saved.title}”.`);
-        });
-      }}
-    />
+        }
+        saveDraft={() =>
+          run("Đang lưu ghi chú…", async () => {
+            await save();
+            setMessage(
+              "Đã lưu bản nháp. Chưa tạo công việc hoặc thay đổi lịch.",
+            );
+          })
+        }
+        onSetTime={() => setPendingSchedule("impact")}
+        availability={
+          pendingSchedule && (
+            <NoteAvailabilitySetup
+              busy={!!busy}
+              timeZone={
+                state.workspace?.preference?.timeZoneId || "Asia/Ho_Chi_Minh"
+              }
+              onSave={saveAvailability}
+              onCancel={() => setPendingSchedule(null)}
+            />
+          )
+        }
+        feedback={
+          <>
+            {busy && <Loading label={busy} />}
+            {message && (
+              <p role="status" className="note-feedback info">
+                {message}
+              </p>
+            )}
+            {agentResult && <AgentResult result={agentResult} />}
+            {error && (
+              <div role="alert" className="form-error note-feedback">
+                {error}
+                {failedAction && (
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      className="btn secondary small"
+                      disabled={!!busy}
+                      onClick={() =>
+                        failedAction === "analysis"
+                          ? analyze()
+                          : requestSchedule(
+                              failedAction === "auto" ? "auto" : "proposal",
+                            )
+                      }
+                    >
+                      Thử lại
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        }
+        onDelete={(target = note) => {
+          const currentTarget = target?.id ? target : note;
+          if (busy || !currentTarget?.id) return;
+          const saved =
+            notes.find((item) => item.id === currentTarget.id) || currentTarget;
+          setDeleteError("");
+          setDeleteTarget(saved);
+        }}
+      />
+    </>
   );
 }
 function NoteAvailabilitySetup({ busy, timeZone, onSave, onCancel }) {

@@ -27,7 +27,7 @@
 .note-studio.notes-workspace.is-writing,
 .note-studio.notes-workspace.is-review {
   grid-template-columns: 270px minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
+  grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
   gap: 0;
   border: 1px solid #e0e8f2;
@@ -39,34 +39,9 @@
 .note-studio.notes-workspace.is-focus {
   grid-template-columns: minmax(0, 1fr);
 }
-.note-desk-header {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 66px;
-  padding: 10px 22px;
-  border-bottom: 1px solid #e8edf4;
-  background: #fff;
-}
-.note-studio.is-focus .note-desk-header,
 .note-studio.is-focus .note-studio-main {
   grid-column: 1;
 }
-.note-context-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  flex: 0 0 auto;
-  padding: 6px 9px;
-  border: 1px solid #e0e7f0;
-  border-radius: 7px;
-  color: #607187;
-  background: #f7f9fc;
-  font-size: 11px;
-}
-.note-context-chip i,
 .note-list-state i {
   width: 6px;
   height: 6px;
@@ -74,11 +49,9 @@
   background: #a6afbf;
   flex: 0 0 auto;
 }
-.note-context-chip.state-reviewed i,
 .note-list-state.state-reviewed i {
   background: #4485df;
 }
-.note-context-chip.state-created i,
 .note-list-state.state-created i {
   background: #2fa58b;
 }
@@ -335,7 +308,7 @@
 .glass-workspace .note-studio .notes-library,
 .glass-workspace .note-studio.is-writing .notes-library {
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1;
   align-self: stretch;
   padding: 20px 0 14px;
   border: 0;
@@ -580,7 +553,7 @@
 }
 .note-studio-main {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
   min-width: 0;
   padding: 0 30px 24px;
   background: #fff;
@@ -592,6 +565,9 @@
   margin: 0;
   padding: 13px 0;
   border-bottom: 1px solid var(--note-paper-line);
+}
+.note-flow-bar .note-writing-tools {
+  margin-left: auto;
 }
 .note-studio .note-flow {
   gap: 18px;
@@ -863,14 +839,6 @@
   .note-studio.notes-workspace.is-focus {
     grid-template-columns: minmax(0, 1fr);
   }
-  .note-desk-header {
-    padding: 9px 16px;
-    gap: 8px;
-  }
-  .note-context-chip {
-    font-size: 10px;
-    padding: 5px 7px;
-  }
   .note-studio-main {
     padding: 0 24px 22px;
   }
@@ -886,7 +854,7 @@
   .note-studio.notes-workspace.is-writing,
   .note-studio.notes-workspace.is-review {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
     border-radius: 17px;
   }
   .glass-workspace .note-studio .notes-library,
@@ -943,27 +911,42 @@
   .note-studio .note-list-item strong {
     white-space: normal;
   }
-  .note-desk-header {
+  .note-studio .note-writing-tools {
     grid-column: 1;
     grid-row: 2;
-    flex-wrap: wrap;
-    gap: 6px 10px;
-    padding: 9px 16px;
+    width: auto;
+    margin-left: 0;
+    gap: 1px;
   }
-  .note-studio .note-writing-tools {
-    order: 3;
-    width: 100%;
+  .note-studio .note-flow-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 8px;
+  }
+  .note-studio .note-flow {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .note-studio .note-desk-actions {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .note-studio.is-review .note-flow {
+    grid-column: 1;
+  }
+  .note-studio.is-review .note-desk-actions {
+    grid-row: 1;
   }
   .note-studio-main {
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 2;
     padding: 0 20px 20px;
   }
-  .note-studio.is-focus .note-desk-header {
+  .note-studio.is-focus .note-studio-main {
     grid-row: 1;
   }
-  .note-studio.is-focus .note-studio-main {
-    grid-row: 2;
+  .note-studio.notes-workspace.is-focus {
+    grid-template-rows: minmax(0, 1fr);
   }
   .note-studio .note-flow {
     gap: 12px;

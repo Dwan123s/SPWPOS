@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { dateFmt, icon, localInput, minutes, toUtc } from "./ui.jsx";
 import { NoteImpact } from "./note-impact.jsx";
-import { NoteLibrary, noteState } from "./note-library.jsx";
+import { NoteLibrary } from "./note-library.jsx";
 import { NoteWritingTools } from "./note-writing-tools.jsx";
 import { noteAppearanceStyle } from "./note-appearance.js";
 import { NoteActivitiesReview } from "./note-activities.jsx";
@@ -104,48 +104,6 @@ export function NoteStudio({
         onDelete={onDelete}
         hidden={focusMode && !reviewing}
       />
-      <header className="note-desk-header">
-        <span className={"note-context-chip state-" + noteState(note).key}>
-          <i aria-hidden="true" />
-          {noteState(note).label}
-        </span>
-        <NoteWritingTools
-          busy={busy}
-          hidden={reviewing}
-          imported={imported}
-          typeMenu={typeMenu}
-          appearance={appearance}
-          setAppearance={setAppearance}
-          insertList={insertList}
-        />
-        <div className="note-desk-actions">
-          {note.id && (
-            <button
-              type="button"
-              className="note-delete-button"
-              aria-label="Xóa ghi chú"
-              title="Xóa ghi chú"
-              disabled={!!busy}
-              onClick={() => onDelete(note)}
-            >
-              {icon("trash")}
-            </button>
-          )}
-          {!reviewing && (
-            <button
-              type="button"
-              className="note-focus-toggle"
-              aria-label={focusMode ? "Thoát tập trung" : "Tập trung viết"}
-              title={focusMode ? "Thoát tập trung" : "Tập trung viết"}
-              aria-pressed={focusMode}
-              onClick={() => setFocusMode(!focusMode)}
-            >
-              <NoteGlyph name={focusMode ? "collapse" : "focus"} />
-              <span>{focusMode ? "Thoát tập trung" : "Tập trung viết"}</span>
-            </button>
-          )}
-        </div>
-      </header>
       <div className="note-studio-main">
         {navigationPrompt}
         <div className="note-flow-bar">
@@ -176,6 +134,42 @@ export function NoteStudio({
               </span>
             </li>
           </ol>
+          <NoteWritingTools
+            busy={busy}
+            hidden={reviewing}
+            imported={imported}
+            typeMenu={typeMenu}
+            appearance={appearance}
+            setAppearance={setAppearance}
+            insertList={insertList}
+          />
+          <div className="note-desk-actions">
+            {note.id && (
+              <button
+                type="button"
+                className="note-delete-button"
+                aria-label="Xóa ghi chú"
+                title="Xóa ghi chú"
+                disabled={!!busy}
+                onClick={() => onDelete(note)}
+              >
+                {icon("trash")}
+              </button>
+            )}
+            {!reviewing && (
+              <button
+                type="button"
+                className="note-focus-toggle"
+                aria-label={focusMode ? "Thoát tập trung" : "Tập trung viết"}
+                title={focusMode ? "Thoát tập trung" : "Tập trung viết"}
+                aria-pressed={focusMode}
+                onClick={() => setFocusMode(!focusMode)}
+              >
+                <NoteGlyph name={focusMode ? "collapse" : "focus"} />
+                <span>{focusMode ? "Thoát tập trung" : "Tập trung viết"}</span>
+              </button>
+            )}
+          </div>
         </div>
         <section
           className="card note-paper"

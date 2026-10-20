@@ -1,19 +1,35 @@
 import { useRef, useState } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { App } from "../src/App.jsx";
 import { ConversationDeleteDialog } from "../src/conversation-delete-dialog.jsx";
 import { GettingStarted } from "../src/getting-started.jsx";
 import { NoteWritingTools } from "../src/note-writing-tools.jsx";
 import { defaultNoteAppearance } from "../src/note-appearance.js";
 import { tasksPage } from "../src/page-tasks.jsx";
-import { getSnapshot, update } from "../src/store.js";
+import { getSnapshot, update, notify } from "../src/store.js";
 import { state } from "../src/ui.jsx";
 
 beforeEach(() => {
   state.workspace = { tasks: [], categories: [] };
   state.taskScope = "all";
   update({ screen: null, modal: null, toasts: [], slots: {} });
+});
+
+it("toasts can be dismissed and automatically disappear after six seconds", () => {
+  vi.useFakeTimers();
+  try {
+    render(<App initialize={false} />);
+    act(() => notify("Đã xóa ghi chú."));
+    fireEvent.click(screen.getByRole("button", { name: "Đóng thông báo" }));
+    expect(screen.queryByText("Đã xóa ghi chú.")).toBeNull();
+    act(() => notify("Đã xóa ghi chú khác."));
+    expect(screen.getByText("Đã xóa ghi chú khác.")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(6000));
+    expect(screen.queryByText("Đã xóa ghi chú khác.")).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("deadline filters keep input values and inline sections when dismissed by an outside click", () => {

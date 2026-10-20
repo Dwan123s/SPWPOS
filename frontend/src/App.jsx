@@ -6,7 +6,7 @@ import {
   useRef,
   useSyncExternalStore,
 } from "react";
-import { getSnapshot, subscribe } from "./store.js";
+import { getSnapshot, subscribe, dismissToast } from "./store.js";
 import { closeModal, button } from "./ui.jsx";
 import {
   startController,
@@ -71,6 +71,20 @@ export function App({ initialize = true }) {
         {snapshot.toasts.map((toast) => (
           <div key={toast.id} className={`toast ${toast.type}`}>
             {toast.message}
+            <button
+              type="button"
+              aria-label="Đóng thông báo"
+              onClick={() => dismissToast(toast.id)}
+              style={{
+                background: "none",
+                border: 0,
+                color: "inherit",
+                cursor: "pointer",
+                marginLeft: 12,
+              }}
+            >
+              ×
+            </button>
           </div>
         ))}
       </div>

@@ -10,6 +10,8 @@ import userEvent from "@testing-library/user-event";
 import { NotesPage } from "../src/notes.jsx";
 
 import { state } from "../src/ui.jsx";
+import { getSnapshot, update } from "../src/store.js";
+beforeEach(() => update({ toasts: [] }));
 
 vi.mock("../src/calendar.jsx", () => ({ planModal: vi.fn() }));
 import { planModal } from "../src/calendar.jsx";
@@ -195,7 +197,10 @@ it("cancels note deletion without changing the saved note or editor", async () =
   await user.click(
     screen.getByRole("button", { name: "Xóa ghi chú", exact: true }),
   );
-  expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Tuần này"));
+  const dialog = screen.getByRole("alertdialog", { name: "Xóa ghi chú?" });
+  expect(within(dialog).getByText("Tuần này", { exact: false })).toBeTruthy();
+  expect(confirm).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole("button", { name: "Hủy" }));
   expect(calls.some((call) => call.method === "DELETE")).toBe(false);
   expect(
     screen.getByRole("heading", { name: "Xem trước công việc" }),
@@ -210,7 +215,15 @@ it("deletes the reviewed note with its latest version and clears the editor", as
   await user.click(
     screen.getByRole("button", { name: "Xóa ghi chú", exact: true }),
   );
-  await screen.findByText("Đã xóa ghi chú “Tuần này”.");
+  await user.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
+  await waitFor(() =>
+    expect(
+      getSnapshot().toasts.some(
+        (t) => t.message === "Đã xóa ghi chú “Tuần này”.",
+      ),
+    ).toBe(true),
+  );
+  expect(screen.queryByText("Đã xóa ghi chú “Tuần này”.")).toBeNull();
   expect(calls.filter((call) => call.method === "DELETE")).toEqual([
     {
       url: "/api/notes/note-1?version=analyzed",
@@ -243,7 +256,14 @@ it("deletes a library note without losing the unsaved current note", async () =>
   await user.click(
     screen.getByRole("button", { name: "Xóa ghi chú Ghi chú cũ" }),
   );
-  await screen.findByText("Đã xóa ghi chú “Ghi chú cũ”.");
+  await user.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
+  await waitFor(() =>
+    expect(
+      getSnapshot().toasts.some(
+        (t) => t.message === "Đã xóa ghi chú “Ghi chú cũ”.",
+      ),
+    ).toBe(true),
+  );
   expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(
     "Nội dung 0 chưa lưu",
   );
@@ -263,17 +283,25 @@ it("preserves saved and unsaved content when note deletion fails", async () => {
   await user.click(
     screen.getByRole("button", { name: "Xóa ghi chú", exact: true }),
   );
+  expect(screen.getByRole("alertdialog").textContent).toContain(
+    "Các thay đổi chưa lưu",
+  );
+  await user.click(screen.getByRole("button", { name: "Xóa vĩnh viễn" }));
   await screen.findByRole("alert");
   expect(screen.getByLabelText("Nội dung ghi chú").value).toContain("chưa lưu");
   expect(notes).toHaveLength(1);
-  expect(confirm).toHaveBeenCalledWith(
-    expect.stringContaining("Các thay đổi chưa lưu"),
-  );
+  expect(confirm).not.toHaveBeenCalled();
   failDelete = false;
   await user.click(
-    screen.getByRole("button", { name: "Xóa ghi chú", exact: true }),
+    screen.getByRole("button", { name: "Xóa vĩnh viễn", exact: true }),
   );
-  await screen.findByText("Đã xóa ghi chú “Tuần này”.");
+  await waitFor(() =>
+    expect(
+      getSnapshot().toasts.some(
+        (t) => t.message === "Đã xóa ghi chú “Tuần này”.",
+      ),
+    ).toBe(true),
+  );
   expect(notes).toHaveLength(0);
 });
 it.each(["Gemini", "VertexAI"])(
@@ -850,7 +878,7 @@ it("inserts a checklist at the editor selection from the top toolbar without sen
   expect(
     screen
       .getByRole("button", { name: "Thêm dòng checklist" })
-      .closest(".note-desk-header"),
+      .closest(".note-flow-bar"),
   ).toBeTruthy();
   expect(calls.some((call) => call.method === "POST")).toBe(false);
 });
