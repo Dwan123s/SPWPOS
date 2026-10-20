@@ -23,7 +23,8 @@ public sealed class AgentApiTests
     [Fact] public async Task A_streamed_overlap_rejection_is_unsaved_and_its_history_replaces_the_provisional_success_text()
     {
         await using var f = new Factory(); using var client = await f.ClientAsync(); await WorkspaceFlowTests.Authorize(f, client);
-        var day = f.Clock.GetUtcNow().AddDays(1);
+        var localNow = TimeZoneInfo.ConvertTime(f.Clock.GetUtcNow(), TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"));
+        var day = new DateTimeOffset(localNow.Date.AddDays(1).AddHours(9), localNow.Offset);
         await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Đi làm", day, day.AddHours(4), EventType: "WORK"));
         f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Reply = "Lịch trình sẽ được cập nhật.", Events = [new("Cuộc họp", day.AddHours(1), day.AddHours(2), EventType: "MEETING")] };
         var request = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Thêm cuộc họp ngày mai", true);
