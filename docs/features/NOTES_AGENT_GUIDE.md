@@ -1,10 +1,10 @@
 # Ghi chú và agent lập lịch
 
-Mục **Ghi chú & AI** lưu ghi chú theo tài khoản và chuyển nội dung thành công việc để lập lịch bằng bộ lập kế hoạch của PLANORA.
+Mục **Ghi chú & AI** lưu ghi chú theo tài khoản và nhận diện cả sự kiện cố định lẫn công việc để lập lịch bằng bộ lập kế hoạch của PLANORA.
 
 ## Sử dụng
 
-1. Thiết lập giờ rảnh, sự kiện bận và thời gian nghỉ trong **Giờ rảnh**.
+1. Thiết lập giờ rảnh và thời gian nghỉ nếu muốn xếp công việc. Ghi chú chỉ có sự kiện cố định không cần thiết lập giờ rảnh.
 2. Vào **Ghi chú & AI**, nhập tiêu đề và nội dung. Ví dụ:
 
    ```text
@@ -12,15 +12,16 @@ Mục **Ghi chú & AI** lưu ghi chú theo tài khoản và chuyển nội dung 
    Ôn chương 4 vào ngày mai, khoảng 90 phút
    ```
 
-3. Chọn số ngày xếp lịch (1–30). Có thể lưu ghi chú để tiếp tục sau.
-4. Chọn **Tạo và lưu lịch ngay**. Hệ thống lưu ghi chú, phân tích, tạo công việc và áp dụng lịch ngay; không cần bấm áp dụng thêm.
-5. Xem các phiên đã tạo và cảnh báo. Nếu chưa đủ giờ rảnh, phần chưa xếp được vẫn được báo rõ. Vào **Hôm nay** hoặc **Lịch làm việc** để thực hiện phiên.
+3. Chọn **Xem trước công việc**. Kết quả mới mở **Xem trước lịch & công việc**, liệt kê cả đi học, ca làm, cuộc họp và công việc.
+4. Chọn các hoạt động cần giữ, sửa ngày giờ và bổ sung thông tin còn thiếu. Công việc có giờ bắt đầu được giữ trong khung giờ đó; công việc linh hoạt cần thời lượng và hạn chót. Không tự điền 60 phút hoặc hạn sau 7 ngày.
+5. Chọn phạm vi 1–30 ngày rồi bấm **Xem lịch đề xuất**. Bước này chưa tạo sự kiện, công việc hoặc phiên làm việc.
+6. Kiểm tra ngày giờ và cảnh báo, rồi bấm **Lưu sự kiện & công việc** để lưu toàn bộ trong một giao dịch. Nếu chưa xếp đủ công việc, chỉnh sửa trước khi lưu. Có thể quay lại chỉnh sửa mà chưa thay đổi lịch.
 
-Nếu tài khoản chưa có giờ rảnh, nút **Tạo công việc & xem lịch** hoặc **Tạo và lưu lịch ngay** mở phần **Chọn giờ rảnh để tạo lịch** ngay trong note. Chọn ngày trong tuần, giờ bắt đầu/kết thúc rồi bấm **Lưu giờ rảnh & tiếp tục**. Hệ thống lưu giờ bạn chọn và tiếp tục thao tác đang thực hiện; tên, thời lượng và lựa chọn công việc đã chỉnh sửa được giữ nguyên. Hủy bước này chưa tạo công việc hoặc lịch. Giờ kết thúc phải sau giờ bắt đầu trong cùng ngày; có thể dùng màn hình Giờ rảnh để cấu hình nhiều khoảng khác nhau.
+Nếu tài khoản chưa có giờ rảnh và bạn chọn công việc, bấm **Thiết lập giờ rảnh** ngay trong bước kiểm tra. Chọn ngày trong tuần, giờ bắt đầu/kết thúc rồi bấm **Lưu giờ rảnh & tiếp tục**, sau đó bấm **Xem lịch đề xuất**. Các hoạt động đã chỉnh sửa được giữ nguyên. Hủy bước này chưa tạo sự kiện, công việc hoặc lịch. Giờ kết thúc phải sau giờ bắt đầu trong cùng ngày; có thể dùng màn hình Giờ rảnh để cấu hình nhiều khoảng khác nhau.
 
 Nếu nút còn bị khóa, lý do hiện ngay cạnh nút: note đã sửa cần phân tích lại, kết quả cũ chưa dùng AI hoặc chưa chọn công việc.
 
-Nếu muốn kiểm tra trước, chọn **Xem trước công việc**, sửa tên, deadline, thời lượng, ưu tiên, loại việc và chọn các công việc cần lưu. **Tạo công việc & xem lịch** mở bản xem trước; lịch chỉ thay đổi khi chọn **Lưu lịch này**.
+Kết quả cũ chỉ có `tasks` vẫn dùng giao diện **Tạo công việc & xem lịch** và **Lưu lịch này**. Phân tích lại ghi chú chưa chuyển đổi để dùng luồng mới. **Tạo và lưu lịch ngay** từ client cũ sẽ dừng ở bước kiểm tra khi phân tích trả danh sách hoạt động mới; không bỏ qua sự kiện để chỉ tạo công việc.
 
 ## Phân tích hoàn toàn bằng AI
 
@@ -28,13 +29,24 @@ Nếu muốn kiểm tra trước, chọn **Xem trước công việc**, sửa t�
 - Gemini sử dụng `AiSettings:Enabled`, `AiSettings:Provider`, `AiSettings:Model` và `AiSettings:GeminiApiKey`. API key không nằm trong trình duyệt.
 - Nếu AI chưa cấu hình, các nút phân tích/tự xếp lịch bị vô hiệu hóa; vẫn có thể lưu note. Server trả `NOTE_AI_NOT_CONFIGURED` (503) khi client gọi phân tích.
 - Nếu provider lỗi, hết quota, trả dữ liệu sai hoặc phản hồi bị cắt, server trả `NOTE_AI_UNAVAILABLE` (503). Ghi chú được giữ nguyên, không tạo công việc/lịch từ phản hồi lỗi và không chuyển sang bộ phân tích quy tắc.
-- AI tách tối đa 12 công việc, nhận diện thời lượng, deadline, ưu tiên, loại việc và deadline cứng. Dòng tâm trạng hoặc chỉ dẫn cho agent không được chuyển thành việc.
-- AI trả cờ `needsReview` cho nội dung mơ hồ, ngày không hợp lệ, quá nhiều việc hoặc điều kiện giờ rảnh/sự kiện/phụ thuộc cần khai báo riêng. Luồng tự động dừng để kiểm tra trước khi tạo công việc.
-- Thông tin thiếu được AI gợi ý thời lượng 60 phút và deadline sau 7 ngày. Người dùng có thể sửa trong chế độ xem trước.
+- AI trả tối đa 12 hoạt động: `EVENT` cho lớp học, ca làm, cuộc họp, cuộc hẹn; `TASK` cho công việc. Dòng tâm trạng hoặc chỉ dẫn cho agent không được chuyển thành hoạt động.
+- Giữ giờ bắt đầu/kết thúc và thời lượng đã nói; diễn giải ngày tương đối theo múi giờ tài khoản và ngữ cảnh cùng ngày. Hoạt động thiếu thông tin vẫn xuất hiện, kèm câu hỏi để bổ sung.
+- AI trả cờ `needsReview` cho nội dung mơ hồ, ngày không hợp lệ, quá nhiều hoạt động hoặc điều kiện giờ rảnh/phụ thuộc cần khai báo riêng. Người dùng phải kiểm tra và xác nhận lưu ý trước khi xem lịch.
+- Trường thời lượng, hạn chót hoặc ngày giờ chưa rõ được giữ `null`; không đoán thành 60 phút hoặc sau 7 ngày trong luồng hoạt động mới.
 - AI đọc và diễn giải note; bộ lập lịch kiểm tra giờ rảnh, sự kiện, deadline, phiên khóa và revision trước khi áp dụng. Viết điều kiện trong note chưa tự cập nhật thiết lập thời gian/phụ thuộc.
 - Kết quả phân tích bằng quy tắc từ phiên bản cũ cần được phân tích lại bằng AI trước khi tạo công việc. Các công việc và lịch đã tạo được giữ nguyên.
 - Server bắt buộc AI dù client cũ gửi `useAi=false`. Thử lại sau khi đã tạo công việc không tạo trùng; lịch đã áp dụng trả lại kết quả cũ.
 - Luồng chỉ chạy khi người dùng bấm nút, chưa tự theo dõi note ở nền.
+
+### Kiểm thử ghi chú có nhiều hoạt động
+
+```text
+thứ 4 tôi đi học vào lúc 7h sáng đến 12h trưa
+sau đó đi làm vào lúc 13h tới 17h, rồi meeting với đồng nghiệp cỡ 15p sau giờ làm
+tối từ 20h30 làm lại báo cáo RDS
+```
+
+Kỳ vọng: đủ bốn hoạt động trên cùng ngày thứ Tư: đi học 07:00–12:00, đi làm 13:00–17:00, họp 17:00–17:15, báo cáo bắt đầu 20:30 và hỏi thời lượng. Sau khi nhập thời lượng, xem đề xuất rồi xác nhận; trước xác nhận chưa có sự kiện/công việc mới. Lịch thay đổi hoặc ghi chú được sửa sau khi xem đề xuất sẽ yêu cầu xem trước lại. Thử lại cùng xác nhận đã thành công không tạo trùng.
 
 ## Bật Gemini cho ghi chú dạng tự do
 

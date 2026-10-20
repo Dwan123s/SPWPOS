@@ -76,9 +76,11 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [NORA sandbox fixes and verification, 19 October / Bản vá và kiểm chứng](reviews/NORA_SANDBOX_PATCH_VERIFICATION_2026-10-19.md)
 - [NORA guardrails integration, 19 October / Tích hợp guardrail với main](reviews/NORA_GUARDRAILS_INTEGRATION_2026-10-19.md)
 - [Nora UI/UX audit and interaction fixes, 19 October](reviews/NORA_UI_UX_AUDIT_2026-10-19.md)
+- [Nora first-pass UI/UX refinement implementation](reviews/NORA_UI_UX_REFINEMENT_2026-10-19.md)
 - [Nora first-pass screenshot findings, 19 October](reviews/NORA_UI_UX_FIRST_PASS_FINDINGS_2026-10-19.md)
 - [Nora UI/UX team handoff inventory](reviews/NORA_UI_UX_HANDOFF.md)
 - [Notes review, 18 October / Đánh giá phần Ghi chú](reviews/NOTE_REVIEW_2026-10-18.md)
+- [Mixed Notes activities, 20 October / Sự kiện và công việc từ ghi chú](reviews/NOTE_ACTIVITIES_2026-10-20.md)
 - [Earlier system review](reviews/SYSTEM_REVIEW.md) · [5 October review](reviews/REVIEW_2026-10-05.md) · [5 October fixes](reviews/FIX_2026-10-05.md)
 
 Reviews and plans describe their recorded dates and may include proposed or superseded behavior. Original evidence and the [UML v2 reference bundle](reference/UML-v2/) are retained separately from the current database export.

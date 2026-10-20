@@ -2,7 +2,7 @@
 
 Inventory verified against the current main workspace on 19 October 2026. Paths refer to this checkout; teammates can use the same paths relative to the repository root.
 
-Start with the page/components and two active Nora stylesheets. For a runnable handoff, give the team the entire frontend directory plus the three artwork files listed below. Shared shell modules have additional application-wide dependencies; this inventory is a review map, not a standalone extracted application.
+Start with the page/components and three active Nora stylesheets. For a runnable handoff, give the team the entire frontend directory plus the three artwork files listed below. Shared shell modules have additional application-wide dependencies; this inventory is a review map, not a standalone extracted application.
 
 ## Nora page and components
 
@@ -16,12 +16,25 @@ Start with the page/components and two active Nora stylesheets. For a runnable h
 | [frontend/src/nora-mascot.jsx](../../frontend/src/nora-mascot.jsx) | Nora avatar, animated mascot and motion preference control. |
 | [frontend/src/mascot-eyes.jsx](../../frontend/src/mascot-eyes.jsx) | Mascot eye rendering and pointer tracking. |
 
+Additional first-pass refinement components:
+
+| File | Review purpose |
+| --- | --- |
+| [frontend/src/nora-result-card.jsx](../../frontend/src/nora-result-card.jsx) | Consolidated confirmations, recovery actions, compact changes and explanation details. |
+| [frontend/src/nora-schedule-panel.jsx](../../frontend/src/nora-schedule-panel.jsx) | Live day timeline, request-scope view, refresh/error state and draft suggestions. |
+| [frontend/src/nora-panel-layout.jsx](../../frontend/src/nora-panel-layout.jsx) | Invisible desktop resize boundaries, keyboard resizing, saved widths and conversation space limits. |
+| [frontend/src/nora-message-actions.jsx](../../frontend/src/nora-message-actions.jsx) | Prompt bubbles and timestamp/copy/edit footers, response copy control and clipboard feedback shared with streaming prompts. |
+| [frontend/src/nora-schedule.js](../../frontend/src/nora-schedule.js) | Account-day timeline, date/category formatting, saved-event matching and title helpers. |
+| [frontend/src/nora-event-editor.jsx](../../frontend/src/nora-event-editor.jsx) | Pre-filled fixed-event editor using the existing event API. |
+
 ## Active Nora-specific styles
 
 | File | Review purpose |
 | --- | --- |
 | [frontend/src/styles/nora-entry.css](../../frontend/src/styles/nora-entry.css) | Imported by agent.jsx. Current UI refinements, popup and modal styles, interaction targets, composer and responsive overrides. |
 | [frontend/src/styles/nora-chat.css](../../frontend/src/styles/nora-chat.css) | Imported by nora-entry.css. Base Nora layout, chat bubbles, history, plan, animations and responsive styles. |
+
+| [frontend/src/styles/nora-refinement.css](../../frontend/src/styles/nora-refinement.css) | First-pass result cards, timeline, accessibility and responsive refinement styles. |
 
 ## Behavior supporting the UI
 
@@ -102,7 +115,15 @@ Start with the page/components and two active Nora stylesheets. For a runnable h
 
 ## Important distinctions
 
-- `frontend/src/styles/agent.css` is a legacy stylesheet and is not imported by the current Nora page. The active chain is `agent.jsx` → `nora-entry.css` → `nora-chat.css`, plus the global cascade above.
+- `frontend/src/styles/agent.css` is a legacy stylesheet and is not imported by the current Nora page. The active imports are `agent.jsx` → `nora-entry.css` → `nora-chat.css`, and `agent.jsx` → `nora-refinement.css`, plus the global cascade above.
 - `src/SPWPOS.Api/wwwroot/app/` contains generated build output. Review and edit the frontend source rather than the generated bundles.
 - Nora page layout and rendering live in the frontend. Backend agent services are needed only if the team also wants to evaluate generated wording, scheduling decisions or API contracts.
 - Synthetic screenshots in the audit use fictional data. Real voice, authentication and AI scheduling were not certified by the visual audit.
+
+## First-pass refinement follow-up
+
+- [Implementation, finding coverage and verification](NORA_UI_UX_REFINEMENT_2026-10-19.md)
+- [Timeline/result regression tests](../../frontend/tests/nora-schedule.test.jsx)
+- [Event editor regression tests](../../frontend/tests/nora-event-editor.test.jsx)
+
+The original review ZIP is a dated earlier snapshot. Use the current checkout for the refined implementation.
