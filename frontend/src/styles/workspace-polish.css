@@ -105,6 +105,7 @@
 .page-scene {
   min-width: 0;
   view-transition-name: workspace-page;
+  transform-origin: 50% 0;
 }
 /* Reserve the assistant frame before its deferred stylesheet arrives. */
 .planning-console[data-route="agent"] {
@@ -525,9 +526,70 @@
   }
 }
 @keyframes page-enter {
-  from {
+  /* Same sampled spring as PageTransition's Web Animations fallback. */
+  0% {
     opacity: 0;
-    transform: translateY(7px);
+    transform: translateY(20px) scale(0.985);
+  }
+  5% {
+    opacity: 0.227;
+    transform: translateY(17.733px) scale(0.9867);
+  }
+  10% {
+    opacity: 0.455;
+    transform: translateY(12.801px) scale(0.9904);
+  }
+  15% {
+    opacity: 0.682;
+    transform: translateY(7.396px) scale(0.99445);
+  }
+  20% {
+    opacity: 0.909;
+    transform: translateY(2.845px) scale(0.99787);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-0.29px) scale(1.00022);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-1.983px) scale(1.00149);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-2.521px) scale(1.00189);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2.301px) scale(1.00173);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(-1.702px) scale(1.00128);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-1.016px) scale(1.00076);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-0.002px) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0.316px) scale(0.99976);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(0.226px) scale(0.99983);
+  }
+  90% {
+    opacity: 1;
+    transform: translateY(0.062px) scale(0.99995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
   }
 }
 ::view-transition-old(root),
@@ -535,14 +597,15 @@
   animation: none;
 }
 ::view-transition-group(workspace-page) {
-  animation-duration: 240ms;
+  animation-duration: 480ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 ::view-transition-old(workspace-page) {
   animation: page-exit 120ms ease both;
 }
 ::view-transition-new(workspace-page) {
-  animation: page-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: 50% 0;
+  animation: page-enter 480ms linear both;
 }
 @media (max-width: 800px) {
   .glass-workspace .page-header > div:first-child {

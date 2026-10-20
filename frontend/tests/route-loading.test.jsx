@@ -116,3 +116,44 @@ it("respects both OS reduced motion and the saved pause setting", () => {
   );
   expect(animate).not.toHaveBeenCalled();
 });
+it("uses a visible light spring arrival and cancels it when navigation interrupts", () => {
+  const cancel = vi.fn();
+  const animate = vi.fn(() => ({ cancel }));
+  HTMLElement.prototype.animate = animate;
+  const view = render(
+    <PageTransition route="notes">
+      <h1 tabIndex={-1}>Ghi chú</h1>
+    </PageTransition>,
+  );
+  const [frames, timing] = animate.mock.calls[0];
+  expect(timing.duration).toBeGreaterThan(240);
+  expect(timing.duration).toBeLessThanOrEqual(500);
+  const positions = frames.map((frame) =>
+    Number(frame.transform.match(/translateY\(([-\d.]+)px\)/)[1]),
+  );
+  expect(positions[0]).toBeGreaterThan(0);
+  expect(Math.min(...positions)).toBeLessThan(-2);
+  expect(Math.min(...positions)).toBeGreaterThan(-4);
+  const scales = frames.map((frame) =>
+    Number(frame.transform.match(/scale\(([\d.]+)\)/)[1]),
+  );
+  expect(scales[0]).toBeLessThan(1);
+  expect(Math.max(...scales)).toBeGreaterThan(1);
+  expect(Math.max(...scales)).toBeLessThan(1.004);
+  expect(scales.at(-1)).toBe(1);
+  expect(positions.at(-1)).toBe(0);
+  expect(
+    frames.every((frame) => frame.opacity >= 0 && frame.opacity <= 1),
+  ).toBe(true);
+  view.rerender(
+    <PageTransition route="tasks">
+      <h1 tabIndex={-1}>Công việc</h1>
+    </PageTransition>,
+  );
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(document.activeElement).toBe(
+    screen.getByRole("heading", { name: "Công việc" }),
+  );
+  view.unmount();
+  expect(cancel).toHaveBeenCalledTimes(2);
+});
