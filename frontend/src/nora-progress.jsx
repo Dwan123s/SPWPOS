@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { icon } from "./ui.jsx";
 import { NoraAvatar } from "./nora-mascot.jsx";
 import { NoraReply } from "./nora-chat-ui.jsx";
+import { NoraPromptMessage } from "./nora-message-actions.jsx";
 
 export function NoraWalker({ active = true }) {
   return (
@@ -20,7 +21,7 @@ export function NoraWalker({ active = true }) {
   );
 }
 
-export function NoraProgress({ pending, busy }) {
+export function NoraProgress({ pending, busy, onEdit }) {
   const [elapsed, setElapsed] = useState(0);
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
@@ -36,10 +37,12 @@ export function NoraProgress({ pending, busy }) {
   const phase = pending.phases.at(-1);
   return (
     <article className="nora-live-turn">
-      <div className="agent-user-message">
-        <span>Bạn</span>
-        <p>{pending.text}</p>
-      </div>
+      <NoraPromptMessage
+        text={pending.text}
+        createdAt={pending.startedAt}
+        busy={busy}
+        onEdit={onEdit}
+      />
       <div className="nora-live-response">
         <div className="agent-response-heading">
           <strong>

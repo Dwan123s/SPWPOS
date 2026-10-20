@@ -1,7 +1,9 @@
+import { useOutsideDismiss } from "./popup-dismissal.jsx";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import { api } from "./api.js";
 import { icon, state } from "./ui.jsx";
+import { conversationLabel } from "./nora-schedule.js";
 import { groupConversations } from "./nora-chat-ui.jsx";
 
 export function LegacyConversationLibrary({
@@ -94,6 +96,7 @@ function groupRows(items) {
 }
 
 export function ConversationLibrary({
+  turns = [],
   selected,
   refresh,
   disabled,
@@ -115,6 +118,7 @@ export function ConversationLibrary({
   const [action, setAction] = useState("");
   const library = useRef(null);
   const menu = useRef(null);
+  const menuTrigger = useRef(null);
   const [menuPosition, setMenuPosition] = useState({});
   const focusLast = useRef(false);
   const previousEdit = useRef(null);
@@ -138,6 +142,7 @@ export function ConversationLibrary({
       ...library.current.querySelectorAll("[data-conversation-menu]"),
     ].find((button) => button.dataset.conversationMenu === menuOpenId);
     if (!trigger) return;
+    menuTrigger.current = trigger;
     node.showPopover?.();
     const anchor = trigger.getBoundingClientRect();
     const width = Math.min(220, window.innerWidth - 16);
@@ -208,18 +213,11 @@ export function ConversationLibrary({
     };
   }, [query, archived, revision, refresh]);
 
-  // Close floating popovers when clicking outside
-  useEffect(() => {
-    if (!menuOpenId) return;
-    const closeAll = (e) => {
-      if (e.target.closest?.(".nora-menu-popover, .nora-chat-item-more")) {
-        return;
-      }
-      setMenuOpenId(null);
-    };
-    document.addEventListener("click", closeAll);
-    return () => document.removeEventListener("click", closeAll);
-  }, [menuOpenId]);
+  useOutsideDismiss(
+    [menu, menuTrigger],
+    () => setMenuOpenId(null),
+    !!menuOpenId,
+  );
 
   async function more() {
     setLoading(true);
@@ -476,13 +474,28 @@ export function ConversationLibrary({
                       aria-current={row.id === selected ? "true" : undefined}
                       className="nora-chat-item-btn"
                       onClick={() => onChoose(row.id, row.archived, false, row)}
-                      aria-label={row.title}
+                      aria-label={conversationLabel(row, turns)}
                       title={row.title}
                     >
                       <span className="nora-chat-item-icon">
                         {icon("chat")}
                       </span>
-                      <span className="nora-chat-item-title">{row.title}</span>
+                      <span className="nora-chat-item-title">
+                        {conversationLabel(row, turns)}
+                        {row.createdAt && (
+                          <small>
+                            {new Intl.DateTimeFormat("vi-VN", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              timeZone:
+                                state.workspace?.preference?.timeZoneId ||
+                                "Asia/Ho_Chi_Minh",
+                            }).format(new Date(row.createdAt))}
+                          </small>
+                        )}
+                      </span>
                     </button>
                     <button
                       type="button"

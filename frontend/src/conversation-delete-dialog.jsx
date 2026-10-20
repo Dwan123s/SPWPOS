@@ -1,3 +1,4 @@
+import { useOutsideDismiss } from "./popup-dismissal.jsx";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { icon } from "./ui.jsx";
@@ -14,6 +15,7 @@ export function ConversationDeleteDialog({
   const heading = useId();
   const description = useId();
   const [position, setPosition] = useState({});
+  useOutsideDismiss([dialog], onCancel, !busy);
   useLayoutEffect(() => {
     const previous = document.activeElement;
     const node = dialog.current;
@@ -110,7 +112,7 @@ export function ConversationDeleteDialog({
       </div>
       <p id={description}>
         Cuộc trò chuyện <strong>{title}</strong> sẽ bị xóa vĩnh viễn. Bạn không
-        thể hoàn tác thao tác này.
+        thể hoàn tác thao tác này. Các mục đã lưu trong lịch vẫn được giữ.
       </p>
       {error && (
         <p className="nora-delete-dialog-error" role="alert">

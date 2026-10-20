@@ -21,6 +21,10 @@ export const state = {
 };
 export const $ = (selector, root = document) => root.querySelector(selector);
 const paths = {
+  undo: "M9 5 4 10l5 5 M4 10h9a6 6 0 0 1 6 6v3",
+  sliders: "M4 6h16 M4 12h16 M4 18h16 M8 3v6 M16 9v6 M10 15v6",
+  refresh:
+    "M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-1l2 6 M4 12l2 6a7 7 0 0 0 12-1",
   copy: "M9 9h12v12H9z M5 15H3V3h12v2",
   chat: "M4 4h16v12H9l-5 4z M8 8h8 M8 12h5",
   stop: "M6 6h12v12H6z",

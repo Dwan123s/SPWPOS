@@ -64,6 +64,17 @@ beforeEach(() => {
     vi.fn(async (url, options = {}) => {
       const body = options.body ? JSON.parse(options.body) : undefined;
       calls.push({ url, method: options.method, body });
+      if (url === "/api/workspace")
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              ...state.workspace,
+              events: state.workspace.events || [],
+              sessions: state.workspace.sessions || [],
+            },
+          }),
+        };
       if (url === "/api/agent/usage")
         return {
           ok: true,
@@ -170,17 +181,90 @@ async function ready() {
   });
 }
 
-it("keeps the explanation and the verified outcome visible after saving and reloading history", async () => {
+it.each([
+  ["hội thoại", "ArrowRight", "Thu gọn lịch sử", "Mở lịch sử", 260],
+  ["lịch", "ArrowLeft", "Đóng bảng lịch", "Lịch của bạn", 320],
+])(
+  "resizes the %s panel, preserves its width after collapse and reload, without sizing menus",
+  async (panel, key, close, reopen, initial) => {
+    vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+      matches: query === "(min-width: 1081px)",
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(1440);
+    turns = [{ ...result }];
+    let view = render(<AgentPage />);
+    await ready();
+    const separator = () =>
+      screen.getByRole("separator", { name: `Đổi chiều rộng bảng ${panel}` });
+    expect(separator().getAttribute("aria-valuenow")).toBe(String(initial));
+    fireEvent.keyDown(separator(), { key });
+    expect(separator().getAttribute("aria-valuenow")).toBe(
+      String(initial + 20),
+    );
+    fireEvent.click(screen.getByRole("button", { name: close, exact: true }));
+    expect(
+      screen.queryByRole("separator", { name: `Đổi chiều rộng bảng ${panel}` }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: reopen, exact: true }));
+    expect(separator().getAttribute("aria-valuenow")).toBe(
+      String(initial + 20),
+    );
+    expect(screen.queryByLabelText(`Kích thước bảng ${panel}`)).toBeNull();
+    view.unmount();
+    view = render(<AgentPage />);
+    await ready();
+    expect(separator().getAttribute("aria-valuenow")).toBe(
+      String(initial + 20),
+    );
+    fireEvent.keyDown(separator(), { key: "End" });
+    const maximum = Number(separator().getAttribute("aria-valuemax"));
+    expect(Number(separator().getAttribute("aria-valuenow"))).toBe(maximum);
+    fireEvent.keyDown(separator(), { key });
+    expect(Number(separator().getAttribute("aria-valuenow"))).toBe(maximum);
+  },
+);
+
+it("keeps the calendar collapsed when a new saved response arrives", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query === "(min-width: 1081px)",
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Đóng bảng lịch" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Gửi yêu cầu cho NORA" }));
+  await screen.findByRole("region", { name: "Kết quả yêu cầu" });
+  expect(
+    screen
+      .getByRole("button", { name: "Lịch của bạn" })
+      .getAttribute("aria-expanded"),
+  ).toBe("false");
+});
+
+it("keeps useful explanation and expandable verified details after saving and reloading history", async () => {
   result.reply = "Mình ưu tiên hồ sơ trước để bạn còn thời gian kiểm tra.";
   result.outcome = "Đã lưu lịch: Xử lý hồ sơ [WORK], 20/10/2026 12:00–12:45.";
   const first = render(<AgentPage />);
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  await screen.findByText(result.outcome);
+  await screen.findByText(result.reply);
+  fireEvent.click(screen.getByText("Giải thích và chi tiết"));
+  const verified = await screen.findByText(
+    "Đã lưu lịch: Xử lý hồ sơ · Công việc, 20/10/2026 12:00–12:45.",
+  );
+  expect(verified.closest("details").open).toBe(true);
   expect(screen.getByText(result.reply)).toBeTruthy();
   first.unmount();
   render(<AgentPage />);
-  await screen.findByText(result.outcome);
+  await screen.findByText(result.reply);
+  fireEvent.click(screen.getByText("Giải thích và chi tiết"));
+  const reloaded = await screen.findByText(
+    "Đã lưu lịch: Xử lý hồ sơ · Công việc, 20/10/2026 12:00–12:45.",
+  );
+  expect(reloaded.closest("details").open).toBe(true);
   expect(screen.getByText(result.reply)).toBeTruthy();
 });
 
@@ -293,9 +377,90 @@ it("sends a clear request, shows actual schedule in the account timezone and per
   expect(calls.find((call) => call.method === "POST").body.autoApply).toBe(
     true,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Hoàn tác yêu cầu" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hoàn tác" }));
   await screen.findByText("Đã hoàn tác yêu cầu.");
   expect(changed).toHaveBeenCalledTimes(2);
+});
+it("keeps save and remaining length in the box with help and keyboard hints below", async () => {
+  render(<AgentPage />);
+  await ready();
+  const composer = screen.getByRole("form", { name: "Gửi yêu cầu cho NORA" });
+  const save = screen.getByRole("switch", { name: "Tự động lưu lịch" });
+  expect(composer.contains(save)).toBe(true);
+  expect(screen.queryByLabelText("Tùy chọn gửi yêu cầu")).toBeNull();
+  const count = document.getElementById("nora-request-count");
+  expect(composer.contains(count)).toBe(true);
+  const request = screen.getByLabelText("Yêu cầu của bạn");
+  fireEvent.change(request, { target: { value: "abc" } });
+  expect(count.textContent).toContain("1997");
+  expect(count.hidden).toBe(true);
+  fireEvent.change(request, { target: { value: "a".repeat(1500) } });
+  expect(count.hidden).toBe(true);
+  fireEvent.change(request, { target: { value: "a".repeat(1501) } });
+  expect(count.hidden).toBe(false);
+  expect(count.textContent).toContain("499");
+  fireEvent.change(request, { target: { value: "" } });
+  expect(count.hidden).toBe(true);
+  const hint = screen.getByText("Enter gửi · Shift + Enter xuống dòng");
+  expect(composer.contains(hint)).toBe(false);
+  const help = screen.getByLabelText("Trợ giúp NORA");
+  expect(composer.contains(help)).toBe(false);
+  fireEvent.click(help);
+  expect(screen.getByText(/NORA lưu khi lịch hợp lệ/)).toBeTruthy();
+  fireEvent.click(screen.getByText(/NORA lưu khi lịch hợp lệ/));
+  expect(help.closest("details").open).toBe(true);
+  fireEvent.click(request);
+  expect(help.closest("details").open).toBe(false);
+  fireEvent.click(help);
+  expect(
+    screen.queryByText(
+      "Dùng thời lượng cá nhân hóa và chừa thời gian dự phòng",
+    ),
+  ).toBeNull();
+  fireEvent.keyDown(help, { key: "Escape" });
+  expect(help.closest("details").hasAttribute("open")).toBe(false);
+});
+it("reserves the floating composer height as it grows without shortening the transcript viewport", async () => {
+  let resized;
+  let paint;
+  vi.stubGlobal(
+    "requestAnimationFrame",
+    vi.fn((callback) => {
+      paint = callback;
+      return 1;
+    }),
+  );
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  const observe = vi.fn();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(callback) {
+        resized = callback;
+      }
+      observe = observe;
+      disconnect() {}
+    },
+  );
+  render(<AgentPage />);
+  await ready();
+  const composer = screen.getByRole("form", { name: "Gửi yêu cầu cho NORA" });
+  const dock = composer.closest(".nora-composer-dock");
+  expect(dock).not.toBeNull();
+  expect(observe).toHaveBeenCalledWith(dock);
+  vi.spyOn(dock, "getBoundingClientRect").mockReturnValue({ height: 200 });
+  resized();
+  const main = screen.getByLabelText("Trò chuyện với NORA");
+  expect(main.style.getPropertyValue("--nora-composer-stack")).not.toBe(
+    "200px",
+  );
+  paint();
+  expect(main.style.getPropertyValue("--nora-composer-stack")).toBe("200px");
+  vi.spyOn(dock, "getBoundingClientRect").mockReturnValue({ height: 260 });
+  resized();
+  paint();
+  expect(main.style.getPropertyValue("--nora-composer-stack")).toBe("260px");
+  vi.unstubAllGlobals();
 });
 it("preview mode leaves the workspace unchanged until explicit apply", async () => {
   result.status = "PREVIEW";
@@ -303,14 +468,14 @@ it("preview mode leaves the workspace unchanged until explicit apply", async () 
   const changed = vi.fn(async () => {});
   render(<AgentPage onWorkspaceChanged={changed} />);
   await ready();
-  fireEvent.click(screen.getByLabelText("Tự lưu khi lịch khả thi"));
+  fireEvent.click(screen.getByLabelText("Tự động lưu lịch"));
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
   await screen.findAllByText("Chờ áp dụng");
   expect(changed).not.toHaveBeenCalled();
   expect(calls.find((call) => call.method === "POST").body.autoApply).toBe(
     false,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Áp dụng yêu cầu này" }));
+  fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
   await screen.findAllByText("Đã lưu lịch");
   expect(changed).toHaveBeenCalledOnce();
 });
@@ -533,11 +698,11 @@ it("opens the specific plan selected from an older reply instead of showing the 
   render(<AgentPage />);
   await ready();
   const cards = screen.getAllByRole("button", {
-    name: /Kế hoạch của bạn.*phiên/,
+    name: "Xem kết quả này",
   });
-  expect(screen.queryByRole("dialog", { name: "Kế hoạch của bạn" })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: "Lịch của bạn" })).toBeNull();
   fireEvent.click(cards[0]);
-  const panel = screen.getByRole("dialog", { name: "Kế hoạch của bạn" });
+  const panel = screen.getByRole("dialog", { name: "Lịch của bạn" });
   expect(panel.textContent).toContain("Kế hoạch trước");
   expect(panel.textContent).not.toContain("Kế hoạch sau");
   expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
@@ -569,28 +734,78 @@ it("retries an initial connection failure without leaving the Nora page", async 
   );
   expect(screen.queryByRole("alert")).toBeNull();
 });
-it("explains a clipboard failure instead of leaving an unresponsive copy control", async () => {
-  turns = [{ ...result, conversationId: "chat" }];
+it("copies the original prompt separately from the response and edits only the draft", async () => {
+  const prompt = "Ngày mai học từ 7h đến 12h sáng.\nGiữ nguyên lịch khác.";
+  turns = [
+    {
+      ...result,
+      conversationId: "chat",
+      text: prompt,
+      createdAt: "2026-10-20T01:21:00Z",
+    },
+  ];
   const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  const writeText = vi.fn(async () => {});
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
-    value: {
-      writeText: async () => {
-        throw new Error("denied");
-      },
-    },
+    value: { writeText },
   });
   try {
-    render(<AgentPage />);
+    const view = render(<AgentPage />);
     await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Sao chép yêu cầu" }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(prompt));
     fireEvent.click(screen.getByRole("button", { name: "Sao chép phản hồi" }));
-    expect(await screen.findByText(/Không thể sao chép tự động/)).toBeTruthy();
-    expect(screen.queryByText("Đã sao chép")).toBeNull();
+    await waitFor(() =>
+      expect(writeText).toHaveBeenLastCalledWith(result.reply),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sửa và gửi lại yêu cầu" }),
+    );
+    expect(screen.getByLabelText("Yêu cầu của bạn").value).toBe(prompt);
+    expect(
+      calls.some(
+        (call) => call.method === "POST" && call.url.includes("/turns"),
+      ),
+    ).toBe(false);
+    expect(
+      [...view.container.querySelectorAll(".agent-turn time")].map(
+        (time) => time.dateTime,
+      ),
+    ).toEqual(["2026-10-20T01:21:00.000Z", "2026-10-20T01:21:00.000Z"]);
   } finally {
     if (previous) Object.defineProperty(navigator, "clipboard", previous);
     else delete navigator.clipboard;
   }
 });
+
+it.each(["yêu cầu", "phản hồi"])(
+  "explains a clipboard failure for the %s instead of leaving an unresponsive copy control",
+  async (kind) => {
+    turns = [{ ...result, conversationId: "chat" }];
+    const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          throw new Error("denied");
+        },
+      },
+    });
+    try {
+      render(<AgentPage />);
+      await ready();
+      fireEvent.click(screen.getByRole("button", { name: `Sao chép ${kind}` }));
+      expect(
+        await screen.findByText(/Không thể sao chép tự động/),
+      ).toBeTruthy();
+      expect(screen.queryByText("Đã sao chép")).toBeNull();
+    } finally {
+      if (previous) Object.defineProperty(navigator, "clipboard", previous);
+      else delete navigator.clipboard;
+    }
+  },
+);
 it("updates the active title after rename and enables an archived conversation only after restore", async () => {
   turns = [{ ...result, conversationId: "chat", text: "Yêu cầu gốc" }];
   let row = {

@@ -1,5 +1,11 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConversationLibrary } from "../src/conversations.jsx";
 
@@ -180,4 +186,21 @@ it("identifies the selected delete target and cancels with Escape without deleti
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(rows).toHaveLength(1);
   expect(document.activeElement).toBe(trigger);
+});
+
+it("closes conversation actions even when the outside click stops propagation", async () => {
+  const user = userEvent.setup();
+  render(
+    <>
+      <ConversationLibrary
+        selected="chat"
+        onChoose={() => {}}
+        onRemoved={() => {}}
+      />
+      <div onClick={(event) => event.stopPropagation()}>Outside surface</div>
+    </>,
+  );
+  await openOptions(user);
+  fireEvent.click(screen.getByText("Outside surface"));
+  expect(screen.queryByRole("menu")).toBeNull();
 });

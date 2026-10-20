@@ -1,0 +1,1068 @@
+@layer components {
+  .nora-studio {
+    --nora-secondary-text: #486078;
+  }
+  .nora-studio .agent-toolbar {
+    box-sizing: border-box;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 16px;
+  }
+  .nora-studio .nora-toolbar-delete-btn {
+    width: 32px;
+    height: 32px;
+    padding: 7px;
+  }
+  .nora-panel-heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .nora-plan-heading-actions {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 5;
+  }
+  .nora-plan-heading-actions .nora-plan-close {
+    position: static;
+  }
+  .nora-panel-resize {
+    position: absolute;
+    top: var(--nora-header-height, 56px);
+    bottom: 0;
+    width: 10px;
+    z-index: 6;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .nora-panel-resize.is-history {
+    left: calc(var(--nora-history-width) - 5px);
+  }
+  .nora-panel-resize.is-plan {
+    right: calc(var(--nora-plan-width) - 5px);
+  }
+  .nora-panel-resize:focus-visible:not([data-pointer-focus]) {
+    outline: 2px solid #0866dc;
+    outline-offset: -2px;
+  }
+  .nora-studio .nora-panel-resize[data-pointer-focus] {
+    outline: none;
+  }
+  .nora-studio.is-resizing-panels {
+    transition: none;
+    cursor: col-resize;
+    user-select: none;
+  }
+  @media (min-width: 1081px) {
+    .nora-studio .nora-history-rail {
+      width: 100%;
+      min-width: 0;
+      max-width: none;
+    }
+    .nora-studio .agent-context .nora-context-heading {
+      padding-right: 30px;
+    }
+  }
+  @media (max-width: 1080px) {
+    .nora-studio .agent-toolbar {
+      height: 44px;
+      min-height: 44px;
+      padding: 0 12px;
+    }
+    .nora-studio .nora-toolbar-delete-btn {
+      width: 44px;
+      height: 44px;
+    }
+  }
+  .nora-studio .nora-header-new,
+  .nora-studio .nora-motion-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: auto;
+    min-width: 36px;
+    padding: 8px;
+    font-size: 12px;
+    color: var(--nora-secondary-text);
+  }
+  .nora-studio .nora-header-new {
+    color: #075bbd;
+  }
+  .nora-studio .nora-chat-item-btn {
+    padding: 8px 10px;
+    align-items: center;
+  }
+  .nora-studio .nora-chat-item-title {
+    display: block;
+    line-height: 1.5;
+  }
+  .nora-studio .nora-chat-item-title small {
+    display: block;
+    color: var(--nora-secondary-text);
+    font-size: 12px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+  .nora-studio .agent-history {
+    padding-bottom: calc(var(--nora-composer-stack, 190px) + 36px);
+    scroll-padding-block: 20px calc(var(--nora-composer-stack, 190px) + 20px);
+  }
+  .nora-composer-dock {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    background: transparent;
+    pointer-events: none;
+  }
+  .nora-composer-dock > * {
+    pointer-events: auto;
+  }
+  .nora-composer-dock > .nora-suggestion-surface {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0),
+      #fff calc(100% - 4px)
+    );
+    pointer-events: none;
+  }
+  .nora-suggestion-surface + .nora-composer-surface::before {
+    content: none;
+  }
+  .nora-composer-dock > .nora-composer-surface {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    pointer-events: none;
+  }
+  .nora-composer-surface::before {
+    content: "";
+    position: absolute;
+    inset: -8px 0 auto;
+    height: 8px;
+    /* Reach solid white halfway through the gap below the suggestion chips. */
+    background: linear-gradient(to bottom, rgb(255 255 255 / 0), #fff 50%);
+    pointer-events: none;
+  }
+  .nora-composer-surface > * {
+    pointer-events: auto;
+  }
+  .nora-composer-dock > :is(.form-error, .info, .nora-save-notice) {
+    width: calc(100% - 48px);
+    max-width: 760px;
+    box-sizing: border-box;
+    margin: 0 auto 8px;
+    font-size: 12px;
+  }
+  .nora-studio .nora-message-footer {
+    justify-content: flex-start;
+    gap: 6px;
+    min-height: 32px;
+    margin-top: 8px;
+    color: var(--nora-secondary-text);
+  }
+  .nora-prompt-message {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 0;
+  }
+  .nora-studio .nora-prompt-footer {
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+  .nora-message-footer time {
+    white-space: nowrap;
+    margin-right: 4px;
+  }
+  .nora-studio :is(.nora-copy-button, .nora-edit-request) {
+    position: static;
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--nora-secondary-text);
+    opacity: 1;
+    cursor: pointer;
+  }
+  .nora-studio :is(.nora-copy-button, .nora-edit-request):hover:not(:disabled) {
+    background: transparent;
+    box-shadow: none;
+    color: #075bbd;
+  }
+  .nora-studio :is(.nora-copy-button, .nora-edit-request) svg {
+    width: 15px;
+    height: 15px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .nora-studio
+      .nora-prompt-footer
+      :is(time, .nora-copy-button, .nora-edit-request) {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 150ms ease;
+    }
+    .nora-studio
+      .nora-prompt-message:is(:hover, :focus-within)
+      .nora-prompt-footer
+      :is(time, .nora-copy-button, .nora-edit-request) {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .nora-studio
+      .nora-prompt-message:is(:hover, :focus-within)
+      .nora-prompt-footer
+      :is(.nora-copy-button, .nora-edit-request):disabled {
+      opacity: 0.45;
+    }
+  }
+  .nora-prompt-message > .nora-copy-error {
+    align-self: flex-end;
+    text-align: right;
+    max-width: 60ch;
+  }
+  @media (max-width: 800px), (pointer: coarse) {
+    .nora-studio :is(.nora-copy-button, .nora-edit-request) {
+      width: 44px;
+      height: 44px;
+    }
+  }
+  .nora-studio .nora-message-footer time,
+  .nora-studio .nora-copy-button,
+  .nora-studio .nora-completed-process,
+  .nora-studio .nora-result-hint,
+  .nora-studio .nora-usage :is(p, summary, button) {
+    font-size: 12px;
+    color: var(--nora-secondary-text);
+  }
+  .nora-studio .nora-copy-button,
+  .nora-studio .nora-process-caption {
+    font-size: 12px !important;
+    color: #486078;
+  }
+  .nora-studio .nora-process-steps li,
+  .nora-studio .nora-rail-note p {
+    font-size: 12px;
+    color: #486078;
+  }
+  .nora-studio .agent-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .nora-studio .agent-status svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .nora-studio .agent-status.is-applied {
+    color: #116548;
+  }
+  .nora-studio .agent-status.is-preview {
+    color: #805013;
+  }
+  .nora-result-card {
+    margin-top: 16px;
+    border: 1px solid #cfdfef;
+    border-radius: 14px;
+    background: #fbfdff;
+    overflow: hidden;
+    color: #19334d;
+  }
+  .nora-result-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 16px 18px 8px;
+    color: #175d9f;
+  }
+  .nora-result-title > svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+  .nora-result-title h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 650;
+  }
+  .nora-result-card > .nora-result-hint,
+  .nora-result-reason {
+    margin: 4px 18px 12px;
+  }
+  .nora-result-reason .nora-reply p {
+    margin: 0;
+    font-size: 14px;
+  }
+  .nora-result-items,
+  .nora-result-sessions ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 18px;
+  }
+  .nora-result-items > li {
+    display: flex;
+    align-items: start;
+    gap: 12px;
+    padding: 12px 0;
+  }
+  .nora-result-items > li + li {
+    border-top: 1px solid #e0eaf3;
+  }
+  .nora-result-items > li > div {
+    flex: 1;
+    min-width: 0;
+  }
+  .nora-result-items strong,
+  .nora-result-sessions strong {
+    display: block;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .nora-result-items span,
+  .nora-result-sessions span {
+    display: block;
+    margin-top: 4px;
+    color: #486078;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+  .nora-result-items details {
+    margin-top: 8px;
+  }
+  .nora-result-items summary,
+  .nora-result-explanation > summary {
+    cursor: pointer;
+    font-size: 12px;
+    color: #365f86;
+    padding-block: 5px;
+  }
+  .nora-result-items details p {
+    font-size: 12px;
+    line-height: 1.7;
+    color: #486078;
+  }
+  .nora-result-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 18px 16px;
+  }
+  .nora-result-actions :is(button, a),
+  .nora-result-edit,
+  .nora-switch-day {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid #c4d8eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #195d9d;
+    font: inherit;
+    font-size: 12px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .nora-result-actions svg,
+  .nora-result-edit svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+  .nora-result-actions .is-primary {
+    color: #fff;
+    border-color: #0761cc;
+    background: #0761cc;
+  }
+  .nora-result-actions :is(button, a):hover,
+  .nora-result-edit:hover,
+  .nora-switch-day:hover {
+    background: #edf5fd;
+  }
+  .nora-result-actions .is-primary:hover {
+    background: #0758b8;
+  }
+  .nora-result-sessions {
+    border-top: 1px solid #e0eaf3;
+    margin-top: 4px;
+    padding-bottom: 10px;
+  }
+  .nora-result-sessions .nora-session-count {
+    margin: 12px 18px 4px;
+    font-size: 12px;
+    color: #486078;
+  }
+  .nora-result-sessions li {
+    padding-block: 6px;
+  }
+  .nora-result-explanation {
+    border-top: 1px solid #dce7f1;
+    padding: 8px 18px;
+    background: #f4f8fc;
+  }
+  .nora-result-explanation .nora-reply {
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .nora-result-card.is-historical {
+    background: #f5f7f9;
+  }
+  .nora-save-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin: 0 24px 8px;
+    padding: 10px 14px;
+    color: #116548;
+    background: #edf9f3;
+    border: 1px solid #badfcd;
+    border-radius: 9px;
+    font-size: 12px;
+  }
+  .nora-save-notice svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .nora-capability-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: calc(100% - 48px);
+    max-width: 760px;
+    box-sizing: border-box;
+    align-self: center;
+    margin: 0 auto 8px;
+    padding: 2px 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+    background: transparent;
+  }
+  .nora-capability-chips button {
+    pointer-events: auto;
+    flex-shrink: 0;
+    min-height: 34px;
+    padding: 7px 10px;
+    border: 1px solid #cbddec;
+    border-radius: 10px;
+    background: #f7fbff;
+    color: #365b7c;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .nora-capability-chips button:hover {
+    background: #eaf3ff;
+    border-color: #8eb4de;
+  }
+  .nora-studio .nora-save-toggle {
+    min-height: 44px;
+    font-size: 13px;
+    gap: 8px;
+  }
+  .nora-save-toggle input {
+    appearance: none;
+    width: 34px;
+    height: 20px;
+    border: 1px solid #7790a8;
+    border-radius: 12px;
+    background: #e1e8ee;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .nora-save-toggle input::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: white;
+    left: 2px;
+    top: 2px;
+    box-shadow: 0 1px 3px #48607855;
+    transition: translate 140ms ease-out;
+  }
+  .nora-save-toggle input:checked {
+    background: #0866ce;
+    border-color: #0866ce;
+  }
+  .nora-save-toggle input:checked::after {
+    translate: 14px 0;
+  }
+  .nora-save-mode-help {
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #486078;
+  }
+  .nora-studio .agent-composer .nora-composer-tools {
+    margin-left: auto;
+    min-width: 0;
+  }
+  .nora-studio .agent-composer-actions {
+    gap: 8px;
+  }
+  .nora-studio .nora-composer-info summary {
+    min-width: 44px;
+    height: 44px;
+    box-sizing: border-box;
+  }
+  .nora-studio .nora-composer-info summary span {
+    display: inline;
+  }
+  .nora-composer-count {
+    font-size: 12px;
+    color: #486078;
+    white-space: nowrap;
+  }
+  .nora-composer-count.is-near-limit {
+    color: #a24a0a;
+    font-weight: 600;
+  }
+  .nora-studio .agent-composer {
+    margin-bottom: 0;
+  }
+  .nora-composer-footer {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    column-gap: 10px;
+    width: calc(100% - 48px);
+    max-width: 760px;
+    flex-shrink: 0;
+    margin: 0 auto 2px;
+    color: #486078;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .nora-studio .nora-composer-footer > .nora-composer-info > summary {
+    height: 28px;
+    min-height: 28px;
+    color: #195d9d;
+    padding-inline: 4px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .nora-composer-footer .nora-composer-help {
+    width: min(380px, 100%);
+    box-sizing: border-box;
+    left: auto;
+    right: 0;
+  }
+  .nora-voice-help summary {
+    cursor: pointer;
+    color: #195d9d;
+  }
+  .nora-voice-help p {
+    margin-top: 8px;
+  }
+  .nora-studio .nora-voice-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: #9b4050;
+  }
+  .nora-voice-error > span {
+    flex: 1;
+  }
+  .nora-voice-error > button {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+  }
+  .nora-voice-error > button:hover {
+    background: #fceef1;
+  }
+  .nora-voice-error > button svg {
+    width: 16px;
+    height: 16px;
+  }
+  :is(.planning-console, #modal) .nora-studio .agent-composer textarea {
+    font-size: 16px;
+  }
+  .nora-studio .agent-context {
+    padding: 20px 16px;
+  }
+  .nora-studio .agent-context .nora-context-heading {
+    padding-right: 30px;
+    margin-bottom: 16px;
+  }
+  .nora-studio .nora-context-heading h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 14px;
+  }
+  .nora-schedule-content {
+    min-width: 0;
+  }
+  .nora-panel-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 3px;
+    gap: 3px;
+    background: #eaf1f8;
+    border-radius: 10px;
+    margin-bottom: 18px;
+  }
+  .nora-panel-tabs button {
+    min-width: 0;
+    min-height: 44px;
+    border: 0;
+    border-radius: 7px;
+    padding: 8px 5px;
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.5;
+    background: transparent;
+    color: #486078;
+    cursor: pointer;
+  }
+  .nora-panel-tabs button[aria-pressed="true"] {
+    color: #135da6;
+    background: white;
+    box-shadow: 0 1px 4px #163f621a;
+    font-weight: 600;
+  }
+  .nora-day-controls {
+    display: flex;
+    gap: 10px;
+    align-items: end;
+  }
+  .nora-day-controls label {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: #486078;
+  }
+  .nora-day-controls input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 9px;
+    min-height: 44px;
+    border: 1px solid #c6d9ea;
+    border-radius: 8px;
+    background: #fff;
+    color: #19334d;
+    font: inherit;
+    font-size: 16px;
+  }
+  .nora-day-controls button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border: 1px solid #c6d9ea;
+    border-radius: 8px;
+    background: white;
+    color: #195d9d;
+    cursor: pointer;
+  }
+  .nora-day-controls button svg {
+    width: 18px;
+    height: 18px;
+  }
+  .nora-day-source {
+    color: #486078;
+    font-size: 12px;
+    line-height: 1.7;
+    margin: 12px 0 20px;
+  }
+  .nora-day-source span {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  .nora-day-error,
+  .nora-overlap-note {
+    color: #a72a3f;
+    font-size: 12px;
+    line-height: 1.65;
+  }
+  .nora-day-timeline h3,
+  .nora-day-suggestions h3,
+  .nora-request-result h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: #19334d;
+  }
+  .nora-day-legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    color: #486078;
+    font-size: 12px;
+    line-height: 1.65;
+    margin-bottom: 16px;
+  }
+  .nora-day-legend svg {
+    width: 13px;
+    height: 13px;
+  }
+  .nora-day-timeline ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .nora-timeline-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 10px;
+    padding: 0 0 14px;
+  }
+  .nora-timeline-item time {
+    white-space: nowrap;
+    padding-top: 10px;
+    color: #315779;
+    font-size: 12px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+  .nora-timeline-item > div {
+    border-left: 3px solid #718aa4;
+    border-radius: 3px 9px 9px 3px;
+    background: #f2f7fc;
+    padding: 10px;
+    min-width: 0;
+  }
+  .nora-timeline-item strong {
+    display: block;
+    color: #19334d;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .nora-timeline-item small,
+  .nora-timeline-item .nora-overlap-note {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.65;
+    color: #486078;
+  }
+  .nora-timeline-item.is-session > div {
+    border-color: #0b69d4;
+    background: #edf5ff;
+  }
+  .nora-timeline-item.is-gap > div {
+    border: 1px dashed #c6d5e3;
+    border-radius: 8px;
+    background: transparent;
+  }
+  .nora-timeline-item.is-gap strong {
+    font-size: 12px;
+    color: #486078;
+    font-weight: 500;
+  }
+  .nora-timeline-item.has-overlap > div {
+    border-color: #b83349;
+  }
+  .nora-timeline-item .nora-overlap-note {
+    color: #a72a3f;
+  }
+  .nora-timeline-edit {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    min-height: 32px;
+    margin-top: 6px;
+    border: 0;
+    background: transparent;
+    padding: 4px 0;
+    color: #155d9e;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .nora-timeline-edit svg {
+    width: 13px;
+    height: 13px;
+  }
+  .nora-day-empty {
+    font-size: 13px;
+    line-height: 1.8;
+    color: #486078;
+    padding: 16px;
+    border: 1px dashed #c6d5e3;
+    border-radius: 9px;
+  }
+  .nora-day-suggestions {
+    border-top: 1px solid #d4e1ed;
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+  .nora-day-suggestions p {
+    color: #486078;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .nora-day-suggestions button {
+    display: block;
+    min-height: 44px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border: 1px solid #c4d8eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #195d9d;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .nora-request-result blockquote {
+    margin: 12px 0;
+    padding-left: 12px;
+    border-left: 2px solid #afc9e4;
+    color: #486078;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .nora-request-result > :is(ol, ul) {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0;
+  }
+  .nora-request-result li {
+    padding: 10px 0;
+    border-bottom: 1px solid #dce7f1;
+  }
+  .nora-request-result li strong {
+    display: block;
+    font-size: 13px;
+  }
+  .nora-request-result li :is(span, small) {
+    display: block;
+    font-size: 12px;
+    color: #486078;
+    margin-top: 5px;
+    line-height: 1.8;
+  }
+  .nora-open-calendar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    border-top: 1px solid #d4e1ed;
+    margin-top: 18px;
+    padding-top: 12px;
+    color: #155d9e;
+    font-size: 13px;
+    text-decoration: none;
+  }
+  .nora-open-calendar svg,
+  .nora-switch-day svg {
+    width: 15px;
+    height: 15px;
+  }
+  .nora-schedule-content :is(button, a, input):focus-visible {
+    outline: 2px solid #0866dc;
+    outline-offset: 2px;
+  }
+  .nora-event-dialog {
+    width: min(440px, calc(100vw - 32px));
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    animation: none;
+  }
+  .nora-event-dialog form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .nora-event-dialog label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #36516f;
+    font-size: 13px;
+  }
+  .nora-event-dialog input {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid #b8cede;
+    border-radius: 8px;
+    padding: 10px;
+    color: #19334d;
+    font: inherit;
+    font-size: 16px;
+  }
+  .nora-event-dialog small {
+    color: #486078;
+    font-size: 12px;
+  }
+  .nora-event-dialog .is-primary {
+    color: white;
+    background: #0761cc;
+    border-color: #0761cc;
+  }
+  .nora-delete-dialog p {
+    color: #486078;
+  }
+  .nora-studio button:disabled,
+  .nora-event-dialog button:disabled {
+    cursor: not-allowed;
+  }
+  @media (max-width: 800px) {
+    .nora-delete-dialog-close {
+      width: 44px;
+      height: 44px;
+    }
+
+    .nora-studio .nora-header-new span,
+    .nora-studio .nora-motion-button span {
+      display: none;
+    }
+    .nora-result-actions :is(button, a),
+    .nora-result-edit,
+    .nora-timeline-edit {
+      min-height: 44px;
+    }
+    .nora-result-items {
+      padding-inline: 14px;
+    }
+    .nora-result-title,
+    .nora-result-actions,
+    .nora-result-explanation {
+      padding-inline: 14px;
+    }
+    .nora-capability-chips {
+      width: calc(100% - 32px);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      overflow: visible;
+    }
+    .nora-capability-chips button {
+      min-height: 44px;
+      min-width: 0;
+      padding: 6px 8px;
+      white-space: normal;
+      line-height: 1.4;
+      text-wrap: balance;
+    }
+    .nora-composer-footer {
+      width: calc(100% - 32px);
+      column-gap: 8px;
+    }
+    .nora-composer-dock > :is(.form-error, .info, .nora-save-notice) {
+      width: calc(100% - 32px);
+    }
+    .nora-studio .nora-composer-footer > .nora-composer-info > summary {
+      height: 32px;
+      min-height: 32px;
+    }
+    .nora-voice-error > button {
+      width: 44px;
+      height: 44px;
+    }
+    .nora-save-notice {
+      margin-inline: 16px;
+    }
+    .nora-studio .nora-save-toggle {
+      font-size: 12px;
+    }
+    .nora-studio .nora-scroll-bottom {
+      left: calc(50% - 22px);
+      width: 44px;
+      height: 44px;
+      bottom: calc(var(--nora-composer-stack, 190px) + 10px);
+    }
+    .nora-studio .nora-scroll-bottom svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+  @media (max-width: 520px) {
+    .nora-studio .nora-plan-toggle-label {
+      display: none;
+    }
+    .nora-studio .nora-plan-toggle::after {
+      content: "Lịch";
+    }
+  }
+  @media (max-height: 500px) and (max-width: 1080px) {
+    .nora-studio .agent-toolbar {
+      min-height: 44px;
+      padding-block: 0;
+    }
+    .nora-studio .agent-history {
+      padding-top: 12px;
+      padding-bottom: calc(var(--nora-composer-stack, 130px) + 12px);
+    }
+    :is(.planning-console, #modal) .nora-studio .agent-composer textarea {
+      max-height: 72px !important;
+    }
+    .nora-studio .nora-capability-chips {
+      display: none;
+    }
+    .nora-studio .agent-composer {
+      margin-top: 2px;
+      margin-bottom: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nora-save-toggle input::after {
+      transition: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .nora-save-toggle input {
+      appearance: auto;
+    }
+    .nora-save-toggle input::after {
+      display: none;
+    }
+  }
+}

@@ -1,6 +1,17 @@
+import { PopupDetails } from "./popup-dismissal.jsx";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./styles/nora-entry.css";
+import "./styles/nora-refinement.css";
 import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
+import { NoraResultCard } from "./nora-result-card.jsx";
+import { NoraSchedulePanel } from "./nora-schedule-panel.jsx";
+import { NoraEventEditor } from "./nora-event-editor.jsx";
+import { NoraPanelResize, useNoraPanelLayout } from "./nora-panel-layout.jsx";
+import {
+  compactScheduleText,
+  conversationLabel,
+  resultDate,
+} from "./nora-schedule.js";
 import { api } from "./api.js";
 import { state, icon } from "./ui.jsx";
 import { NoraAvatar, NoraMotionControl } from "./nora-mascot.jsx";
@@ -11,6 +22,11 @@ import {
 import { sendAgentStream } from "./agent-stream.js";
 import { agentFailure } from "./agent-failure.js";
 import { NoraProgress } from "./nora-progress.jsx";
+import {
+  NoraCopyButton,
+  NoraMessageTime,
+  NoraPromptMessage,
+} from "./nora-message-actions.jsx";
 import { useVoiceInput } from "./voice-input.js";
 import {
   NoraReply,
@@ -30,15 +46,16 @@ const statuses = {
   FAILED: "Chưa thực hiện",
   UNDONE: "Đã hoàn tác",
 };
-function formatTime(value) {
-  return new Intl.DateTimeFormat("vi-VN", {
-    timeZone: state.workspace?.preference?.timeZoneId || "Asia/Ho_Chi_Minh",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
+const statusIcons = {
+  PROCESSING: "clock",
+  PREVIEW: "clock",
+  APPLIED: "check",
+  NEEDS_INPUT: "chat",
+  BLOCKED: "alertCircle",
+  ANSWERED: "chat",
+  FAILED: "alertCircle",
+  UNDONE: "undo",
+};
 function extractOptions(turn) {
   if (Array.isArray(turn.options) && turn.options.length > 0) {
     return turn.options;
@@ -78,34 +95,36 @@ function extractOptions(turn) {
   return [];
 }
 
-function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
+function Turn({
+  turn,
+  busy,
+  onAction,
+  onReply,
+  onEdit,
+  onViewPlan,
+  onEditEvent,
+  process,
+}) {
   const [otherText, setOtherText] = useState("");
-  const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const sessions = turn.plan?.sessions?.filter((item) => !item.preserved) || [];
   const options = turn.question ? extractOptions(turn) : [];
+  const hasResult = Boolean(turn.changes?.length || sessions.length);
   return (
     <article className="agent-turn">
-      <div className="agent-user-message">
-        <span>Bạn</span>
-        <p>{turn.text}</p>
-        <button
-          className="nora-edit-request"
-          type="button"
-          disabled={busy}
-          onClick={() => onEdit(turn.text)}
-          aria-label="Sửa và gửi lại yêu cầu"
-          title="Chép vào ô nhập để sửa và gửi thành yêu cầu mới"
-        >
-          {icon("edit")}
-        </button>
-      </div>
+      <NoraPromptMessage
+        text={turn.text}
+        createdAt={turn.createdAt}
+        busy={busy}
+        onEdit={onEdit}
+      />
       <div className="agent-response">
         <div className="agent-response-heading">
           <strong>
             <NoraAvatar /> NORA
           </strong>
           <span className={`agent-status is-${turn.status.toLowerCase()}`}>
+            {icon(statusIcons[turn.status] || "chat")}
             {statuses[turn.status] || turn.status}
           </span>
         </div>
@@ -122,13 +141,13 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
             </ol>
           </details>
         )}
-        <NoraReply text={turn.reply} />
-        {turn.outcome && (
+        {!hasResult && <NoraReply text={compactScheduleText(turn.reply)} />}
+        {!hasResult && turn.outcome && (
           <section
             className="agent-verified-outcome"
             aria-label="Kết quả đã kiểm tra"
           >
-            <NoraReply text={turn.outcome} />
+            <NoraReply text={compactScheduleText(turn.outcome)} />
           </section>
         )}
         {!!turn.warnings?.length && (
@@ -200,78 +219,14 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
             )}
           </div>
         )}
-        {!!turn.changes?.length && (
-          <div className="agent-changes">
-            {turn.changes.map((change, index) => (
-              <div className="agent-change" key={index}>
-                <strong>{change.name}</strong>
-                {change.before && <small>Trước: {change.before}</small>}
-                <span>{change.after || "Không còn khoảng thời gian"}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {!!sessions.length && (
-          <button
-            type="button"
-            className="nora-plan-card"
-            onClick={(event) => onViewPlan(turn, event.currentTarget)}
-          >
-            <span className="nora-plan-card-icon">{icon("calendar")}</span>
-            <span>
-              <strong>
-                {turn.status === "UNDONE"
-                  ? "Lịch sử kế hoạch"
-                  : "Kế hoạch của bạn"}
-              </strong>
-              <small>
-                {sessions.length} phiên ·{" "}
-                {sessions.reduce(
-                  (sum, item) =>
-                    sum +
-                    Math.round(
-                      (new Date(item.end) - new Date(item.start)) / 60000,
-                    ),
-                  0,
-                )}{" "}
-                phút ·{" "}
-                {turn.status === "APPLIED" ? "Đã lưu vào lịch" : "Xem chi tiết"}
-              </small>
-            </span>
-            {icon("arrow")}
-          </button>
-        )}
-        {!!sessions.length && (
-          <details className="agent-sessions">
-            <summary>
-              {sessions.length} phiên{" "}
-              {turn.status === "APPLIED" ? "đã xếp" : "đề xuất"}
-            </summary>
-            <ul>
-              {sessions.map((item) => (
-                <li key={item.id}>
-                  <strong>
-                    {state.workspace?.tasks?.find(
-                      (task) => task.id === item.taskId,
-                    )?.name ||
-                      turn.changes?.find(
-                        (change) => change.taskId === item.taskId,
-                      )?.name ||
-                      "Phiên làm việc"}
-                  </strong>
-                  <span>
-                    {formatTime(item.start)} → {formatTime(item.end)}
-                  </span>
-                  <small>
-                    {Math.round(
-                      (new Date(item.end) - new Date(item.start)) / 60000,
-                    )}{" "}
-                    phút
-                  </small>
-                </li>
-              ))}
-            </ul>
-          </details>
+        {hasResult && (
+          <NoraResultCard
+            turn={turn}
+            busy={busy}
+            onAction={onAction}
+            onViewResult={onViewPlan}
+            onEditEvent={onEditEvent}
+          />
         )}
         {turn.status === "BLOCKED" && (
           <div className="agent-blocked-tip">
@@ -283,67 +238,21 @@ function Turn({ turn, busy, onAction, onReply, onEdit, onViewPlan, process }) {
             </span>
           </div>
         )}
-        {turn.status === "PREVIEW" && (
-          <div className="actions spaced">
-            <button
-              type="button"
-              className="btn primary"
-              disabled={busy}
-              onClick={() => onAction(turn, "apply")}
-            >
-              Áp dụng yêu cầu này
-            </button>
-            <span className="muted">
-              Lịch chưa thay đổi. Bản xem trước có hiệu lực tối đa 30 phút.
-            </span>
-          </div>
-        )}
-        {turn.status === "APPLIED" && turn.canUndo && (
-          <button
-            type="button"
-            className="btn ghost small"
-            disabled={busy}
-            onClick={() => onAction(turn, "undo")}
-          >
-            Hoàn tác yêu cầu
-          </button>
-        )}
-        {turn.status === "UNDONE" && (
-          <small className="muted">
-            Các phiên trên là lịch sử của yêu cầu đã hoàn tác.
-          </small>
-        )}
         <div className="nora-message-footer">
-          <time dateTime={turn.createdAt}>
-            {turn.createdAt ? formatTime(turn.createdAt) : ""}
-          </time>
-          <button
-            type="button"
-            className="nora-copy-button"
-            onClick={async () => {
-              setCopyError(false);
-              try {
-                await navigator.clipboard.writeText(
-                  [
-                    turn.reply,
-                    turn.outcome,
-                    turn.question,
-                    ...(turn.warnings || []),
-                  ]
-                    .filter(Boolean)
-                    .join("\n\n"),
-                );
-                setCopied(true);
-              } catch {
-                setCopied(false);
-                setCopyError(true);
-              }
-            }}
-            aria-label="Sao chép phản hồi"
-          >
-            {icon(copied ? "check" : "copy")}
-            <span>{copied ? "Đã sao chép" : "Sao chép"}</span>
-          </button>
+          <NoraMessageTime value={turn.createdAt} />
+          <NoraCopyButton
+            text={[
+              turn.reply,
+              turn.outcome,
+              turn.question,
+              ...(turn.warnings || []),
+            ]
+              .filter(Boolean)
+              .map(compactScheduleText)
+              .join("\n\n")}
+            label="Sao chép phản hồi"
+            onError={setCopyError}
+          />
         </div>
         {copyError && (
           <small className="nora-copy-error" role="status">
@@ -363,7 +272,6 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const [conversationId, setConversationId] = useState(null);
   const [text, setText] = useState("");
   const [autoApply, setAutoApply] = useState(true);
-  const [personalized, setPersonalized] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -378,16 +286,31 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     () => window.matchMedia("(min-width: 1081px)").matches,
   );
   const [planOpen, setPlanOpen] = useState(false);
+  const planVisibility = useRef(null);
+  const panelLayout = useNoraPanelLayout(wide, historyCollapsed, planOpen);
   const [planTurnId, setPlanTurnId] = useState(null);
+  const [planView, setPlanView] = useState("day");
+  const [dayDate, setDayDate] = useState(() => resultDate(null));
+  const [calendarRevision, setCalendarRevision] = useState(0);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   const [awayFromBottom, setAwayFromBottom] = useState(false);
   const [confirmDeleteCurrent, setConfirmDeleteCurrent] = useState(false);
   const streamAbort = useRef(null);
   const streamState = useRef(null);
   const followBottom = useRef(true);
+  const scrollToBottomActive = useRef(false);
+  const scrollToBottomTimer = useRef(null);
   const retry = useRef(null);
   const requestField = useRef(null);
   const drawerTrigger = useRef(null);
   const historyPanel = useRef(null);
+  const composerDock = useRef(null);
   const mounted = useRef(true);
   const updateConversation = useCallback(
     (row) => {
@@ -457,6 +380,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     })();
     return () => {
       mounted.current = false;
+      clearTimeout(scrollToBottomTimer.current);
       streamAbort.current?.abort();
     };
   }, [accountKey, connectionAttempt]);
@@ -501,8 +425,8 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             requestId: crypto.randomUUID(),
             text: messageText,
             autoApply,
-            useCapacityFactor: personalized,
-            useEstimateBias: personalized,
+            useCapacityFactor: false,
+            useEstimateBias: false,
           };
     retry.current = body;
     const controller = new AbortController();
@@ -517,6 +441,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     };
     setPending(streamState.current);
     followBottom.current = true;
+    scrollToBottomActive.current = false;
     try {
       const result = await sendAgentStream(
         body,
@@ -546,6 +471,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         },
       }));
       replaceTurn(result);
+      if (result.status === "APPLIED") {
+        setNotice(
+          "Đã lưu vào lịch. Bạn có thể hoàn tác trong kết quả vừa tạo.",
+        );
+        setCalendarRevision((value) => value + 1);
+      }
       setPending(null);
       if (!overrideText) setText("");
       retry.current = null;
@@ -624,6 +555,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       const result = await api(`/api/agent/turns/${turn.id}/${action}`, "POST");
       if (!mounted.current) return;
       replaceTurn(result);
+      setCalendarRevision((value) => value + 1);
+      setNotice(
+        action === "undo"
+          ? "Đã hoàn tác và khôi phục lịch trước đó."
+          : "Đã lưu thay đổi vào lịch.",
+      );
       await onWorkspaceChanged();
       const history = await api("/api/agent/turns");
       if (mounted.current) setTurns(history);
@@ -637,7 +574,37 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     (turn) => turn.conversationId === conversationId,
   );
   useEffect(() => {
-    if (!followBottom.current) return;
+    const panel = historyPanel.current;
+    if (!panel || typeof ResizeObserver !== "function") return;
+    let frame;
+    const sync = () => {
+      const main = panel.parentElement;
+      if (!main) return;
+      const stack = composerDock.current?.getBoundingClientRect().height || 0;
+      main.style.setProperty("--nora-composer-stack", `${Math.ceil(stack)}px`);
+      if (followBottom.current && !scrollToBottomActive.current) {
+        panel.scrollTo?.({ top: panel.scrollHeight, behavior: "instant" });
+        setAwayFromBottom(false);
+      } else if (!scrollToBottomActive.current) {
+        setAwayFromBottom(
+          panel.scrollHeight - panel.scrollTop - panel.clientHeight > 90,
+        );
+      }
+    };
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(sync);
+    });
+    observer.observe(panel);
+    if (composerDock.current) observer.observe(composerDock.current);
+    sync();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, []);
+  useEffect(() => {
+    if (!followBottom.current || scrollToBottomActive.current) return;
     historyPanel.current?.scrollTo?.({
       top: current.length || busy ? historyPanel.current.scrollHeight : 0,
       behavior: "instant",
@@ -653,6 +620,34 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     setText(value);
     retry.current = null;
     requestField.current?.focus();
+  }
+  function finishScrollToLatest() {
+    scrollToBottomActive.current = false;
+    clearTimeout(scrollToBottomTimer.current);
+    scrollToBottomTimer.current = null;
+    const panel = historyPanel.current;
+    if (!panel) return;
+    const away = panel.scrollHeight - panel.scrollTop - panel.clientHeight > 90;
+    followBottom.current = !away;
+    setAwayFromBottom(away);
+  }
+  function scrollToLatest() {
+    const panel = historyPanel.current;
+    if (!panel) return;
+    followBottom.current = true;
+    setAwayFromBottom(false);
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      scrollToBottomActive.current = false;
+      panel.scrollTo?.({ top: panel.scrollHeight, behavior: "instant" });
+      return;
+    }
+    scrollToBottomActive.current = true;
+    clearTimeout(scrollToBottomTimer.current);
+    scrollToBottomTimer.current = setTimeout(finishScrollToLatest, 1200);
+    panel.scrollTo?.({ top: panel.scrollHeight, behavior: "smooth" });
   }
   async function chooseConversation(
     id,
@@ -674,6 +669,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     setError("");
     setHistoryOpen(false);
     followBottom.current = true;
+    scrollToBottomActive.current = false;
     if (!fresh && capabilities?.features?.includes("conversation-lifecycle")) {
       setLoading(true);
       try {
@@ -757,6 +753,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     setLoading(true);
     setError("");
     followBottom.current = false;
+    scrollToBottomActive.current = false;
     try {
       const page = await api(
         `/api/agent/conversations/${conversationId}/turns?pageSize=50&cursor=${encodeURIComponent(messageCursor)}`,
@@ -838,26 +835,28 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     else setPlanOpen(false);
   }, [wide]);
   const selectedTitle =
-    (conversationDetails?.id === conversationId && conversationDetails.title) ||
+    (conversationDetails?.id === conversationId &&
+      conversationLabel(conversationDetails, turns)) ||
     current[0]?.text ||
     "Hội thoại mới";
   const latestPlan = [...current]
     .reverse()
-    .find((turn) => turn.plan?.sessions?.some((session) => !session.preserved));
+    .find(
+      (turn) =>
+        turn.changes?.length ||
+        turn.plan?.sessions?.some((session) => !session.preserved),
+    );
   const visiblePlan =
-    current.find(
-      (turn) => turn.id === planTurnId && turn.plan?.sessions?.length,
-    ) || latestPlan;
-  const plannedSessions =
-    visiblePlan?.plan?.sessions
-      ?.filter((session) => !session.preserved)
-      .toSorted((a, b) => new Date(a.start) - new Date(b.start)) || [];
+    current.find((turn) => turn.id === planTurnId) || latestPlan;
   useEffect(() => {
     setPlanOpen(
-      Boolean(latestPlan) && window.matchMedia("(min-width: 1081px)").matches,
+      window.matchMedia("(min-width: 1081px)").matches &&
+        planVisibility.current !== false,
     );
     setPlanTurnId(latestPlan?.id || null);
-  }, [latestPlan?.id]);
+    setPlanView("day");
+    setDayDate(resultDate(latestPlan));
+  }, [latestPlan?.id, conversationId]);
 
   const examples = [
     {
@@ -887,7 +886,9 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   ];
   return (
     <div
-      className={`agent-layout nora-studio${visiblePlan && planOpen ? " is-plan-open" : ""}${historyCollapsed ? " is-history-collapsed" : ""}`}
+      className={`agent-layout nora-studio${planOpen ? " is-plan-open" : ""}${historyCollapsed ? " is-history-collapsed" : ""}${panelLayout.resizing ? " is-resizing-panels" : ""}`}
+      ref={panelLayout.root}
+      style={panelLayout.style}
       data-motion-state="running"
     >
       <header
@@ -938,22 +939,25 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           </div>
         </div>
         <div className="nora-header-controls">
-          <span
-            className={`nora-presence ${loading ? "is-loading" : capabilities?.aiAvailable ? "is-ready" : "is-offline"}`}
-          >
-            <i aria-hidden="true" />
-            {loading
-              ? "Đang kết nối"
-              : capabilities?.aiAvailable
-                ? voice.active
-                  ? voice.phase === "recording"
-                    ? "Đang nghe"
-                    : "Đang nhận chữ"
-                  : busy
-                    ? "Đang xử lý"
-                    : "Sẵn sàng hỗ trợ"
-                : "Chưa kết nối"}
-          </span>
+          {(loading || !capabilities?.aiAvailable || voice.active || busy) && (
+            <span
+              role="status"
+              className={`nora-presence ${loading ? "is-loading" : capabilities?.aiAvailable ? "is-ready" : "is-offline"}`}
+            >
+              <i aria-hidden="true" />
+              {loading
+                ? "Đang kết nối"
+                : capabilities?.aiAvailable
+                  ? voice.active
+                    ? voice.phase === "recording"
+                      ? "Đang nghe"
+                      : "Đang nhận chữ"
+                    : busy
+                      ? "Đang xử lý"
+                      : "Sẵn sàng hỗ trợ"
+                  : "Chưa kết nối"}
+            </span>
+          )}
           <NoraMotionControl />
           <button
             type="button"
@@ -963,23 +967,28 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             disabled={busy || loading || voice.active}
             onClick={newConversation}
           >
-            {icon("edit")}
+            {icon("plus")}
+            <span>Hội thoại mới</span>
           </button>
-          {visiblePlan && (
+          {
             <button
               type="button"
               className="nora-plan-toggle"
+              aria-label="Lịch của bạn"
               aria-expanded={planOpen}
               aria-controls="nora-plan-panel"
               onClick={(event) => {
                 drawerTrigger.current = event.currentTarget;
                 setHistoryOpen(false);
+                setPlanView("day");
+                if (wide) planVisibility.current = !planOpen;
                 setPlanOpen(!planOpen);
               }}
             >
-              {icon("calendar")}Kế hoạch
+              {icon("calendar")}
+              <span className="nora-plan-toggle-label">Lịch của bạn</span>
             </button>
-          )}
+          }
         </div>
       </header>
       {historyOpen && (
@@ -1001,18 +1010,20 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       >
         <div className="nora-rail-title">
           <span>Hội thoại</span>
-          <button
-            type="button"
-            className="nora-rail-close"
-            aria-label="Đóng bảng hội thoại"
-            onClick={() => {
-              if (wide) setHistoryCollapsed(true);
-              else setHistoryOpen(false);
-              document.querySelector(".nora-history-toggle")?.focus();
-            }}
-          >
-            {icon("close")}
-          </button>
+          <div className="nora-panel-heading-actions">
+            <button
+              type="button"
+              className="nora-rail-close"
+              aria-label="Đóng bảng hội thoại"
+              onClick={() => {
+                if (wide) setHistoryCollapsed(true);
+                else setHistoryOpen(false);
+                document.querySelector(".nora-history-toggle")?.focus();
+              }}
+            >
+              {icon("close")}
+            </button>
+          </div>
         </div>
         <button
           type="button"
@@ -1025,6 +1036,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         {capabilities?.features?.includes("conversation-lifecycle") ? (
           <ConversationLibrary
             selected={conversationId}
+            turns={turns}
             refresh={`${turns.length}:${turns.at(-1)?.id}:${turns.at(-1)?.status}:${conversationDetails?.version}`}
             disabled={busy || loading || voice.active}
             onChoose={chooseConversation}
@@ -1052,6 +1064,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           <p>Lịch và hội thoại thuộc tài khoản của bạn.</p>
         </div>
       </aside>
+      {wide && !historyCollapsed && (
+        <NoraPanelResize
+          options={panelLayout.options("history")}
+          onResizing={panelLayout.setResizing}
+        />
+      )}
       <section
         className="card agent-main"
         aria-label="Trò chuyện với NORA"
@@ -1062,11 +1080,6 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           <div className="nora-toolbar-title-wrap">
             <span className="nora-chat-title" title={selectedTitle}>
               {icon("chat")} {selectedTitle}
-            </span>
-            <span className="nora-chat-meta">
-              {current.length
-                ? `${current.length} yêu cầu`
-                : "Không gian riêng của bạn"}
             </span>
           </div>
           {current.length > 0 &&
@@ -1131,10 +1144,21 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             const panel = event.currentTarget;
             const away =
               panel.scrollHeight - panel.scrollTop - panel.clientHeight > 90;
+            if (scrollToBottomActive.current) {
+              if (!away) finishScrollToLatest();
+              return;
+            }
             followBottom.current = !away;
             setAwayFromBottom(away);
           }}
+          onWheel={() => {
+            if (scrollToBottomActive.current) finishScrollToLatest();
+          }}
+          onTouchStart={() => {
+            if (scrollToBottomActive.current) finishScrollToLatest();
+          }}
         >
+          <h2 className="nora-sr-only">Tin nhắn trong hội thoại</h2>
           {loading ? (
             <p role="status">Đang tải trợ lý…</p>
           ) : !current.length && !pending ? (
@@ -1196,21 +1220,26 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                   onAction={act}
                   onReply={(replyText) => send(null, replyText)}
                   onEdit={editRequest}
+                  onEditEvent={setEditingEvent}
                   onViewPlan={(turn, trigger) => {
                     drawerTrigger.current = trigger;
                     setPlanTurnId(turn.id);
+                    setPlanView("result");
+                    if (wide) planVisibility.current = true;
                     setPlanOpen(true);
                   }}
                   process={processes[turn.id]}
                 />
               ))
           )}
-          {pending && <NoraProgress pending={pending} busy={busy} />}
+          {pending && (
+            <NoraProgress pending={pending} busy={busy} onEdit={editRequest} />
+          )}
           {busy && !pending && (
             <div className="agent-thinking" role="status">
               <NoraAvatar />
               <span>
-                NORA đang tìm thời gian phù hợp
+                NORA đang xử lý yêu cầu
                 <span className="nora-thinking-dots" aria-hidden="true">
                   <i />
                   <i />
@@ -1224,340 +1253,366 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           <button
             type="button"
             className="nora-scroll-bottom"
-            onClick={() => {
-              followBottom.current = true;
-              setAwayFromBottom(false);
-              historyPanel.current?.scrollTo({
-                top: historyPanel.current.scrollHeight,
-                behavior: "instant",
-              });
-            }}
+            aria-label="Xuống cuối hội thoại"
+            title="Xuống cuối hội thoại"
+            onClick={scrollToLatest}
           >
-            {icon("arrow")}Xuống cuối hội thoại
+            {icon("arrow")}
           </button>
         )}
-        {capabilities && !capabilities.aiAvailable && (
-          <p className="info">
-            Trợ lý AI chưa được cấu hình. Bạn vẫn có thể nhập lịch ở mục Giờ
-            rảnh và Công việc.
-          </p>
-        )}
-        {error && !confirmDeleteCurrent && (
-          <p className="form-error" role="alert">
-            {error}
-            {!capabilities && (
-              <button
-                type="button"
-                className="btn secondary small"
-                onClick={() => {
-                  setError("");
-                  setLoading(true);
-                  setConnectionAttempt((value) => value + 1);
-                }}
-              >
-                Thử kết nối lại
-              </button>
-            )}
-          </p>
-        )}
-        <form
-          className="agent-composer"
-          onSubmit={send}
-          aria-label="Gửi yêu cầu cho NORA"
-        >
-          <label htmlFor="agent-request" className="field">
-            <span className="nora-sr-only">Yêu cầu của bạn</span>
-            <textarea
-              id="agent-request"
-              aria-label="Yêu cầu của bạn"
-              ref={requestField}
-              value={text}
-              maxLength={2000}
-              rows={1}
-              aria-describedby="nora-composer-hint nora-request-count"
-              disabled={busy || loading || voice.active || conversationArchived}
-              placeholder={
-                conversationArchived
-                  ? "Khôi phục hội thoại để gửi yêu cầu mới…"
-                  : "NORA ơi, giúp mình lên lịch…"
-              }
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing &&
-                  event.nativeEvent.keyCode !== 229
-                )
-                  send(event);
-              }}
-            />
-          </label>
-          <div className="agent-composer-actions">
-            <label className="agent-toggle">
-              <input
-                type="checkbox"
-                checked={autoApply}
-                disabled={busy || voice.active}
-                onChange={(event) => {
-                  setAutoApply(event.target.checked);
-                  if (retry.current)
-                    retry.current = {
-                      ...retry.current,
-                      autoApply: event.target.checked,
-                    };
-                }}
-              />
-              Tự lưu khi lịch khả thi
-            </label>
-            <div className="nora-composer-tools">
-              <details
-                className="nora-composer-info"
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    event.currentTarget.removeAttribute("open");
-                    event.stopPropagation();
-                  }
-                }}
-              >
-                <summary
-                  aria-label="Tùy chọn gửi yêu cầu"
-                  title="Tùy chọn gửi yêu cầu"
+        <div className="nora-composer-dock" ref={composerDock}>
+          {capabilities && !capabilities.aiAvailable && (
+            <p className="info">
+              Trợ lý AI chưa được cấu hình. Bạn vẫn có thể nhập lịch ở mục Giờ
+              rảnh và Công việc.
+            </p>
+          )}
+          {error && !confirmDeleteCurrent && (
+            <p className="form-error" role="alert">
+              {error}
+              {!capabilities && (
+                <button
+                  type="button"
+                  className="btn secondary small"
+                  onClick={() => {
+                    setError("");
+                    setLoading(true);
+                    setConnectionAttempt((value) => value + 1);
+                  }}
                 >
-                  {icon("settings")}
-                  <span>Tùy chọn</span>
+                  Thử kết nối lại
+                </button>
+              )}
+            </p>
+          )}
+          {notice && (
+            <p className="nora-save-notice" role="status">
+              {icon("check")}
+              {notice}
+            </p>
+          )}
+          {!loading && current.length > 0 && !conversationArchived && (
+            <div className="nora-suggestion-surface">
+              <div className="nora-capability-chips" aria-label="Gợi ý yêu cầu">
+                {[
+                  [
+                    "Xem lịch ngày mai",
+                    "Ngày mai lịch của tôi thế nào? Chỉ xem và tư vấn, chưa thay đổi lịch.",
+                  ],
+                  [
+                    "Tìm giờ trống",
+                    "Ngày mai tôi có thể làm việc trong khoảng giờ rảnh nào? Chỉ xem giờ rảnh trong cài đặt và các mục lịch đã lưu, chưa thay đổi lịch.",
+                  ],
+                  [
+                    "Dời một sự kiện",
+                    "Tôi muốn dời một sự kiện. Hãy hỏi tên sự kiện và giờ mới trước khi thay đổi lịch.",
+                  ],
+                ].map(([label, prompt]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    disabled={busy || voice.active}
+                    onClick={() => editRequest(prompt)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="nora-composer-surface">
+            <form
+              className="agent-composer"
+              onSubmit={send}
+              aria-label="Gửi yêu cầu cho NORA"
+            >
+              <label htmlFor="agent-request" className="field">
+                <span className="nora-sr-only">Yêu cầu của bạn</span>
+                <textarea
+                  id="agent-request"
+                  aria-label="Yêu cầu của bạn"
+                  ref={requestField}
+                  value={text}
+                  maxLength={2000}
+                  rows={1}
+                  aria-describedby="nora-composer-hint nora-request-count"
+                  disabled={
+                    busy || loading || voice.active || conversationArchived
+                  }
+                  placeholder={
+                    conversationArchived
+                      ? "Khôi phục hội thoại để gửi yêu cầu mới…"
+                      : "NORA ơi, giúp mình lên lịch…"
+                  }
+                  onChange={(event) => setText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !event.shiftKey &&
+                      !event.nativeEvent.isComposing &&
+                      event.nativeEvent.keyCode !== 229
+                    )
+                      send(event);
+                  }}
+                />
+              </label>
+              <div className="agent-composer-actions">
+                <label
+                  className="agent-toggle nora-save-toggle"
+                  title="Bật để tự lưu khi lịch hợp lệ; tắt để xem bản đề xuất trước khi lưu."
+                >
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    aria-label="Tự động lưu lịch"
+                    aria-describedby="nora-save-mode-help"
+                    checked={autoApply}
+                    disabled={busy || voice.active}
+                    onChange={(event) => {
+                      setAutoApply(event.target.checked);
+                      if (retry.current)
+                        retry.current = {
+                          ...retry.current,
+                          autoApply: event.target.checked,
+                        };
+                    }}
+                  />
+                  Tự động lưu
+                </label>
+                <div className="nora-composer-tools">
+                  <span
+                    id="nora-request-count"
+                    hidden={2000 - text.length >= 500}
+                    className={`nora-composer-count${text.length >= 1800 ? " is-near-limit" : ""}`}
+                    aria-label={`Còn ${2000 - text.length} ký tự`}
+                    title={`Còn ${2000 - text.length} / 2000 ký tự`}
+                  >
+                    Còn {2000 - text.length}
+                  </span>
+                  {capabilities?.voiceAvailable && (
+                    <button
+                      type="button"
+                      className={`nora-mic-button${voice.phase === "recording" ? " is-recording" : ""}`}
+                      aria-label={
+                        voice.phase === "recording"
+                          ? "Dừng ghi và chuyển thành chữ"
+                          : "Nhập bằng giọng nói"
+                      }
+                      aria-pressed={voice.phase === "recording"}
+                      title={
+                        !voice.supported
+                          ? "Trình duyệt này chưa hỗ trợ ghi âm. Hãy dùng Chrome, Edge hoặc Safari mới trên HTTPS."
+                          : !capabilities?.voiceAvailable
+                            ? "Nhập bằng giọng nói hiện chưa khả dụng."
+                            : "Nhập bằng giọng nói"
+                      }
+                      disabled={
+                        busy ||
+                        conversationArchived ||
+                        loading ||
+                        !capabilities?.voiceAvailable ||
+                        !voice.supported ||
+                        (voice.active && voice.phase !== "recording")
+                      }
+                      onClick={() =>
+                        voice.phase === "recording"
+                          ? voice.stop()
+                          : voice.start()
+                      }
+                    >
+                      {icon(voice.phase === "recording" ? "stop" : "mic")}
+                    </button>
+                  )}
+                  {busy && pending ? (
+                    <button
+                      type="button"
+                      className="nora-stop-button"
+                      onClick={() => streamAbort.current?.abort()}
+                      disabled={pending.phases.at(-1)?.stage === "SAVING"}
+                    >
+                      {icon("stop")}
+                      <span className="nora-sr-only">Dừng</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      className="btn primary nora-send-button"
+                      aria-label="Gửi yêu cầu"
+                      title="Gửi yêu cầu"
+                      disabled={
+                        busy ||
+                        conversationArchived ||
+                        voice.active ||
+                        loading ||
+                        !capabilities?.aiAvailable ||
+                        !text.trim()
+                      }
+                    >
+                      {icon("arrow")}
+                      <span className="nora-sr-only">
+                        {busy ? "Đang xử lý…" : "Gửi yêu cầu"}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+              {voice.active && (
+                <div className="nora-voice-status" role="status">
+                  <span>
+                    <i
+                      className={
+                        voice.phase === "recording" ? "is-listening" : ""
+                      }
+                    />
+                    {voice.phase === "requesting"
+                      ? "Đang mở micro…"
+                      : voice.phase === "recording"
+                        ? `Đang nghe · 00:${String(voice.seconds).padStart(2, "0")}${voice.previewing ? " · Chữ tạm thời" : ""}`
+                        : "Đang chuyển giọng nói thành chữ…"}
+                  </span>
+                  <button type="button" onClick={voice.cancel}>
+                    Hủy
+                  </button>
+                </div>
+              )}
+              {voice.error && (
+                <div className="nora-voice-error" role="alert">
+                  <span>{voice.error}</span>
+                  <button
+                    type="button"
+                    aria-label="Đóng thông báo micro"
+                    title="Đóng thông báo"
+                    onClick={() => {
+                      voice.clearError();
+                      requestField.current?.focus();
+                    }}
+                  >
+                    {icon("close")}
+                  </button>
+                </div>
+              )}
+            </form>
+            <div className="nora-composer-footer">
+              <span id="nora-composer-hint">
+                Enter gửi · Shift + Enter xuống dòng
+              </span>
+              <PopupDetails className="nora-composer-info">
+                <summary aria-label="Trợ giúp NORA" title="Trợ giúp NORA">
+                  Trợ giúp
                 </summary>
                 <div className="nora-composer-help">
-                  {capabilities?.features?.includes("planning-policy") && (
-                    <>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={personalized}
-                          disabled={busy || voice.active}
-                          onChange={(event) => {
-                            setPersonalized(event.target.checked);
-                            retry.current = null;
-                          }}
-                        />
-                        Dùng thời lượng cá nhân hóa và chừa thời gian dự phòng
-                      </label>
-                      <p>
-                        {personalized
-                          ? "Ước lượng và khả năng thực hiện dùng cùng chính sách với form lập kế hoạch."
-                          : "Giữ đúng thời lượng bạn yêu cầu và dùng toàn bộ giờ rảnh trong giới hạn ngày. Deadline, giờ nghỉ và giới hạn phiên vẫn được giữ."}
-                      </p>
-                    </>
-                  )}
-                  <p>
+                  <p id="nora-save-mode-help">
+                    <strong>Tự động lưu.</strong>{" "}
                     {autoApply
-                      ? "NORA sẽ lưu lịch khi khả thi. Bạn có thể hoàn tác sau đó."
-                      : "NORA sẽ đề xuất lịch để bạn xem trước khi lưu."}
+                      ? "NORA lưu khi lịch hợp lệ. Bạn có thể hoàn tác yêu cầu mới nhất."
+                      : "Đang tắt. NORA chỉ tạo bản xem trước; chọn Lưu thay đổi để cập nhật lịch."}
                   </p>
                   <p>
-                    Nội dung yêu cầu và dữ liệu lịch cần thiết được gửi đến dịch
-                    vụ AI khi bạn gửi.
+                    <strong>Gửi yêu cầu.</strong> Enter để gửi, Shift + Enter để
+                    xuống dòng. Mỗi yêu cầu tối đa 2000 ký tự.
                   </p>
                   <p>
-                    Micro ghi tối đa 60 giây. Chữ tạm thời xuất hiện khi nói qua
-                    dịch vụ nhận dạng của trình duyệt, hoặc Google Cloud theo
-                    từng cụm lời nói. Khi dừng, Google Cloud hoàn thiện bản chép
-                    lời. PLANORA không lưu bản ghi; bạn xem lại văn bản rồi gửi.
+                    <strong>Lịch của bạn.</strong> NORA dùng yêu cầu và thông
+                    tin lịch của bạn để hỗ trợ sắp xếp thời gian.
                   </p>
-                  {!capabilities?.voiceAvailable && (
+                  {capabilities?.voiceAvailable ? (
+                    <details className="nora-voice-help">
+                      <summary>Nhập bằng giọng nói</summary>
+                      <p>
+                        Bấm micro để bắt đầu nói, bấm dừng khi nói xong. Mỗi lần
+                        tối đa 60 giây. Chờ văn bản hoàn tất, xem lại hoặc chỉnh
+                        sửa rồi bấm gửi.
+                      </p>
+                    </details>
+                  ) : (
                     <p>
-                      Nhập giọng nói chưa được cấu hình. Bạn có thể nhập yêu cầu
+                      Nhập bằng giọng nói hiện chưa khả dụng. Bạn có thể nhập
                       bằng bàn phím.
                     </p>
                   )}
                 </div>
-              </details>
-              {capabilities?.voiceAvailable && (
-                <button
-                  type="button"
-                  className={`nora-mic-button${voice.phase === "recording" ? " is-recording" : ""}`}
-                  aria-label={
-                    voice.phase === "recording"
-                      ? "Dừng ghi và chuyển thành chữ"
-                      : "Nhập bằng giọng nói"
-                  }
-                  aria-pressed={voice.phase === "recording"}
-                  title={
-                    !voice.supported
-                      ? "Trình duyệt này chưa hỗ trợ ghi âm. Hãy dùng Chrome, Edge hoặc Safari mới trên HTTPS."
-                      : !capabilities?.voiceAvailable
-                        ? "Chuyển giọng nói cần Gemini hoặc Google Cloud được cấu hình."
-                        : "Nhập bằng giọng nói"
-                  }
-                  disabled={
-                    busy ||
-                    conversationArchived ||
-                    loading ||
-                    !capabilities?.voiceAvailable ||
-                    !voice.supported ||
-                    (voice.active && voice.phase !== "recording")
-                  }
-                  onClick={() =>
-                    voice.phase === "recording" ? voice.stop() : voice.start()
-                  }
-                >
-                  {icon(voice.phase === "recording" ? "stop" : "mic")}
-                </button>
-              )}
-              {busy && pending ? (
-                <button
-                  type="button"
-                  className="nora-stop-button"
-                  onClick={() => streamAbort.current?.abort()}
-                  disabled={pending.phases.at(-1)?.stage === "SAVING"}
-                >
-                  {icon("stop")}
-                  <span className="nora-sr-only">Dừng</span>
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  className="btn primary nora-send-button"
-                  aria-label="Gửi yêu cầu"
-                  title="Gửi yêu cầu"
-                  disabled={
-                    busy ||
-                    conversationArchived ||
-                    voice.active ||
-                    loading ||
-                    !capabilities?.aiAvailable ||
-                    !text.trim()
-                  }
-                >
-                  {icon("arrow")}
-                  <span className="nora-sr-only">
-                    {busy ? "Đang xử lý…" : "Gửi yêu cầu"}
-                  </span>
-                </button>
-              )}
+              </PopupDetails>
             </div>
           </div>
-          <div className="nora-composer-meta">
-            <span id="nora-composer-hint">
-              Enter gửi · Shift + Enter xuống dòng
-            </span>
-            <span
-              id="nora-request-count"
-              className={text.length >= 1900 ? "is-near-limit" : ""}
-            >
-              {text.length}/2000 ký tự
-            </span>
-          </div>
-          {voice.active && (
-            <div className="nora-voice-status" role="status">
-              <span>
-                <i
-                  className={voice.phase === "recording" ? "is-listening" : ""}
-                />
-                {voice.phase === "requesting"
-                  ? "Đang mở micro…"
-                  : voice.phase === "recording"
-                    ? `Đang nghe · 00:${String(voice.seconds).padStart(2, "0")}${voice.previewing ? " · Chữ tạm thời" : ""}`
-                    : "Đang chuyển giọng nói thành chữ…"}
-              </span>
-              <button type="button" onClick={voice.cancel}>
-                Hủy
-              </button>
-            </div>
-          )}
-          {voice.error && (
-            <p className="nora-voice-error" role="alert">
-              {voice.error}
-            </p>
-          )}
-        </form>
+        </div>
       </section>
-      {visiblePlan && planOpen && !wide && (
+      {planOpen && !wide && (
         <button
           type="button"
           className="nora-plan-backdrop"
-          aria-label="Đóng kế hoạch"
+          aria-label="Đóng lịch"
           onClick={() => setPlanOpen(false)}
         />
       )}
-      {visiblePlan && planOpen && (
+      {planOpen && (
         <aside
           id="nora-plan-panel"
           className="agent-context"
-          aria-label="Kế hoạch của bạn"
+          aria-label="Lịch của bạn"
           data-nora-reveal
           role={wide ? undefined : "dialog"}
           aria-modal={wide ? undefined : true}
         >
-          <button
-            className="nora-plan-close"
-            type="button"
-            onClick={() => setPlanOpen(false)}
-            aria-label="Đóng bảng kế hoạch"
-          >
-            {icon("close")}
-          </button>
-          {visiblePlan && (
-            <section
-              className="nora-plan-artifact"
-              aria-label="Chi tiết kế hoạch"
+          <div className="nora-panel-heading-actions nora-plan-heading-actions">
+            <button
+              className="nora-plan-close"
+              type="button"
+              onClick={() => {
+                if (wide) planVisibility.current = false;
+                setPlanOpen(false);
+                document.querySelector(".nora-plan-toggle")?.focus();
+              }}
+              aria-label="Đóng bảng lịch"
             >
-              <div className="nora-context-heading">
-                <span>{icon("calendar")}Kế hoạch của bạn</span>
-                <span className="agent-status">
-                  {statuses[visiblePlan.status]}
-                </span>
-              </div>
-              <p>
-                {plannedSessions.length} phiên ·{" "}
-                {plannedSessions.reduce(
-                  (sum, session) =>
-                    sum +
-                    Math.round(
-                      (new Date(session.end) - new Date(session.start)) / 60000,
-                    ),
-                  0,
-                )}{" "}
-                phút
-              </p>
-              {visiblePlan.status !== "APPLIED" && (
-                <p className="nora-plan-state-hint">
-                  {visiblePlan.status === "UNDONE"
-                    ? "Đây là lịch sử của yêu cầu đã hoàn tác."
-                    : "Đây là bản đề xuất; các phiên này chưa được lưu."}
-                </p>
-              )}
-              <ol>
-                {plannedSessions.map((session, index) => (
-                  <li key={session.id}>
-                    {(index === 0 ||
-                      planDay(session.start) !==
-                        planDay(plannedSessions[index - 1].start)) && (
-                      <h3>{planDay(session.start)}</h3>
-                    )}
-                    <div className="nora-plan-session">
-                      <span>
-                        {planHours(session.start)} — {planHours(session.end)}
-                        {planDay(session.start) !== planDay(session.end)
-                          ? ` (${planDay(session.end)})`
-                          : ""}
-                      </span>
-                      <strong>{planSessionName(session, visiblePlan)}</strong>
-                      <small>
-                        {Math.round(
-                          (new Date(session.end) - new Date(session.start)) /
-                            60000,
-                        )}{" "}
-                        phút tập trung
-                      </small>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <a href="#calendar">Mở lịch làm việc {icon("arrow")}</a>
-            </section>
-          )}
+              {icon("close")}
+            </button>
+          </div>
+          <div className="nora-context-heading">
+            <h2>{icon("calendar")}Lịch của bạn</h2>
+          </div>
+          <NoraSchedulePanel
+            turn={visiblePlan}
+            view={planView}
+            onViewChange={setPlanView}
+            date={dayDate}
+            onDateChange={setDayDate}
+            refreshKey={`${calendarRevision}:${conversationId}:${state.workspace?.preference?.revision || ""}`}
+            busy={busy}
+            onEditEvent={setEditingEvent}
+            onSuggest={(prompt) => {
+              setPlanOpen(wide);
+              editRequest(prompt);
+              setTimeout(() => requestField.current?.focus(), 0);
+            }}
+          />
         </aside>
+      )}
+      {wide && planOpen && (
+        <NoraPanelResize
+          options={panelLayout.options("plan")}
+          onResizing={panelLayout.setResizing}
+        />
+      )}
+      {editingEvent && (
+        <NoraEventEditor
+          event={editingEvent}
+          onCancel={() => setEditingEvent(null)}
+          onSaved={async () => {
+            setEditingEvent(null);
+            setCalendarRevision((value) => value + 1);
+            setTurns((previous) =>
+              previous.map((turn) => ({ ...turn, canUndo: false })),
+            );
+            setNotice("Đã cập nhật sự kiện. Lịch trong ngày sẽ được tải lại.");
+            try {
+              await onWorkspaceChanged();
+            } catch {
+              setError(
+                "Sự kiện đã lưu. Chưa tải lại được dữ liệu trang; hãy làm mới để đối chiếu.",
+              );
+            }
+          }}
+        />
       )}
     </div>
   );

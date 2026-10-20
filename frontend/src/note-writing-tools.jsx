@@ -1,3 +1,4 @@
+import { PopupDetails } from "./popup-dismissal.jsx";
 import { icon } from "./ui.jsx";
 import {
   defaultNoteAppearance,
@@ -24,15 +25,10 @@ export function NoteWritingTools({
       hidden={hidden}
       aria-label="Công cụ ghi chú"
     >
-      <details
+      <PopupDetails
         className="note-type-menu"
         ref={typeMenu}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.currentTarget.open = false;
-            event.currentTarget.querySelector("summary")?.focus();
-          }
-        }}
+
         onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget))
             event.currentTarget.open = false;
@@ -96,7 +92,7 @@ export function NoteWritingTools({
             </button>
           </div>
         </div>
-      </details>
+      </PopupDetails>
       <span className="note-tool-divider" aria-hidden="true" />
       <button
         type="button"

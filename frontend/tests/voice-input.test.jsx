@@ -367,3 +367,49 @@ it("the chat composer blocks Enter during recording and enables review before En
   );
   unmount();
 });
+
+it("microphone denial can be dismissed without losing the draft and returns on another denied attempt", async () => {
+  state.workspace = {
+    profile: { id: "voice-member" },
+    tasks: [],
+    events: [],
+    sessions: [],
+    preference: { timeZoneId: "Asia/Ho_Chi_Minh" },
+  };
+  getUserMedia.mockRejectedValue(new DOMException("denied", "NotAllowedError"));
+  fetch.mockImplementation(async (url) => ({
+    ok: true,
+    json: async () => ({
+      data:
+        url === "/api/agent/capabilities"
+          ? { aiAvailable: true, voiceAvailable: true }
+          : url.startsWith("/api/agent/conversations")
+            ? { items: [], nextCursor: null }
+            : url === "/api/workspace"
+              ? state.workspace
+              : [],
+    }),
+  }));
+  render(<AgentPage />);
+  const mic = await screen.findByRole("button", {
+    name: "Nhập bằng giọng nói",
+  });
+  await waitFor(() => expect(mic.disabled).toBe(false));
+  const input = screen.getByLabelText("Yêu cầu của bạn");
+  fireEvent.change(input, { target: { value: "Bản nháp cần giữ" } });
+  fireEvent.click(mic);
+  await screen.findByText(/Chưa được phép dùng micro/);
+  fireEvent.click(screen.getByRole("button", { name: "Đóng thông báo micro" }));
+  expect(screen.queryByText(/Chưa được phép dùng micro/)).toBeNull();
+  expect(input.value).toBe("Bản nháp cần giữ");
+  expect(document.activeElement).toBe(input);
+  expect(screen.getByRole("button", { name: "Gửi yêu cầu" }).disabled).toBe(
+    false,
+  );
+  fireEvent.click(mic);
+  await screen.findByText(/Chưa được phép dùng micro/);
+  expect(getUserMedia).toHaveBeenCalledTimes(2);
+  expect(fetch.mock.calls.some(([url]) => url.endsWith("turns/stream"))).toBe(
+    false,
+  );
+});

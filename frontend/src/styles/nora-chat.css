@@ -1802,28 +1802,39 @@
   border: 0;
 }
 .nora-scroll-bottom {
-  align-self: center;
-  position: relative;
-  flex-shrink: 0;
-  z-index: 3;
-  margin-top: -36px;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 12px;
+  position: absolute;
+  left: calc(50% - 20px);
+  bottom: calc(var(--nora-composer-stack, 190px) + 12px);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  margin: 0;
   background: #fff;
-  border: 1px solid #dce6f3;
-  border-radius: 22px;
-  color: #7b93b4;
-  font-size: 11px !important;
+  border: 1px solid #9db9d6;
+  border-radius: 50%;
+  color: #0757a8;
   cursor: pointer;
-  box-shadow: 0 3px 12px #3b659c10;
   animation: nora-pop-in 0.2s ease-out both;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out;
+}
+.nora-scroll-bottom:hover {
+  background: #0757a8;
+  border-color: #0757a8;
+  color: #fff;
+}
+.nora-scroll-bottom:focus-visible {
+  outline: 3px solid rgba(7, 87, 168, 0.35);
+  outline-offset: 2px;
 }
 .nora-scroll-bottom svg {
-  width: 12px;
-  height: 12px;
+  width: 17px;
+  height: 17px;
   rotate: 90deg;
 }
 .nora-studio .agent-main > :is(.form-error, .info) {

@@ -1,3 +1,4 @@
+import { useOutsideDismiss } from "./popup-dismissal.jsx";
 import {
   Fragment,
   useEffect,
@@ -25,6 +26,7 @@ function prefetchNavigation(event) {
 export function App({ initialize = true }) {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot),
     dialog = useRef(null);
+  useOutsideDismiss([dialog], closeModal, !!snapshot.modal);
   useEffect(() => {
     if (!initialize) return;
     const stopController = startController(),
@@ -79,9 +81,6 @@ export function App({ initialize = true }) {
         onCancel={(event) => {
           event.preventDefault();
           closeModal();
-        }}
-        onClick={(event) => {
-          if (event.target === dialog.current) closeModal();
         }}
       >
         <div id="modal-content">

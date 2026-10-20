@@ -1,3 +1,4 @@
+import { PopupDetails } from "./popup-dismissal.jsx";
 import { Select, Slot, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
 import {
@@ -90,7 +91,7 @@ export function tasksPage() {
             <option value="2">Vừa</option>
             <option value="1">Thấp</option>
           </Select>
-          <details className="date-filters">
+          <PopupDetails className="date-filters">
             <summary>Khoảng deadline</summary>
             <div>
               <label className="field">
@@ -102,7 +103,7 @@ export function tasksPage() {
                 <input className="filter" id="task-to" type="date" />
               </label>
             </div>
-          </details>
+          </PopupDetails>
         </div>
         <Slot id="task-list" as="div">
           {taskRows(

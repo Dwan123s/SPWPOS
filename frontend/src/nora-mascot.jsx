@@ -145,6 +145,7 @@ export function NoraMotionControl() {
       }}
     >
       {icon(paused || reduced || inheritedPause ? "play" : "pause")}
+      <span>Chuyển động</span>
     </button>
   );
 }

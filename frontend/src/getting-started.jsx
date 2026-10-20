@@ -1,3 +1,4 @@
+import { useOutsideDismiss } from "./popup-dismissal.jsx";
 import { useLayoutEffect, useRef, useState } from "react";
 import { brand } from "./brand.jsx";
 import { icon } from "./ui.jsx";
@@ -226,6 +227,13 @@ const faqs = [
 ];
 export function GettingStarted({ signedIn = false, onLogin }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuPanel = useRef(null),
+    menuTrigger = useRef(null);
+  useOutsideDismiss(
+    [menuPanel, menuTrigger],
+    () => setMenuOpen(false),
+    menuOpen,
+  );
   const cta = signedIn ? "#today" : "#register";
   const info = (section) => {
     setMenuOpen(false);
@@ -264,9 +272,16 @@ export function GettingStarted({ signedIn = false, onLogin }) {
         <div className="start-header-inner">
           {brand("#getting-started", "start-brand")}
           <nav
+            ref={menuPanel}
             id="start-navigation"
             className={menuOpen ? "is-open" : ""}
             aria-label="Điều hướng giới thiệu"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setMenuOpen(false);
+                menuTrigger.current?.focus();
+              }
+            }}
           >
             <button type="button" onClick={() => info("about")}>
               Về PLANORA
@@ -288,6 +303,10 @@ export function GettingStarted({ signedIn = false, onLogin }) {
               {icon("arrow")}
             </a>
             <button
+              ref={menuTrigger}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setMenuOpen(false);
+              }}
               className="start-menu-toggle"
               type="button"
               aria-label={
