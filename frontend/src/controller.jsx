@@ -253,6 +253,7 @@ async function scheduleTask(id, triggerEvent = "MANUAL") {
     triggerEvent,
   });
   if (
+    plan.hasUrgentReplan ||
     plan.warnings.length ||
     !plan.sessions.some((session) => !session.preserved)
   ) {

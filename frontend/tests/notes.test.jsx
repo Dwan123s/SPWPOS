@@ -24,7 +24,8 @@ let notes,
   failDelete,
   aiErrorCode,
   aiAvailable,
-  aiSource;
+  aiSource,
+  urgentReplan;
 const candidate = (name, minutes) => ({
   name,
   description: "",
@@ -46,6 +47,7 @@ beforeEach(() => {
   aiErrorCode = undefined;
   aiAvailable = true;
   aiSource = "Gemini";
+  urgentReplan = false;
   state.workspace = {
     availability: [{ dayOfWeek: 1 }],
     exceptions: [],
@@ -141,7 +143,8 @@ beforeEach(() => {
           note,
           plan: {
             id: "auto-plan",
-            isApplied: true,
+            isApplied: !urgentReplan,
+            hasUrgentReplan: urgentReplan,
             sessions: [{ preserved: false }],
             warnings: [],
           },
@@ -418,6 +421,20 @@ it("automatically schedules a saved note and reports the applied calendar", asyn
   expect(refresh).toHaveBeenCalledOnce();
   expect(screen.getByRole("region", { name: "Kết quả xếp lịch" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Xem lịch đề xuất" })).toBeNull();
+});
+
+it("shows a confirmation proposal for urgent displacement instead of claiming the note schedule was saved", async () => {
+  urgentReplan = true;
+  const user = userEvent.setup();
+  render(<NotesPage onWorkspaceChanged={vi.fn(async () => {})} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Xem trước công việc" }).closest("fieldset").disabled).toBe(false));
+  await user.type(screen.getByLabelText("Tiêu đề ghi chú"), "Báo cáo khẩn");
+  await user.type(screen.getByLabelText("Nội dung ghi chú"), "Báo cáo khẩn 60 phút");
+  await useQuickSchedule(user);
+  await screen.findByText(/Đã tạo đề xuất dời lịch để ưu tiên việc khẩn/);
+  expect(screen.queryByText(/Đã tự động áp dụng lịch với/)).toBeNull();
+  expect(planModal).toHaveBeenCalledWith(expect.objectContaining({ hasUrgentReplan: true, isApplied: false }));
+  expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
 });
 
 it("allows saving but disables AI actions when Gemini is not configured", async () => {

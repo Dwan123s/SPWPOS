@@ -99,7 +99,7 @@ public sealed partial class PlanningAgentTests
         Assert.Equal("UNDONE", (await Agent(h, s => s.UndoAgentTurnAsync(user.Id, preview.Id, Ct))).Status);
     }
 
-    [Fact] public async Task Meeting_moves_only_conflicting_flexible_work_and_undo_restores_it()
+    [Fact] public async Task Meeting_conflict_suggests_a_free_time_and_only_the_selected_alternative_is_saved_and_undoable()
     {
         var ai = new AgentAiTestDouble { Response = now => AgentAiTestDouble.Empty() with { Events = [new("Họp", now.AddHours(6), now.AddHours(8), EventType: "MEETING")] } };
         await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id); var now = h.Clock.GetUtcNow();
@@ -108,12 +108,15 @@ public sealed partial class PlanningAgentTests
         var original = new WorkSession { UserId = user.Id, TaskId = task, Start = now.AddHours(6), End = now.AddHours(7) };
         var kept = new WorkSession { UserId = user.Id, TaskId = other, Start = now.AddHours(9), End = now.AddHours(10) };
         await h.DbAsync(async db => { db.WorkSessions.AddRange(original, kept); await db.SaveChangesAsync(Ct); });
-        var result = await Agent(h, s => s.SendAgentTurnAsync(user.Id, Request(), Ct)); Assert.Equal("APPLIED", result.Status);
-        Assert.Contains(result.Changes, x => x.Kind == "SESSION" && x.Before.Length > 0 && x.After.Length > 0);
+        var conflict = await Assert.ThrowsAsync<AuthException>(() => Agent(h, s => s.SendAgentTurnAsync(user.Id, Request(), Ct)));
+        Assert.Equal("SESSION_OVERLAP", conflict.Code); Assert.Contains("Đề xuất", conflict.Message);
+        ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Họp", now.AddHours(7), now.AddHours(9), EventType: "MEETING")] };
+        var result = await Agent(h, s => s.SendAgentTurnAsync(user.Id, Request("Thêm cuộc họp từ 15:00 đến 17:00 hôm nay"), Ct)); Assert.Equal("APPLIED", result.Status);
+        Assert.DoesNotContain(result.Changes, x => x.Kind == "SESSION");
         var sessions = await h.DbAsync(db => db.WorkSessions.AsNoTracking().ToArrayAsync(Ct));
-        Assert.Equal(WorkSessionStatus.Cancelled, sessions.Single(x => x.Id == original.Id).Status);
+        Assert.Equal(WorkSessionStatus.Scheduled, sessions.Single(x => x.Id == original.Id).Status);
         Assert.Equal(kept.Start, sessions.Single(x => x.Id == kept.Id).Start);
-        Assert.All(sessions.Where(x => x.Status == WorkSessionStatus.Scheduled), x => Assert.False(x.Start < now.AddHours(8) && now.AddHours(6) < x.End));
+        Assert.All(sessions.Where(x => x.Status == WorkSessionStatus.Scheduled), x => Assert.False(x.Start < now.AddHours(9) && now.AddHours(7) < x.End));
         await Agent(h, s => s.UndoAgentTurnAsync(user.Id, result.Id, Ct));
         Assert.Equal(0, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
         Assert.Equal(WorkSessionStatus.Scheduled, (await h.DbAsync(db => db.WorkSessions.SingleAsync(x => x.Id == original.Id, Ct))).Status);
@@ -188,18 +191,43 @@ public sealed partial class PlanningAgentTests
         Assert.Equal("NOT_FOUND", (await Assert.ThrowsAsync<AuthException>(() => Agent(h, s => s.UndoAgentTurnAsync(other.Id, turn.Id, Ct)))).Code);
     }
 
-    [Fact] public async Task Time_forms_reschedule_conflicting_sessions_and_keep_cancelled_history()
+    [Fact] public async Task Time_forms_reject_conflicts_and_preserve_sessions_when_the_user_selects_a_free_alternative()
     {
         var ai = new AgentAiTestDouble(); await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
         var now = h.Clock.GetUtcNow(); var id = await Work(h, s => s.SaveTaskAsync(user.Id, null, new("Viết", "", now.AddDays(2), 60), Ct));
         var old = new WorkSession { UserId = user.Id, TaskId = id, Start = now.AddHours(6), End = now.AddHours(7) };
         await h.DbAsync(async db => { db.WorkSessions.Add(old); await db.SaveChangesAsync(Ct); });
-        await Work(h, s => s.SaveEventAsync(user.Id, null, new("Họp", now.AddHours(6), now.AddHours(8)), Ct));
+        var conflict = await Assert.ThrowsAsync<AuthException>(() => Work(h, s => s.SaveEventAsync(user.Id, null, new("Họp", now.AddHours(6), now.AddHours(8)), Ct)));
+        Assert.Equal("SESSION_OVERLAP", conflict.Code); Assert.Contains("Đề xuất", conflict.Message);
+        Assert.Equal(0, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
+        await Work(h, s => s.SaveEventAsync(user.Id, null, new("Họp", now.AddHours(7), now.AddHours(9)), Ct));
         var sessions = await h.DbAsync(db => db.WorkSessions.AsNoTracking().ToArrayAsync(Ct));
-        Assert.Equal(WorkSessionStatus.Cancelled, sessions.Single(x => x.Id == old.Id).Status);
+        Assert.Equal(WorkSessionStatus.Scheduled, sessions.Single(x => x.Id == old.Id).Status);
         var replacement = Assert.Single(sessions, x => x.Status == WorkSessionStatus.Scheduled);
-        Assert.False(replacement.Start < now.AddHours(8) && now.AddHours(6) < replacement.End);
+        Assert.Equal(old.Start, replacement.Start); Assert.Equal(old.End, replacement.End);
         Assert.Equal(0, ai.Calls);
+    }
+
+    [Fact] public async Task A_time_change_proposes_urgent_displacement_without_automatically_moving_the_old_sessions()
+    {
+        await using var h = await Harness(new AgentAiTestDouble()); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        var now = h.Clock.GetUtcNow();
+        var urgent = new WorkTask { UserId = user.Id, Name = "Khẩn", Priority = 4, EstimatedMinutes = 60,
+            Deadline = now.AddHours(4), IsHardDeadline = true, WorkWindowStart = now.AddHours(2), WorkWindowEnd = now.AddHours(4) };
+        var old = new WorkTask { UserId = user.Id, Name = "Việc cũ", Deadline = now.AddDays(7), EstimatedMinutes = 60 };
+        var first = new WorkSession { UserId = user.Id, TaskId = urgent.Id, Start = now.AddHours(2), End = now.AddHours(3) };
+        var second = new WorkSession { UserId = user.Id, TaskId = old.Id, Start = now.AddHours(3), End = now.AddHours(4) };
+        await h.DbAsync(async db => { db.WorkTasks.AddRange(urgent, old); db.WorkSessions.AddRange(first, second); await db.SaveChangesAsync(Ct); });
+        await Work(h, s => s.SaveExceptionAsync(user.Id, null, new(DateOnly.FromDateTime(now.DateTime), 600, 660, false), Ct));
+        var saved = await h.DbAsync(db => db.WorkSessions.Where(x => x.Status == WorkSessionStatus.Scheduled).ToArrayAsync(Ct));
+        Assert.Equal(2, saved.Length); Assert.Contains(saved, x => x.Id == first.Id && x.Start == first.Start);
+        Assert.Contains(saved, x => x.Id == second.Id && x.Start == second.Start);
+        var proposal = Assert.Single(await h.DbAsync(db => db.PlanProposals.ToArrayAsync(Ct)));
+        Assert.False(proposal.IsApplied);
+        var plan = await Work(h, s => s.GetPlanAsync(user.Id, proposal.Id, Ct));
+        Assert.True(plan.HasUrgentReplan); Assert.Empty(plan.Warnings);
+        await Work(h, s => s.ApplyPlanAsync(user.Id, proposal.Id, Ct));
+        Assert.True((await Work(h, s => s.GetPlanAsync(user.Id, proposal.Id, Ct))).IsApplied);
     }
 
     [Fact] public async Task Recurring_events_check_all_occurrences_before_saving_any()
@@ -250,13 +278,14 @@ public sealed partial class PlanningAgentTests
         Assert.Equal("Họp cũ", (await h.DbAsync(db => db.FixedEvents.SingleAsync(Ct))).Name);
     }
 
-    [Fact] public async Task Turning_off_automatic_rescheduling_keeps_sessions_and_issues_a_notice()
+    [Fact] public async Task Disabling_automatic_rescheduling_still_rejects_a_conflicting_event_with_alternatives()
     {
         var ai = new AgentAiTestDouble(); await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id, automatic: false);
         var now = h.Clock.GetUtcNow(); var task = await Work(h, s => s.SaveTaskAsync(user.Id, null, new("Viết", "", now.AddDays(2), 60), Ct));
         await h.DbAsync(async db => { db.WorkSessions.Add(new() { UserId = user.Id, TaskId = task, Start = now.AddHours(6), End = now.AddHours(7) }); await db.SaveChangesAsync(Ct); });
-        await Work(h, s => s.SaveEventAsync(user.Id, null, new("Họp", now.AddHours(6), now.AddHours(8)), Ct));
+        var conflict = await Assert.ThrowsAsync<AuthException>(() => Work(h, s => s.SaveEventAsync(user.Id, null, new("Họp", now.AddHours(6), now.AddHours(8)), Ct)));
+        Assert.Equal("SESSION_OVERLAP", conflict.Code); Assert.Contains("Đề xuất", conflict.Message);
         Assert.Equal(WorkSessionStatus.Scheduled, (await h.DbAsync(db => db.WorkSessions.SingleAsync(Ct))).Status);
-        Assert.Contains(await h.DbAsync(db => db.InAppNotifications.ToArrayAsync(Ct)), x => x.Title == "Cần kiểm tra lại lịch");
+        Assert.Equal(0, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
     }
 }

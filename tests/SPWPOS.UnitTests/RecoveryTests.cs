@@ -32,6 +32,28 @@ public sealed class RecoveryTests
         await Work(h,s=>s.ApplyRecoveryAsync(data.User,row.Id,Ct));Assert.Equal(revision,(await Work(h,s=>s.GetAsync(data.User,Ct))).Preference.Revision);
         Assert.Single((await Work(h,s=>s.GetAsync(data.User,Ct))).Sessions, x=>x.Status=="Scheduled");
     }
+    [Fact] public async Task Automatic_recovery_waits_for_confirmation_when_urgent_work_displaces_an_existing_session()
+    {
+        await using var h = await ServiceHarness.CreateAsync(); var data = await Setup(h);
+        var start = h.Clock.GetUtcNow().AddMinutes(5);
+        var old = new WorkTask { UserId = data.User, Name = "Lịch cũ", Deadline = start.AddDays(7), EstimatedMinutes = 60 };
+        var original = new WorkSession { UserId = data.User, TaskId = old.Id, Start = start, End = start.AddHours(1) };
+        await h.DbAsync(async db => {
+            var urgent = await db.WorkTasks.SingleAsync(Ct); urgent.Priority = 4;
+            urgent.WorkWindowStart = start; urgent.WorkWindowEnd = start.AddHours(1);
+            db.WorkTasks.Add(old); db.WorkSessions.Add(original); await db.SaveChangesAsync(Ct);
+        });
+        await Work(h, s => s.SetRecoverySettingsAsync(data.User, new(true, true, 2, 0, 0), Ct));
+        await Work(h, s => s.ScanRecoveryAsync(data.User, Ct));
+        await Work(h, s => s.ScanRecoveryAsync(data.User, Ct));
+        var row = Assert.Single((await Work(h, s => s.GetRecoveryAsync(data.User, 1, Ct))).Items);
+        Assert.Equal("PROPOSED", row.Status); Assert.True(row.Plan!.HasUrgentReplan);
+        var saved = Assert.Single(await h.DbAsync(db => db.WorkSessions.Where(x => x.Status == WorkSessionStatus.Scheduled).ToArrayAsync(Ct)));
+        Assert.Equal(original.Id, saved.Id); Assert.Equal(start, saved.Start);
+        await Work(h, s => s.ApplyRecoveryAsync(data.User, row.Id, Ct));
+        Assert.Equal("APPLIED", Assert.Single((await Work(h, s => s.GetRecoveryAsync(data.User, 1, Ct))).Items).Status);
+    }
+
     [Fact] public async Task Stale_proposals_require_rebuild_and_hard_deadline_is_never_extended()
     {
         await using var h=await ServiceHarness.CreateAsync();var data=await Setup(h);

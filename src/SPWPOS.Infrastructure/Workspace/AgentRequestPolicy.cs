@@ -12,7 +12,7 @@ public sealed partial class WorkspaceService
 
     private static AgentIntent ClarifyAgentIntent(AgentIntent intent, string question) => intent with {
         Reply = ClarificationReply(intent.Reply), Question = question.Trim(), ResultKind = "CLARIFICATION",
-        ReplaceWeeklyAvailability = false, WeeklySlots = [], Exceptions = [], Events = [], Tasks = [], ScheduleTaskIds = [], Reschedule = false
+        ReplaceWeeklyAvailability = false, WeeklySlots = [], Exceptions = [], Events = [], Tasks = [], ScheduleTaskIds = [], Reschedule = false, FreeTimeQuery = null, ScheduleReviewQuery = null
     };
 
     private static MatchCollection RequestMatches(string text, string pattern) => Regex.Matches(text, pattern,
@@ -40,6 +40,19 @@ public sealed partial class WorkspaceService
             if (date.DayOfWeek != weekday)
                 return AskCalendar("Thứ và ngày trong yêu cầu không khớp nhau.",
                     $"Ngày {date:dd/MM/yyyy} là {(date.DayOfWeek == DayOfWeek.Sunday ? "Chủ nhật" : "thứ " + ((int)date.DayOfWeek + 1))}. Bạn muốn dùng ngày này hay thứ đã nêu?");
+        }
+        if ((intent.ScheduleReviewQuery ?? intent.FreeTimeQuery) is { } query)
+        {
+            var queryDay = RequestMatches(text, @"\b(ngay mai|hom nay|tomorrow|today|ngay kia)\b");
+            if (queryDay.Count == 1 && RequestMatches(text, @"\d{1,2}/\d{1,2}|\d{4}-\d{2}-\d{2}").Count == 0)
+            {
+                var offset = queryDay[0].Value is "ngay mai" or "tomorrow" ? 1 : queryDay[0].Value == "ngay kia" ? 2 : 0;
+                var expectedDay = LocalDate(now, preference).AddDays(offset);
+                if (LocalDate(query.Start, preference) != expectedDay || LocalDate(query.End.AddTicks(-1), preference) != expectedDay)
+                    return AskCalendar("Ngày AI diễn giải chưa khớp ngày theo múi giờ của bạn.",
+                        $"Theo múi giờ của bạn, {queryDay[0].Value} là {expectedDay:dd/MM/yyyy}. Bạn muốn kiểm tra ngày này nhé?");
+            }
+            return intent;
         }
         if (!HasAgentActions(intent)) return intent;
         // A single relative date for a single event/exception has an unambiguous account-local anchor.

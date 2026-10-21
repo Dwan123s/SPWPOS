@@ -15,10 +15,12 @@ public sealed record AgentExceptionCommand(DateOnly Date, int StartMinute, int E
     bool IsAvailable, string Note = "", Guid? ExistingId = null);
 public sealed record AgentEventCommand(string Name, DateTimeOffset Start, DateTimeOffset End,
     string Description = "", string EventType = "OTHER", int RepeatWeeks = 1, Guid? ExistingId = null);
+public sealed record AgentFreeTimeQuery(DateTimeOffset Start, DateTimeOffset End);
 public sealed record AgentIntent(string Reply, string Question, bool ReplaceWeeklyAvailability,
     AvailabilityInput[] WeeklySlots, AgentExceptionCommand[] Exceptions, AgentEventCommand[] Events,
     AgentTaskCommand[] Tasks, Guid[] ScheduleTaskIds, bool Reschedule, int HorizonDays, string[]? Options = null,
-    AgentPendingRequest? Pending = null, string? ResultKind = null);
+    AgentPendingRequest? Pending = null, string? ResultKind = null, AgentFreeTimeQuery? FreeTimeQuery = null,
+    AgentFreeTimeQuery? ScheduleReviewQuery = null);
 public sealed record AgentMessage(string Text, string Reply, string Status);
 public sealed record AgentChangeView(string Kind, string Name, string Before, string After, Guid? TaskId = null);
 public sealed record AgentTurnView(Guid Id, Guid ConversationId, Guid RequestId, string Text,

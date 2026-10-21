@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SPWPOS.Application.Authentication;
 using SPWPOS.Application.Workspace;
+using SPWPOS.Domain.Entities;
 using SPWPOS.TestSupport;
 namespace SPWPOS.UnitTests;
 
@@ -76,6 +77,33 @@ public sealed class NoteWorkflowTests
         Assert.NotEmpty(plan.Sessions); Assert.Empty(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
         await Call(h, async s => { await s.ApplyPlanAsync(user.Id, plan.Id, Ct); return true; });
         Assert.NotEmpty(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
+    }
+
+    [Fact] public async Task Note_automatic_scheduling_returns_an_urgent_displacement_proposal_without_applying_it()
+    {
+        await using var h = await CreateHarnessAsync(); var user = await h.RegisterAsync();
+        var now = h.Clock.GetUtcNow(); var start = now.AddDays(1);
+        await Call(h, async s => {
+            await s.SetPreferenceAsync(user.Id, new("UTC", 25, 240, 0, 0, 1440), Ct);
+            await s.SetAvailabilityAsync(user.Id, new(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()), Ct);
+            return true;
+        });
+        var note = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Khẩn", "Báo cáo khẩn 60 phút"), Ct));
+        note = await Call(h, s => s.AnalyzeNoteAsync(user.Id, note.Id, new(note.Version), Ct));
+        note = await Call(h, s => s.ImportNoteAsync(user.Id, note.Id, new(note.Version,
+            [note.Analysis!.Tasks[0] with { Priority = 4, EstimatedMinutes = 60, Deadline = start.AddHours(1), IsHardDeadline = true }]), Ct));
+        var old = new WorkTask { UserId = user.Id, Name = "Đã lên lịch", Deadline = now.AddDays(7), EstimatedMinutes = 60 };
+        var original = new WorkSession { UserId = user.Id, TaskId = old.Id, Start = start, End = start.AddHours(1) };
+        await h.DbAsync(async db => {
+            var urgent = await db.WorkTasks.SingleAsync(Ct); urgent.WorkWindowStart = start; urgent.WorkWindowEnd = start.AddHours(1);
+            db.WorkTasks.Add(old); db.WorkSessions.Add(original); await db.SaveChangesAsync(Ct);
+        });
+        var result = await Call(h, s => s.ScheduleNoteAsync(user.Id, note.Id, new(note.Version, true, 7), Ct));
+        Assert.True(result.Plan.HasUrgentReplan); Assert.False(result.Plan.IsApplied);
+        Assert.Empty(result.Plan.Warnings);
+        Assert.Equal(WorkSessionStatus.Scheduled, Assert.Single(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct))).Status);
+        await Call(h, async s => { await s.ApplyPlanAsync(user.Id, result.Plan.Id, Ct); return true; });
+        Assert.True((await Call(h, s => s.GetPlanAsync(user.Id, result.Plan.Id, Ct))).IsApplied);
     }
 
     [Fact] public async Task Automatic_scheduling_applies_once_and_keeps_existing_sessions()

@@ -372,6 +372,13 @@ export function availabilityRow(
 }
 export function planModal(plan, simulation = false) {
   state.plan = plan;
+  const confirmMove = plan.hasUrgentReplan && !plan.isApplied;
+  const movedTaskIds = new Set(
+    plan.sessions.filter((s) => !s.preserved &&
+      ["URGENT_NEAR_DEADLINE_MOVE", "URGENT_FLEXIBLE_MOVE"].includes(s.reasonCode))
+      .map((s) => s.taskId),
+  );
+  const windowText = (s) => `${dateFmt(s.start)} · ${timeFmt(s.start)}–${timeFmt(s.end)}`;
   modal(
     plan.isApplied ? "Lịch đã được lưu" : "Xem trước lịch",
     `${dateFmt(plan.start)} → ${dateFmt(plan.end)} · ${plan.sessions.length} phiên · ${plan.isApplied ? "đã cập nhật lịch" : "chưa thay đổi lịch"}.`,
@@ -380,8 +387,29 @@ export function planModal(plan, simulation = false) {
         <div role="status" className="info plan-save-status">
           {plan.isApplied
             ? "Lịch này đã được lưu. Mở Lịch làm việc để bắt đầu."
+            : confirmMove
+              ? "Đề xuất dời lịch để ưu tiên việc khẩn. Lịch hiện tại chưa thay đổi. Kiểm tra giờ cũ và giờ mới rồi bấm Xác nhận dời lịch. Hạn chót giữ nguyên."
             : "Đây là lịch xem trước, chưa thay đổi lịch hiện tại. Bấm Lưu lịch này để đưa các khoảng làm việc vào lịch."}
         </div>
+      )}
+      {confirmMove && movedTaskIds.size > 0 && (
+        <section aria-label="Các công việc được đề xuất dời lịch">
+          <h3>Đề xuất dời lịch</h3>
+          {nodeList([...movedTaskIds].map((taskId) => {
+            const task = state.workspace.tasks.find((t) => t.id === taskId);
+            const kept = new Set(plan.sessions.filter((s) => s.preserved).map((s) => s.id));
+            const before = (state.workspace.sessions || []).filter((s) => s.taskId === taskId &&
+              s.status === "Scheduled" && new Date(s.start) >= new Date(plan.start) &&
+              new Date(s.start) < new Date(plan.end) && !kept.has(s.id));
+            const after = plan.sessions.filter((s) => s.taskId === taskId && !s.preserved);
+            return <div className="info spaced">
+              <strong>{task?.name || "Công việc"}</strong>
+              <p>Giờ cũ: {before.map(windowText).join("; ") || "Xem lịch đã lưu"}</p>
+              <p>Giờ mới: {after.map(windowText).join("; ")}</p>
+              {task?.deadline && <p>Hạn chót giữ nguyên: {dateFmt(task.deadline)} · {timeFmt(task.deadline)}</p>}
+            </div>;
+          }))}
+        </section>
       )}
       {nodeList(
         plan.warnings.map((w) => (
@@ -458,7 +486,7 @@ export function planModal(plan, simulation = false) {
           ""
         )}
         {!simulation && !plan.isApplied && plan.status !== "DISCARDED"
-          ? button("Lưu lịch này", "apply-plan", "primary", plan.id, "check")
+          ? button(confirmMove ? "Xác nhận dời lịch" : "Lưu lịch này", "apply-plan", "primary", plan.id, "check")
           : ""}
         {!simulation && plan.isApplied
           ? button("Mở Hôm nay để làm việc", "nav", "primary", "today", "play")

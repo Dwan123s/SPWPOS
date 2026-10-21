@@ -70,7 +70,13 @@ public sealed partial class WorkspaceService
         if(!quiet)await AddNotification(uid,"RECOVERY","Kế hoạch cần điều chỉnh",row.Message,"recovery:"+key,null,ct,planId:row.PlanId);
         if(settings.AutoApply&&!quiet&&row.Status=="PROPOSED")autoCase=row.Id;
         },ct,false);
-        if(autoCase is {} caseId)await ApplyRecoveryAsync(uid,caseId,ct);
+        if(autoCase is {} caseId)
+        {
+            var recovery = await Find<RecoveryCase>(uid, caseId, ct);
+            var proposal = await Find<PlanProposal>(uid, recovery.PlanId!.Value, ct);
+            if (JsonSerializer.Deserialize<PlanView>(proposal.PayloadJson)?.HasUrgentReplan != true)
+                await ApplyRecoveryAsync(uid,caseId,ct);
+        }
     }
     private async Task BuildRecovery(Guid uid,RecoveryCase row,PlanningState state,CancellationToken ct)
     {

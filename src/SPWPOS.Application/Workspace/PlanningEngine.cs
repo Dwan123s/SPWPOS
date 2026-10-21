@@ -119,14 +119,15 @@ public sealed partial class PlanningEngine
         }
         return nodes.Any(x => Visit(x.Id));
     }
-    public PlanView Generate(PlanningState state, PlanInput input, DateTimeOffset now)
+    private PlanView GenerateCore(PlanningState state, PlanInput input, DateTimeOffset now, UrgentReplanPolicy? urgency = null, bool urgentFirst = true)
     {
         var start = input.Start < now ? now : input.Start; var end = start.AddDays(input.HorizonDays);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         var factor = input.UseCapacityFactor ? Capacity(state, now).Factor : 1;
         var affected = input.AffectedTaskIds is null ? null : AffectedClosure(state, input.AffectedTaskIds);
         var preserve = state.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused ||
-            x.Status == WorkSessionStatus.Scheduled && x.End > now && (x.Start < start || x.Start >= end || x.IsLocked || affected is not null && !affected.Contains(x.TaskId))).ToArray();
+            x.Status == WorkSessionStatus.Scheduled && x.End > now && (x.Start < start || x.Start >= end || x.IsLocked ||
+                urgency?.RetainedSessionIds.Contains(x.Id) == true || affected is not null && !affected.Contains(x.TaskId))).ToArray();
         var schedule = preserve.Where(x => x.End > start && x.Start < end).Select(x => new ProposedSession(x.Id, x.TaskId, x.Start, x.End, "PRESERVED_SESSION", true)).ToList();
         TimeSlot Block(DateTimeOffset from, DateTimeOffset to) => new(from.AddMinutes(-state.Preference.BreakMinutes), to.AddMinutes(state.Preference.BreakMinutes));
         var completedBlocks = state.Sessions.Where(x => x.Status == WorkSessionStatus.Completed).Select(x => Block(x.Start, x.End)).ToArray();
@@ -142,7 +143,7 @@ public sealed partial class PlanningEngine
         while (tasks.Count > 0)
         {
             var task = tasks.Values.Where(t => state.Dependencies.Where(d => d.TaskId == t.Id).All(d => done.ContainsKey(d.PredecessorId)))
-                .OrderBy(t => t.Deadline).ThenByDescending(t => t.Priority).ThenBy(t => t.Id).FirstOrDefault();
+                .OrderByDescending(t => urgentFirst && t.Priority == 4).ThenBy(t => t.Deadline).ThenByDescending(t => t.Priority).ThenBy(t => t.Id).FirstOrDefault();
             if (task is null)
             {
                 foreach (var blocked in tasks.Values) warnings.Add(new(blocked.Id, blocked.Name, "DEPENDENCY_UNSCHEDULED", "Công việc phụ thuộc chưa có phương án hoàn thành.", Remaining(blocked, bias)));
@@ -166,10 +167,13 @@ public sealed partial class PlanningEngine
             // Prefer the configured productive hours across the horizon. Fall back to
             // other available hours so soft preferences never block a hard deadline.
             var choices = preferredWindows.Concat(task.Splittable ? free.SelectMany(slot => Subtract(slot, preferredWindows)) : free).ToArray();
+            var strictDeadline = task.IsHardDeadline || task.Priority == 4 || urgency?.Displaced.ContainsKey(task.Id) == true;
             var candidates = choices.Select(x => new TimeSlot(x.Start, x.End < task.Deadline ? x.End : task.Deadline)).Where(x => x.End > x.Start)
-                .Concat(task.IsHardDeadline ? [] : choices.Select(x => new TimeSlot(x.Start > task.Deadline ? x.Start : task.Deadline, x.End)).Where(x => x.End > x.Start))
+                .Concat(strictDeadline ? [] : choices.Select(x => new TimeSlot(x.Start > task.Deadline ? x.Start : task.Deadline, x.End)).Where(x => x.End > x.Start))
                 .Select(x => new TimeSlot(task.WorkWindowStart is { } from && from > x.Start ? from : x.Start,
                     task.WorkWindowEnd is { } to && to < x.End ? to : x.End)).Where(x => x.End > x.Start);
+            if (urgency?.Displaced.TryGetValue(task.Id, out var move) == true)
+                candidates = DisplacedWindows(candidates, move, remaining, task.Splittable, state.Preference.MaximumSessionMinutes, zone);
             foreach (var slot in candidates)
             {
                 // Preferred windows may be visited before earlier fallback windows.
@@ -179,7 +183,7 @@ public sealed partial class PlanningEngine
                 {
                     if (remaining <= 0) break;
                     var cursor = window.Start > earliest ? window.Start : earliest;
-                    var limit = task.IsHardDeadline && task.Deadline < window.End ? task.Deadline : window.End;
+                    var limit = strictDeadline && task.Deadline < window.End ? task.Deadline : window.End;
                     if (cursor >= limit) continue;
                     var day = Day(cursor); var budget = Math.Max(0, trialBudgets.GetValueOrDefault(day));
                     while (remaining > 0 && cursor < limit && budget > 0)
@@ -189,7 +193,10 @@ public sealed partial class PlanningEngine
                         if (duration > space || duration > state.Preference.MaximumSessionMinutes || duration < minimum) break;
                         if (task.Splittable && remaining > duration && remaining - duration < minimum) duration -= minimum - (remaining - duration);
                         if (duration <= 0 || remaining > duration && duration < minimum) break;
-                        tentative.Add(new(Guid.NewGuid(), task.Id, cursor, cursor.AddMinutes(duration), "DEADLINE_PRIORITY_CAPACITY", false));
+                        var reason = urgency?.Displaced.TryGetValue(task.Id, out var moved) == true
+                            ? moved.NearDeadline ? "URGENT_NEAR_DEADLINE_MOVE" : "URGENT_FLEXIBLE_MOVE"
+                            : task.Priority == 4 ? "URGENT_TASK_FIRST" : "DEADLINE_PRIORITY_CAPACITY";
+                        tentative.Add(new(Guid.NewGuid(), task.Id, cursor, cursor.AddMinutes(duration), reason, false));
                         remaining -= duration; budget -= duration; cursor = cursor.AddMinutes(duration + state.Preference.BreakMinutes);
                         if (!task.Splittable) break;
                     }
@@ -210,7 +217,7 @@ public sealed partial class PlanningEngine
             free = FreeSlots(state, start, end, allBlocks.Concat(completedBlocks));
         }
         return new(Guid.Empty, state.Preference.Revision, start, end, schedule.OrderBy(x => x.Start).ToArray(), warnings.ToArray(),
-            ["Sắp xếp theo deadline, ưu tiên và thứ tự phụ thuộc.", $"Khả năng sử dụng thời gian: {factor:P0}; " + (input.UseEstimateBias ? $"dữ liệu ước lượng chỉ cá nhân hóa từ {MinimumBiasSamples} mẫu." : "dùng thời lượng công việc đã xác định trong yêu cầu."), "Giữ phiên đã khóa/đang thực hiện; không vượt deadline cứng. Phiên sau deadline mềm luôn có cảnh báo."], false, UseEstimateBias: input.UseEstimateBias);
+            ["Ưu tiên công việc khẩn, sau đó theo deadline và thứ tự phụ thuộc.", $"Khả năng sử dụng thời gian: {factor:P0}; " + (input.UseEstimateBias ? $"dữ liệu ước lượng chỉ cá nhân hóa từ {MinimumBiasSamples} mẫu." : "dùng thời lượng công việc đã xác định trong yêu cầu."), "Giữ phiên đã khóa/đang thực hiện; không vượt deadline cứng. Phiên sau deadline mềm luôn có cảnh báo."], false, UseEstimateBias: input.UseEstimateBias);
     }
     public IntelligenceView Analyze(PlanningState state, PlanInput input, DateTimeOffset now)
     {

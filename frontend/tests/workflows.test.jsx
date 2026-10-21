@@ -21,7 +21,7 @@ import {
   profile,
 } from "./fixtures.js";
 
-let calls, currentWorkspace, failTaskDelete, failPlan, planWarnings;
+let calls, currentWorkspace, failTaskDelete, failPlan, planWarnings, urgentReplan;
 beforeEach(() => {
   resetFixtures();
   currentWorkspace = workspace();
@@ -29,6 +29,7 @@ beforeEach(() => {
   failTaskDelete = false;
   failPlan = false;
   planWarnings = [];
+  urgentReplan = false;
   Object.assign(state, {
     workspace: null,
     insights: null,
@@ -157,7 +158,7 @@ beforeEach(() => {
             status: 503,
             json: async () => ({ error: { message: "Planning unavailable" } }),
           };
-        data = { ...plan, warnings: planWarnings };
+        data = { ...plan, warnings: planWarnings, hasUrgentReplan: urgentReplan };
       }
       if (url === "/api/tasks/capture")
         data = {
@@ -872,6 +873,33 @@ it("schedules a selected task and previews capacity warnings without applying th
     calls.find((c) => c.url === "/api/plans").body.affectedTaskIds,
   ).toEqual(["task-1"]);
   expect(calls.some((c) => c.url.endsWith("/apply"))).toBe(false);
+});
+
+it.each(["existing", "new"])("requires confirmation before applying urgent displacement for a %s task", async (kind) => {
+  urgentReplan = true;
+  const old = currentWorkspace.sessions.find((s) => s.taskId === "task-1" && s.status === "Scheduled");
+  plan.sessions = [{ ...old, id: "moved-session", preserved: false,
+    start: new Date(new Date(old.start).getTime() + 86400000).toISOString(),
+    end: new Date(new Date(old.end).getTime() + 86400000).toISOString(),
+    reasonCode: "URGENT_FLEXIBLE_MOVE" }];
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  if (kind === "new") {
+    await user.click(screen.getByRole("button", { name: "Thêm công việc" }));
+    await user.type(screen.getByLabelText("Tên công việc"), "Báo cáo khẩn");
+    await user.click(screen.getByRole("button", { name: "Tạo công việc", exact: true }));
+  } else {
+    await user.click(screen.getByRole("button", { name: `Xếp lịch công việc ${currentWorkspace.tasks[1].name}` }));
+  }
+  const confirm = await screen.findByRole("button", { name: "Xác nhận dời lịch", exact: true });
+  const movements = screen.getByRole("region", { name: "Các công việc được đề xuất dời lịch" });
+  expect(movements.textContent).toContain("Giờ cũ:");
+  expect(movements.textContent).toContain("Giờ mới:");
+  expect(movements.textContent).toContain("Hạn chót giữ nguyên:");
+  expect(calls.some((c) => c.url.endsWith("/apply"))).toBe(false);
+  await user.click(confirm);
+  await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/apply"))).toHaveLength(1));
 });
 
 it("keeps the created task when automatic scheduling fails", async () => {

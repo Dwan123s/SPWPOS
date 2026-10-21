@@ -52,6 +52,45 @@ public sealed class AgentInterpreterTests
         var error = await Assert.ThrowsAsync<AuthException>(() => Interpreter(client).InterpretAsync("Họp", "{}", [], "UTC", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken));
         Assert.Equal(503, error.StatusCode);
     }
+    [Theory] [InlineData(true)] [InlineData(false)]
+    public async Task Free_time_queries_require_explicit_offsets_and_are_sent_as_read_only_queries(bool explicitOffset)
+    {
+        var payload = JsonNode.Parse(Payload)!.AsObject();
+        payload["events"] = new JsonArray(); payload["resultKind"] = "ANSWER";
+        payload["freeTimeQuery"] = new JsonObject {
+            ["start"] = explicitOffset ? "2026-10-15T00:00:00+07:00" : "2026-10-15T00:00:00",
+            ["end"] = "2026-10-16T00:00:00+07:00" };
+        using var provider = new Provider(payload.ToJsonString()); using var client = new HttpClient(provider);
+        var call = Interpreter(client).InterpretAsync("Ngày mai tôi rảnh giờ nào?", "{}", [], "Asia/Ho_Chi_Minh",
+            DateTimeOffset.Parse("2026-10-14T06:00:00Z"), TestContext.Current.CancellationToken);
+        if (explicitOffset)
+        {
+            var result = await call;
+            Assert.NotNull(result.FreeTimeQuery); Assert.Equal(TimeSpan.FromHours(7), result.FreeTimeQuery.Start.Offset);
+            Assert.Empty(result.Events); Assert.Empty(result.Tasks);
+            Assert.Contains("verifiedFreeTime", provider.Body);
+            using var request = JsonDocument.Parse(provider.Body);
+            Assert.Contains("19:00–20:00 and 21:00–22:00", request.RootElement.GetProperty("systemInstruction").GetProperty("parts")[0].GetProperty("text").GetString());
+        }
+        else Assert.Equal("AGENT_AI_INVALID_RESPONSE", (await Assert.ThrowsAsync<AuthException>(() => call)).Code);
+    }
+    [Theory] [InlineData(true)] [InlineData(false)]
+    public async Task Schedule_review_queries_have_their_own_scope_and_require_explicit_offsets(bool explicitOffset)
+    {
+        var payload = JsonNode.Parse(Payload)!.AsObject();
+        payload["events"] = new JsonArray(); payload["resultKind"] = "ANSWER";
+        payload["scheduleReviewQuery"] = new JsonObject {
+            ["start"] = explicitOffset ? "2026-10-15T00:00:00+07:00" : "2026-10-15T00:00:00",
+            ["end"] = "2026-10-16T00:00:00+07:00" };
+        using var provider = new Provider(payload.ToJsonString()); using var client = new HttpClient(provider);
+        var call = Interpreter(client).InterpretAsync("Phân tích lịch trình ngày mai của tôi.", "{}", [], "Asia/Ho_Chi_Minh",
+            DateTimeOffset.Parse("2026-10-14T06:00:00Z"), TestContext.Current.CancellationToken);
+        if (explicitOffset) {
+            var result = await call; Assert.NotNull(result.ScheduleReviewQuery); Assert.Null(result.FreeTimeQuery);
+            Assert.Empty(result.Events); Assert.Contains("verifiedScheduleReview", provider.Body);
+        } else Assert.Equal("AGENT_AI_INVALID_RESPONSE", (await Assert.ThrowsAsync<AuthException>(() => call)).Code);
+    }
+
     [Theory] [InlineData("missing")] [InlineData("offset")] [InlineData("unknown")]
     [InlineData("categoryNumber")] [InlineData("categoryObject")] [InlineData("categoryBoolean")]
     public async Task Malformed_schema_or_offset_is_rejected(string mode)

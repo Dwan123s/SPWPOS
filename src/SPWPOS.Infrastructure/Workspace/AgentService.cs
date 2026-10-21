@@ -75,7 +75,8 @@ public sealed partial class WorkspaceService
         if (!reserved.Process)
         {
             var saved = TurnView(reserved.Turn);
-            return autoApply && saved.Status == "PREVIEW" ? await ApplyAgentTurnAsync(uid, saved.Id, ct) : saved;
+            return autoApply && saved.Status == "PREVIEW" && saved.Plan?.HasUrgentReplan != true
+                ? await ApplyAgentTurnAsync(uid, saved.Id, ct) : saved;
         }
         var turnId = reserved.Turn.Id;
         try
@@ -89,10 +90,10 @@ public sealed partial class WorkspaceService
                 x.Status == "FAILED" ? "Yêu cầu thất bại; chưa lưu thay đổi từ yêu cầu này. Kiểm tra dữ liệu hiện tại trước khi trả lời."
                     : TurnView(x).Reply + " " + TurnView(x).Outcome + " " + TurnView(x).Question, x.Status)).ToArray();
             var latest = historyRows.FirstOrDefault();
-            var pending = latest?.Status == "NEEDS_INPUT" && latest.CommandJson.Length > 0
+            var pending = latest?.Status is "NEEDS_INPUT" or "BLOCKED" && latest.CommandJson.Length > 0
                 ? JsonSerializer.Deserialize<AgentIntent>(latest.CommandJson, AgentJson)?.Pending : null;
             var activeTaskTypes = await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).Select(x => x.Code).OrderBy(x => x).ToArrayAsync(ct);
-            var (context, contextNotices) = BuildAgentContext(state, input.Text, activeTaskTypes, pending);
+            var (context, contextNotices) = BuildAgentContext(await AgentCalendarStateAsync(uid, state, ct), input.Text, activeTaskTypes, pending);
             await Phase("UNDERSTANDING", "Đang hiểu yêu cầu và soạn phản hồi");
             var agent = (IPlanningAgentInterpreter)interpreter;
             var intent = await RunJob(uid, "AI_REQUEST", () => publish is null
@@ -106,6 +107,18 @@ public sealed partial class WorkspaceService
                 // Exactly one bounded recheck. A separate reservation records its
                 // provider usage and respects the ordinary quota/concurrency limits.
                 intent = await RunJob(uid, "AI_REQUEST", () => agent.InterpretAsync(input.Text, recoveredContext, history, state.Preference.TimeZoneId, Now, ct), ct);
+            }
+            intent = RecognizeScheduleReview(intent, input.Text);
+            string? scheduleReviewReply = null;
+            if (intent.ScheduleReviewQuery is not null)
+            {
+                intent = GroundAgentDates(intent, input.Text, state.Preference, Now);
+                ValidateIntent(intent);
+                if (intent.ScheduleReviewQuery is not null)
+                {
+                    await Phase("ANALYZING", "Đang phân tích lịch đã lưu, việc gần hạn và các phương án phù hợp");
+                    scheduleReviewReply = await ExplainScheduleReviewAsync(uid, intent, input.Text, state, activeTaskTypes, ct);
+                }
             }
             await Phase("PLANNING", "Đang kiểm tra khung giờ, deadline và xung đột");
             // Another HTTP request could have modified the account during the AI call.
@@ -123,6 +136,7 @@ public sealed partial class WorkspaceService
                 intent = NormalizeAgentIntent(intent, input.Text, current, pending);
                 intent = GroundAgentDates(intent, input.Text, current.Preference, Now);
                 ValidateIntent(intent);
+                if (intent.FreeTimeQuery is not null) current = await AgentCalendarStateAsync(uid, current, ct);
                 turn.ExpectedRevision = revision; turn.CommandJson = JsonSerializer.Serialize(intent, AgentJson); turn.ExpiresAt = Now.AddMinutes(30);
                 if (intent.Question.Length > 0)
                 {
@@ -161,19 +175,26 @@ public sealed partial class WorkspaceService
                     summary = summary.Concat(movements.Where(x => x.Before != x.After)).ToArray();
                 }
                 turn.ChangesJson = JsonSerializer.Serialize(changes, AgentJson);
+                if (blocked && intent.Tasks is [var retryTask] && changes.Tasks is [var retry] && retry.WorkWindowStart is not null)
+                    turn.CommandJson = JsonSerializer.Serialize(intent with { Pending = new(pending?.OriginalText ?? input.Text,
+                        retryTask.TaskId, retry.WorkWindowStart, retry.WorkWindowEnd, retryTask.EstimatedMinutes ?? retry.EstimatedMinutes,
+                        retry.Deadline, pending is null ? [] : (pending.Answers ?? []).Append(input.Text).TakeLast(4).ToArray()) }, AgentJson);
                 var blockedDetail = warnings.Length > 0 ? $" ({string.Join("; ", warnings)})" : "";
                 var replyMessage = blocked
-                    ? $"Chưa thể lưu toàn bộ yêu cầu vì lịch chưa khả thi{blockedDetail}. Lịch chưa thay đổi. Bạn muốn điều chỉnh điều kiện nào?"
+                    ? $"Chưa thể lưu toàn bộ yêu cầu vì lịch chưa khả thi{blockedDetail}. Lịch chưa thay đổi. " +
+                        (BlockedWorkWindowSuggestions(candidate, plan!, input.UseEstimateBias) is { Length: > 0 } alternatives ? alternatives : "Bạn muốn điều chỉnh điều kiện nào?")
+                    : hasChanges && plan?.HasUrgentReplan == true
+                        ? "Việc khẩn cần dời một số phiên đã lên lịch. Đây là đề xuất, chưa lưu thay đổi. Bạn xem giờ cũ → giờ mới bên dưới rồi bấm Xác nhận dời lịch để áp dụng. Hạn chót được giữ nguyên."
                     : hasChanges ? AgentExplanation(intent.Reply) is { Length: > 0 } explanation ? explanation : AgentActionReply(summary, false)
                     : affected.Length > 0 || intent.Events.Length > 0 || intent.Tasks.Length > 0 || intent.Exceptions.Length > 0 || intent.ReplaceWeeklyAvailability
                         ? "Lịch hiện tại đã đúng với yêu cầu; không có thay đổi cần lưu."
-                        : ScopedReadOnlyReply(intent, input.Text, current, history, contextNotices);
+                        : scheduleReviewReply ?? ScopedReadOnlyReply(intent, input.Text, current, history, contextNotices);
                 return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text,
                     replyMessage,
                     blocked ? "BLOCKED" : hasChanges ? "PREVIEW" : "ANSWERED", "", hasChanges || blocked ? plan : null, summary, warnings.Concat(contextNotices).Concat(categoryNotices).ToArray(), turn.CreatedAt,
                     Outcome: hasChanges && !blocked ? "Đã kiểm tra phương án. Các thay đổi đang chờ bạn áp dụng." : ""));
             }, ct, false);
-            if (autoApply && view.Status == "PREVIEW")
+            if (autoApply && view.Status == "PREVIEW" && view.Plan?.HasUrgentReplan != true)
             {
                 await Phase("SAVING", "Đang lưu lịch đã kiểm tra");
                 return await ApplyAgentTurnAsync(uid, view.Id, ct);
@@ -211,6 +232,12 @@ public sealed partial class WorkspaceService
             "AGENT_INVALID_INTENT", "AI trả yêu cầu vượt giới hạn hoặc thiếu dữ liệu hợp lệ.", 503);
         Require(intent.Tasks.All(x => x is not null) && intent.Events.All(x => x is not null) && intent.Exceptions.All(x => x is not null) && intent.WeeklySlots.All(x => x is not null),
             "AGENT_INVALID_INTENT", "AI trả danh sách thay đổi chưa hợp lệ; lịch chưa thay đổi.", 503);
+        Require(intent.FreeTimeQuery is null || intent.Question.Length == 0 && !HasAgentActions(intent) &&
+            intent.FreeTimeQuery.End > intent.FreeTimeQuery.Start && intent.FreeTimeQuery.End - intent.FreeTimeQuery.Start <= TimeSpan.FromDays(31),
+            "AGENT_INVALID_INTENT", "Yêu cầu xem giờ rảnh phải có phạm vi hợp lệ và không kèm thay đổi lịch.", 503);
+        Require(intent.ScheduleReviewQuery is null || intent.FreeTimeQuery is null && intent.Question.Length == 0 && !HasAgentActions(intent) &&
+            intent.ScheduleReviewQuery.End > intent.ScheduleReviewQuery.Start && intent.ScheduleReviewQuery.End - intent.ScheduleReviewQuery.Start <= TimeSpan.FromDays(31),
+            "AGENT_INVALID_INTENT", "Yêu cầu tư vấn lịch phải có phạm vi hợp lệ và không kèm thay đổi lịch.", 503);
         if (shapeOnly) return;
         var kind = intent.Question.Length > 0 ? "CLARIFICATION" : HasAgentActions(intent) ? "MUTATION" : "ANSWER";
         Require(intent.ResultKind is null || intent.ResultKind == kind, "AGENT_INVALID_INTENT", "Trạng thái câu trả lời không khớp với yêu cầu thay đổi; lịch chưa thay đổi.", 503);
@@ -278,7 +305,10 @@ public sealed partial class WorkspaceService
             if (item.ExistingId is null && occurrences.All(occurrence => state.Events.Any(x => x.Name == occurrence.Name && x.Start == occurrence.Start && x.End == occurrence.End && x.Description == occurrence.Description && x.EventType == occurrence.EventType))) continue;
             if (item.ExistingId is { } occurrenceId) occurrences[0].Id = occurrenceId;
             if (original is not null && original.Name == occurrences[0].Name && original.Start == occurrences[0].Start && original.End == occurrences[0].End && original.Description == occurrences[0].Description && original.EventType == occurrences[0].EventType) continue;
-            ValidateEventConflicts(state with { Events = state.Events.Where(x => !events.Any(e => e.Id == x.Id)).Concat(events).ToArray() }, occurrences, item.ExistingId);
+            var eventState = await CalendarStateAsync(uid, state with { Availability = weekly ?? state.Availability,
+                Exceptions = state.Exceptions.Where(x => !exceptions.Any(e => e.Id == x.Id) && !removedExceptions.Any(e => e.Id == x.Id)).Concat(exceptions).ToArray() },
+                occurrences.Min(x => x.Start), occurrences.Max(x => x.End).AddDays(8), ct);
+            ValidateEventConflicts(eventState with { Events = state.Events.Where(x => !events.Any(e => e.Id == x.Id)).Concat(events).ToArray() }, occurrences, item.ExistingId);
             events.AddRange(occurrences);
             foreach (var occurrence in occurrences) summary.Add(new("EVENT", occurrence.Name, original is null ? "" : LocalWindow(original.Start, original.End, state.Preference), LocalWindow(occurrence.Start, occurrence.End, state.Preference)));
         }

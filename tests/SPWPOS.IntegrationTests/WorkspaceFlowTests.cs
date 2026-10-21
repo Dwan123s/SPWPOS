@@ -143,7 +143,7 @@ public sealed class WorkspaceFlowTests
         await Send(other, HttpMethod.Post, "/api/tasks", new TaskInput("Cross owner", "", factory.Clock.GetUtcNow().AddDays(1), 60, CategoryId: category), HttpStatusCode.NotFound);
         Assert.Single((await Send(owner, HttpMethod.Get, "/api/tasks")).GetProperty("data").EnumerateArray());
     }
-    [Fact] public async Task Proposal_can_be_applied_after_review_and_unlocked_conflicting_work_is_rescheduled()
+    [Fact] public async Task Proposal_can_be_applied_and_conflicting_events_require_the_user_to_choose_an_alternative()
     {
         await using var factory = new ApiFactory(); using var client = await factory.ClientAsync(); await Authorize(factory, client); await SetupTime(client);
         await Send(client, HttpMethod.Put, "/api/time/preferences", new PreferenceInput("UTC", 25, 90, 0, 0, 1440));
@@ -155,16 +155,19 @@ public sealed class WorkspaceFlowTests
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/lock");
         await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Conflict", s.GetProperty("start").GetDateTimeOffset(), s.GetProperty("end").GetDateTimeOffset()), HttpStatusCode.Conflict);
         await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/unlock");
-        await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Meeting", s.GetProperty("start").GetDateTimeOffset(), s.GetProperty("end").GetDateTimeOffset()));
+        var rejected = await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Meeting", s.GetProperty("start").GetDateTimeOffset(), s.GetProperty("end").GetDateTimeOffset()), HttpStatusCode.Conflict);
+        Assert.Equal("SESSION_OVERLAP", rejected.GetProperty("error").GetProperty("code").GetString());
+        Assert.Contains("Đề xuất", rejected.GetProperty("error").GetProperty("message").GetString());
+        var alternativeStart = s.GetProperty("end").GetDateTimeOffset();
+        await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Meeting", alternativeStart,
+            alternativeStart + (s.GetProperty("end").GetDateTimeOffset() - s.GetProperty("start").GetDateTimeOffset())));
         var conflicts = (await Send(client, HttpMethod.Post, "/api/plans/conflicts", new PlanInput(factory.Clock.GetUtcNow(), 1))).GetProperty("data");
         Assert.Empty(conflicts.EnumerateArray());
         var workspace = (await Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
         var replacement = Assert.Single(workspace.GetProperty("sessions").EnumerateArray());
-        Assert.NotEqual(sid, replacement.GetProperty("id").GetGuid());
-        Assert.False(replacement.GetProperty("start").GetDateTimeOffset() < s.GetProperty("end").GetDateTimeOffset() &&
-            s.GetProperty("start").GetDateTimeOffset() < replacement.GetProperty("end").GetDateTimeOffset());
-        var rejected = await Send(client, HttpMethod.Post, $"/api/sessions/{sid}/start", expected: HttpStatusCode.BadRequest);
-        Assert.Equal("INVALID_TRANSITION", rejected.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(sid, replacement.GetProperty("id").GetGuid());
+        Assert.Equal(s.GetProperty("start").GetDateTimeOffset(), replacement.GetProperty("start").GetDateTimeOffset());
+        Assert.Equal(s.GetProperty("end").GetDateTimeOffset(), replacement.GetProperty("end").GetDateTimeOffset());
     }
     [Fact] public async Task Natural_language_duration_is_bounded_and_does_not_save_without_confirmation()
     {

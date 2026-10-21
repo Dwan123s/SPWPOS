@@ -181,6 +181,83 @@ async function ready() {
   });
 }
 
+it("renders detailed schedule advice as readable paragraphs and sections without apply actions", async () => {
+  result.status = "ANSWERED"; result.canUndo = false; result.changes = []; result.plan = null;
+  result.reply = "Lịch của bạn có nhiều khoảng nghỉ ngắn. Mình gợi ý giữ khoảng dài nhất cho báo cáo gần hạn.\n\n**Thời gian còn lại và điểm cần chú ý**\n- Còn 110 phút trống, gồm bốn khoảng ngắn và một khoảng dài.\n\n**Gợi ý có thể cân nhắc**\n- Báo cáo: 17:50–18:50, đủ thời lượng và đã kiểm tra ràng buộc.\n\nLịch hiện tại chưa thay đổi.";
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  await screen.findByText(/Lịch của bạn có nhiều khoảng nghỉ ngắn/);
+  expect(screen.getByText("Thời gian còn lại và điểm cần chú ý").tagName).toBe("STRONG");
+  expect(screen.getByText(/Báo cáo: 17:50–18:50/).closest("li")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Lưu thay đổi|Xác nhận dời lịch/ })).toBeNull();
+  expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
+});
+
+it("keeps an urgent displacement pending with automatic save enabled until the user confirms", async () => {
+  result.status = "PREVIEW";
+  result.canUndo = false;
+  result.plan.hasUrgentReplan = true;
+  result.changes.push({ kind: "SESSION", name: "Bài tập cũ", taskId: "old",
+    before: "22/10/2026 19:00 → 22/10/2026 20:00",
+    after: "23/10/2026 19:00 → 23/10/2026 20:00" });
+  const changed = vi.fn();
+  render(<AgentPage onWorkspaceChanged={changed} />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  const confirm = await screen.findByRole("button", { name: "Xác nhận dời lịch" });
+  expect(calls.find((call) => call.url === "/api/agent/turns/stream").body.autoApply).toBe(true);
+  expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
+  expect(changed).not.toHaveBeenCalled();
+  const card = screen.getByRole("region", { name: "Kết quả yêu cầu" });
+  expect(within(card).getByText(/Giờ cũ:/).closest("details")).toBeNull();
+  expect(within(card).getByText(/Giờ mới:/)).toBeTruthy();
+  fireEvent.click(confirm);
+  await screen.findAllByText("Đã lưu lịch");
+  expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
+  expect(changed).toHaveBeenCalledOnce();
+});
+
+it("offers clickable time alternatives on an existing rejected turn and sends the chosen date in the same conversation", async () => {
+  const original = "lên lịch mai tôi đi học vào lúc 18h đến 19h";
+  turns = [
+    {
+      ...result,
+      status: "FAILED",
+      changes: [],
+      plan: null,
+      canUndo: false,
+      text: original,
+      errorCode: "BUSY_TIME_CONFLICT",
+      reply:
+        "Sự kiện nằm trong giờ đã đánh dấu bận. Chưa lưu thay đổi. Đề xuất giữ nguyên thời lượng: 22/10/2026 21:00–22:00; 23/10/2026 19:00–20:00. Bạn chọn một khung giờ để thử lại.",
+    },
+  ];
+  render(<AgentPage />);
+  await ready();
+  const chip = await screen.findByRole("button", {
+    name: "23/10/2026 · 19:00–20:00",
+  });
+  expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
+  fireEvent.click(chip);
+  await waitFor(() =>
+    expect(calls.some((call) => call.url === "/api/agent/turns/stream")).toBe(
+      true,
+    ),
+  );
+  const request = calls.find((call) => call.url === "/api/agent/turns/stream");
+  expect(request.body.conversationId).toBe("conversation");
+  expect(request.body.text).toContain(
+    "Tôi chọn từ 19:00 đến 20:00 ngày 23/10/2026.",
+  );
+  expect(request.body.text).toContain(original);
+  expect(
+    calls.some(
+      (call) => call.url === "/api/time/events" && call.method === "POST",
+    ),
+  ).toBe(false);
+});
+
 it.each([
   ["hội thoại", "ArrowRight", "Thu gọn lịch sử", "Mở lịch sử", 260],
   ["lịch", "ArrowLeft", "Đóng bảng lịch", "Lịch của bạn", 320],

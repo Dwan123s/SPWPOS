@@ -108,6 +108,110 @@ public static class LiveAiCheck
         }
         Console.WriteLine($"LIVE AI: {agent.Capabilities.Provider} structured output and planner checks passed. No calendar data was saved.");
     }
+    public static async Task RunFreeTimeAsync(ITaskInterpreter interpreter, TimeProvider clock, CancellationToken ct)
+    {
+        if (interpreter is not IPlanningAgentInterpreter agent || !agent.Capabilities.AiAvailable)
+            throw new InvalidOperationException("AI is not configured.");
+        const string zoneId = "Asia/Ho_Chi_Minh";
+        var zone = PlanningEngine.Zone(zoneId); var now = clock.GetUtcNow();
+        var tomorrow = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime).AddDays(1);
+        var dayStart = PlanningEngine.At(tomorrow, 0, zone);
+        var dayEnd = PlanningEngine.At(tomorrow.AddDays(1), 0, zone);
+        DateTimeOffset Local(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, zone);
+        var freeContext = JsonSerializer.Serialize(new {
+            activeTaskTypes = new[] { "OTHER" },
+            clock = new { currentLocal = Local(now), today = tomorrow.AddDays(-1), tomorrow },
+            tasks = Array.Empty<object>(), sessions = Array.Empty<object>(), dependencies = Array.Empty<object>(), events = Array.Empty<object>(),
+            availability = new[] { new AvailabilityInput((int)tomorrow.DayOfWeek, 1140, 1320) },
+            exceptions = new[] { new { date = tomorrow, startMinute = 1200, endMinute = 1260, isAvailable = false } },
+            verifiedFreeTime = new { rangeStart = Local(now), rangeEnd = Local(now.AddDays(30)), timeZoneId = zoneId,
+                includesAllSavedCalendarItems = true, intervals = new[] {
+                    new { date = tomorrow, start = Local(PlanningEngine.At(tomorrow, 1140, zone)), end = Local(PlanningEngine.At(tomorrow, 1200, zone)), minutes = 60 },
+                    new { date = tomorrow, start = Local(PlanningEngine.At(tomorrow, 1260, zone)), end = Local(PlanningEngine.At(tomorrow, 1320, zone)), minutes = 60 } } },
+            preference = new { maximumDailyMinutes = 480, maximumSessionMinutes = 240, minimumSessionMinutes = 25, breakMinutes = 0, planningHorizonDays = 14 }
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var free = await agent.InterpretAsync("Ngày mai tôi có thể làm việc trong khoảng giờ rảnh nào? Chỉ xem giờ rảnh trong cài đặt và các mục lịch đã lưu, chưa thay đổi lịch.",
+            freeContext, [], zoneId, now, ct);
+        Check(free.Question.Length == 0 && free.FreeTimeQuery is { } query && query.Start == dayStart && query.End == dayEnd &&
+            free.Events.Length == 0 && free.Tasks.Length == 0 && free.Exceptions.Length == 0 && free.WeeklySlots.Length == 0 &&
+            free.ScheduleTaskIds.Length == 0 && !free.Reschedule && !free.ReplaceWeeklyAvailability,
+            "AI did not return an exact read-only free-time query for tomorrow.");
+        Console.WriteLine("LIVE AI: free-time question resolved to the correct local day without calendar mutations; verified gaps are 19:00-20:00 and 21:00-22:00.");
+        Console.WriteLine($"LIVE AI: {agent.Capabilities.Provider} free-time check passed. No calendar data was saved.");
+    }
+    public static async Task RunUrgencyAsync(ITaskInterpreter interpreter, TimeProvider clock, CancellationToken ct)
+    {
+        if (interpreter is not IPlanningAgentInterpreter agent || !agent.Capabilities.AiAvailable)
+            throw new InvalidOperationException("AI is not configured.");
+        const string zoneId = "Asia/Ho_Chi_Minh";
+        var now = clock.GetUtcNow(); var zone = PlanningEngine.Zone(zoneId);
+        var tomorrow = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime).AddDays(1);
+        var oldId = Guid.NewGuid();
+        var context = JsonSerializer.Serialize(new {
+            activeTaskTypes = new[] { "OTHER", "WRITING" },
+            tasks = new[] { new { id = oldId, name = "Bài tập đã lên lịch", priority = 2, estimatedMinutes = 60,
+                deadline = PlanningEngine.At(tomorrow.AddDays(7), 1320, zone), isHardDeadline = true } },
+            sessions = new[] { new { id = Guid.NewGuid(), taskId = oldId, start = PlanningEngine.At(tomorrow, 1140, zone),
+                end = PlanningEngine.At(tomorrow, 1200, zone), status = "Scheduled", isLocked = false } },
+            dependencies = Array.Empty<object>(), events = Array.Empty<object>(), exceptions = Array.Empty<object>(),
+            availability = Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 1140, 1320)).ToArray(),
+            preference = new { maximumDailyMinutes = 480, maximumSessionMinutes = 240, minimumSessionMinutes = 25, breakMinutes = 0, planningHorizonDays = 14 }
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var request = $"Có báo cáo đột xuất rất khẩn, cần làm liên tục 60 phút từ 19:00 đến 20:00 ngày {tomorrow:yyyy-MM-dd}, hạn chót bắt buộc 20:00 cùng ngày. Ưu tiên báo cáo này và dời bài tập đang trùng giờ giúp tôi, giữ nguyên hạn chót của bài tập.";
+        var result = await agent.InterpretAsync(request, context, [], zoneId, now, ct);
+        Check(result.Question.Length == 0 && result.Tasks.Length == 1 && result.Events.Length == 0 &&
+            result.Tasks[0].Priority == 4 && result.Tasks[0].EstimatedMinutes == 60 &&
+            result.Tasks[0].Deadline == PlanningEngine.At(tomorrow, 1200, zone) &&
+            result.Tasks[0].WorkWindowStart == PlanningEngine.At(tomorrow, 1140, zone) &&
+            result.Tasks[0].WorkWindowEnd == PlanningEngine.At(tomorrow, 1200, zone),
+            "AI did not preserve urgent priority, duration, deadline and requested work window.");
+        Console.WriteLine($"LIVE AI: {agent.Capabilities.Provider} recognizes urgent work at priority 4 with exact duration, deadline and work window. No calendar data was saved.");
+    }
+    public static async Task RunScheduleReviewAsync(ITaskInterpreter interpreter, TimeProvider clock, CancellationToken ct)
+    {
+        if (interpreter is not IPlanningAgentInterpreter agent || !agent.Capabilities.AiAvailable)
+            throw new InvalidOperationException("AI is not configured.");
+        const string zoneId = "Asia/Ho_Chi_Minh";
+        var zone = PlanningEngine.Zone(zoneId); var now = clock.GetUtcNow();
+        var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime).AddDays(1);
+        DateTimeOffset At(int minute) => TimeZoneInfo.ConvertTime(PlanningEngine.At(day, minute, zone), zone);
+        var query = new AgentFreeTimeQuery(At(0), At(1440));
+        var request = "Phân tích lịch trình ngày mai của tôi và tư vấn nên ưu tiên việc gì, chưa thay đổi lịch.";
+        var gaps = new[] { (810, 820), (850, 860), (990, 1000), (1030, 1040), (1070, 1140) }
+            .Select(x => new { start = At(x.Item1), end = At(x.Item2), minutes = x.Item2 - x.Item1 }).ToArray();
+        var entries = new[] { ("Họp nhóm", 820, 850), ("Đi học", 860, 990), ("Trao đổi dự án", 1000, 1030), ("Cuộc hẹn", 1040, 1070) }
+            .Select(x => new { name = x.Item1, start = At(x.Item2), end = At(x.Item3), kind = "EVENT", status = "FIXED" }).ToArray();
+        var task = new { name = "Báo cáo gần hạn", deadline = At(1200), priority = 4, remainingMinutes = 60, savedMinutes = 0,
+            concern = "Chưa có đủ thời lượng trong các phiên phù hợp trước hạn." };
+        var facts = new { query, asOf = TimeZoneInfo.ConvertTime(now, zone), timeZoneId = zoneId, hasAvailability = true,
+            metrics = new { fixedEvents = 4, workSessions = 0, occupiedMinutes = 220, remainingCalendarFreeMinutes = 110,
+                shortGapCount = 4, minimumSessionMinutes = 25, schedulableMinutesWithinDailyBudgets = 110 },
+            entries, entryScope = new { included = 4, total = 4, truncated = false }, freeGaps = gaps, conflicts = Array.Empty<string>(),
+            tasks = new[] { task }, taskScope = new { included = 1, total = 1, truncated = false },
+            taskSuggestions = new[] { new { name = task.name, start = At(1070), end = At(1130), minutes = 60 } },
+            taskSuggestionsAreAlternatives = true, changesSaved = false };
+        string Context(bool verified) => JsonSerializer.Serialize(new {
+            activeTaskTypes = new[] { "OTHER", "WRITING" },
+            clock = new { currentLocal = TimeZoneInfo.ConvertTime(now, zone), today = day.AddDays(-1), tomorrow = day },
+            tasks = new[] { task }, events = entries, sessions = Array.Empty<object>(), exceptions = Array.Empty<object>(), dependencies = Array.Empty<object>(),
+            availability = new[] { new AvailabilityInput((int)day.DayOfWeek, 810, 1140) },
+            verifiedFreeTime = new { rangeStart = At(0), rangeEnd = At(1440), intervals = gaps },
+            verifiedScheduleReview = verified ? facts : null
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var scope = await agent.InterpretAsync(request, Context(false), [], zoneId, now, ct);
+        Console.WriteLine($"LIVE AI REVIEW SCOPE: review={scope.ScheduleReviewQuery}; freeTime={scope.FreeTimeQuery}; actions={HasActions(scope)}.");
+        Check(scope.ScheduleReviewQuery == query && scope.FreeTimeQuery is null && !HasActions(scope), "Schedule analysis must use its own read-only query.");
+        var advice = await agent.InterpretAsync(request, Context(true), [], zoneId, now, ct);
+        Console.WriteLine($"LIVE AI REVIEW ADVICE: characters={advice.Reply.Length}; review={advice.ScheduleReviewQuery}; actions={HasActions(advice)}.");
+        Console.WriteLine("FICTIONAL SCHEDULE ADVICE:\n" + advice.Reply);
+        Check(advice.ScheduleReviewQuery == query && advice.FreeTimeQuery is null && !HasActions(advice) &&
+            advice.Reply.Length is > 400 and <= 2200 && advice.Reply.Contains("báo cáo", StringComparison.OrdinalIgnoreCase) &&
+            advice.Reply.Contains("17:50", StringComparison.Ordinal) && advice.Reply.Contains("18:50", StringComparison.Ordinal),
+            "Schedule advice must be detailed, grounded in the saved work, and read-only.");
+        Console.WriteLine($"LIVE AI: {agent.Capabilities.Provider} distinguishes schedule analysis from a free-time lookup and gives detailed advice from verified facts. No calendar data saved.");
+        static bool HasActions(AgentIntent intent) => intent.Question.Length > 0 || intent.ReplaceWeeklyAvailability || intent.Reschedule ||
+            intent.Tasks.Length > 0 || intent.Events.Length > 0 || intent.Exceptions.Length > 0 || intent.WeeklySlots.Length > 0 || intent.ScheduleTaskIds.Length > 0;
+    }
     private static void Check(bool condition, string message)
     { if (!condition) throw new InvalidOperationException(message); }
 }

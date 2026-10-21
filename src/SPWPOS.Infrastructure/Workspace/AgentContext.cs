@@ -23,7 +23,7 @@ public sealed partial class WorkspaceService
         var sessions = state.Sessions.Where(x=>x.End > Now && x.Start < Now.AddDays(30) && x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).OrderBy(x=>x.Start).ToArray();
         var notices = new List<string>();
         if (active.Length > tasks.Count(x=>active.Any(t=>t.Id==x.Id))) notices.Add($"NORA đang đọc {tasks.Count(x=>active.Any(t=>t.Id==x.Id))}/{active.Length} công việc đang hoạt động, ưu tiên tên khớp yêu cầu và deadline. Hãy nêu tên cụ thể để xem phần khác.");
-        if (events.Length > 100 || sessions.Length > 100) notices.Add("NORA chỉ đọc 100 sự kiện và 100 phiên gần nhất trong 30 ngày tới. Câu trả lời chỉ áp dụng cho phạm vi này.");
+        if (events.Length > 100 || sessions.Length > 100) notices.Add("Danh sách chi tiết gửi NORA gồm tối đa 100 sự kiện và 100 phiên trong 30 ngày tới. Các khoảng giờ rảnh vẫn được tính từ toàn bộ lịch đã lưu trong phạm vi này.");
         if (notices.Count > 0) notices.Add($"Phạm vi lịch đang đọc: {Local(Now):dd/MM/yyyy HH:mm} đến {Local(Now.AddDays(30)):dd/MM/yyyy HH:mm} ({state.Preference.TimeZoneId}).");
         var json = JsonSerializer.Serialize(new {
             activeTaskTypes, pendingRequest = pending is null ? null : pending with {
@@ -31,6 +31,11 @@ public sealed partial class WorkspaceService
             clock = new { currentLocal = Local(Now), today, tomorrow = today.AddDays(1), dayAfterTomorrow = today.AddDays(2),
                 currentWeekStart = weekStart, nextWeekStart = weekStart.AddDays(7) },
             capabilities = new { taskWorkWindows = true, preferenceChanges = false },
+            verifiedFreeTime = new { rangeStart = Local(Now), rangeEnd = Local(Now.AddDays(30)),
+                timeZoneId = state.Preference.TimeZoneId, includesAllSavedCalendarItems = true,
+                intervals = AgentFreeTimeSlots(state, Now, Now.AddDays(30)).Select(x => new {
+                    date = LocalDate(x.Start, state.Preference), start = Local(x.Start), end = Local(x.End),
+                    minutes = (int)(x.End - x.Start).TotalMinutes }) },
             currentCalendarCapacity = new { reservationsMayChangeWhenRescheduling = true, usesCapacityFactor = false,
                 rangeEnd = Local(Now.AddDays(30)), perDate = engine.CapacityDays(state, Now.AddMinutes(5), Now.AddDays(30), Now, false)
                     .Select(x => new { x.Date, x.DailyBudgetMinutes, x.SchedulableMinutes }) },

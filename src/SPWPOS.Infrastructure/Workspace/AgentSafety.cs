@@ -192,6 +192,7 @@ public sealed partial class WorkspaceService
 
     private string ScopedReadOnlyReply(AgentIntent intent, string request, PlanningState state, AgentMessage[] history, string[] notices)
     {
+        if (intent.FreeTimeQuery is { } query) return VerifiedFreeTimeReply(query, state);
         if (notices.Length > 0 && RequestMatches(MatchText(request), @"\b(?:toan bo|tat ca|all)\b").Count > 0)
             return string.Join(" ", notices) + " Chưa đủ dữ liệu để kết luận cho toàn bộ công việc. Hãy nêu tên công việc hoặc thu hẹp phạm vi cần kiểm tra.";
         return GroundedReadOnlyReply(intent, request, state, history);

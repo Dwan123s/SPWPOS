@@ -37,6 +37,7 @@ public sealed partial class WorkspaceService
     {
         Require(id is null || input.RepeatWeeks == 1, "VALIDATION_ERROR", "Khi sửa sự kiện, chỉ cập nhật lần xuất hiện đang chọn.");
         var state = await State(uid, ct); var occurrences = EventOccurrences(uid, input, state.Preference);
+        state = await CalendarStateAsync(uid, state, occurrences.Min(x => x.Start), occurrences.Max(x => x.End).AddDays(8), ct);
         ValidateEventConflicts(state, occurrences, id);
         if (id is { } eventId)
         {
@@ -67,12 +68,41 @@ public sealed partial class WorkspaceService
     {
         foreach (var item in events)
         {
-            var conflict = state.Events.Concat(events.Where(x => x.Id != item.Id)).FirstOrDefault(x => x.Id != excludeId && x.Start < item.End && item.Start < x.End);
-            Require(conflict is null, "FIXED_EVENT_OVERLAP", conflict is null ? "Sự kiện bị trùng lịch."
-                : $"Sự kiện trùng với “{conflict.Name}” ({LocalWindow(conflict.Start, conflict.End, state.Preference)}). Chưa lưu thay đổi. Hãy chọn giờ khác hoặc chỉnh sự kiện đang trùng.", 409);
-            Require(!state.Sessions.Any(x => x.Start < item.End && item.Start < x.End &&
-                (x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && (x.IsLocked || x.Start < Now))),
-                "LOCKED_SESSION_CONFLICT", "Sự kiện trùng với phiên đã khóa hoặc đang thực hiện.", 409);
+            var calendar = state with { Events = state.Events.Where(x => x.Id != excludeId)
+                .Concat(events.Where(x => x.Id != item.Id)).ToArray() };
+            var occupied = state.Sessions.Where(x => x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused or WorkSessionStatus.Completed)
+                .Select(x => new TimeSlot(x.Start, x.End)).ToArray();
+            var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
+            bool FitsSeries(TimeSlot alternative)
+            {
+                var shift = TimeZoneInfo.ConvertTime(alternative.Start, zone).DateTime - TimeZoneInfo.ConvertTime(item.Start, zone).DateTime;
+                foreach (var occurrence in events)
+                {
+                    var localStart = TimeZoneInfo.ConvertTime(occurrence.Start, zone).DateTime + shift;
+                    var localEnd = TimeZoneInfo.ConvertTime(occurrence.End, zone).DateTime + shift;
+                    if (zone.IsInvalidTime(localStart) || zone.IsInvalidTime(localEnd) || zone.IsAmbiguousTime(localStart) || zone.IsAmbiguousTime(localEnd)) return false;
+                    var start = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localStart, zone));
+                    var end = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localEnd, zone));
+                    if (start < Now || state.Events.Any(x => x.Id != excludeId && x.Start < end && start < x.End) ||
+                        occupied.Any(x => x.Start < end && start < x.End) || state.Exceptions.Any(x => !x.IsAvailable &&
+                            PlanningEngine.At(x.Date, x.StartMinute, zone) < end && start < PlanningEngine.At(x.Date, x.EndMinute, zone))) return false;
+                }
+                return true;
+            }
+            var conflict = calendar.Events.FirstOrDefault(x => x.Start < item.End && item.Start < x.End);
+            if (conflict is not null)
+                throw CalendarConflict("FIXED_EVENT_OVERLAP", $"Sự kiện trùng với “{conflict.Name}” ({LocalWindow(conflict.Start, conflict.End, state.Preference)}).",
+                    calendar, item.Start, item.End, occupied, FitsSeries);
+            var session = state.Sessions.FirstOrDefault(x => x.Start < item.End && item.Start < x.End &&
+                x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused or WorkSessionStatus.Completed);
+            if (session is not null)
+                throw CalendarConflict(session.IsLocked || session.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused ? "LOCKED_SESSION_CONFLICT" : "SESSION_OVERLAP",
+                    $"Sự kiện trùng với phiên làm việc đã lưu ({LocalWindow(session.Start, session.End, state.Preference)}).", calendar, item.Start, item.End, occupied, FitsSeries);
+            var busy = state.Exceptions.Where(x => !x.IsAvailable).FirstOrDefault(x =>
+                PlanningEngine.At(x.Date, x.StartMinute, zone) < item.End && item.Start < PlanningEngine.At(x.Date, x.EndMinute, zone));
+            if (busy is not null)
+                throw CalendarConflict("BUSY_TIME_CONFLICT", $"Sự kiện nằm trong giờ đã đánh dấu bận ({busy.Date:dd/MM/yyyy} {busy.StartMinute / 60:00}:{busy.StartMinute % 60:00}–{busy.EndMinute / 60:00}:{busy.EndMinute % 60:00}).",
+                    calendar, item.Start, item.End, occupied, FitsSeries);
         }
     }
     public Task DeleteEventAsync(Guid uid, Guid id, CancellationToken ct) => Mutate(uid, async () => db.FixedEvents.Remove(await Find<FixedEvent>(uid, id, ct)), ct);
@@ -137,6 +167,11 @@ public sealed partial class WorkspaceService
         var plan = engine.Generate(state, new(Now.AddMinutes(1), 30, affected, true, "AVAILABILITY_CHANGED"), Now);
         var proposal = await StoreAgentPlanAsync(uid, plan, state, "AVAILABILITY_CHANGED", ct);
         plan = plan with { Id = proposal.Id };
+        if (plan.HasUrgentReplan)
+        {
+            await AddNotification(uid, "SCHEDULE_CHANGE", "Cần xác nhận dời lịch", "Đã tạo đề xuất dời lịch để ưu tiên việc khẩn. Xem giờ cũ và giờ mới rồi xác nhận trước khi lưu.", "plan:" + proposal.Id, null, ct, planId: proposal.Id);
+            return;
+        }
         await ApplyPlanCoreAsync(uid, proposal, plan, state, ct);
     }
 

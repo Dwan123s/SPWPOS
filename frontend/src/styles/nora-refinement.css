@@ -1,4 +1,24 @@
 @layer components {
+  .nora-studio .nora-time-alternatives {
+    margin: 14px 0;
+    min-width: 0;
+  }
+  .nora-studio .nora-time-alternatives > p {
+    margin: 0 0 8px;
+    color: var(--nora-secondary-text, #486078);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .nora-studio .nora-time-alternatives button {
+    min-height: 40px;
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
+  }
+  .nora-studio .nora-time-alternatives button:focus-visible {
+    outline: 2px solid #0866dc;
+    outline-offset: 3px;
+  }
   .nora-studio {
     --nora-secondary-text: #486078;
   }

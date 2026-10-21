@@ -20,6 +20,67 @@ public sealed class AgentApiTests
         { base.ConfigureWebHost(builder); builder.ConfigureServices(s => s.AddSingleton<ITaskInterpreter>(Ai)); }
     }
 
+    [Theory] [InlineData(false)] [InlineData(true)]
+    public async Task Schedule_review_returns_detailed_advice_and_verified_facts_without_changing_the_calendar(bool streaming)
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync(); await WorkspaceFlowTests.Authorize(f, client);
+        var localNow = f.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7));
+        var start = new DateTimeOffset(localNow.Date.AddDays(1), localNow.Offset);
+        await WorkspaceFlowTests.Send(client, HttpMethod.Put, "/api/time/availability", new WeeklyInput([new((int)start.DayOfWeek, 1140, 1320)]));
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Họp dự án", start.AddHours(20), start.AddHours(21)));
+        var before = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        const string advice = "Cuộc họp dự án nằm giữa buổi tối, nên thời gian rảnh của bạn được chia thành hai phần riêng. Bạn nên chọn một việc vừa đủ thời lượng cho từng phần, thay vì tính toàn bộ buổi tối là thời gian làm việc liên tục.\n\nMình gợi ý giữ một ít thời gian chuẩn bị trước cuộc họp và rà soát lại việc quan trọng sau đó. Nếu có công việc gần hạn, hãy cho mình biết để mình kiểm tra khung giờ phù hợp trước khi tạo đề xuất cho bạn xác nhận.";
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Reply = f.Ai.Calls == 1 ? "Đang kiểm tra lịch." : advice,
+            ResultKind = "ANSWER", ScheduleReviewQuery = new(start, start.AddDays(1)) };
+        var request = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Phân tích lịch trình ngày mai của tôi.", true);
+        JsonElement turn;
+        if (streaming) {
+            using var response = await client.PostAsJsonAsync("/api/agent/turns/stream", request, Ct);
+            var frames = (await response.Content.ReadAsStringAsync(Ct)).Split('\n').Where(x => x.StartsWith("data: "))
+                .Select(x => JsonDocument.Parse(x[6..]).RootElement.Clone()).ToArray();
+            Assert.Contains(frames, x => x.GetProperty("type").GetString() == "phase" && x.GetProperty("stage").GetString() == "ANALYZING");
+            turn = Assert.Single(frames, x => x.GetProperty("type").GetString() == "result").GetProperty("turn");
+        } else turn = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns", request)).GetProperty("data");
+        Assert.Equal("ANSWERED", turn.GetProperty("status").GetString()); Assert.Contains(advice, turn.GetProperty("reply").GetString());
+        Assert.Contains("120 phút trống", turn.GetProperty("reply").GetString()); Assert.Empty(turn.GetProperty("changes").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, turn.GetProperty("plan").ValueKind);
+        var after = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Equal(before.GetProperty("preference").GetProperty("revision").GetGuid(), after.GetProperty("preference").GetProperty("revision").GetGuid());
+        Assert.Single(after.GetProperty("events").EnumerateArray()); Assert.Empty(after.GetProperty("sessions").EnumerateArray());
+        Assert.Equal(2, f.Ai.Calls);
+        var retry = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns", request)).GetProperty("data");
+        Assert.Equal(turn.GetProperty("reply").GetString(), retry.GetProperty("reply").GetString()); Assert.Equal(2, f.Ai.Calls);
+    }
+
+    [Fact] public async Task Free_time_stream_and_manual_conflicts_share_the_same_verified_calendar_intervals()
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync(); await WorkspaceFlowTests.Authorize(f, client);
+        var localNow = f.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7));
+        var start = new DateTimeOffset(localNow.Date.AddDays(1), localNow.Offset);
+        await WorkspaceFlowTests.Send(client, HttpMethod.Put, "/api/time/availability",
+            new WeeklyInput([new((int)start.DayOfWeek, 1140, 1320)]));
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/exceptions",
+            new ExceptionInput(DateOnly.FromDateTime(start.DateTime), 1200, 1260, false));
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with {
+            Reply = "Bạn rảnh 19:00–22:00, trừ lúc bận.", ResultKind = "ANSWER", FreeTimeQuery = new(start, start.AddDays(1)) };
+        using var response = await client.PostAsJsonAsync("/api/agent/turns/stream",
+            new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Ngày mai tôi rảnh giờ nào?", true), Ct);
+        var frames = (await response.Content.ReadAsStringAsync(Ct)).Split('\n').Where(x => x.StartsWith("data: "))
+            .Select(x => JsonDocument.Parse(x[6..]).RootElement.Clone()).ToArray();
+        var result = Assert.Single(frames, x => x.GetProperty("type").GetString() == "result").GetProperty("turn");
+        Assert.Equal("ANSWERED", result.GetProperty("status").GetString());
+        Assert.Contains("19:00–20:00", result.GetProperty("reply").GetString());
+        Assert.Contains("21:00–22:00", result.GetProperty("reply").GetString());
+        var rejected = await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events",
+            new EventInput("Họp", start.AddHours(20), start.AddHours(21)), HttpStatusCode.Conflict);
+        Assert.Equal("BUSY_TIME_CONFLICT", rejected.GetProperty("error").GetProperty("code").GetString());
+        Assert.Contains("21:00–22:00", rejected.GetProperty("error").GetProperty("message").GetString());
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events",
+            new EventInput("Họp", start.AddHours(21), start.AddHours(22)));
+        var workspace = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Single(workspace.GetProperty("events").EnumerateArray());
+    }
+
     [Fact] public async Task A_streamed_overlap_rejection_is_unsaved_and_its_history_replaces_the_provisional_success_text()
     {
         await using var f = new Factory(); using var client = await f.ClientAsync(); await WorkspaceFlowTests.Authorize(f, client);

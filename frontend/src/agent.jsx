@@ -6,6 +6,10 @@ import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import { NoraResultCard } from "./nora-result-card.jsx";
 import { NoraSchedulePanel } from "./nora-schedule-panel.jsx";
 import { NoraEventEditor } from "./nora-event-editor.jsx";
+import {
+  NoraScheduleAlternatives,
+  scheduleAlternativeView,
+} from "./nora-schedule-alternatives.jsx";
 import { NoraPanelResize, useNoraPanelLayout } from "./nora-panel-layout.jsx";
 import {
   compactScheduleText,
@@ -110,6 +114,7 @@ function Turn({
   const sessions = turn.plan?.sessions?.filter((item) => !item.preserved) || [];
   const options = turn.question ? extractOptions(turn) : [];
   const hasResult = Boolean(turn.changes?.length || sessions.length);
+  const alternatives = scheduleAlternativeView(turn);
   return (
     <article className="agent-turn">
       <NoraPromptMessage
@@ -141,7 +146,16 @@ function Turn({
             </ol>
           </details>
         )}
-        {!hasResult && <NoraReply text={compactScheduleText(turn.reply)} />}
+        {!hasResult && (
+          <NoraReply text={compactScheduleText(alternatives.reply)} />
+        )}
+        {!hasResult && (
+          <NoraScheduleAlternatives
+            options={alternatives.options}
+            busy={busy}
+            onReply={onReply}
+          />
+        )}
         {!hasResult && turn.outcome && (
           <section
             className="agent-verified-outcome"
@@ -221,11 +235,18 @@ function Turn({
         )}
         {hasResult && (
           <NoraResultCard
-            turn={turn}
+            turn={{ ...turn, reply: alternatives.reply }}
             busy={busy}
             onAction={onAction}
             onViewResult={onViewPlan}
             onEditEvent={onEditEvent}
+          />
+        )}
+        {hasResult && (
+          <NoraScheduleAlternatives
+            options={alternatives.options}
+            busy={busy}
+            onReply={onReply}
           />
         )}
         {turn.status === "BLOCKED" && (
@@ -1216,7 +1237,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                 <Turn
                   key={turn.id}
                   turn={turn}
-                  busy={busy || voice.active}
+                  busy={busy || voice.active || conversationArchived}
                   onAction={act}
                   onReply={(replyText) => send(null, replyText)}
                   onEdit={editRequest}

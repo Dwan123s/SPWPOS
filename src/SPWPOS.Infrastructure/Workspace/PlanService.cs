@@ -61,6 +61,8 @@ public sealed partial class WorkspaceService
     }, ct);
     private async Task ApplyPlanCoreAsync(Guid uid, PlanProposal proposal, PlanView plan, PlanningState state, CancellationToken ct)
     {
+        Require(!plan.HasUrgentReplan || !plan.Warnings.Any(x => x.UnscheduledMinutes > 0 || x.Code == "SOFT_DEADLINE_EXCEEDED"),
+            "URGENT_REPLAN_INFEASIBLE", "Chưa thể nhường giờ cho việc khẩn mà vẫn hoàn thành các công việc còn lại đúng hạn. Lịch cũ được giữ nguyên; hãy điều chỉnh giờ rảnh, thời lượng hoặc xem lại các điều kiện.", 409);
         var id = proposal.Id;
         var retained = plan.Sessions.Where(x => x.Preserved).Select(x => x.Id).ToHashSet();
         // Sessions outside the bounded proposal horizon remain untouched.
@@ -82,7 +84,7 @@ public sealed partial class WorkspaceService
         await AddNotification(uid, "SCHEDULE_CHANGE", "Kế hoạch đã cập nhật", $"Đã áp dụng {plan.Sessions.Count(x => !x.Preserved)} phiên mới. {plan.Warnings.Length} công việc có cảnh báo.", "plan:" + id, null, ct, planId: id);
     }
     private void ValidateSession(PlanningState state, Guid taskId, DateTimeOffset start, DateTimeOffset end,
-        IEnumerable<ProposedSession> occupied, Guid excludeId, bool dependenciesMustBeCompleted, bool useEstimateBias = true)
+        IEnumerable<ProposedSession> occupied, Guid excludeId, bool dependenciesMustBeCompleted, bool useEstimateBias = true, bool suggestAlternatives = true)
     {
         var task = state.Tasks.SingleOrDefault(x => x.Id == taskId);
         Require(task is not null && !task.IsDeleted && task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled, "INVALID_TASK", "Công việc không thể xếp lịch.");
@@ -91,11 +93,14 @@ public sealed partial class WorkspaceService
         var duration = (end - start).TotalMinutes;
         Require(duration >= Math.Max(state.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) && duration <= state.Preference.MaximumSessionMinutes,
             "SESSION_LENGTH", "Thời lượng phiên vượt giới hạn.");
-        Require(engine.FreeSlots(state, start, end).Any(x => x.Start <= start && x.End >= end), "OUTSIDE_AVAILABILITY", "Phiên ngoài thời gian rảnh hoặc trùng sự kiện cố định.", 409);
+        RequireSessionTime(engine.FreeSlots(state, start, end).Any(x => x.Start <= start && x.End >= end), "OUTSIDE_AVAILABILITY", "Phiên ngoài thời gian rảnh hoặc trùng sự kiện cố định.",
+            state, taskId, start, end, occupied, excludeId, dependenciesMustBeCompleted, useEstimateBias, suggestAlternatives);
         var others = occupied.Where(x => x.Id != excludeId).ToArray();
-        Require(!others.Any(x => x.Start < end && start < x.End), "SESSION_OVERLAP", "Phiên làm việc trùng lịch.", 409);
-        Require(!others.Any(x => x.Start < end.AddMinutes(state.Preference.BreakMinutes) && start.AddMinutes(-state.Preference.BreakMinutes) < x.End),
-            "SESSION_BREAK_CONFLICT", "Cần giữ thời gian nghỉ giữa các phiên làm việc.", 409);
+        RequireSessionTime(!others.Any(x => x.Start < end && start < x.End), "SESSION_OVERLAP", "Phiên làm việc trùng lịch.",
+            state, taskId, start, end, occupied, excludeId, dependenciesMustBeCompleted, useEstimateBias, suggestAlternatives);
+        RequireSessionTime(!others.Any(x => x.Start < end.AddMinutes(state.Preference.BreakMinutes) && start.AddMinutes(-state.Preference.BreakMinutes) < x.End),
+            "SESSION_BREAK_CONFLICT", "Cần giữ thời gian nghỉ giữa các phiên làm việc.",
+            state, taskId, start, end, occupied, excludeId, dependenciesMustBeCompleted, useEstimateBias, suggestAlternatives);
         var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
         var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start, zone).DateTime);
         double MinutesOnDay(DateTimeOffset from, DateTimeOffset to)
@@ -124,6 +129,8 @@ public sealed partial class WorkspaceService
     {
         var session = await Find<WorkSession>(uid, id, ct); var state = await State(uid, ct);
         Require(session.Status == WorkSessionStatus.Scheduled && !session.IsLocked, "SESSION_NOT_EDITABLE", "Chỉ chỉnh sửa phiên chưa bắt đầu và chưa khóa.", 409);
+        var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
+        state = await CalendarStateAsync(uid, state, PlanningEngine.At(LocalDate(input.Start, state.Preference), 0, zone), input.End.AddDays(8), ct);
         ValidateSession(state, session.TaskId, input.Start, input.End, Occupied(state), id, false);
         session.Start = input.Start; session.End = input.End; session.ReasonCode = "USER_ADJUSTMENT";
         await AddNotification(uid, "SCHEDULE_CHANGED", "Phiên đã được chỉnh sửa", "Đã cập nhật thời gian của một phiên làm việc.", "edit:" + Guid.NewGuid(), session.TaskId, ct);
