@@ -76,6 +76,6 @@ export async function submit(form, operation) {
     else toast(e.message, "error");
     throw e;
   } finally {
-    if (btn && btn.isConnected) btn.disabled = false;
+    if (btn && btn.isConnected) btn.disabled = form.dataset.stale === "true";
   }
 }

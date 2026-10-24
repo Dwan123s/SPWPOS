@@ -14,6 +14,7 @@ public sealed class TaskCategory : OwnedRecord
 }
 public sealed class WorkTask : OwnedRecord
 {
+    public Guid Version { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public Guid? CategoryId { get; set; }
@@ -61,6 +62,7 @@ public sealed class AvailabilityException : OwnedRecord
 }
 public sealed class FixedEvent : OwnedRecord
 {
+    public bool? IsUrgent { get; set; }
     public string Description { get; set; } = "";
     public string EventType { get; set; } = "OTHER";
     public string Name { get; set; } = "";

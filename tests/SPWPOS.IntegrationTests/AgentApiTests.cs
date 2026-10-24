@@ -20,6 +20,91 @@ public sealed class AgentApiTests
         { base.ConfigureWebHost(builder); builder.ConfigureServices(s => s.AddSingleton<ITaskInterpreter>(Ai)); }
     }
 
+    [Fact]
+    public async Task New_urgent_meeting_overrides_a_saved_urgent_meeting_and_persists_both_urgency_flags()
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync(); await WorkspaceFlowTests.Authorize(f, client);
+        var start = new DateTimeOffset(f.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).Date.AddDays(1).AddHours(15), TimeSpan.FromHours(7));
+        var oldId = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events",
+            new EventInput("Họp dự án", start, start.AddHours(2), EventType: "MEETING", IsUrgent: true))).GetProperty("data").GetProperty("id").GetGuid();
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Họp phát sinh", start.AddHours(1), start.AddHours(3), EventType: "MEETING")] };
+        var preview = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns",
+            new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Ngày mai có cuộc họp phát sinh khẩn từ 16:00 đến 18:00.", true))).GetProperty("data");
+        Assert.Equal("PREVIEW", preview.GetProperty("status").GetString());
+        Assert.Contains("lịch khẩn cũ", preview.GetProperty("reply").GetString());
+        var before = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.True(Assert.Single(before.GetProperty("events").EnumerateArray()).GetProperty("isUrgent").GetBoolean());
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{preview.GetProperty("id").GetGuid()}/apply");
+        var after = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        var events = after.GetProperty("events").EnumerateArray().ToArray();
+        Assert.All(events, item => Assert.True(item.GetProperty("isUrgent").GetBoolean()));
+        Assert.Equal(start.AddHours(1), Assert.Single(events, item => item.GetProperty("name").GetString() == "Họp phát sinh").GetProperty("start").GetDateTimeOffset());
+        Assert.Equal(start.AddHours(3), Assert.Single(events, item => item.GetProperty("id").GetGuid() == oldId).GetProperty("start").GetDateTimeOffset());
+        await WorkspaceFlowTests.Send(client, HttpMethod.Put, $"/api/time/events/{oldId}",
+            new EventInput("Họp dự án đã dời", start.AddHours(3), start.AddHours(5), EventType: "MEETING"));
+        var edited = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.True(Assert.Single(edited.GetProperty("events").EnumerateArray(), item => item.GetProperty("id").GetGuid() == oldId).GetProperty("isUrgent").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Urgent_meeting_work_shift_proposal_names_both_events_hours_and_external_permission_over_http()
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync();
+        await WorkspaceFlowTests.Authorize(f, client);
+        var start = new DateTimeOffset(f.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).Date.AddDays(1).AddHours(15), TimeSpan.FromHours(7));
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Đi làm", start, start.AddHours(3), EventType: "WORK"));
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Họp khẩn", start.AddHours(1), start.AddHours(3), EventType: "MEETING")] };
+        var preview = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns",
+            new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Chiều mai 4h tôi có lịch họp khẩn trong 2 tiếng.", true))).GetProperty("data");
+        Assert.Equal("PREVIEW", preview.GetProperty("status").GetString());
+        var move = Assert.Single(preview.GetProperty("changes").EnumerateArray(), item => item.GetProperty("name").GetString() == "Đi làm");
+        Assert.Contains("15:00", move.GetProperty("before").GetString()); Assert.Contains("21:00", move.GetProperty("after").GetString());
+        Assert.Contains("được phép đổi ca", move.GetProperty("reason").GetString());
+        Assert.Contains("Đi làm", preview.GetProperty("reply").GetString()); Assert.Contains("16:00", preview.GetProperty("reply").GetString());
+        var before = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Equal(start, Assert.Single(before.GetProperty("events").EnumerateArray()).GetProperty("start").GetDateTimeOffset());
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{preview.GetProperty("id").GetGuid()}/apply");
+        var after = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Equal(start.AddHours(3), Assert.Single(after.GetProperty("events").EnumerateArray(), item => item.GetProperty("name").GetString() == "Đi làm").GetProperty("start").GetDateTimeOffset());
+    }
+
+    [Theory] [InlineData(false)] [InlineData(true)]
+    public async Task Urgent_meeting_displaces_shopping_only_after_confirmation_and_a_stale_preview_cannot_apply(bool stale)
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync();
+        await WorkspaceFlowTests.Authorize(f, client);
+        var start = new DateTimeOffset(f.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).Date.AddDays(1).AddHours(15), TimeSpan.FromHours(7));
+        var shoppingId = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events",
+            new EventInput("Đi mua sắm", start, start.AddHours(1)))).GetProperty("data").GetProperty("id").GetGuid();
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Cuộc họp khẩn", start, start.AddHours(2), EventType: "MEETING")] };
+        var request = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), "Ngày mai tôi có cuộc họp khẩn từ 15:00 đến 17:00, ưu tiên cuộc họp này.", true);
+        var turn = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns", request)).GetProperty("data");
+        var turnId = turn.GetProperty("id").GetGuid();
+        Assert.Equal("PREVIEW", turn.GetProperty("status").GetString());
+        Assert.True(turn.GetProperty("plan").GetProperty("hasUrgentReplan").GetBoolean());
+        var before = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Equal(start, Assert.Single(before.GetProperty("events").EnumerateArray()).GetProperty("start").GetDateTimeOffset());
+        if (stale) {
+            await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Hẹn khác", start.AddHours(2), start.AddHours(3), EventType: "APPOINTMENT"));
+            var rejected = await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{turnId}/apply", expected: HttpStatusCode.Conflict);
+            Assert.Equal("AGENT_STALE", rejected.GetProperty("error").GetProperty("code").GetString());
+            var unchanged = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+            Assert.Equal(start, Assert.Single(unchanged.GetProperty("events").EnumerateArray(), item => item.GetProperty("id").GetGuid() == shoppingId).GetProperty("start").GetDateTimeOffset());
+            Assert.DoesNotContain(unchanged.GetProperty("events").EnumerateArray(), item => item.GetProperty("eventType").GetString() == "MEETING");
+            return;
+        }
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{turnId}/apply");
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{turnId}/apply");
+        var after = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        var events = after.GetProperty("events").EnumerateArray().ToArray(); Assert.Equal(2, events.Length);
+        var meeting = Assert.Single(events, item => item.GetProperty("eventType").GetString() == "MEETING");
+        Assert.Equal(start, meeting.GetProperty("start").GetDateTimeOffset()); Assert.Equal(start.AddHours(2), meeting.GetProperty("end").GetDateTimeOffset());
+        Assert.Equal(start.AddHours(2), Assert.Single(events, item => item.GetProperty("id").GetGuid() == shoppingId).GetProperty("start").GetDateTimeOffset());
+        await WorkspaceFlowTests.Send(client, HttpMethod.Post, $"/api/agent/turns/{turnId}/undo");
+        var undone = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Equal(start, Assert.Single(undone.GetProperty("events").EnumerateArray()).GetProperty("start").GetDateTimeOffset());
+    }
+
     [Theory] [InlineData(false)] [InlineData(true)]
     public async Task Schedule_review_returns_detailed_advice_and_verified_facts_without_changing_the_calendar(bool streaming)
     {

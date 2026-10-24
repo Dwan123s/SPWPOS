@@ -1,6 +1,8 @@
 param(
     [ValidateSet('Offline', 'Live')][string]$Mode = 'Offline',
     [ValidateSet('Smoke', 'All')][string]$Suite = 'Smoke',
+    [ValidateSet('Legacy', 'Conversations')][string]$Catalog = 'Legacy',
+    [string[]]$GroupId = @(),
     [string[]]$CaseId = @(),
     [ValidateRange(1, 5)][int]$Repeats = 1,
     [ValidateRange(1, 500)][int]$MaxCalls = 30,
@@ -19,9 +21,11 @@ if (-not $taskSandboxOutput.StartsWith($taskSandboxRoot + [IO.Path]::DirectorySe
 }
 if (Test-Path -LiteralPath (Join-Path $taskSandboxOutput 'results.json')) { throw 'Results already exist there. Choose a new output directory.' }
 $taskSandboxCases = @($CaseId | ForEach-Object { $_.Split(',') } | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ })
+$taskSandboxGroups = @($GroupId | ForEach-Object { $_.Split(',') } | ForEach-Object { $_.Trim().ToUpperInvariant() } | Where-Object { $_ })
+if ($Catalog -eq 'Legacy' -and $taskSandboxGroups.Count -gt 0) { throw 'GroupId requires -Catalog Conversations.' }
 [IO.Directory]::CreateDirectory($taskSandboxOutput) | Out-Null
 $taskSandboxOptions = Join-Path $taskSandboxOutput 'options.json'
-@{ repositoryRoot=$taskSandboxRoot; outputDirectory=$taskSandboxOutput; mode=$Mode; suite=$Suite; caseIds=$taskSandboxCases;
+@{ repositoryRoot=$taskSandboxRoot; outputDirectory=$taskSandboxOutput; mode=$Mode; suite=$Suite; caseIds=$taskSandboxCases; catalog=$Catalog; groupIds=$taskSandboxGroups;
     repeats=$Repeats; maxCalls=$MaxCalls; timeoutSeconds=$TimeoutSeconds } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath $taskSandboxOptions -Encoding UTF8
 . (Join-Path $PSScriptRoot 'Initialize-Dotnet.ps1')
@@ -31,7 +35,8 @@ try {
     $env:SPWPOS_NORA_SANDBOX_OPTIONS = $taskSandboxOptions
     $taskSandboxBuild = Join-Path $taskSandboxOutput 'build\net8.0'
     $taskSandboxProject = Join-Path $taskSandboxRoot 'tests\SPWPOS.UnitTests\SPWPOS.UnitTests.csproj'
-    Write-Host "NORA sandbox: $Mode / $Suite; interpreter attempt cap $MaxCalls; results: $taskSandboxOutput"
+    Write-Host "NORA sandbox: $Catalog / $Mode / $Suite; interpreter attempt cap $MaxCalls; results: $taskSandboxOutput"
+    if ($Catalog -eq 'Conversations' -and $Mode -eq 'Offline') { Write-Host 'Conversation Offline mode validates catalog and isolated database fixtures; it does not interpret prompts or run model checks.' }
     if ($Mode -eq 'Live') { Write-Host 'Live mode uses the saved AI provider and synthetic calendar data; provider quota may be consumed.' }
     # Separate output keeps the currently serving API and ordinary test builds untouched.
     & $SpwposDotnet test $taskSandboxProject -c Release --no-restore -m:1 -p:SkipFrontendBuild=true -p:UseSharedCompilation=false "-p:OutputPath=$taskSandboxBuild" `

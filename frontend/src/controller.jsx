@@ -254,6 +254,7 @@ async function scheduleTask(id, triggerEvent = "MANUAL") {
   });
   if (
     plan.hasUrgentReplan ||
+    plan.hasDeadlineProtection ||
     plan.warnings.length ||
     !plan.sessions.some((session) => !session.preserved)
   ) {
@@ -451,6 +452,15 @@ async function action(name, id, element) {
       break;
     case "edit-task":
       openTask(taskById(id));
+      break;
+    case "reload-task":
+      await load(false);
+      if (taskById(id)) openTask(taskById(id));
+      else {
+        closeModal();
+        render();
+        toast("Công việc không còn tồn tại. Danh sách đã được cập nhật.");
+      }
       break;
     case "delete-task": {
       const task = taskById(id);
@@ -870,11 +880,39 @@ async function formAction(form, data, nextAction = null) {
       break;
     }
     case "task": {
-      const saved = await api(
-        `/api/tasks${id ? `/${id}` : ""}`,
-        id ? "PUT" : "POST",
-        taskInput(data),
-      );
+      if (form.dataset.stale === "true")
+        throw new Error("Tải lại bản mới trước khi chỉnh sửa công việc.");
+      let saved;
+      try {
+        saved = await api(
+          `/api/tasks${id ? `/${id}` : ""}`,
+          id ? "PUT" : "POST",
+          taskInput(data),
+        );
+      } catch (error) {
+        if (id && ["TASK_STALE", "DATA_STALE"].includes(error.code)) {
+          form.dataset.stale = "true";
+          setSlot(
+            "task-conflict",
+            <div className="info section-gap">
+              <p>
+                Công việc đã được cập nhật ở nơi khác. Bạn có thể giữ nội dung
+                đang nhập để đối chiếu, hoặc tải bản mới để chỉnh sửa lại.
+              </p>
+              <p>Khi tải bản mới, nội dung trong form sẽ được thay thế.</p>
+              <button
+                type="button"
+                className="btn ghost"
+                data-action="reload-task"
+                data-id={id}
+              >
+                Tải bản mới
+              </button>
+            </div>,
+          );
+        }
+        throw error;
+      }
       if (!id) completeGuideStep(0);
       await refreshAfter("Đã lưu công việc.");
       if (!id && data.has("scheduleAfterSave")) {
@@ -1008,6 +1046,7 @@ async function formAction(form, data, nextAction = null) {
         description: String(data.get("description") || ""),
         eventType: String(data.get("eventType") || "OTHER"),
         repeatWeeks: Number(data.get("repeatWeeks") || 1),
+        isUrgent: data.get("isUrgent") === "on",
       });
       await refreshAfter();
       break;

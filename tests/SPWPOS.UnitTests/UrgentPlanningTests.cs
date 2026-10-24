@@ -21,6 +21,18 @@ public sealed class UrgentPlanningTests
     private static PlanView Plan(PlanningState state, WorkTask urgent, DateTimeOffset? now = null) =>
         new PlanningEngine().Generate(state, new(now ?? Now, 7, [urgent.Id], true, UseCapacityFactor: false, UseEstimateBias: false), now ?? Now);
 
+    [Fact]
+    public void New_urgent_task_has_priority_over_an_existing_urgent_task_even_with_a_later_deadline()
+    {
+        var old = Task("Việc khẩn cũ", Now.AddHours(5), 4);
+        var added = Urgent(); added.Deadline = Now.AddHours(6);
+        var original = new WorkSession { TaskId = old.Id, Start = Now.AddHours(2), End = Now.AddHours(3) };
+        var plan = Plan(State(old, added, original), added);
+        Assert.True(plan.HasUrgentReplan); Assert.Empty(plan.Warnings);
+        Assert.Equal(original.Start, Assert.Single(plan.Sessions, session => session.TaskId == added.Id).Start);
+        Assert.True(Assert.Single(plan.Sessions, session => session.TaskId == old.Id).Start >= Now.AddHours(3));
+    }
+
     [Theory] [InlineData(true)] [InlineData(false)]
     public void Urgent_work_takes_the_conflicting_slot_and_displaced_work_obeys_its_deadline_policy(bool nearDeadline)
     {

@@ -74,7 +74,7 @@ public sealed partial class WorkspaceService
         {
             var recovery = await Find<RecoveryCase>(uid, caseId, ct);
             var proposal = await Find<PlanProposal>(uid, recovery.PlanId!.Value, ct);
-            if (JsonSerializer.Deserialize<PlanView>(proposal.PayloadJson)?.HasUrgentReplan != true)
+            if (JsonSerializer.Deserialize<PlanView>(proposal.PayloadJson)?.RequiresConfirmation != true)
                 await ApplyRecoveryAsync(uid,caseId,ct);
         }
     }

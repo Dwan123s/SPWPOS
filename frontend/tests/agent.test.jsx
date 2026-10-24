@@ -218,6 +218,70 @@ it("keeps an urgent displacement pending with automatic save enabled until the u
   expect(changed).toHaveBeenCalledOnce();
 });
 
+it("shows deadline protection as a plan that needs confirmation even when automatic save is enabled", async () => {
+  result.status = "PREVIEW";
+  result.canUndo = false;
+  result.plan.hasDeadlineProtection = true;
+  const changed = vi.fn();
+  render(<AgentPage onWorkspaceChanged={changed} />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  const confirm = await screen.findByRole("button", { name: "Xác nhận kế hoạch" });
+  expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
+  expect(changed).not.toHaveBeenCalled();
+  fireEvent.click(confirm);
+  await screen.findAllByText("Đã lưu lịch");
+  expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
+});
+
+it("shows the old and proposed shopping hours beside an urgent meeting before confirming the move", async () => {
+  result.status = "PREVIEW";
+  result.canUndo = false;
+  result.plan.hasUrgentReplan = true;
+  result.plan.sessions = [];
+  result.changes = [
+    { kind: "EVENT", name: "Cuộc họp khẩn", before: "", after: "22/10/2026 15:00 → 22/10/2026 17:00" },
+    { kind: "EVENT", name: "Đi mua sắm", before: "22/10/2026 15:00 → 22/10/2026 16:00", after: "22/10/2026 17:00 → 22/10/2026 18:00" },
+  ];
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  const confirm = await screen.findByRole("button", { name: "Xác nhận dời lịch" });
+  const shopping = screen.getByText("Đi mua sắm").closest("li");
+  expect(within(shopping).getByText(/Giờ cũ:/).closest("details")).toBeNull();
+  expect(within(shopping).getByText(/Giờ mới:/)).toBeTruthy();
+  expect(shopping.textContent).toContain("15:00");
+  expect(shopping.textContent).toContain("18:00");
+  expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
+  fireEvent.click(confirm);
+  await screen.findAllByText("Đã lưu lịch");
+  expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
+});
+
+it("names the proposed work shift move and explains that changing a shift needs permission", async () => {
+  result.status = "PREVIEW";
+  result.canUndo = false;
+  result.reply = "Giữ Họp khẩn 16:00–18:00; đề xuất dời Đi làm để tránh trùng giờ.";
+  result.plan.hasUrgentReplan = true;
+  result.plan.sessions = [];
+  result.changes = [
+    { kind: "EVENT", name: "Họp khẩn", before: "", after: "24/10/2026 16:00 → 24/10/2026 18:00" },
+    { kind: "EVENT", name: "Đi làm", before: "24/10/2026 15:00 → 24/10/2026 18:00", after: "24/10/2026 18:00 → 24/10/2026 21:00",
+      reason: "Đây là ca làm. Chỉ xác nhận phương án nếu bạn được phép đổi ca." },
+  ];
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  const confirm = await screen.findByRole("button", { name: "Xác nhận dời lịch" });
+  const move = screen.getByText("Đi làm").closest("li");
+  expect(within(move).getByText(/Giờ cũ:/).textContent).toContain("15:00");
+  expect(within(move).getByText(/Giờ mới:/).textContent).toContain("21:00");
+  expect(within(move).getByText(/Lý do và điều kiện:/).textContent).toContain("được phép đổi ca");
+  expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
+  fireEvent.click(confirm);
+  await waitFor(() => expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1));
+});
+
 it("offers clickable time alternatives on an existing rejected turn and sends the chosen date in the same conversation", async () => {
   const original = "lên lịch mai tôi đi học vào lúc 18h đến 19h";
   turns = [

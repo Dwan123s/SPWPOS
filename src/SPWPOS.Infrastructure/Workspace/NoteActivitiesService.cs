@@ -31,7 +31,7 @@ public sealed partial class WorkspaceService
         var proposal = new PlanProposal { UserId = uid, CreatedAt = Now, ExpiresAt = Now.AddMinutes(30), Revision = state.Preference.Revision,
             Kind = "RESCHEDULE", TriggerEvent = "NEW_TASK", HorizonStart = plan.Start, HorizonEnd = plan.End };
         plan = plan with { Id = proposal.Id, Kind = proposal.Kind, NoteContext = new(noteId, note.Version, input.Activities,
-            tasks.Select(x => x.Id).ToArray(), events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType)).ToArray(),
+            tasks.Select(x => x.Id).ToArray(), events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),
             input.AllowRequestedTimeOutsideAvailability) };
         // The proposal stores drafts only. Task/event/session rows are created together after confirmation.
         proposal.PayloadJson = JsonSerializer.Serialize(plan);
@@ -60,7 +60,7 @@ public sealed partial class WorkspaceService
         Require(tasks.Length == context.TaskIds.Length, "PLAN_STALE", "Đề xuất không còn hợp lệ.", 409);
         for (var i = 0; i < tasks.Length; i++) tasks[i].Id = context.TaskIds[i];
         var events = context.Events.Select(x => new FixedEvent { Id = x.Id, UserId = uid, Name = x.Name,
-            Description = x.Description, EventType = x.EventType, Start = x.Start, End = x.End }).ToArray();
+            Description = x.Description, EventType = x.EventType, Start = x.Start, End = x.End, IsUrgent = x.IsUrgent }).ToArray();
         Require(events.All(x => x.Start >= Now), "PLAN_EXPIRED", "Có hoạt động đã bắt đầu. Xem trước lại để cập nhật.", 409);
         var oneOffHours = context.AllowRequestedTimeOutsideAvailability ? NoteRequestedHours(uid, tasks, state.Preference) : [];
         var candidate = NoteCandidate(state with { Exceptions = state.Exceptions.Concat(oneOffHours).ToArray() }, tasks, events);
@@ -167,7 +167,7 @@ public sealed partial class WorkspaceService
             Require(activity.Start is not null && activity.End is not null && activity.Start >= Now,
                 "NOTE_ACTIVITY_INCOMPLETE", $"Bổ sung giờ bắt đầu và kết thúc cho “{activity.Name}”.");
             foreach (var item in EventOccurrences(uid, new(activity.Name, activity.Start!.Value, activity.End!.Value,
-                activity.Description, activity.Type, activity.RepeatWeeks), state.Preference))
+                activity.Description, activity.Type, activity.RepeatWeeks, IsUrgent: activity.Priority == 4 ? true : null), state.Preference))
             {
                 var existing = state.Events.Concat(events).FirstOrDefault(x => x.Name.Equals(item.Name, StringComparison.OrdinalIgnoreCase) &&
                     x.EventType == item.EventType && x.Start == item.Start && x.End == item.End);

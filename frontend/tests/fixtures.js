@@ -20,6 +20,7 @@ const names = [
 ];
 let tasks = names.map((name, index) => ({
   id: `task-${index}`,
+  version: `00000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`,
   name,
   description: "Công việc minh họa dùng để kiểm tra giao diện.",
   status: index === 0 ? "InProgress" : index === 5 ? "Completed" : "Todo",

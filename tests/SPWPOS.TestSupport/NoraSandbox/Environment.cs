@@ -34,6 +34,7 @@ public sealed class SandboxTransportHandler : DelegatingHandler
 
 public sealed class SandboxBudget(int limit)
 {
+    public int Limit => limit;
     public int Used { get; private set; }
     public void Reserve()
     {

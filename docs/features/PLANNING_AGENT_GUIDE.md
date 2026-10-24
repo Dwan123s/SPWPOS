@@ -1,5 +1,18 @@
 # NORA — Trợ lý AI lập lịch
 
+## Tiếng Việt gõ Telex chưa chuyển dấu
+
+NORA hỗ trợ đọc các từ Telex thông dụng trong yêu cầu lập lịch, kể cả khi trộn với chữ đã có dấu hoặc gõ lặp phím dấu:
+
+- `lamf`, `vieejc` → làm, việc.
+- `vieets`, `vieetss` → viết.
+- `45 phuts, xong truowsc 21h ngayf mai` → 45 phút, xong trước 21h ngày mai.
+- `ddungwf tuwj ddoongj luuw` → đừng tự động lưu; yêu cầu xem trước vẫn không tự áp dụng.
+
+Tin nhắn trong hội thoại giữ nguyên nội dung đã gửi. Backend cung cấp cách đọc Telex cho AI và dùng cùng cách đọc khi kiểm tra thời lượng, deadline, giờ trong ngày và tên task. Số liệu, ID, địa chỉ email, URL và đoạn mã trong backtick được giữ nguyên.
+
+Đây là hỗ trợ diễn giải, không phải bộ sửa chính tả cho mọi từ hoặc bộ gõ đầy đủ. Từ không nhận diện được vẫn được gửi nguyên bản cho AI; nếu ngày giờ, thời lượng hoặc ý định còn mơ hồ, NORA cần hỏi lại. Thay đổi backend cần build và khởi động lại API để có hiệu lực.
+
 ## Giao diện NORA — 15/10/2026
 
 Menu **NORA · Trợ lý AI** dùng cùng phong cách kính xanh, gradient, ánh sáng và Web Animations API của login/getting started. Linh vật cú xanh hiện có là NORA; dùng chung MascotEyes để nhìn theo con trỏ. NORA có trạng thái sẵn sàng/đang xử lý, nút tạm dừng chuyển động lưu trên máy, hỗ trợ prefers-reduced-motion và kế thừa thiết lập tạm dừng của workspace. Bản mobile giữ mascot ở đầu cuộc trò chuyện.

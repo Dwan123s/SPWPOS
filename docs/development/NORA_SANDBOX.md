@@ -8,6 +8,29 @@ It does not start the web server, connect to the configured SQL Server database,
 
 ## Run
 
+### Grouped conversation pack
+
+`tests/nora-sandbox/planning-conversations.vi.json` adds 180 cases in 30 groups, including regional Vietnamese, teencode, Gen Alpha slang, multi-turn clarification, calendar boundaries and failure scenarios. The original flat catalog remains the default (`-Catalog Legacy`). Select the new pack explicitly:
+
+```powershell
+# No provider calls: validate catalog and load isolated database fixtures.
+.\scripts\Test-NoraSandbox.ps1 -Catalog Conversations -Mode Offline -GroupId G01,G03
+.\scripts\Test-NoraSandbox.ps1 -Catalog Conversations -Mode Offline -Suite All
+
+# Opt-in configured model; group and case filters intersect when both are supplied.
+.\scripts\Test-NoraSandbox.ps1 -Catalog Conversations -Mode Live -GroupId G10 -CaseId G10-01 -MaxCalls 5
+```
+
+Comma-separated IDs work in Windows PowerShell and pwsh. Unknown IDs and empty intersections are rejected before provider calls. Without IDs, `Smoke` selects G01-01, G03-01, G10-01, G21-01 and G23-01. Each case gets a fresh synthetic account, conversation and SQLite database. Its turns share state and use actual prior replies. Inherited fixture objects merge recursively; arrays replace rather than append. The runner resolves fixture IDs, clocks/timezones, active categories, tasks, events, sessions, exceptions, dependencies, generated large fixtures and seeded history.
+
+**Offline `VALIDATED` is fixture validation, not a planning test or model pass.** It consumes zero interpreter calls. Live user-only `execution=chat` cases run through the real interpreter/service. They check outcome, read-only/clarification atomicity and generic scheduling invariants. A successful automatic check sequence ends in **`REVIEW_REQUIRED`**, because the pack's natural-language `expected.checks` still need a reviewer to assess exact intent, fields, scope and response quality. These checks are not translated into invented scripted answers. No expected answers or voice tags enter model context.
+
+The 29 cases requiring API, harness, extended, fault, streaming or concurrency adapters remain **`NOT_RUN`**. Their actions and expectations are retained in the exported `catalog.json`; the runner does not execute a partial sequence and call it a pass. The 151 user-only chat cases are selectable for live execution. A failed prerequisite stops dependent turns. Provider failures are errors; the call cap and three-consecutive-error circuit breaker remain in effect. Full results, before/after snapshots, public responses and interpreted/stored commands are exported using the normal report files. No live run is triggered by ordinary unit tests.
+
+The selected `catalog.json` preserves all manual review criteria and a `selection` section; original suite counts/hash are under `source_validation`. The actual input pack SHA-256 and runtime assembly hashes are recorded in `results.json`. Offline and live reports use schema 1.2 for this catalog, while legacy reports retain schema 1.1.
+
+### Legacy sandbox catalog
+
 From the repository root in PowerShell:
 
 ```powershell

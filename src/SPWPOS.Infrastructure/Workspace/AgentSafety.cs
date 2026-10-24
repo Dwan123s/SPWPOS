@@ -7,13 +7,32 @@ namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService
 {
+    private PlanView RespectSchedulingExclusions(PlanView plan, PlanningState state, Guid[] affected, AgentTurnInput input)
+    {
+        var excluded = state.Tasks.Where(task => !affected.Contains(task.Id) &&
+            plan.Sessions.Any(session => session.TaskId == task.Id && !session.Preserved) &&
+            ChatMatch(input.Text, @"\b(?:khong|dung|cho)\s+(?:xep|len)\s+(?:lich\s+)?(?:cho\s+)?" +
+                Regex.Escape(MatchText(task.Name)) + @"\b").Success).ToArray();
+        if (excluded.Length == 0) return plan;
+        var bias = input.UseEstimateBias ? engine.Biases(state) : [new BiasView("All", 0, 1, false)];
+        var warnings = excluded.Select(task => new PlanWarning(task.Id, task.Name,
+            state.Dependencies.Any(edge => edge.PredecessorId == task.Id && affected.Contains(edge.TaskId))
+                ? "DEPENDENCY_UNSCHEDULED" : "EXCLUDED_DEADLINE_TASK",
+            "Công việc cần được dành thời gian trước hạn nhưng yêu cầu hiện tại không cho phép xếp việc này. Chưa lưu thay đổi; hãy điều chỉnh phạm vi hoặc giờ rảnh.",
+            engine.Remaining(task, bias)));
+        return plan with { Sessions = plan.Sessions.Where(session => session.Preserved).ToArray(),
+            Warnings = plan.Warnings.Concat(warnings).ToArray() };
+    }
+
     private static Match ChatMatch(string text, string pattern) => Regex.Match(MatchText(text), pattern,
         RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
 
-    // Quotes must come from the current request or its unresolved parent, never
-    // from model prose or another completed request's duration/deadline.
+    // Quotes must come from the current request or its unresolved parent. Only
+    // recognized Telex equivalents are accepted; no fuzzy spelling/numeric match
+    // can manufacture evidence from model prose or a completed request.
     private static bool SourceQuote(string? quote, string source) => !string.IsNullOrWhiteSpace(quote) &&
-        quote.Length <= 500 && source.Contains(quote, StringComparison.OrdinalIgnoreCase);
+        quote.Length <= 500 && (source.Contains(quote, StringComparison.OrdinalIgnoreCase) ||
+            VietnameseTelex.Normalize(source).Contains(VietnameseTelex.Normalize(quote), StringComparison.OrdinalIgnoreCase));
 
     private static int? QuotedMinutes(string? quote)
     {
@@ -32,7 +51,7 @@ public sealed partial class WorkspaceService
             return item.DurationEvidence;
         // Recover only a literal duration directly attached to this exact task name.
         // Available hours elsewhere in the request are never task-duration evidence.
-        var matches = Regex.Matches(source, Regex.Escape(item.Name) +
+        var matches = Regex.Matches(VietnameseTelex.Normalize(source), Regex.Escape(VietnameseTelex.Normalize(item.Name)) +
             @"\s*(?:(?:cần|trong|tổng cộng|khoảng|dự kiến|mất)\s+){0,3}(?<duration>\d{1,4}\s*(?:phút|tiếng|giờ)(?:\s+rưỡi)?)\b",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
         return matches.Cast<Match>().Select(x => x.Groups["duration"].Value)
@@ -42,6 +61,7 @@ public sealed partial class WorkspaceService
     private static bool GroundDeadlineQuote(string quote, string source)
     {
         if (!SourceQuote(quote, source)) return false;
+        quote = VietnameseTelex.Normalize(quote); source = VietnameseTelex.Normalize(source);
         const string marker = @"\b(truoc|han|deadline|xong|hoan thanh|before|due)\b";
         if (ChatMatch(quote, marker).Success) return true;
         // A short verbatim time quote may omit the immediately preceding deadline label.
@@ -54,7 +74,7 @@ public sealed partial class WorkspaceService
 
     private TimeSlot? RequestedWorkWindow(string text, WorkPreference preference, DateTimeOffset? reference = null)
     {
-        var period = ChatMatch(text, @"\b(toi|sang|chieu)\s+(?:thu\b|ngay\b|\d|mai\b|hom\b|do\b)");
+        var period = ChatMatch(AgentInputRules.NormalizeTimeText(text), @"\b(toi|sang|chieu)\s+(?:thu\b|ngay\b|\d|mai\b|hom\b|do\b)");
         var exact = ChatMatch(text, @"\btu\s+(\d{1,2})\s*(?:h|gio|:)(\d{2})?\s*(?:den|[-–])\s*(\d{1,2})\s*(?:h|gio|:)(\d{2})?");
         if (!period.Success && !exact.Success) return null;
         var zone = PlanningEngine.Zone(preference.TimeZoneId);
@@ -175,7 +195,7 @@ public sealed partial class WorkspaceService
                 var completion = ChatMatch(request, @"\b(?:xong|hoan thanh|deadline|han).*?\btruoc\s+(\d{1,2})\s*(?:h|gio|:)(\d{2})?");
                 if (completion.Success && int.TryParse(completion.Groups[1].Value, out var h) && h < 24)
                 {
-                    if (h < 12 && ChatMatch(request, @"\b(chieu|toi|dem|pm)\b").Success) h += 12;
+                    if (h < 12 && ChatMatch(AgentInputRules.NormalizeTimeText(request), @"\b(chieu|toi|dem|pm)\b").Success) h += 12;
                     else if (h == 12 && ChatMatch(request, @"\b(sang|am)\b").Success) h = 0;
                     var minute = completion.Groups[2].Success ? int.Parse(completion.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
                     if (minute < 60)

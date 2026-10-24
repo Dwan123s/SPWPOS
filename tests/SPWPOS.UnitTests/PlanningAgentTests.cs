@@ -152,7 +152,9 @@ public sealed partial class PlanningAgentTests
         await Work(h, s => s.SaveTaskAsync(user.Id, null, new("Khác", "", h.Clock.GetUtcNow().AddDays(2), 60), Ct));
         Assert.Equal("AGENT_STALE", (await Assert.ThrowsAsync<AuthException>(() => Agent(h, s => s.ApplyAgentTurnAsync(user.Id, preview.Id, Ct)))).Code);
         var result = await Agent(h, s => s.SendAgentTurnAsync(user.Id, Request(), Ct));
-        await Work(h, s => s.ExecuteSessionAsync(user.Id, Assert.Single(result.Plan!.Sessions, x => !x.Preserved).Id, "start", Ct));
+        Assert.Equal("PREVIEW", result.Status); Assert.True(result.Plan!.HasDeadlineProtection);
+        result = await Agent(h, s => s.ApplyAgentTurnAsync(user.Id, result.Id, Ct));
+        await Work(h, s => s.ExecuteSessionAsync(user.Id, result.Plan!.Sessions.First(x => !x.Preserved).Id, "start", Ct));
         Assert.Equal("AGENT_UNDO_STALE", (await Assert.ThrowsAsync<AuthException>(() => Agent(h, s => s.UndoAgentTurnAsync(user.Id, result.Id, Ct)))).Code);
     }
 

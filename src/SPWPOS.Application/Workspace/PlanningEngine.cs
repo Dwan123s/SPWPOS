@@ -119,7 +119,8 @@ public sealed partial class PlanningEngine
         }
         return nodes.Any(x => Visit(x.Id));
     }
-    private PlanView GenerateCore(PlanningState state, PlanInput input, DateTimeOffset now, UrgentReplanPolicy? urgency = null, bool urgentFirst = true)
+    private PlanView GenerateGreedy(PlanningState state, PlanInput input, DateTimeOffset now, UrgentReplanPolicy? urgency,
+        bool urgentFirst, HashSet<Guid>? promoted = null)
     {
         var start = input.Start < now ? now : input.Start; var end = start.AddDays(input.HorizonDays);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
@@ -143,7 +144,10 @@ public sealed partial class PlanningEngine
         while (tasks.Count > 0)
         {
             var task = tasks.Values.Where(t => state.Dependencies.Where(d => d.TaskId == t.Id).All(d => done.ContainsKey(d.PredecessorId)))
-                .OrderByDescending(t => urgentFirst && t.Priority == 4).ThenBy(t => t.Deadline).ThenByDescending(t => t.Priority).ThenBy(t => t.Id).FirstOrDefault();
+                .OrderByDescending(t => urgentFirst && t.Priority == 4)
+                .ThenByDescending(t => urgentFirst && urgency?.RequestedUrgentTaskIds?.Contains(t.Id) == true)
+                .ThenByDescending(t => promoted?.Contains(t.Id) == true)
+                .ThenBy(t => t.Deadline).ThenByDescending(t => t.Priority).ThenBy(t => t.Id).FirstOrDefault();
             if (task is null)
             {
                 foreach (var blocked in tasks.Values) warnings.Add(new(blocked.Id, blocked.Name, "DEPENDENCY_UNSCHEDULED", "Công việc phụ thuộc chưa có phương án hoàn thành.", Remaining(blocked, bias)));
@@ -167,7 +171,8 @@ public sealed partial class PlanningEngine
             // Prefer the configured productive hours across the horizon. Fall back to
             // other available hours so soft preferences never block a hard deadline.
             var choices = preferredWindows.Concat(task.Splittable ? free.SelectMany(slot => Subtract(slot, preferredWindows)) : free).ToArray();
-            var strictDeadline = task.IsHardDeadline || task.Priority == 4 || urgency?.Displaced.ContainsKey(task.Id) == true;
+            var strictDeadline = task.IsHardDeadline || task.Priority == 4 || urgency?.Displaced.ContainsKey(task.Id) == true ||
+                urgency?.ProtectedTaskIds?.Contains(task.Id) == true;
             var candidates = choices.Select(x => new TimeSlot(x.Start, x.End < task.Deadline ? x.End : task.Deadline)).Where(x => x.End > x.Start)
                 .Concat(strictDeadline ? [] : choices.Select(x => new TimeSlot(x.Start > task.Deadline ? x.Start : task.Deadline, x.End)).Where(x => x.End > x.Start))
                 .Select(x => new TimeSlot(task.WorkWindowStart is { } from && from > x.Start ? from : x.Start,

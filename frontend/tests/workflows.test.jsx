@@ -21,15 +21,24 @@ import {
   profile,
 } from "./fixtures.js";
 
-let calls, currentWorkspace, failTaskDelete, failPlan, planWarnings, urgentReplan;
+let calls,
+  currentWorkspace,
+  failTaskDelete,
+  failTaskUpdate,
+  failPlan,
+  planWarnings,
+  urgentReplan,
+  deadlineProtection;
 beforeEach(() => {
   resetFixtures();
   currentWorkspace = workspace();
   calls = [];
   failTaskDelete = false;
+  failTaskUpdate = false;
   failPlan = false;
   planWarnings = [];
   urgentReplan = false;
+  deadlineProtection = false;
   Object.assign(state, {
     workspace: null,
     insights: null,
@@ -149,6 +158,26 @@ beforeEach(() => {
             : session,
         );
       }
+      if (/^\/api\/tasks\/[^/]+$/.test(url) && options.method === "PUT") {
+        if (failTaskUpdate)
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: {
+                code: "TASK_STALE",
+                message:
+                  "Công việc đã thay đổi ở nơi khác. Tải lại bản mới trước khi chỉnh sửa.",
+              },
+            }),
+          };
+        Object.assign(
+          currentWorkspace.tasks.find(
+            (task) => task.id === url.split("/").at(-1),
+          ),
+          body,
+        );
+      }
       if (url === "/api/workspace/profile" && options.method === "PUT")
         Object.assign(currentWorkspace.profile, body);
       if (url === "/api/plans") {
@@ -158,7 +187,12 @@ beforeEach(() => {
             status: 503,
             json: async () => ({ error: { message: "Planning unavailable" } }),
           };
-        data = { ...plan, warnings: planWarnings, hasUrgentReplan: urgentReplan };
+        data = {
+          ...plan,
+          warnings: planWarnings,
+          hasUrgentReplan: urgentReplan,
+          hasDeadlineProtection: deadlineProtection,
+        };
       }
       if (url === "/api/tasks/capture")
         data = {
@@ -850,6 +884,99 @@ it("creates a task and retains filters while updating the React result list", as
   ).toEqual(["created-task"]);
 });
 
+it("submits the version captured when opening the task editor", async () => {
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  const task = currentWorkspace.tasks[1];
+  const version = task.version;
+  await user.click(
+    await screen.findByRole("button", { name: task.name, exact: true }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Chỉnh sửa", exact: true }),
+  );
+  await user.clear(screen.getByLabelText("Tên công việc"));
+  await user.type(screen.getByLabelText("Tên công việc"), "My edit");
+  // A workspace refresh must not silently replace the form's concurrency token.
+  task.version = "00000000-0000-0000-0000-000000000099";
+  await user.click(
+    screen.getByRole("button", { name: "Lưu thay đổi", exact: true }),
+  );
+  await waitFor(() =>
+    expect(
+      calls.find(
+        (call) =>
+          call.options.method === "PUT" && call.url === `/api/tasks/${task.id}`,
+      )?.body.version,
+    ).toBe(version),
+  );
+});
+
+it("keeps an unsaved stale task edit and requires an explicit reload before saving again", async () => {
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  const task = currentWorkspace.tasks[1];
+  await user.click(
+    await screen.findByRole("button", { name: task.name, exact: true }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Chỉnh sửa", exact: true }),
+  );
+  await user.clear(screen.getByLabelText("Tên công việc"));
+  await user.type(screen.getByLabelText("Tên công việc"), "My unsaved draft");
+  failTaskUpdate = true;
+  task.name = "Saved in another tab";
+  task.version = "00000000-0000-0000-0000-000000000098";
+  await user.click(
+    screen.getByRole("button", { name: "Lưu thay đổi", exact: true }),
+  );
+  const reload = await screen.findByRole("button", {
+    name: "Tải bản mới",
+    exact: true,
+  });
+  expect(screen.getByLabelText("Tên công việc").value).toBe("My unsaved draft");
+  expect(
+    screen.getByRole("button", { name: "Lưu thay đổi", exact: true }).disabled,
+  ).toBe(true);
+  expect(task.name).toBe("Saved in another tab");
+  const updateCount = () =>
+    calls.filter(
+      (call) =>
+        call.options.method === "PUT" && call.url === `/api/tasks/${task.id}`,
+    ).length;
+  await user.click(
+    screen.getByRole("button", { name: "Lưu thay đổi", exact: true }),
+  );
+  expect(updateCount()).toBe(1);
+  await user.click(reload);
+  await waitFor(() =>
+    expect(screen.getByLabelText("Tên công việc").value).toBe(
+      "Saved in another tab",
+    ),
+  );
+  expect(
+    screen.queryByRole("button", { name: "Tải bản mới", exact: true }),
+  ).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Lưu thay đổi", exact: true }).disabled,
+  ).toBe(false);
+  failTaskUpdate = false;
+  await user.click(
+    screen.getByRole("button", { name: "Lưu thay đổi", exact: true }),
+  );
+  await waitFor(() => expect(updateCount()).toBe(2));
+  expect(
+    calls
+      .filter(
+        (call) =>
+          call.options.method === "PUT" && call.url === `/api/tasks/${task.id}`,
+      )
+      .at(-1).body.version,
+  ).toBe(task.version);
+});
+
 it("schedules a selected task and previews capacity warnings without applying them", async () => {
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
@@ -899,6 +1026,18 @@ it.each(["existing", "new"])("requires confirmation before applying urgent displ
   expect(movements.textContent).toContain("Hạn chót giữ nguyên:");
   expect(calls.some((c) => c.url.endsWith("/apply"))).toBe(false);
   await user.click(confirm);
+  await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/apply"))).toHaveLength(1));
+});
+
+it("previews deadline protection and waits for confirmation before applying a new task plan", async () => {
+  deadlineProtection = true;
+  mount();
+  await navigate("tasks", "Công việc");
+  await userEvent.click(screen.getByRole("button", { name: `Xếp lịch công việc ${currentWorkspace.tasks[1].name}` }));
+  const confirm = await screen.findByRole("button", { name: "Xác nhận kế hoạch", exact: true });
+  expect(screen.getByText(/Đề xuất đã dành thời gian cho việc khẩn hoặc gần hạn/)).toBeTruthy();
+  expect(calls.some((c) => c.url.endsWith("/apply"))).toBe(false);
+  await userEvent.click(confirm);
   await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/apply"))).toHaveLength(1));
 });
 
@@ -981,6 +1120,7 @@ it("saves a fixed work shift with the WORK category from the calendar form", asy
   );
   const user = userEvent.setup();
   await user.selectOptions(screen.getByLabelText("Loại sự kiện"), "WORK");
+  await user.click(screen.getByLabelText("Lịch khẩn"));
   await user.click(
     screen.getByRole("button", { name: "Lưu sự kiện", exact: true }),
   );
@@ -992,6 +1132,7 @@ it("saves a fixed work shift with the WORK category from the calendar form", asy
       )?.body.eventType,
     ).toBe("WORK"),
   );
+  expect(calls.find((call) => call.url === "/api/time/events" && call.options.method === "POST")?.body.isUrgent).toBe(true);
 });
 
 it("guides an empty daily schedule to input before offering planning", async () => {

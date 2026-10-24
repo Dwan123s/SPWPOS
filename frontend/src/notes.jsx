@@ -301,6 +301,8 @@ export function NotesPage({ onWorkspaceChanged }) {
           setMessage(
             result.plan.hasUrgentReplan && !result.plan.isApplied
               ? "Đã tạo đề xuất dời lịch để ưu tiên việc khẩn. Xem giờ cũ và giờ mới, rồi xác nhận trước khi lưu."
+              : result.plan.hasDeadlineProtection && !result.plan.isApplied
+                ? "Đã tạo đề xuất dành thời gian cho việc khẩn hoặc gần hạn. Kiểm tra các phiên rồi xác nhận kế hoạch trước khi lưu."
               : `Đã tự động áp dụng lịch với ${result.plan.sessions.filter((s) => !s.preserved).length} phiên mới. ${result.plan.warnings.length ? `${result.plan.warnings.length} công việc có cảnh báo; xem chi tiết kết quả.` : "Bạn có thể bắt đầu làm việc trong mục Hôm nay."}`,
           );
           planModal(result.plan);

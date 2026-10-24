@@ -28,7 +28,8 @@ public sealed class WorkspaceRegressionTests
         var parent = await Call(h, s => s.SaveTaskAsync(user.Id, null, new("Parent", "", due, 60), Ct));
         var child = await Call(h, s => s.SaveTaskAsync(user.Id, null, new("Child", "", due, 30), Ct));
         await Call(h, s => s.SetDependencyAsync(user.Id, child, parent, false, Ct));
-        Assert.Equal("DEPENDENCY_CYCLE", (await Assert.ThrowsAsync<AuthException>(() => Call(h, s => s.SaveTaskAsync(user.Id, child, new("Child", "", due, 30, ParentId: parent), Ct)))).Code);
+        var version = await h.DbAsync(db => db.WorkTasks.Where(x => x.Id == child).Select(x => x.Version).SingleAsync(Ct));
+        Assert.Equal("DEPENDENCY_CYCLE", (await Assert.ThrowsAsync<AuthException>(() => Call(h, s => s.SaveTaskAsync(user.Id, child, new("Child", "", due, 30, ParentId: parent, Version: version), Ct)))).Code);
         Assert.Null(await h.DbAsync(db => db.WorkTasks.Where(x => x.Id == child).Select(x => x.ParentId).SingleAsync(Ct)));
     }
     [Fact] public async Task Repeated_reads_and_analysis_do_not_write_jobs_learning_or_risk_history()

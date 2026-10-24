@@ -198,6 +198,7 @@ export function taskForm(task = {}, parentId = null) {
     task.deadline || new Date(Date.now() + 86400000 * 2).toISOString();
   return (
     <form data-form="task" data-id={task.id || ""}>
+      <input type="hidden" name="version" defaultValue={task.version || ""} />
       <input
         type="hidden"
         name="creationSource"
@@ -340,6 +341,7 @@ export function taskForm(task = {}, parentId = null) {
           Tự xếp vào giờ rảnh sau khi tạo
         </label>
       )}
+      {task.id && <Slot id="task-conflict" />}
       <div className="form-error" />
       <div className="form-actions">
         {button("Hủy", "close-modal", "ghost")}
@@ -351,6 +353,7 @@ export function taskForm(task = {}, parentId = null) {
   );
 }
 export function openTask(task = {}, parentId = null) {
+  setSlot("task-conflict", null);
   modal(
     task.id ? "Chỉnh sửa công việc" : "Thêm công việc",
     "Bắt đầu với tên, deadline và thời gian dự kiến.",
@@ -371,6 +374,7 @@ export function taskInput(data) {
     creationSource: String(data.get("creationSource") || "MANUAL"),
     splittable: data.has("splittable"),
     minimumSessionMinutes: Number(data.get("minimumSessionMinutes") || 25),
+    version: data.get("version") || null,
   };
 }
 export function openDetail(id, afterSession = false) {

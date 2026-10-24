@@ -95,6 +95,7 @@ export function NoraEventEditor({ event, onCancel, onSaved }) {
               description: event.description || "",
               eventType: event.eventType || "OTHER",
               repeatWeeks: 1,
+              isUrgent: event.isUrgent ?? null,
             });
             await onSaved();
           } catch (failure) {

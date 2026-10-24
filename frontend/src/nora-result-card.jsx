@@ -75,18 +75,21 @@ export function NoraResultCard({
             <li key={index}>
               <div>
                 <strong>{change.name}</strong>
-                {confirmMove && change.kind === "SESSION" && change.before && (
+                {confirmMove && ["SESSION", "EVENT"].includes(change.kind) && change.before && (
                   <p>Giờ cũ: {compactScheduleText(change.before)}</p>
                 )}
                 <span>
-                  {confirmMove && change.kind === "SESSION" && change.before && (
+                  {confirmMove && ["SESSION", "EVENT"].includes(change.kind) && change.before && (
                     <>Giờ mới: </>
                   )}
                   {compactScheduleText(
                     change.after || "Không còn khoảng thời gian",
                   )}
                 </span>
-                {change.before && !(confirmMove && change.kind === "SESSION") && (
+                {change.reason && (
+                  <p className="nora-result-hint">Lý do và điều kiện: {change.reason}</p>
+                )}
+                {change.before && !(confirmMove && ["SESSION", "EVENT"].includes(change.kind)) && (
                     <details>
                       <summary>Trước khi thay đổi</summary>
                       <p>{compactScheduleText(change.before)}</p>
@@ -163,7 +166,7 @@ export function NoraResultCard({
             disabled={busy}
             onClick={() => onAction(turn, "apply")}
           >
-            {confirmMove ? "Xác nhận dời lịch" : "Lưu thay đổi"}
+            {confirmMove ? "Xác nhận dời lịch" : turn.plan?.hasDeadlineProtection ? "Xác nhận kế hoạch" : "Lưu thay đổi"}
           </button>
         )}
         <button

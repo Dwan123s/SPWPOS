@@ -75,7 +75,7 @@ export function NoraScheduleAlternatives({ options, busy, onReply }) {
   if (!options.length) return null;
   return (
     <section className="nora-time-alternatives" aria-label="Khung giờ thay thế">
-      <p>Chọn giờ thay thế</p>
+      <p>Chọn giờ khác cho yêu cầu mới</p>
       <div className="agent-option-chips">
         {options.map((option) => (
           <button

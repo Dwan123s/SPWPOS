@@ -45,6 +45,23 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<RiskAssessment> RiskAssessments => Set<RiskAssessment>();
     public DbSet<RiskReason> RiskReasons => Set<RiskReason>();
     public DbSet<SystemJobRun> SystemJobRuns => Set<SystemJobRun>();
+    // Rotate the token for every writer, including agent, execution, note import
+    // and container updates. Fixed clocks and rapid saves cannot reuse a token.
+    private void RefreshTaskVersions()
+    {
+        foreach (var entry in ChangeTracker.Entries<WorkTask>().Where(x => x.State == EntityState.Modified))
+            entry.Entity.Version = Guid.NewGuid();
+    }
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        RefreshTaskVersions();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        RefreshTaskVersions();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

@@ -40,6 +40,7 @@ public static class WorkspaceModel
         note.Property(x => x.Version).IsConcurrencyToken();
         note.HasIndex(x => new { x.UserId, x.UpdatedAt });
         var task = Owned<WorkTask>(b);
+        task.Property(x => x.Version).IsConcurrencyToken();
         task.Property(x => x.Name).HasMaxLength(200); task.Property(x => x.Description).HasMaxLength(4000);
         task.Property(x => x.TaskType).HasMaxLength(60); task.HasIndex(x => new { x.UserId, x.Deadline });
         task.HasOne<TaskCategory>().WithMany().HasForeignKey(x => new { x.UserId, x.CategoryId }).HasPrincipalKey(x => new { x.UserId, x.Id }).OnDelete(DeleteBehavior.Restrict);

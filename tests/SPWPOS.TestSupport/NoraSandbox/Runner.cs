@@ -42,7 +42,9 @@ public static class SandboxRunner
     public static async Task<SandboxRun> RunAsync(SandboxOptions options, Action<string>? progress, CancellationToken ct)
     {
         if (options.Mode is not "Offline" and not "Live" || options.Suite is not "Smoke" and not "All" || options.Repeats is < 1 or > 5 ||
-            options.MaxCalls is < 1 or > 500 || options.TimeoutSeconds is < 5 or > 120) throw new ArgumentException("Invalid sandbox options.");
+            options.MaxCalls is < 1 or > 500 || options.TimeoutSeconds is < 5 or > 120 || options.Catalog is not "Legacy" and not "Conversations") throw new ArgumentException("Invalid sandbox options.");
+        if (options.Catalog == "Conversations") return await ConversationRunner.RunAsync(options, progress, ct);
+        if (options.GroupIds is { Length: > 0 }) throw new ArgumentException("Group IDs require the Conversations catalog.");
         var root = Path.GetFullPath(options.RepositoryRoot); var output = Path.GetFullPath(options.OutputDirectory);
         if (File.Exists(Path.Combine(output, "results.json"))) throw new InvalidOperationException("Use a fresh output directory; existing results are preserved.");
         var catalog = LoadCatalog(root); var requested = options.CaseIds ?? [];

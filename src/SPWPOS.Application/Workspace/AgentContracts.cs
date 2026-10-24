@@ -22,7 +22,7 @@ public sealed record AgentIntent(string Reply, string Question, bool ReplaceWeek
     AgentPendingRequest? Pending = null, string? ResultKind = null, AgentFreeTimeQuery? FreeTimeQuery = null,
     AgentFreeTimeQuery? ScheduleReviewQuery = null);
 public sealed record AgentMessage(string Text, string Reply, string Status);
-public sealed record AgentChangeView(string Kind, string Name, string Before, string After, Guid? TaskId = null);
+public sealed record AgentChangeView(string Kind, string Name, string Before, string After, Guid? TaskId = null, string Reason = "");
 public sealed record AgentTurnView(Guid Id, Guid ConversationId, Guid RequestId, string Text,
     string Reply, string Status, string Question, PlanView? Plan, AgentChangeView[] Changes,
     string[] Warnings, DateTimeOffset CreatedAt, bool CanUndo = false, string[]? Options = null, string? ErrorCode = null,

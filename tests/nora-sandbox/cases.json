@@ -1921,6 +1921,17 @@
         "prompt": "Mình nói công việc có hạn chót 22:00 ngày 27/10/2026. Chỉ sửa thời lượng, giữ nguyên deadline và loại việc.",
         "expected": {
           "statuses": [
+            "PREVIEW"
+          ],
+          "unchanged": true,
+          "taskCount": 2
+        },
+        "operation": "Send"
+      },
+      {
+        "prompt": "Xác nhận kế hoạch đã dành thời gian cho báo cáo gần hạn còn lại.",
+        "expected": {
+          "statuses": [
             "APPLIED"
           ],
           "unchanged": false,
@@ -1938,7 +1949,7 @@
             }
           ]
         },
-        "operation": "Send"
+        "operation": "Apply"
       }
     ]
   },

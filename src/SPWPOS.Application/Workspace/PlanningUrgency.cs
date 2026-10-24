@@ -6,17 +6,19 @@ public sealed partial class PlanningEngine
     public static readonly TimeSpan NearDeadlineWindow = TimeSpan.FromHours(48);
     public const int MaximumUrgentDisplacementDays = 2;
     private sealed record UrgentMove(DateTimeOffset Anchor, DateTimeOffset Earliest, DateTimeOffset Latest, bool NearDeadline);
-    private sealed record UrgentReplanPolicy(HashSet<Guid> RetainedSessionIds, Dictionary<Guid, UrgentMove> Displaced);
+    private sealed record UrgentReplanPolicy(HashSet<Guid> RetainedSessionIds, Dictionary<Guid, UrgentMove> Displaced,
+        HashSet<Guid>? ProtectedTaskIds = null, HashSet<Guid>? RequestedUrgentTaskIds = null);
 
-    public PlanView Generate(PlanningState state, PlanInput input, DateTimeOffset now)
+    private PlanView GenerateUrgent(PlanningState state, PlanInput input, DateTimeOffset now, UrgentReplanPolicy? protection = null)
     {
         var start = input.Start > now ? input.Start : now;
         var end = start.AddDays(input.HorizonDays);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         var selected = input.AffectedTaskIds is null ? null : AffectedClosure(state, input.AffectedTaskIds);
         var urgent = state.Tasks.Where(x => x.Priority == 4 && Remaining(x, bias) > 0 &&
-            (selected is null || selected.Contains(x.Id))).Select(x => x.Id).ToHashSet();
-        if (urgent.Count == 0) return GenerateCore(state, input, now);
+            (selected is null || selected.Contains(x.Id)) &&
+            (protection?.RequestedUrgentTaskIds is null || protection.RequestedUrgentTaskIds.Contains(x.Id))).Select(x => x.Id).ToHashSet();
+        if (urgent.Count == 0) return GenerateCore(state, input, now, protection);
 
         // A prerequisite cannot give up the very session needed by urgent work.
         var prerequisites = new HashSet<Guid>(urgent);
@@ -32,21 +34,21 @@ public sealed partial class PlanningEngine
 
         var tasks = state.Tasks.ToDictionary(x => x.Id);
         var movable = state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && !x.IsLocked &&
-            x.Start >= start && x.Start < end && !prerequisites.Contains(x.TaskId) &&
-            tasks.TryGetValue(x.TaskId, out var task) && task.Priority < 4).ToArray();
-        if (movable.Length == 0) return GenerateCore(state, input, now);
+            x.Start >= start && x.Start < end && !prerequisites.Contains(x.TaskId) && protection?.RetainedSessionIds.Contains(x.Id) != true &&
+            tasks.ContainsKey(x.TaskId)).ToArray();
+        if (movable.Length == 0) return GenerateCore(state, input, now, protection);
         var movableIds = movable.Select(x => x.Id).ToHashSet();
         var trial = GenerateCore(state with { Sessions = state.Sessions.Where(x => !movableIds.Contains(x.Id)).ToArray() },
-            input with { AffectedTaskIds = urgent.ToArray() }, now);
+            input with { AffectedTaskIds = urgent.ToArray() }, now, protection);
         if (trial.Warnings.Any(x => urgent.Contains(x.TaskId) && x.UnscheduledMinutes > 0))
-            return GenerateCore(state, input, now);
+            return GenerateCore(state, input, now, protection);
         var urgentSlots = trial.Sessions.Where(x => urgent.Contains(x.TaskId) && !x.Preserved).ToArray();
         var hitSessions = movable.Where(x => urgentSlots.Any(u =>
             x.Start < u.End.AddMinutes(state.Preference.BreakMinutes) && u.Start.AddMinutes(-state.Preference.BreakMinutes) < x.End))
             .ToArray();
         var hitIds = hitSessions.Select(x => x.Id).ToHashSet();
         var directlyAffected = hitSessions.Select(x => x.TaskId).ToHashSet();
-        if (directlyAffected.Count == 0) return GenerateCore(state, input, now);
+        if (directlyAffected.Count == 0) return GenerateCore(state, input, now, protection);
 
         var closure = AffectedClosure(state, directlyAffected);
         var released = movable.Where(x => hitIds.Contains(x.Id) || closure.Contains(x.TaskId) && !directlyAffected.Contains(x.TaskId)).ToArray();
@@ -69,7 +71,8 @@ public sealed partial class PlanningEngine
                 if (dependent.Start < latest) latest = dependent.Start;
             return new UrgentMove(group.Min(x => x.Start), near ? start : group.Max(x => x.Start), latest, near);
         });
-        var policy = new UrgentReplanPolicy(retained, moves);
+        if (protection is not null) retained.UnionWith(protection.RetainedSessionIds);
+        var policy = new UrgentReplanPolicy(retained, moves, protection?.ProtectedTaskIds, protection?.RequestedUrgentTaskIds ?? urgent);
         var affected = input.AffectedTaskIds is null ? null : selected!.Concat(closure).Distinct().ToArray();
         var request = input with { AffectedTaskIds = affected };
         var plan = GenerateCore(state, request, now, policy);

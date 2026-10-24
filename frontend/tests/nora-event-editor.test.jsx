@@ -10,6 +10,7 @@ const event = {
   end: "2026-10-20T10:00:00Z",
   eventType: "WORK",
   description: "Giữ mô tả này",
+  isUrgent: true,
 };
 beforeEach(() => {
   state.workspace = { preference: { timeZoneId: "Asia/Ho_Chi_Minh" } };
@@ -80,6 +81,7 @@ it("retains edits after an overlap rejection, retries, and preserves category an
     eventType: "WORK",
     description: event.description,
     repeatWeeks: 1,
+    isUrgent: true,
   });
 });
 

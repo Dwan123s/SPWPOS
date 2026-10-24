@@ -89,7 +89,8 @@ public sealed class UmlAlignmentTests
         var now = factory.Clock.GetUtcNow(); var parentId = await Create(client, now);
         await Send(client, HttpMethod.Post, "/api/tasks", new TaskInput("Invalid child", "", now.AddDays(2), 60, ParentId: parentId), HttpStatusCode.BadRequest);
         await Send(client, HttpMethod.Post, "/api/tasks", new TaskInput("Child", "", now.AddHours(10), 60, ParentId: parentId));
-        await Send(client, HttpMethod.Put, $"/api/tasks/{parentId}", new TaskInput("Parent", "", now.AddHours(1), 60), HttpStatusCode.BadRequest);
+        var parentVersion = (await Send(client, HttpMethod.Get, $"/api/tasks/{parentId}")).GetProperty("data").GetProperty("version").GetGuid();
+        await Send(client, HttpMethod.Put, $"/api/tasks/{parentId}", new TaskInput("Parent", "", now.AddHours(1), 60, Version: parentVersion), HttpStatusCode.BadRequest);
         await Send(client, HttpMethod.Put, "/api/workspace/profile", new ProfileInput("Minh", "Nguyen", "Minh Workspace"));
         await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Class", now.AddDays(1), now.AddDays(1).AddHours(1), "Review", "CLASS"));
         await Send(client, HttpMethod.Put, "/api/time/preferences", new PreferenceInput("UTC", 25, 90, 10, 0, 1440, 30, "MORNING"));

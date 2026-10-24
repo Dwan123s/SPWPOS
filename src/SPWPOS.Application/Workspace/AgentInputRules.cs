@@ -6,12 +6,17 @@ namespace SPWPOS.Application.Workspace;
 
 public static class AgentInputRules
 {
-    public static string Normalize(string value) => string.Concat(value.Normalize(NormalizationForm.FormD)
+    public static string Normalize(string value) => string.Concat(VietnameseTelex.Normalize(value).Normalize(NormalizationForm.FormD)
         .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)).ToLowerInvariant().Replace('đ', 'd');
+
+    // Accent folding must not turn the pronoun tôi (including Telex tooi) into
+    // the evening qualifier tối when validating an otherwise ambiguous clock.
+    public static string NormalizeTimeText(string value) => Normalize(Regex.Replace(VietnameseTelex.Normalize(value),
+        @"\btôi\b", "nguoi_nhap", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)));
 
     public static (int StartMinute, int EndMinute)? ExplicitTimeRange(string request)
     {
-        var text = Normalize(request);
+        var text = NormalizeTimeText(request);
         var match = Regex.Match(text, @"\btu\s+(?<from>\d{1,2})\s*(?:h|gio|:)\s*(?<fm>\d{1,2})?\s*(?:den|[-–])\s*(?<to>\d{1,2})\s*(?:h|gio|:)\s*(?<tm>\d{1,2})?\s*(?:buoi\s+)?(?<period>sang|trua|chieu|toi|am|pm)\b",
             RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
         if (!match.Success) return null;
@@ -31,7 +36,7 @@ public static class AgentInputRules
 
     public static (string Question, string[] Options)? AmbiguousClock(string request)
     {
-        var text = Normalize(request);
+        var text = NormalizeTimeText(request);
         var match = Regex.Match(text, @"\b(?:luc|vao|truoc|tu)\s+(\d{1,2}|muoi hai|muoi mot|mot|hai|ba|bon|nam|sau|bay|tam|chin|muoi)\s*(?:gio\b|h(?=\d|\b)|:)\s*(\d{1,2})?",
             RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
         if (!match.Success || Regex.IsMatch(text, @"\b(sang|chieu|toi|trua|dem|am|pm)\b", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))) return null;

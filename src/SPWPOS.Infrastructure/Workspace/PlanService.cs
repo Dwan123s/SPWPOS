@@ -61,6 +61,8 @@ public sealed partial class WorkspaceService
     }, ct);
     private async Task ApplyPlanCoreAsync(Guid uid, PlanProposal proposal, PlanView plan, PlanningState state, CancellationToken ct)
     {
+        Require(!plan.HasDeadlineProtection || !plan.Warnings.Any(x => x.UnscheduledMinutes > 0 || x.Code == "SOFT_DEADLINE_EXCEEDED"),
+            "DEADLINE_PROTECTION_INFEASIBLE", "Chưa đủ thời gian để hoàn thành việc khẩn hoặc gần hạn cùng yêu cầu mới. Lịch cũ được giữ nguyên; hãy điều chỉnh thời lượng, giờ rảnh hoặc điều kiện của việc mới.", 409);
         Require(!plan.HasUrgentReplan || !plan.Warnings.Any(x => x.UnscheduledMinutes > 0 || x.Code == "SOFT_DEADLINE_EXCEEDED"),
             "URGENT_REPLAN_INFEASIBLE", "Chưa thể nhường giờ cho việc khẩn mà vẫn hoàn thành các công việc còn lại đúng hạn. Lịch cũ được giữ nguyên; hãy điều chỉnh giờ rảnh, thời lượng hoặc xem lại các điều kiện.", 409);
         var id = proposal.Id;

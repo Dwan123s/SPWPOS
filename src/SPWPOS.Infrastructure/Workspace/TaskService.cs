@@ -8,6 +8,14 @@ public sealed partial class WorkspaceService
     public Task<Guid> SaveTaskAsync(Guid uid, Guid? id, TaskInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
         ValidTask(input);
+        WorkTask? existingTask = null;
+        if (id is { } existingId)
+        {
+            existingTask = await Find<WorkTask>(uid, existingId, ct);
+            Require(!existingTask.IsDeleted, "NOT_FOUND", "Công việc đã xóa.", 404);
+            Require(input.Version is { } version && version != Guid.Empty && version == existingTask.Version,
+                "TASK_STALE", "Công việc đã thay đổi ở nơi khác. Tải lại bản mới trước khi chỉnh sửa.", 409);
+        }
         var type = NormalizeTaskType(input.TaskType);
         Require(await db.TaskTypes.AnyAsync(x => x.Code == type && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không hợp lệ.");
         if (input.CategoryId is { } categoryId) await Find<TaskCategory>(uid, categoryId, ct);
@@ -25,7 +33,7 @@ public sealed partial class WorkspaceService
         WorkTask task;
         if (id is { } taskId)
         {
-            task = await Find<WorkTask>(uid, taskId, ct); Require(!task.IsDeleted, "NOT_FOUND", "Công việc đã xóa.", 404);
+            task = existingTask!;
             Require(!await Mine<WorkTask>(uid).AnyAsync(x => x.ParentId == taskId && !x.IsDeleted && x.Deadline > input.Deadline, ct), "SUBTASK_DEADLINE", "Deadline mới phải bao phủ các công việc con.");
             Require(!await Mine<WorkSession>(uid).AnyAsync(x => x.TaskId == taskId && x.IsLocked && x.Status == WorkSessionStatus.Scheduled && x.End > input.Deadline, ct),
                 "LOCKED_SESSION_CONFLICT", "Deadline mới xung đột với phiên đã khóa.", 409);

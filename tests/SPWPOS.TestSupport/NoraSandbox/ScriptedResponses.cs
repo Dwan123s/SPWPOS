@@ -38,6 +38,13 @@ public static class SandboxScriptedResponses
             return empty with { Events = [new(meeting.Name, meeting.Start, meeting.End, meeting.Description, meeting.EventType, ExistingId: meeting.Id)] };
         }
         if (id == "E09") return empty with { ReplaceWeeklyAvailability = true, WeeklySlots = state.Weekly.Select(x => new AvailabilityInput(x.DayOfWeek, x.StartMinute, x.EndMinute)).ToArray() };
+        if (id == "S04" && stepIndex == 1)
+        {
+            // A preview expectation describes persisted state, so the requested
+            // edit must be supplied independently of expected saved task fields.
+            var target = state.Tasks.Single(x => x.Deadline == SandboxEnvironment.At(1, 22));
+            return empty with { Tasks = [new(target.Id, target.Name, target.Deadline, 45, target.Priority, "", target.Splittable)] };
+        }
         if (id.StartsWith('H') && step.Operation is "Send" or "SendPreview") return empty with { Tasks = [New(id == "H09" ? "Viết báo cáo" : "Ôn SQL", 60, 1, type: id == "H09" ? "WRITING" : "STUDY")] };
         if (expected.Statuses.Contains("NEEDS_INPUT") && expected.Unchanged && !expected.Statuses.Contains("ANSWERED")) return Question();
         if (expected.Unchanged && expected.Statuses.Contains("ANSWERED")) return empty;

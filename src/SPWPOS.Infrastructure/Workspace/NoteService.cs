@@ -167,7 +167,7 @@ public sealed partial class WorkspaceService
             return NoteViewOf(saved);
         }, ct, false);
         // The normal apply path validates revision, conflicts, deadlines and ownership.
-        if (plan.HasUrgentReplan) return AgentResult(note, plan);
+        if (plan.RequiresConfirmation) return AgentResult(note, plan);
         await ApplyPlanAsync(uid, plan.Id, ct);
         return AgentResult(note, await GetPlanAsync(uid, plan.Id, ct));
     }

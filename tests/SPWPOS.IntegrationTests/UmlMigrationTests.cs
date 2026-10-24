@@ -11,6 +11,26 @@ namespace SPWPOS.IntegrationTests;
 public sealed class UmlMigrationTests
 {
     public static bool SqlServerAvailable => SqlServerConcurrencyTests.SqlServerAvailable;
+    [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
+    public async Task Task_version_upgrade_backfills_distinct_tokens_without_changing_existing_tasks()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync();
+        await WorkspaceFlowTests.Authorize(factory, client);
+        var first = await WorkspaceFlowTests.Create(client, factory.Clock.GetUtcNow());
+        var second = await WorkspaceFlowTests.Create(client, factory.Clock.GetUtcNow());
+        await using var scope = factory.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var before = await db.WorkTasks.AsNoTracking().OrderBy(x => x.Id).Select(x => new { x.Id, x.Name, x.EstimatedMinutes, x.Deadline }).ToArrayAsync(ct);
+        var migrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();
+        var index = Array.FindIndex(migrations, x => x.EndsWith("_AddTaskVersions", StringComparison.Ordinal)); Assert.True(index > 0);
+        var migrator = db.GetService<IMigrator>(); await migrator.MigrateAsync(migrations[index - 1], ct);
+        await migrator.MigrateAsync(null, ct);
+        var after = await db.WorkTasks.AsNoTracking().OrderBy(x => x.Id).ToArrayAsync(ct);
+        Assert.Equal(before, after.Select(x => new { x.Id, x.Name, x.EstimatedMinutes, x.Deadline }).ToArray());
+        Assert.Equal(2, after.Select(x => x.Version).Distinct().Count());
+        Assert.All(after, x => Assert.NotEqual(Guid.Empty, x.Version));
+        Assert.Contains(after, x => x.Id == first); Assert.Contains(after, x => x.Id == second);
+    }
     [Theory(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
     [InlineData(false)] [InlineData(true)]
     public async Task Work_category_upgrade_adds_the_default_without_overwriting_existing_configuration(bool existing)

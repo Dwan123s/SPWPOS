@@ -12,11 +12,14 @@ public sealed class NotesApiTests
 {
     private sealed class AiFactory(bool mixed = false) : ApiFactory
     {
+        // Use a fixed local hour so continuous work never straddles midnight.
+        private static DateTimeOffset DayStart(DateTimeOffset now) => new(
+            now.ToOffset(TimeSpan.FromHours(7)).Date.AddDays(1).AddHours(8), TimeSpan.FromHours(7));
         public NoteAiTestDouble Ai { get; } = new(activities: mixed ? now => [
-            new("EVENT", "Đi học", Type: "CLASS", Start: now.AddDays(1), End: now.AddDays(1).AddHours(5)),
-            new("EVENT", "Đi làm", Type: "WORK", Start: now.AddDays(1).AddHours(6), End: now.AddDays(1).AddHours(10)),
-            new("EVENT", "Họp", Type: "MEETING", Start: now.AddDays(1).AddHours(10), End: now.AddDays(1).AddHours(10).AddMinutes(15)),
-            new("TASK", "Báo cáo RDS", Type: "WRITING", Start: now.AddDays(1).AddHours(13).AddMinutes(30), EstimatedMinutes: 60)
+            new("EVENT", "Đi học", Type: "CLASS", Start: DayStart(now), End: DayStart(now).AddHours(5)),
+            new("EVENT", "Đi làm", Type: "WORK", Start: DayStart(now).AddHours(6), End: DayStart(now).AddHours(10)),
+            new("EVENT", "Họp", Type: "MEETING", Start: DayStart(now).AddHours(10), End: DayStart(now).AddHours(10).AddMinutes(15)),
+            new("TASK", "Báo cáo RDS", Type: "WRITING", Start: DayStart(now).AddHours(13).AddMinutes(30), EstimatedMinutes: 60)
         ] : null);
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {

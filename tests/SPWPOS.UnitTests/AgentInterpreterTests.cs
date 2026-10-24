@@ -15,7 +15,7 @@ public sealed class AgentInterpreterTests
          "events":[{"name":"Họp","start":"2026-10-15T14:00:00+07:00","end":"2026-10-15T16:00:00+07:00","description":"","eventType":"MEETING","repeatWeeks":1,"existingId":null}],
          "tasks":[],"scheduleTaskIds":[],"reschedule":false,"horizonDays":14}
         """;
-    private sealed class Provider(string output = Payload, string finish = "STOP", HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
+    private sealed class Provider(string output = Payload, string finish = "STOP", HttpStatusCode status = HttpStatusCode.OK, bool stream = false) : HttpMessageHandler
     {
         public string Body { get; private set; } = "";
         public Uri? Url { get; private set; }
@@ -23,21 +23,38 @@ public sealed class AgentInterpreterTests
         {
             Url = request.RequestUri; Body = await request.Content!.ReadAsStringAsync(ct);
             Assert.Equal("test-key", request.Headers.GetValues("x-goog-api-key").Single());
-            return new(status) { Content = new StringContent(JsonSerializer.Serialize(new {
+            var payload = JsonSerializer.Serialize(new {
                 candidates = new[] { new { finishReason = finish, content = new { parts = new object[] { new { thought = true, text = "private" }, new { text = output } } } } }
-            })) };
+            });
+            return new(status) { Content = new StringContent(stream ? "data: " + payload + "\n\n" : payload) };
         }
     }
     private static TaskInterpreter Interpreter(HttpClient client) => new(client,
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
             ["AiSettings:Enabled"] = "true", ["AiSettings:Provider"] = "Gemini", ["AiSettings:Model"] = "gemini-3.5-flash-lite", ["AiSettings:GeminiApiKey"] = "test-key"
         }).Build(), NullLogger<TaskInterpreter>.Instance);
+    [Theory] [InlineData(false)] [InlineData(true)]
+    public async Task Telex_reading_helps_the_provider_while_the_original_request_remains_available_for_evidence(bool streaming)
+    {
+        const string raw = "Tooi muoons lamf vieejc, vieetss baos caos 45 phuts truowsc 21h ngayf mai";
+        using var provider = new Provider(stream: streaming); using var client = new HttpClient(provider);
+        var interpreter = Interpreter(client); var ct = TestContext.Current.CancellationToken;
+        if (streaming) await interpreter.InterpretStreamingAsync(raw, "{}", [], "Asia/Ho_Chi_Minh", DateTimeOffset.Parse("2026-10-15T01:00:00Z"), (_, _) => Task.CompletedTask, ct);
+        else await interpreter.InterpretAsync(raw, "{}", [], "Asia/Ho_Chi_Minh", DateTimeOffset.Parse("2026-10-15T01:00:00Z"), ct);
+        using var body = JsonDocument.Parse(provider.Body);
+        var promptText = body.RootElement.GetProperty("contents")[0].GetProperty("parts")[0].GetProperty("text").GetString()!;
+        using var prompt = JsonDocument.Parse(promptText);
+        Assert.Equal(raw, prompt.RootElement.GetProperty("request").GetString());
+        Assert.Equal("Tôi muốn làm việc, viết báo cáo 45 phút trước 21h ngày mai", prompt.RootElement.GetProperty("telexReading").GetString());
+        Assert.Contains("unconverted Telex", body.RootElement.GetProperty("systemInstruction").GetProperty("parts")[0].GetProperty("text").GetString());
+    }
     [Fact] public async Task Interpreter_sends_the_schema_context_and_timezone_and_preserves_exact_event_times()
     {
         using var provider = new Provider(); using var client = new HttpClient(provider);
         var result = await Interpreter(client).InterpretAsync("Họp ngày mai 14h–16h", "{\"availability\":[]}", [], "Asia/Ho_Chi_Minh", DateTimeOffset.Parse("2026-10-14T06:00:00Z"), TestContext.Current.CancellationToken);
         Assert.Equal(TimeSpan.FromHours(7), Assert.Single(result.Events).Start.Offset);
         Assert.Equal(14, result.Events[0].Start.Hour); Assert.Equal(16, result.Events[0].End.Hour);
+        Assert.Contains("urgent meeting/appointment at exact hours", provider.Body);
         Assert.DoesNotContain("test-key", provider.Body); Assert.Equal("", provider.Url!.Query);
         using var request = JsonDocument.Parse(provider.Body);
         var schema = request.RootElement.GetProperty("generationConfig").GetProperty("responseFormat").GetProperty("text").GetProperty("schema");

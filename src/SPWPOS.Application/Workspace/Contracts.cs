@@ -12,12 +12,13 @@ public sealed record TaskInput(
     bool Splittable = true,
     [Range(5, 480)] int MinimumSessionMinutes = 25,
     Guid? CategoryId = null, Guid? ParentId = null, bool IsHardDeadline = false,
-    [RegularExpression("^(MANUAL|NATURAL_LANGUAGE|AI_BREAKDOWN)$")] string CreationSource = "MANUAL");
+    [RegularExpression("^(MANUAL|NATURAL_LANGUAGE|AI_BREAKDOWN)$")] string CreationSource = "MANUAL",
+    Guid? Version = null);
 public sealed record TaskView(Guid Id, string Name, string Description, DateTimeOffset Deadline, int EstimatedMinutes,
     int AdjustedMinutes, int RemainingMinutes, int ActualMinutes, int PlannedMinutes, int Priority, string TaskType,
     bool Splittable, int MinimumSessionMinutes, Guid? CategoryId, Guid? ParentId, string Status, int Progress,
     DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, Guid[] Dependencies, bool IsHardDeadline = false, string CreationSource = "MANUAL",
-    DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null);
+    DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
 public sealed record CategoryView(Guid Id, string Name, string Color);
@@ -32,8 +33,8 @@ public sealed record ExceptionInput(DateOnly Date, [Range(0, 1439)] int StartMin
 public sealed record ExceptionView(Guid Id, DateOnly Date, int StartMinute, int EndMinute, bool IsAvailable, string Note, bool OverridesWeeklyAvailability = false);
 public sealed record EventInput([Required, StringLength(200)] string Name, DateTimeOffset Start, DateTimeOffset End,
     [StringLength(1000)] string Description = "", [RegularExpression("^(MEETING|CLASS|APPOINTMENT|WORK|OTHER)$")] string EventType = "OTHER",
-    [Range(1, 12)] int RepeatWeeks = 1);
-public sealed record EventView(Guid Id, string Name, DateTimeOffset Start, DateTimeOffset End, string Description = "", string EventType = "OTHER");
+    [Range(1, 12)] int RepeatWeeks = 1, bool? IsUrgent = null);
+public sealed record EventView(Guid Id, string Name, DateTimeOffset Start, DateTimeOffset End, string Description = "", string EventType = "OTHER", bool IsUrgent = false);
 public sealed record PreferenceInput([Required, StringLength(100)] string TimeZoneId,
     [Range(5, 480)] int MinimumSessionMinutes, [Range(5, 480)] int MaximumSessionMinutes,
     [Range(0, 120)] int BreakMinutes, [Range(0, 1439)] int PreferredStartMinute,
@@ -57,7 +58,10 @@ public sealed record ProposedSession(Guid Id, Guid TaskId, DateTimeOffset Start,
 public sealed record PlanView(Guid Id, Guid Revision, DateTimeOffset Start, DateTimeOffset End,
     ProposedSession[] Sessions, PlanWarning[] Warnings, string[] Explanations, bool IsApplied,
     string Status = "PROPOSED", string Kind = "INITIAL", Guid? PreviousPlanId = null, DateTimeOffset? AppliedAt = null,
-    bool UseEstimateBias = true, NotePlanContext? NoteContext = null, bool HasUrgentReplan = false);
+    bool UseEstimateBias = true, NotePlanContext? NoteContext = null, bool HasUrgentReplan = false, bool HasDeadlineProtection = false)
+{
+    public bool RequiresConfirmation => HasUrgentReplan || HasDeadlineProtection;
+}
 public sealed record ScenarioInput(PlanInput Plan, TaskInput NewTask, [MaxLength(11)] TaskInput[]? AdditionalTasks = null);
 public sealed record BiasView(string TaskType, int Samples, double Ratio, bool Personalized);
 public sealed record RiskView(Guid TaskId, string Name, string Level, int Score, string[] Reasons, int RemainingMinutes);

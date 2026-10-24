@@ -230,6 +230,10 @@ export function eventModal(event = {}) {
           )}
         </Select>
       </label>
+      <label className="check spaced">
+        <input type="checkbox" name="isUrgent" defaultChecked={Boolean(event.isUrgent)} />
+        Lịch khẩn
+      </label>
       <label className="field spaced">
         Mô tả
         <textarea
@@ -389,6 +393,8 @@ export function planModal(plan, simulation = false) {
             ? "Lịch này đã được lưu. Mở Lịch làm việc để bắt đầu."
             : confirmMove
               ? "Đề xuất dời lịch để ưu tiên việc khẩn. Lịch hiện tại chưa thay đổi. Kiểm tra giờ cũ và giờ mới rồi bấm Xác nhận dời lịch. Hạn chót giữ nguyên."
+            : plan.hasDeadlineProtection
+              ? "Đề xuất đã dành thời gian cho việc khẩn hoặc gần hạn chưa có đủ lịch trước khi xếp việc mới. Lịch chưa thay đổi; kiểm tra các phiên rồi xác nhận kế hoạch."
             : "Đây là lịch xem trước, chưa thay đổi lịch hiện tại. Bấm Lưu lịch này để đưa các khoảng làm việc vào lịch."}
         </div>
       )}
@@ -486,7 +492,7 @@ export function planModal(plan, simulation = false) {
           ""
         )}
         {!simulation && !plan.isApplied && plan.status !== "DISCARDED"
-          ? button(confirmMove ? "Xác nhận dời lịch" : "Lưu lịch này", "apply-plan", "primary", plan.id, "check")
+          ? button(confirmMove ? "Xác nhận dời lịch" : plan.hasDeadlineProtection ? "Xác nhận kế hoạch" : "Lưu lịch này", "apply-plan", "primary", plan.id, "check")
           : ""}
         {!simulation && plan.isApplied
           ? button("Mở Hôm nay để làm việc", "nav", "primary", "today", "play")

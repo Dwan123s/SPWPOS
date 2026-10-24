@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using SPWPOS.Application.Workspace;
 using SPWPOS.Domain.Entities;
@@ -7,8 +5,7 @@ namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService
 {
-    private static string MatchText(string value) => string.Concat(value.Normalize(NormalizationForm.FormD)
-        .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)).ToLowerInvariant().Replace('đ','d');
+    private static string MatchText(string value) => AgentInputRules.Normalize(value);
     private (string Json, string[] Notices) BuildAgentContext(PlanningState state, string request, string[] activeTaskTypes, AgentPendingRequest? pending)
     {
         var search = MatchText(request);
@@ -51,7 +48,7 @@ public sealed partial class WorkspaceService
             tasks=tasks.Select(x=>new {x.Id,x.Name,Deadline=Local(x.Deadline),WorkWindowStart=LocalOrNull(x.WorkWindowStart),WorkWindowEnd=LocalOrNull(x.WorkWindowEnd),x.EstimatedMinutes,x.Progress,x.Splittable,x.MinimumSessionMinutes,x.Priority,x.TaskType,status=x.Status.ToString()}),
             availability=state.Availability.Select(x=>new AvailabilityInput(x.DayOfWeek,x.StartMinute,x.EndMinute)),
             exceptions=state.Exceptions.Where(x=>x.Date>=LocalDate(Now,state.Preference) && x.Date<=LocalDate(Now.AddDays(30),state.Preference)).Select(x=>new {x.Id,x.Date,x.StartMinute,x.EndMinute,x.IsAvailable,x.Note,x.OverridesWeeklyAvailability}),
-            events=events.Take(100).Select(x=>new{x.Id,x.Name,Start=Local(x.Start),End=Local(x.End),x.EventType,x.Description}),
+            events=events.Take(100).Select(x=>new{x.Id,x.Name,Start=Local(x.Start),End=Local(x.End),x.EventType,x.Description,IsUrgent=IsUrgentEvent(x)}),
             sessions=sessions.Take(100).Select(x=>new{x.TaskId,Start=Local(x.Start),End=Local(x.End),x.IsLocked,status=x.Status.ToString()}),
             dependencies=state.Dependencies.Select(x=>new{x.TaskId,x.PredecessorId}),
             preference=new {state.Preference.MaximumDailyMinutes,state.Preference.MaximumSessionMinutes,state.Preference.MinimumSessionMinutes,state.Preference.BreakMinutes,state.Preference.PlanningHorizonDays}

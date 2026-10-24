@@ -42,7 +42,9 @@ public sealed partial class WorkspaceService
         if (id is { } eventId)
         {
             var item = await Find<FixedEvent>(uid, eventId, ct); var occurrence = occurrences[0];
+            var wasUrgent = IsUrgentEvent(item);
             item.Name = occurrence.Name; item.Start = occurrence.Start; item.End = occurrence.End; item.Description = occurrence.Description; item.EventType = occurrence.EventType;
+            item.IsUrgent = input.IsUrgent ?? wasUrgent;
             return item.Id;
         }
         db.FixedEvents.AddRange(occurrences); return occurrences[0].Id;
@@ -59,7 +61,7 @@ public sealed partial class WorkspaceService
             var from = start.AddDays(index * 7); var to = end.AddDays(index * 7);
             Require(index == 0 || !zone.IsInvalidTime(from) && !zone.IsInvalidTime(to) && !zone.IsAmbiguousTime(from) && !zone.IsAmbiguousTime(to),
                 "INVALID_TIME_WINDOW", "Một lần lặp rơi vào giờ chuyển múi giờ không rõ ràng; hãy nhập riêng lần đó.");
-            return new FixedEvent { UserId = uid, Name = input.Name.Trim(), Description = input.Description, EventType = input.EventType,
+            return new FixedEvent { UserId = uid, Name = input.Name.Trim(), Description = input.Description, EventType = input.EventType, IsUrgent = input.IsUrgent,
                 Start = index == 0 ? input.Start : new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(from, zone)),
                 End = index == 0 ? input.End : new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(to, zone)) };
         }).ToArray();
@@ -91,7 +93,9 @@ public sealed partial class WorkspaceService
             }
             var conflict = calendar.Events.FirstOrDefault(x => x.Start < item.End && item.Start < x.End);
             if (conflict is not null)
-                throw CalendarConflict("FIXED_EVENT_OVERLAP", $"Sự kiện trùng với “{conflict.Name}” ({LocalWindow(conflict.Start, conflict.End, state.Preference)}).",
+                throw CalendarConflict("FIXED_EVENT_OVERLAP", $"“{item.Name}” ({LocalWindow(item.Start, item.End, state.Preference)}) trùng với “{conflict.Name}” ({LocalWindow(conflict.Start, conflict.End, state.Preference)}). " +
+                    $"Để giữ giờ “{item.Name}”, cần dời “{conflict.Name}”, nhưng chưa có phương án dời phù hợp đã được kiểm tra và xác nhận. " +
+                    $"Hiện giữ nguyên “{conflict.Name}”; các khung giờ gợi ý dưới đây là để đổi giờ “{item.Name}”.",
                     calendar, item.Start, item.End, occupied, FitsSeries);
             var session = state.Sessions.FirstOrDefault(x => x.Start < item.End && item.Start < x.End &&
                 x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused or WorkSessionStatus.Completed);
@@ -167,9 +171,9 @@ public sealed partial class WorkspaceService
         var plan = engine.Generate(state, new(Now.AddMinutes(1), 30, affected, true, "AVAILABILITY_CHANGED"), Now);
         var proposal = await StoreAgentPlanAsync(uid, plan, state, "AVAILABILITY_CHANGED", ct);
         plan = plan with { Id = proposal.Id };
-        if (plan.HasUrgentReplan)
+        if (plan.RequiresConfirmation)
         {
-            await AddNotification(uid, "SCHEDULE_CHANGE", "Cần xác nhận dời lịch", "Đã tạo đề xuất dời lịch để ưu tiên việc khẩn. Xem giờ cũ và giờ mới rồi xác nhận trước khi lưu.", "plan:" + proposal.Id, null, ct, planId: proposal.Id);
+            await AddNotification(uid, "SCHEDULE_CHANGE", "Cần xác nhận kế hoạch", "Đã tạo đề xuất ưu tiên việc khẩn hoặc gần hạn. Xem các phiên đề xuất rồi xác nhận trước khi lưu.", "plan:" + proposal.Id, null, ct, planId: proposal.Id);
             return;
         }
         await ApplyPlanCoreAsync(uid, proposal, plan, state, ct);
