@@ -153,6 +153,8 @@ public interface ITaskInterpreter
 {
     NoteAgentCapabilities Capabilities => new(false);
     Task<NoteAnalysis> AnalyzeNoteAsync(string text, bool useAi, string timeZoneId, DateTimeOffset now, CancellationToken ct);
+    Task<NoteAnalysis> AnalyzeNoteChangesAsync(string text, NoteAnalysisContext context, string timeZoneId, DateTimeOffset now, CancellationToken ct)
+        => AnalyzeNoteAsync(text, true, timeZoneId, now, ct);
     Task<TaskSuggestion> CaptureAsync(CaptureInput input, string timeZoneId, DateTimeOffset now, CancellationToken ct);
     Task<BreakdownView> BreakdownAsync(TaskInput task, bool useAi, CancellationToken ct);
 }

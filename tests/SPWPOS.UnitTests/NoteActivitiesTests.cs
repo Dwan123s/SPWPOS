@@ -64,6 +64,49 @@ public sealed class NoteActivitiesTests
         Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
         Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
     }
+    [Fact] public async Task Invalid_activity_cannot_bypass_validation_during_incremental_filtering()
+    {
+        var (h, uid, note) = await Setup(); await using var lifetime = h;
+        var error = await Assert.ThrowsAsync<AuthException>(() => Call(h,
+            s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, [null!]), Ct)));
+        Assert.Equal("VALIDATION_ERROR", error.Code);
+        Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+    }
+    [Fact] public async Task Appending_to_a_saved_mixed_note_adds_only_new_activities_and_keeps_earlier_rows()
+    {
+        var (h, uid, note) = await Setup(); await using var lifetime = h;
+        var original = Activities(h.Clock.GetUtcNow());
+        var firstPlan = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, original), Ct));
+        var first = await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, firstPlan.Id, new(note.Version), Ct));
+        var oldEvents = await h.DbAsync(db => db.FixedEvents.AsNoTracking().ToArrayAsync(Ct));
+        var oldSessions = await h.DbAsync(db => db.WorkSessions.AsNoTracking().ToArrayAsync(Ct));
+        var draft = await Call(h, s => s.SaveNoteAsync(uid, note.Id, new(note.Title, note.Content + "\nThêm cuộc hẹn và chuẩn bị slide", first.Note.Version), Ct));
+        var analyzed = await Call(h, s => s.AnalyzeNoteAsync(uid, note.Id, new(draft.Version), Ct));
+        Assert.False(analyzed.AnalysisImported); Assert.True(analyzed.HasProcessedContent);
+        var addedEvent = original[0] with { Name = "Cuộc hẹn mới", Start = original[0].Start!.Value.AddDays(1), End = original[0].End!.Value.AddDays(1) };
+        var addedTask = original[3] with { Name = "Chuẩn bị slide", Start = original[3].Start!.Value.AddDays(1), End = null };
+        var nextPlan = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(analyzed.Version, [..original, addedEvent, addedTask]), Ct));
+        Assert.Equal(2, nextPlan.NoteContext!.Activities.Length);
+        var next = await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, nextPlan.Id, new(analyzed.Version), Ct));
+        Assert.Equal(2, next.Note.CreatedTaskIds.Length);
+        Assert.Equal(4, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
+        Assert.Equal(2, await h.DbAsync(db => db.WorkTasks.CountAsync(Ct)));
+        var currentEvents = await h.DbAsync(db => db.FixedEvents.AsNoTracking().ToArrayAsync(Ct));
+        var currentSessions = await h.DbAsync(db => db.WorkSessions.AsNoTracking().ToArrayAsync(Ct));
+        foreach (var old in oldEvents)
+        {
+            var kept = Assert.Single(currentEvents, x => x.Id == old.Id);
+            Assert.Equal(old.Start, kept.Start); Assert.Equal(old.End, kept.End); Assert.Equal(old.Name, kept.Name);
+        }
+        foreach (var old in oldSessions)
+        {
+            var kept = Assert.Single(currentSessions, x => x.Id == old.Id);
+            Assert.Equal(old.Start, kept.Start); Assert.Equal(old.End, kept.End); Assert.Equal(old.Status, kept.Status);
+        }
+        await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, nextPlan.Id, new(analyzed.Version), Ct));
+        Assert.Equal(4, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
+        Assert.Equal(2, await h.DbAsync(db => db.WorkTasks.CountAsync(Ct)));
+    }
     [Fact] public async Task Requested_Wednesday_evening_requires_explicit_one_off_availability_and_saves_it_atomically()
     {
         var (h, uid, note) = await Setup(); await using var lifetime = h;

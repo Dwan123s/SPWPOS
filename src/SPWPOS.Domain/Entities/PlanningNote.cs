@@ -7,6 +7,7 @@ public sealed class PlanningNote : OwnedRecord
     public Guid Version { get; set; } = Guid.NewGuid();
     public string AnalysisJson { get; set; } = "";
     public string CreatedTaskIdsJson { get; set; } = "[]";
+    public string ProcessingStateJson { get; set; } = "";
     public Guid? PlanId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

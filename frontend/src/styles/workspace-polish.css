@@ -8,6 +8,19 @@
 .calendar-schedule-main {
   min-width: 0;
 }
+.planning-console[data-route="calendar"] .content {
+  width: 100%;
+  max-width: none;
+}
+@media (min-width: 1101px) {
+  .planning-console[data-route="calendar"] .calendar-planning-layout {
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .planning-console[data-route="calendar"] .week-day {
+    min-height: clamp(470px, calc(100dvh - 340px), 760px);
+  }
+}
 .glass-workspace .calendar-task-context {
   padding: 18px 16px;
   position: sticky;

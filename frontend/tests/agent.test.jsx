@@ -322,6 +322,25 @@ it("offers clickable time alternatives on an existing rejected turn and sends th
   ).toBe(false);
 });
 
+it("submits a custom time prompt in the same conversation without directly saving an event", async () => {
+  const original = "Ngày mai tôi đi học từ 20h đến 21h";
+  turns = [{ ...result, status: "FAILED", changes: [], plan: null, canUndo: false,
+    text: original, errorCode: "BUSY_TIME_CONFLICT",
+    reply: "Sự kiện nằm trong giờ bận. Đề xuất giữ nguyên thời lượng: 26/10/2026 19:00–20:00. Bạn chọn một khung giờ để thử lại." }];
+  render(<AgentPage />);
+  await ready();
+  const form = (await screen.findByRole("group", { name: "Hoặc nhập thời gian khác" })).closest("form");
+  fireEvent.change(within(form).getByRole("textbox", { name: "Thời gian khác" }), { target: { value: "Mai 22h, giữ nguyên thời lượng giúp tôi" } });
+  expect(calls.some((call) => call.url === "/api/agent/turns/stream")).toBe(false);
+  fireEvent.submit(form);
+  await waitFor(() => expect(calls.some((call) => call.url === "/api/agent/turns/stream")).toBe(true));
+  const request = calls.find((call) => call.url === "/api/agent/turns/stream");
+  expect(request.body.conversationId).toBe("conversation");
+  expect(request.body.text).toContain("Mai 22h, giữ nguyên thời lượng giúp tôi");
+  expect(request.body.text).toContain(original);
+  expect(calls.some((call) => call.url === "/api/time/events" && call.method === "POST")).toBe(false);
+});
+
 it.each([
   ["hội thoại", "ArrowRight", "Thu gọn lịch sử", "Mở lịch sử", 260],
   ["lịch", "ArrowLeft", "Đóng bảng lịch", "Lịch của bạn", 320],

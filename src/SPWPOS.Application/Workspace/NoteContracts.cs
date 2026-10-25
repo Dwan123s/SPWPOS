@@ -19,7 +19,9 @@ public sealed record NotePlanContext(Guid NoteId, Guid NoteVersion, NoteActivity
 public sealed record NoteApplyInput(Guid Version);
 public sealed record NoteAgentCapabilities(bool AiAvailable, int MaxTasks = 12, string Provider = "OpenAI");
 public sealed record NoteView(Guid Id, string Title, string Content, Guid Version,
-    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, NoteAnalysis? Analysis, Guid[] CreatedTaskIds, Guid? PlanId = null);
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, NoteAnalysis? Analysis, Guid[] CreatedTaskIds, Guid? PlanId = null,
+    bool AnalysisImported = false, bool HasProcessedContent = false, Guid[]? PendingTaskIds = null);
+public sealed record NoteAnalysisContext(string ProcessedContent, string[] ExistingTaskNames, string[] ExistingActivityKeys);
 public sealed record NoteScheduleInput(Guid Version, bool UseAi = true, [Range(1, 30)] int HorizonDays = 14);
 public sealed record NoteAgentStep(string Code, string Message);
 public sealed record NoteScheduleResult(NoteView Note, PlanView Plan, NoteAgentStep[]? Steps = null);

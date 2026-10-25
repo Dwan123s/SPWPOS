@@ -3,6 +3,7 @@ import { icon } from "./ui.jsx";
 import { LoginBackground, LoginScene } from "./login-scene.jsx";
 import { LoginMotionControl } from "./login-motion.jsx";
 import { GoogleSignIn } from "./google-signin.jsx";
+import { ForgotPasswordResend } from "./forgot-password-resend.jsx";
 
 export function authView(
   mode,
@@ -11,6 +12,7 @@ export function authView(
   fields,
   buttons,
   onGoogleLogin,
+  email,
 ) {
   const login = mode === "login";
   return (
@@ -124,6 +126,9 @@ export function authView(
                         Quay lại đăng nhập
                       </button>
                     </div>
+                  )}
+                  {mode === "forgotOtp" && (
+                    <ForgotPasswordResend email={email} />
                   )}
                   {mode === "verify" && (
                     <p className="auth-resend">

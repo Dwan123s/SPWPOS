@@ -15,9 +15,12 @@ public sealed partial class WorkspaceService
         Require(!analysis.NeedsReview || input.ReviewedConditions, "NOTE_NEEDS_REVIEW", "Kiểm tra và xác nhận các lưu ý trong ghi chú trước khi xem lịch.");
         Require(input.Activities is { Length: >= 1 and <= 12 } && input.HorizonDays is >= 1 and <= 30,
             "VALIDATION_ERROR", "Chọn 1–12 hoạt động và phạm vi 1–30 ngày.");
+        var processing = await ProcessingWithTasks(note, ct);
+        var activities = NewActivities(processing, input.Activities);
+        Require(activities.Length > 0, "NOTE_NO_NEW_ACTIVITIES", "Không có hoạt động mới để thêm. Lịch đã lưu được giữ nguyên.", 409);
         var state = await State(uid, ct);
-        var tasks = await NoteTasks(uid, input.Activities, state, ct);
-        var events = NoteEvents(uid, input.Activities, state);
+        var tasks = await NoteTasks(uid, activities, state, ct);
+        var events = NoteEvents(uid, activities, state);
         var oneOffHours = input.AllowRequestedTimeOutsideAvailability ? NoteRequestedHours(uid, tasks, state.Preference) : [];
         var candidate = NoteCandidate(state with { Exceptions = state.Exceptions.Concat(oneOffHours).ToArray() }, tasks, events);
         var affected = tasks.Select(x => x.Id).Concat(TimeConflictTaskIds(candidate)).Distinct().ToArray();
@@ -30,7 +33,7 @@ public sealed partial class WorkspaceService
         plan = ExplainNoteAvailability(plan, candidate, tasks);
         var proposal = new PlanProposal { UserId = uid, CreatedAt = Now, ExpiresAt = Now.AddMinutes(30), Revision = state.Preference.Revision,
             Kind = "RESCHEDULE", TriggerEvent = "NEW_TASK", HorizonStart = plan.Start, HorizonEnd = plan.End };
-        plan = plan with { Id = proposal.Id, Kind = proposal.Kind, NoteContext = new(noteId, note.Version, input.Activities,
+        plan = plan with { Id = proposal.Id, Kind = proposal.Kind, NoteContext = new(noteId, note.Version, activities,
             tasks.Select(x => x.Id).ToArray(), events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),
             input.AllowRequestedTimeOutsideAvailability) };
         // The proposal stores drafts only. Task/event/session rows are created together after confirmation.
@@ -71,7 +74,16 @@ public sealed partial class WorkspaceService
         StorePlanDecisions(uid, proposal, plan, candidate);
         await db.SaveChangesAsync(ct);
         await ApplyPlanCoreAsync(uid, proposal, plan, candidate, ct);
-        note.CreatedTaskIdsJson = JsonSerializer.Serialize(context.TaskIds, NoteJson);
+        var previousIds = JsonSerializer.Deserialize<Guid[]>(note.CreatedTaskIdsJson, NoteJson)!;
+        var processing = await ProcessingWithTasks(note, ct);
+        var committed = CommitActivities(note, processing, context.Activities, context.TaskIds);
+        // Remember source identities as well when the user renamed activities in review.
+        var source = JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson)!;
+        if (source.Activities?.Length == context.Activities.Length)
+            committed = committed with { ActivityKeys = committed.ActivityKeys.Concat(source.Activities.Select(ActivityKey)).Distinct().ToArray(),
+                TaskNames = committed.TaskNames.Concat(source.Activities.Where(x => x.Kind == "TASK").Select(x => NoteName(x.Name))).Distinct().ToArray() };
+        SetProcessing(note, committed);
+        note.CreatedTaskIdsJson = JsonSerializer.Serialize(previousIds.Concat(context.TaskIds).Distinct().ToArray(), NoteJson);
         var analysis = JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson)!;
         note.AnalysisJson = JsonSerializer.Serialize(analysis with { Activities = context.Activities }, NoteJson);
         note.PlanId = planId; note.Version = Guid.NewGuid(); note.UpdatedAt = Now;
@@ -80,7 +92,7 @@ public sealed partial class WorkspaceService
 
     private static void CheckActivityNote(PlanningNote note)
     {
-        Require(note.PlanId is null && note.CreatedTaskIdsJson == "[]", "NOTE_CONVERTED", "Ghi chú đã được lưu vào lịch. Tạo ghi chú mới cho hoạt động bổ sung.", 409);
+        Require(!ProcessingOf(note).AnalysisImported, "NOTE_NO_NEW_ACTIVITIES", "Các hoạt động này đã được lưu. Bổ sung nội dung rồi phân tích phần mới.", 409);
         var analysis = note.AnalysisJson.Length == 0 ? null : JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson);
         Require(analysis?.Activities is not null && analysis.Source is "OpenAI" or "Gemini" or "VertexAI",
             "NOTE_NOT_ANALYZED", "Phân tích ghi chú trước khi xem lịch.", 409);

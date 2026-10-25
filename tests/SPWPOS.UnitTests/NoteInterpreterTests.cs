@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using SPWPOS.Infrastructure.Workspace;
+using SPWPOS.Application.Workspace;
 namespace SPWPOS.UnitTests;
 
 public sealed class NoteInterpreterTests
@@ -46,6 +47,20 @@ public sealed class NoteInterpreterTests
         var result = await Interpreter(http).AnalyzeNoteAsync("Hôm nay tôi cảm thấy mệt", true, "Asia/Ho_Chi_Minh",
             DateTimeOffset.UtcNow, TestContext.Current.CancellationToken);
         Assert.Equal("OpenAI", result.Source); Assert.Empty(result.Tasks);
+    }
+    [Fact] public async Task Incremental_analysis_sends_old_content_as_context_and_requests_only_additions()
+    {
+        using var provider = new FakeProvider("[]"); using var http = new HttpClient(provider);
+        await Interpreter(http).AnalyzeNoteChangesAsync("Old task. New meeting.",
+            new NoteAnalysisContext("Old task.", ["OLD TASK"], []), "Asia/Ho_Chi_Minh",
+            DateTimeOffset.Parse("2026-10-24T10:00:00Z"), TestContext.Current.CancellationToken);
+        using var request = JsonDocument.Parse(provider.Body);
+        var prompt = request.RootElement.GetProperty("input").GetString()!;
+        Assert.Contains("ONLY new activities", prompt);
+        Assert.Contains("Old task.", prompt);
+        Assert.Contains("Old task. New meeting.", prompt);
+        Assert.Contains("do not emit them again", prompt);
+        Assert.Contains("untrusted data", request.RootElement.GetProperty("instructions").GetString());
     }
 
 }

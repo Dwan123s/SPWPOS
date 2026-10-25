@@ -1063,6 +1063,10 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("PlanId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ProcessingStateJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(120)

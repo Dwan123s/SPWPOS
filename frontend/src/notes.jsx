@@ -57,6 +57,8 @@ export function NotesPage({ onWorkspaceChanged }) {
   const [busy, setBusy] = useState("Đang tải ghi chú…");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [autosaveStatus, setAutosaveStatus] = useState("");
+  const [autosaveError, setAutosaveError] = useState("");
   const [failedAction, setFailedAction] = useState(null);
   const [selectionTarget, setSelectionTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -71,7 +73,16 @@ export function NotesPage({ onWorkspaceChanged }) {
   const locked = useRef(false);
   const activityReviewDirty = useRef(false);
   const alive = useRef(true);
-  const imported = !!note.createdTaskIds?.length;
+  const currentNote = useRef(note);
+  const savedNotes = useRef(notes);
+  const editSession = useRef(0);
+  const saving = useRef(null);
+  currentNote.current = note;
+  savedNotes.current = notes;
+  const imported =
+    note.analysisImported ?? (!!note.createdTaskIds?.length || !!note.planId);
+  const hasHistory =
+    note.hasProcessedContent || !!note.createdTaskIds?.length || !!note.planId;
   const hasAiAnalysis = ["Gemini", "OpenAI", "VertexAI"].includes(
     note.analysis?.source,
   );
@@ -133,6 +144,10 @@ export function NotesPage({ onWorkspaceChanged }) {
   }, []);
 
   const select = (item) => {
+    editSession.current += 1;
+    currentNote.current = item;
+    setAutosaveStatus("");
+    setAutosaveError("");
     activityReviewDirty.current = false;
     setSelectionTarget(null);
     setAppearance(readNoteAppearance(appearanceAccount, item.id));
@@ -174,7 +189,12 @@ export function NotesPage({ onWorkspaceChanged }) {
   const remember = (saved) => {
     saveNoteAppearance(appearanceAccount, saved.id, appearance);
     if (!note.id) clearNoteAppearance(appearanceAccount);
-    setNotes((items) => [saved, ...items.filter((n) => n.id !== saved.id)]);
+    savedNotes.current = [
+      saved,
+      ...savedNotes.current.filter((n) => n.id !== saved.id),
+    ];
+    currentNote.current = saved;
+    setNotes(savedNotes.current);
     setNote(saved);
     return saved;
   };
@@ -187,6 +207,7 @@ export function NotesPage({ onWorkspaceChanged }) {
     setMessage("");
     setFailedAction(null);
     try {
+      if (saving.current) await saving.current;
       return await operation();
     } catch (e) {
       if (alive.current) {
@@ -198,33 +219,127 @@ export function NotesPage({ onWorkspaceChanged }) {
       if (alive.current) setBusy("");
     }
   };
-  const save = async () => {
-    if (!note.content.trim()) throw new Error("Nhập nội dung ghi chú.");
+  const save = async (flush = true) => {
+    if (saving.current) await saving.current;
+    const snapshot = currentNote.current;
+    const session = editSession.current;
+    if (!snapshot.content.trim()) throw new Error("Nhập nội dung ghi chú.");
     const title =
-      note.title.trim() ||
-      note.content
+      snapshot.title.trim() ||
+      snapshot.content
         .split("\n")
         .find((line) => line.trim())
         ?.trim()
         .replace(/^[•☐\s]+/, "")
         .slice(0, 120) ||
       "Ghi chú mới";
-    if (note.id && !dirty) return note;
-    const saved = await api(
-      `/api/notes${note.id ? `/${note.id}` : ""}`,
-      note.id ? "PUT" : "POST",
+    const previous = savedNotes.current.find((item) => item.id === snapshot.id);
+    if (
+      previous &&
+      previous.title === snapshot.title &&
+      previous.content === snapshot.content
+    )
+      return snapshot;
+    setAutosaveStatus("Đang tự động lưu…");
+    const operation = api(
+      `/api/notes${snapshot.id ? `/${snapshot.id}` : ""}`,
+      snapshot.id ? "PUT" : "POST",
       {
         title,
-        content: note.content,
-        version: note.version,
+        content: snapshot.content,
+        version: snapshot.version,
       },
-    );
-    if (alive.current) {
-      remember(saved);
-      setDrafts([]);
+    ).then((saved) => {
+      if (!alive.current) return saved;
+      savedNotes.current = [
+        saved,
+        ...savedNotes.current.filter((item) => item.id !== saved.id),
+      ];
+      setNotes(savedNotes.current);
+      if (session === editSession.current) {
+        saveNoteAppearance(appearanceAccount, saved.id, appearance);
+        if (!snapshot.id) clearNoteAppearance(appearanceAccount);
+        const latest = currentNote.current;
+        // A slow save must only advance the version, never replace text typed meanwhile.
+        const next = {
+          ...saved,
+          title: latest.title === snapshot.title ? saved.title : latest.title,
+          content:
+            latest.content === snapshot.content
+              ? saved.content
+              : latest.content,
+        };
+        currentNote.current = next;
+        setNote(next);
+        if (!saved.analysis) setDrafts([]);
+        setAutosaveStatus("Đã tự động lưu");
+        setAutosaveError("");
+      }
+      return saved;
+    });
+    saving.current = operation;
+    let saved;
+    try {
+      saved = await operation;
+    } finally {
+      if (saving.current === operation) saving.current = null;
+    }
+    if (session !== editSession.current)
+      throw new Error(
+        "Bạn đã chuyển ghi chú. Hãy thao tác lại trên ghi chú đang mở.",
+      );
+    if (
+      flush &&
+      (currentNote.current.content !== saved.content ||
+        currentNote.current.title !== saved.title)
+    ) {
+      return save(true);
     }
     return saved;
   };
+  const needsSave = !note.id || dirty;
+  useEffect(() => {
+    if (
+      busy ||
+      deleteTarget ||
+      selectionTarget ||
+      !needsSave ||
+      !note.content.trim()
+    )
+      return;
+    const session = editSession.current;
+    const timer = setTimeout(() => {
+      save(false).catch((failure) => {
+        if (alive.current && session === editSession.current) {
+          setAutosaveStatus("");
+          setAutosaveError(
+            failure.code === "NOTE_STALE"
+              ? "Bản trên server đã thay đổi. Nội dung bạn đang viết vẫn được giữ ở đây; mở lại ghi chú trong tab mới để đối chiếu trước khi lưu."
+              : `Chưa tự động lưu được: ${failure.message} Nội dung vẫn được giữ trong ô nhập. Bấm Lưu bản nháp để thử lại.`,
+          );
+        }
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [
+    note.id,
+    note.title,
+    note.content,
+    note.version,
+    busy,
+    needsSave,
+    deleteTarget,
+    selectionTarget,
+  ]);
+  useEffect(() => {
+    if (!needsSave || !note.content.trim()) return;
+    const protectDraft = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", protectDraft);
+    return () => window.removeEventListener("beforeunload", protectDraft);
+  }, [needsSave, note.content]);
   const analyze = () =>
     run(
       "AI đang đọc và phân tích ghi chú…",
@@ -257,7 +372,9 @@ export function NotesPage({ onWorkspaceChanged }) {
           setMessage(
             result.analysis.tasks.length || result.analysis.activities?.length
               ? "Đây là kết quả xem trước. Chưa tạo công việc hoặc lưu lịch; bạn có thể chỉnh các việc bên dưới."
-              : "Chưa tìm thấy công việc. Bổ sung việc cần làm rồi phân tích lại.",
+              : result.hasProcessedContent
+                ? "Không có việc mới để thêm. Các công việc và lịch đã tạo được giữ nguyên."
+                : "Chưa tìm thấy công việc. Bổ sung việc cần làm rồi phân tích lại.",
           );
         }
       },
@@ -303,7 +420,7 @@ export function NotesPage({ onWorkspaceChanged }) {
               ? "Đã tạo đề xuất dời lịch để ưu tiên việc khẩn. Xem giờ cũ và giờ mới, rồi xác nhận trước khi lưu."
               : result.plan.hasDeadlineProtection && !result.plan.isApplied
                 ? "Đã tạo đề xuất dành thời gian cho việc khẩn hoặc gần hạn. Kiểm tra các phiên rồi xác nhận kế hoạch trước khi lưu."
-              : `Đã tự động áp dụng lịch với ${result.plan.sessions.filter((s) => !s.preserved).length} phiên mới. ${result.plan.warnings.length ? `${result.plan.warnings.length} công việc có cảnh báo; xem chi tiết kết quả.` : "Bạn có thể bắt đầu làm việc trong mục Hôm nay."}`,
+                : `Đã tự động áp dụng lịch với ${result.plan.sessions.filter((s) => !s.preserved).length} phiên mới. ${result.plan.warnings.length ? `${result.plan.warnings.length} công việc có cảnh báo; xem chi tiết kết quả.` : "Bạn có thể bắt đầu làm việc trong mục Hôm nay."}`,
           );
           planModal(result.plan);
         } catch (failure) {
@@ -335,7 +452,7 @@ export function NotesPage({ onWorkspaceChanged }) {
     run(
       "Đang chuẩn bị công việc và lịch đề xuất…",
       async () => {
-        let saved = note;
+        let saved = currentNote.current;
         if (
           !Number.isInteger(Number(horizonDays)) ||
           Number(horizonDays) < 1 ||
@@ -361,8 +478,8 @@ export function NotesPage({ onWorkspaceChanged }) {
               creationSource: "NATURAL_LANGUAGE",
             }));
           if (!tasks.length) throw new Error("Chọn ít nhất một công việc.");
-          saved = await api(`/api/notes/${note.id}/tasks`, "POST", {
-            version: note.version,
+          saved = await api(`/api/notes/${saved.id}/tasks`, "POST", {
+            version: saved.version,
             tasks,
           });
           if (alive.current) {
@@ -379,7 +496,7 @@ export function NotesPage({ onWorkspaceChanged }) {
         const proposal = await api("/api/plans/reschedule", "POST", {
           start: new Date().toISOString(),
           horizonDays: Number(horizonDays),
-          affectedTaskIds: saved.createdTaskIds,
+          affectedTaskIds: saved.pendingTaskIds ?? saved.createdTaskIds,
           isReschedule: true,
           triggerEvent: "NEW_TASK",
         });
@@ -433,17 +550,17 @@ export function NotesPage({ onWorkspaceChanged }) {
     );
   const prepareActivities = (input) =>
     run("Đang kiểm tra sự kiện và công việc…", () =>
-      api(`/api/notes/${note.id}/proposals`, "POST", {
+      api(`/api/notes/${currentNote.current.id}/proposals`, "POST", {
         ...input,
-        version: note.version,
+        version: currentNote.current.version,
       }),
     );
   const applyActivities = (planId) =>
     run("Đang lưu sự kiện và công việc…", async () => {
       const result = await api(
-        `/api/notes/${note.id}/proposals/${planId}/apply`,
+        `/api/notes/${currentNote.current.id}/proposals/${planId}/apply`,
         "POST",
-        { version: note.version },
+        { version: currentNote.current.version },
       );
       if (!alive.current) return;
       remember(result.note);
@@ -482,8 +599,11 @@ export function NotesPage({ onWorkspaceChanged }) {
             setDeleteError("");
             run("Đang xóa ghi chú…", async () => {
               try {
-                const versionParam = saved.version
-                  ? `?version=${encodeURIComponent(saved.version)}`
+                const latestSaved =
+                  savedNotes.current.find((item) => item.id === saved.id) ||
+                  saved;
+                const versionParam = latestSaved.version
+                  ? `?version=${encodeURIComponent(latestSaved.version)}`
                   : "";
                 await api(`/api/notes/${saved.id}${versionParam}`, "DELETE");
                 if (!alive.current) return;
@@ -518,6 +638,8 @@ export function NotesPage({ onWorkspaceChanged }) {
         }}
         agent={agent}
         imported={imported}
+        hasHistory={hasHistory}
+        autosaveStatus={autosaveStatus}
         busy={busy}
         dirty={dirty}
         hasAiAnalysis={hasAiAnalysis}
@@ -605,6 +727,11 @@ export function NotesPage({ onWorkspaceChanged }) {
         feedback={
           <>
             {busy && <Loading label={busy} />}
+            {autosaveError && (
+              <p role="alert" className="form-error note-feedback">
+                {autosaveError}
+              </p>
+            )}
             {message && (
               <p role="status" className="note-feedback info">
                 {message}

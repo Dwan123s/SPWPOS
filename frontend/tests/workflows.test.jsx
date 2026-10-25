@@ -550,6 +550,13 @@ it("completes forgot password, OTP and reset transitions with the returned token
   await user.click(screen.getByRole("button", { name: "Gửi mã xác minh" }));
   await screen.findByRole("heading", { name: "Xác minh mã OTP" });
   expect(document.querySelector(".login-scene")).toBe(artwork);
+  expect(screen.getByLabelText("Email").readOnly).toBe(true);
+  expect(
+    screen.getByRole("button", { name: /Gửi lại OTP \(\d+s\)/ }).disabled,
+  ).toBe(true);
+  expect(
+    calls.filter((c) => c.url === "/api/auth/forgot-password"),
+  ).toHaveLength(1);
   await user.type(screen.getByLabelText("Mã OTP"), "123456");
   await user.click(
     screen.getByRole("button", { name: "Xác minh mã", exact: true }),

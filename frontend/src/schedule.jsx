@@ -11,6 +11,7 @@ import {
   minutes,
 } from "./ui.jsx";
 import { sessionCard } from "./calendar.jsx";
+import { workflowSteps } from "./workflow.js";
 export function weekStart(key) {
   const date = new Date(`${key}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
@@ -233,6 +234,16 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed) {
               )}
             </div>
             {button("Sự kiện", "new-event", "small secondary", "", "plus")}
+            {workflowSteps(state.workspace)
+              .slice(0, 2)
+              .every((step) => step.done) &&
+              button(
+                "Lập kế hoạch",
+                "generate-plan",
+                "small primary",
+                "",
+                "spark",
+              )}
           </div>
         </div>
         <div className="calendar-context">

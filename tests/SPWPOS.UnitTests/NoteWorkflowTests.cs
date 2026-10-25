@@ -29,6 +29,18 @@ public sealed class NoteWorkflowTests
         Assert.Empty(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
         Assert.Empty(await h.DbAsync(db => db.PlanProposals.ToArrayAsync(Ct)));
     }
+    [Fact] public async Task Draft_saves_preserve_line_breaks_and_reject_stale_versions_without_overwriting_content()
+    {
+        await using var h = await CreateHarnessAsync(); var user = await h.RegisterAsync();
+        var content = "Báo cáo 60 phút\n\n";
+        var first = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Nháp", content), Ct));
+        Assert.Equal(content, first.Content);
+        var second = await Call(h, s => s.SaveNoteAsync(user.Id, first.Id, new(first.Title, content + "Ý mới\n", first.Version), Ct));
+        var conflict = await Assert.ThrowsAsync<AuthException>(() => Call(h, s => s.SaveNoteAsync(user.Id, first.Id,
+            new(first.Title, "Dữ liệu từ tab cũ", first.Version), Ct)));
+        Assert.Equal("NOTE_STALE", conflict.Code);
+        Assert.Equal(second.Content, Assert.Single(await Call(h, s => s.GetNotesAsync(user.Id, Ct))).Content);
+    }
 
     [Theory] [InlineData("Gemini")] [InlineData("VertexAI")]
     public async Task Import_is_atomic_and_retry_does_not_duplicate_tasks(string source)
@@ -204,20 +216,26 @@ public sealed class NoteWorkflowTests
     private sealed class DynamicInterpreter : ITaskInterpreter
     {
         public int Count { get; set; } = 1;
+        public int Calls { get; private set; }
+        public NoteAnalysisContext? LastContext { get; private set; }
         public NoteAgentCapabilities Capabilities => new(true, Provider: "Gemini");
+        public Task<NoteAnalysis> AnalyzeNoteChangesAsync(string text, NoteAnalysisContext context, string timeZoneId, DateTimeOffset now, CancellationToken ct)
+        { LastContext = context; return AnalyzeNoteAsync(text, true, timeZoneId, now, ct); }
         public Task<NoteAnalysis> AnalyzeNoteAsync(string text, bool useAi, string timeZoneId, DateTimeOffset now, CancellationToken ct)
         {
-            TaskInput[] tasks = Count == 2
+            Calls++;
+            TaskInput[] tasks = Count >= 2
                 ? [new("Báo cáo", "", now.AddDays(2), 120, TaskType: "WRITING"), new("Ôn bài", "", now.AddDays(2), 90, TaskType: "STUDY")]
                 : [new("Báo cáo", "", now.AddDays(2), 60, TaskType: "WRITING")];
+            if (Count == 3) tasks = [..tasks, new("Chuẩn bị slide", "", now.AddDays(3), 30, TaskType: "WRITING")];
             return Task.FromResult(new NoteAnalysis(tasks, "Gemini", [], false));
         }
         public Task<TaskSuggestion> CaptureAsync(CaptureInput input, string timeZoneId, DateTimeOffset now, CancellationToken ct) => throw new NotSupportedException();
         public Task<BreakdownView> BreakdownAsync(TaskInput input, bool useAi, CancellationToken ct) => throw new NotSupportedException();
     }
 
-    [Fact]
-    public async Task Converted_note_can_be_edited_and_rescheduled_to_sync_calendar()
+    [Theory] [InlineData(false)] [InlineData(true)]
+    public async Task Repeated_note_edits_only_add_new_tasks_and_preserve_original_task_and_sessions(bool legacy)
     {
         var interpreter = new DynamicInterpreter { Count = 1 };
         await using var h = await ServiceHarness.CreateAsync(services => services.AddSingleton<ITaskInterpreter>(interpreter));
@@ -231,6 +249,9 @@ public sealed class NoteWorkflowTests
         Assert.True(firstResult.Plan.IsApplied);
         Assert.Single(firstResult.Note.CreatedTaskIds);
         Assert.Single(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+        var originalTask = Assert.Single(await h.DbAsync(db => db.WorkTasks.AsNoTracking().ToArrayAsync(Ct)));
+        var originalSessions = await h.DbAsync(db => db.WorkSessions.AsNoTracking().ToArrayAsync(Ct));
+        if (legacy) await h.DbAsync(async db => { (await db.PlanningNotes.SingleAsync(Ct)).ProcessingStateJson = ""; await db.SaveChangesAsync(Ct); });
 
         // 2. User edits the note and saves it
         interpreter.Count = 2;
@@ -243,8 +264,71 @@ public sealed class NoteWorkflowTests
         Assert.True(secondResult.Plan.IsApplied);
         Assert.Equal(2, secondResult.Note.CreatedTaskIds.Length);
         Assert.Equal(2, (await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct))).Length);
+        Assert.Equal("Viết báo cáo 60 phút", interpreter.LastContext!.ProcessedContent);
+        Assert.Contains("BÁO CÁO", interpreter.LastContext.ExistingTaskNames);
+        var unchanged = await h.DbAsync(db => db.WorkTasks.AsNoTracking().SingleAsync(x => x.Id == originalTask.Id, Ct));
+        Assert.Equal(originalTask.Version, unchanged.Version);
+        Assert.Equal(originalTask.EstimatedMinutes, unchanged.EstimatedMinutes);
+        Assert.Equal(originalTask.Deadline, unchanged.Deadline);
         var sessions = await h.DbAsync(db => db.WorkSessions.AsNoTracking().ToArrayAsync(Ct));
         Assert.Contains(sessions, s => s.TaskId == secondResult.Note.CreatedTaskIds[0]);
         Assert.Contains(sessions, s => s.TaskId == secondResult.Note.CreatedTaskIds[1]);
+        foreach (var old in originalSessions)
+        {
+            var kept = Assert.Single(sessions, x => x.Id == old.Id);
+            Assert.Equal(old.Start, kept.Start); Assert.Equal(old.End, kept.End); Assert.Equal(old.Status, kept.Status);
+        }
+        interpreter.Count = 3;
+        var thirdDraft = await Call(h, s => s.SaveNoteAsync(user.Id, note.Id,
+            new("Lần ba", "Viết báo cáo và ôn bài, thêm chuẩn bị slide", secondResult.Note.Version), Ct));
+        var third = await Call(h, s => s.ScheduleNoteAsync(user.Id, note.Id, new(thirdDraft.Version, true, 7), Ct));
+        Assert.Equal(3, third.Note.CreatedTaskIds.Length);
+        Assert.Equal(3, await h.DbAsync(db => db.WorkTasks.CountAsync(Ct)));
+        Assert.Single(third.Note.PendingTaskIds!);
+        Assert.Equal("Chuẩn bị slide", Assert.Single(third.Note.Analysis!.Tasks).Name);
+        var retry = await Call(h, s => s.ScheduleNoteAsync(user.Id, note.Id, new(thirdDraft.Version, true, 7), Ct));
+        Assert.Equal(third.Plan.Id, retry.Plan.Id);
+        Assert.Equal(3, await h.DbAsync(db => db.WorkTasks.CountAsync(Ct)));
+    }
+
+    [Fact] public async Task Renamed_or_deleted_tasks_are_not_recreated_and_forged_old_task_inputs_cannot_overwrite_them()
+    {
+        var interpreter = new DynamicInterpreter();
+        await using var h = await ServiceHarness.CreateAsync(services => services.AddSingleton<ITaskInterpreter>(interpreter));
+        var user = await h.RegisterAsync();
+        var note = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Nháp", "Báo cáo 60 phút"), Ct));
+        note = await Call(h, s => s.AnalyzeNoteAsync(user.Id, note.Id, new(note.Version), Ct));
+        var oldInput = note.Analysis!.Tasks[0];
+        note = await Call(h, s => s.ImportNoteAsync(user.Id, note.Id, new(note.Version, [oldInput]), Ct));
+        await h.DbAsync(async db => { var task = await db.WorkTasks.SingleAsync(Ct); task.Name = "Báo cáo đã đổi tên"; task.IsDeleted = true; await db.SaveChangesAsync(Ct); });
+        interpreter.Count = 2;
+        var draft = await Call(h, s => s.SaveNoteAsync(user.Id, note.Id, new(note.Title, "Báo cáo 60 phút\nÔn bài 90 phút", note.Version), Ct));
+        var analyzed = await Call(h, s => s.AnalyzeNoteAsync(user.Id, note.Id, new(draft.Version), Ct));
+        Assert.Equal("Ôn bài", Assert.Single(analyzed.Analysis!.Tasks).Name);
+        var imported = await Call(h, s => s.ImportNoteAsync(user.Id, note.Id, new(analyzed.Version,
+            [oldInput with { EstimatedMinutes = 180 }, analyzed.Analysis.Tasks[0]]), Ct));
+        Assert.Equal(2, imported.CreatedTaskIds.Length);
+        var old = await h.DbAsync(db => db.WorkTasks.SingleAsync(x => x.IsDeleted, Ct));
+        Assert.Equal("Báo cáo đã đổi tên", old.Name); Assert.Equal(60, old.EstimatedMinutes);
+        Assert.Equal(2, await h.DbAsync(db => db.WorkTasks.CountAsync(Ct)));
+    }
+
+    [Fact] public async Task Saving_title_or_identical_content_preserves_analysis_and_unchanged_processed_content_has_no_new_work()
+    {
+        var interpreter = new DynamicInterpreter();
+        await using var h = await ServiceHarness.CreateAsync(services => services.AddSingleton<ITaskInterpreter>(interpreter));
+        var user = await h.RegisterAsync();
+        var note = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Nháp", "Báo cáo 60 phút"), Ct));
+        note = await Call(h, s => s.AnalyzeNoteAsync(user.Id, note.Id, new(note.Version), Ct));
+        note = await Call(h, s => s.ImportNoteAsync(user.Id, note.Id, new(note.Version, note.Analysis!.Tasks), Ct));
+        var renamed = await Call(h, s => s.SaveNoteAsync(user.Id, note.Id, new("Tiêu đề mới", note.Content, note.Version), Ct));
+        Assert.NotNull(renamed.Analysis); Assert.True(renamed.AnalysisImported);
+        var same = await Call(h, s => s.SaveNoteAsync(user.Id, note.Id, new(renamed.Title, renamed.Content, renamed.Version), Ct));
+        Assert.Equal(renamed.Version, same.Version);
+        h.Clock.Advance(TimeSpan.FromDays(1));
+        var analyzed = await Call(h, s => s.AnalyzeNoteAsync(user.Id, note.Id, new(same.Version), Ct));
+        Assert.Empty(analyzed.Analysis!.Tasks); Assert.Empty(analyzed.Analysis.Activities!);
+        Assert.Equal(1, interpreter.Calls);
+        Assert.Single(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
     }
 }

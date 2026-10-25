@@ -151,6 +151,7 @@ function Turn({
         )}
         {!hasResult && (
           <NoraScheduleAlternatives
+            turn={turn}
             options={alternatives.options}
             busy={busy}
             onReply={onReply}
@@ -244,6 +245,7 @@ function Turn({
         )}
         {hasResult && (
           <NoraScheduleAlternatives
+            turn={turn}
             options={alternatives.options}
             busy={busy}
             onReply={onReply}

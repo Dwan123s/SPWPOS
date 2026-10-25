@@ -8,7 +8,7 @@ import {
   WorkspaceMotionControl,
 } from "./workspace-motion.jsx";
 import { $, state, icon, button, userAvatar, dateFmt, modal } from "./ui.jsx";
-import { nextWorkflowStep, workflowSteps } from "./workflow.js";
+import { nextWorkflowStep } from "./workflow.js";
 
 const menuKey = "planora.menu.compact";
 function readStorage(key) {
@@ -59,9 +59,6 @@ export function workspaceShell(routes, title, description, body) {
       (n) => !n.isRead,
     ).length;
   const next = nextWorkflowStep(state.workspace);
-  const readyToPlan = workflowSteps(state.workspace)
-    .slice(0, 2)
-    .every((step) => step.done);
   const nav = (keys) =>
     nodeList(
       keys
@@ -99,18 +96,6 @@ export function workspaceShell(routes, title, description, body) {
         "primary",
         next.route || "",
         next.symbol,
-      )
-    ) : state.route === "calendar" ? (
-      readyToPlan ? (
-        button("Lập kế hoạch", "generate-plan", "primary", "", "spark")
-      ) : (
-        button(
-          next.label,
-          next.action || "nav",
-          "primary",
-          next.route || "",
-          next.symbol,
-        )
       )
     ) : (
       ""
@@ -168,11 +153,6 @@ export function workspaceShell(routes, title, description, body) {
                 {icon("close")}
               </button>
             </div>
-            <button type="button" className="quick-search" data-action="search">
-              {icon("search")}
-              <span>Tìm công việc</span>
-              <kbd>Ctrl K</kbd>
-            </button>
           </div>
           <nav className="nav" aria-label="Điều hướng chính">
             <section className="nav-group" aria-label="Không gian cá nhân">
@@ -193,9 +173,7 @@ export function workspaceShell(routes, title, description, body) {
               <button
                 className="user-link"
                 type="button"
-                aria-label={
-                  state.route === "agent" ? "Hồ sơ của bạn" : undefined
-                }
+                aria-label="Hồ sơ của bạn"
                 data-action="nav"
                 data-id="settings"
                 title={
@@ -294,25 +272,31 @@ export function workspaceShell(routes, title, description, body) {
           {state.route === "today" && <CapacityRibbon />}
           <main className="content" id="main-content" tabIndex="-1">
             <PageTransition route={state.route}>
-              <div className="page-header">
-                <div>
-                  <div className="eyebrow">
-                    {state.route === "today"
-                      ? dateFmt(Date.now(), {
-                          weekday: "long",
-                          month: "long",
-                        })
-                      : "KHÔNG GIAN CỦA BẠN"}
+              {state.route === "calendar" ? (
+                <h1 className="sr-only" tabIndex="-1">
+                  {headline}
+                </h1>
+              ) : (
+                <div className="page-header">
+                  <div>
+                    <div className="eyebrow">
+                      {state.route === "today"
+                        ? dateFmt(Date.now(), {
+                            weekday: "long",
+                            month: "long",
+                          })
+                        : "KHÔNG GIAN CỦA BẠN"}
+                    </div>
+                    <h1 tabIndex="-1">{headline}</h1>
+                    <p>
+                      {state.route === "today"
+                        ? "Nhìn rõ việc cần làm. Dành thời gian để hoàn thành."
+                        : description}
+                    </p>
                   </div>
-                  <h1 tabIndex="-1">{headline}</h1>
-                  <p>
-                    {state.route === "today"
-                      ? "Nhìn rõ việc cần làm. Dành thời gian để hoàn thành."
-                      : description}
-                  </p>
+                  <div className="actions">{actions}</div>
                 </div>
-                <div className="actions">{actions}</div>
-              </div>
+              )}
               {state.analysisError ? (
                 <div className="warning analysis-warning" role="status">
                   <div>

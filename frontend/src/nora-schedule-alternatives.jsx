@@ -1,4 +1,28 @@
+import { useId, useRef, useState } from "react";
 import { icon } from "./ui.jsx";
+
+function alternativeReply(turn, date, start, endDate, end) {
+  const selection =
+    date === endDate
+      ? `Tôi chọn từ ${start} đến ${end} ngày ${date}.`
+      : `Tôi chọn từ ${start} ngày ${date} đến ${end} ngày ${endDate}.`;
+  const text = `${selection} Thực hiện lại yêu cầu dưới đây ở khung giờ mới, thay cho khung giờ ban đầu; giữ nguyên các thông tin khác:\n${turn?.text || ""}`;
+  return text.length <= 2000
+    ? text
+    : `${selection} Thực hiện lại yêu cầu tôi vừa gửi ở khung giờ mới này, giữ nguyên các thông tin khác.`;
+}
+
+function isTimeConflict(turn) {
+  return (
+    ["FAILED", "BLOCKED"].includes(turn?.status) &&
+    [
+      "FIXED_EVENT_OVERLAP",
+      "SESSION_OVERLAP",
+      "LOCKED_SESSION_CONFLICT",
+      "BUSY_TIME_CONFLICT",
+    ].includes(turn.errorCode)
+  );
+}
 
 // Stored conflict replies already contain server-checked suggestions. Read only
 // that labelled section, never infer choices from arbitrary times in a reply.
@@ -38,17 +62,9 @@ export function scheduleAlternativeView(turn) {
           )
             return null;
           const label = `${date} · ${start}–${endDate === date ? "" : `${endDate} `}${end}`;
-          const selection =
-            date === endDate
-              ? `Tôi chọn từ ${start} đến ${end} ngày ${date}.`
-              : `Tôi chọn từ ${start} ngày ${date} đến ${end} ngày ${endDate}.`;
-          const text = `${selection} Thực hiện lại yêu cầu dưới đây ở khung giờ mới, thay cho khung giờ ban đầu; giữ nguyên các thông tin khác:\n${turn.text || ""}`;
           return {
             label,
-            text:
-              text.length <= 2000
-                ? text
-                : `${selection} Thực hiện lại yêu cầu tôi vừa gửi ở khung giờ mới này, giữ nguyên các thông tin khác.`,
+            text: alternativeReply(turn, date, start, endDate, end),
           };
         });
         if (
@@ -71,8 +87,40 @@ export function scheduleAlternativeView(turn) {
   };
 }
 
-export function NoraScheduleAlternatives({ options, busy, onReply }) {
-  if (!options.length) return null;
+export function NoraScheduleAlternatives({ options, busy, onReply, turn }) {
+  const [prompt, setPrompt] = useState("");
+  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
+  const pending = useRef(false);
+  const hintId = useId();
+  const disabled = busy || sending || !onReply;
+  if (!options.length && !isTimeConflict(turn)) return null;
+
+  async function submitCustom(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (disabled || pending.current) return;
+    setError("");
+    try {
+      const value = prompt.trim();
+      if (!value) throw new Error("Hãy nhập thời gian khác bạn muốn.");
+      if (value.length > 1500) throw new Error("Nhập tối đa 1.500 ký tự.");
+      const selection = `Tôi muốn đổi thời gian cho yêu cầu này: ${value}\n`;
+      const full = `${selection}Thực hiện lại yêu cầu dưới đây theo thời gian vừa nhập, thay cho khung giờ ban đầu; giữ nguyên các thông tin khác:\n${turn?.text || ""}`;
+      const text =
+        full.length <= 2000
+          ? full
+          : `${selection}Thực hiện lại yêu cầu tôi vừa gửi theo thời gian vừa nhập, giữ nguyên các thông tin khác.`;
+      pending.current = true;
+      setSending(true);
+      await onReply(text);
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      pending.current = false;
+      setSending(false);
+    }
+  }
   return (
     <section className="nora-time-alternatives" aria-label="Khung giờ thay thế">
       <p>Chọn giờ khác cho yêu cầu mới</p>
@@ -82,7 +130,7 @@ export function NoraScheduleAlternatives({ options, busy, onReply }) {
             key={option.label}
             type="button"
             className="btn secondary small agent-chip-btn"
-            disabled={busy || !onReply}
+            disabled={disabled}
             onClick={() => onReply(option.text)}
           >
             {icon("clock")}
@@ -90,6 +138,43 @@ export function NoraScheduleAlternatives({ options, busy, onReply }) {
           </button>
         ))}
       </div>
+      <form className="nora-custom-time" onSubmit={submitCustom}>
+        <fieldset disabled={disabled}>
+          <legend>Hoặc nhập thời gian khác</legend>
+          <textarea
+            name="timePrompt"
+            aria-label="Thời gian khác"
+            placeholder="Ví dụ: Mai 9h sáng, hoặc thứ Sáu sau 20h…"
+            rows={2}
+            maxLength={1500}
+            required
+            disabled={disabled}
+            value={prompt}
+            aria-describedby={hintId}
+            onChange={(event) => {
+              setPrompt(event.target.value);
+              setError("");
+            }}
+          />
+          <p id={hintId} className="nora-custom-time-hint">
+            Ghi thời gian bạn muốn bằng lời. NORA sẽ hiểu yêu cầu và kiểm tra
+            lại lịch.
+          </p>
+          {error && (
+            <p className="nora-custom-time-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            className="btn primary small"
+            disabled={disabled}
+          >
+            {icon("arrow")}
+            {sending ? "Đang gửi…" : "Gửi thời gian khác"}
+          </button>
+        </fieldset>
+      </form>
     </section>
   );
 }

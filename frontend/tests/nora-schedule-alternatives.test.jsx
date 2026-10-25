@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
   NoraScheduleAlternatives,
   scheduleAlternativeView,
@@ -18,7 +18,7 @@ it.each(["FAILED", "BLOCKED"])(
     const view = scheduleAlternativeView({ ...turn, status });
     const reply = vi.fn();
     render(<NoraScheduleAlternatives options={view.options} onReply={reply} />);
-    expect(screen.getAllByRole("button")).toHaveLength(3);
+    expect(screen.getAllByRole("button")).toHaveLength(4);
     expect(
       screen.getByRole("button", { name: "22/10/2026 · 21:00–22:00" }),
     ).toBeTruthy();
@@ -84,4 +84,111 @@ it("keeps a chip reply within the existing message limit for a maximum-length re
   const view = scheduleAlternativeView({ ...turn, text: "a".repeat(2000) });
   expect(view.options[0].text.length).toBeLessThanOrEqual(2000);
   expect(view.options[0].text).toContain("21:00 đến 22:00 ngày 22/10/2026");
+});
+
+function customTimeForm(onReply, source = turn, busy = false) {
+  render(
+    <NoraScheduleAlternatives
+      turn={source}
+      options={scheduleAlternativeView(source).options}
+      onReply={onReply}
+      busy={busy}
+    />,
+  );
+  return document.querySelector(".nora-custom-time");
+}
+function fillPrompt(value) {
+  fireEvent.change(screen.getByRole("textbox", { name: "Thời gian khác" }), {
+    target: { value },
+  });
+}
+
+it.each(["Mai 22h, giữ nguyên thời lượng giúp tôi", "thu sau sau 20h toois"])(
+  "sends a natural-language time prompt unchanged with the original request: %s",
+  async (prompt) => {
+    const reply = vi.fn();
+    const form = customTimeForm(reply);
+    fillPrompt(prompt);
+    expect(reply).not.toHaveBeenCalled();
+    await act(async () => fireEvent.submit(form));
+    expect(reply).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining(prompt),
+    );
+    expect(reply.mock.calls[0][0]).toContain(turn.text);
+  },
+);
+
+it("rejects empty or overlong prompts without clearing entered values", async () => {
+  const reply = vi.fn();
+  const form = customTimeForm(reply);
+  fillPrompt("   ");
+  await act(async () => fireEvent.submit(form));
+  expect(screen.getByRole("alert").textContent).toContain("Hãy nhập");
+  fillPrompt("a".repeat(1501));
+  await act(async () => fireEvent.submit(form));
+  expect(screen.getByRole("alert").textContent).toContain("1.500");
+  expect(
+    screen.getByRole("textbox", { name: "Thời gian khác" }).value,
+  ).toHaveLength(1501);
+  expect(reply).not.toHaveBeenCalled();
+});
+
+it("keeps a long prompt and conversation reference within the API message limit", async () => {
+  const reply = vi.fn();
+  const form = customTimeForm(reply, { ...turn, text: "a".repeat(2000) });
+  fillPrompt("b".repeat(1500));
+  await act(async () => fireEvent.submit(form));
+  expect(reply).toHaveBeenCalledTimes(1);
+  expect(reply.mock.calls[0][0].length).toBeLessThanOrEqual(2000);
+  expect(reply.mock.calls[0][0]).toContain("b".repeat(1500));
+  expect(reply.mock.calls[0][0]).toContain("yêu cầu tôi vừa gửi");
+});
+
+it("allows custom time for a calendar conflict even when no suggestions fit", () => {
+  customTimeForm(vi.fn(), {
+    ...turn,
+    reply: "Chưa tìm được giờ trống.",
+    errorCode: "BUSY_TIME_CONFLICT",
+  });
+  expect(screen.getByRole("textbox", { name: "Thời gian khác" })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Gửi thời gian khác" }),
+  ).toBeTruthy();
+});
+
+it.each(["AI_UNAVAILABLE", "VALIDATION_ERROR"])(
+  "does not show scheduling fields for unrelated %s failures",
+  (errorCode) => {
+    customTimeForm(vi.fn(), { ...turn, reply: "Không thể xử lý.", errorCode });
+    expect(
+      screen.queryByRole("textbox", { name: "Thời gian khác" }),
+    ).toBeNull();
+  },
+);
+
+it("blocks duplicate submissions and retains a failed custom request for retry", async () => {
+  let reject;
+  const reply = vi.fn(
+    () =>
+      new Promise((resolve, fail) => {
+        reject = fail;
+      }),
+  );
+  const form = customTimeForm(reply);
+  fillPrompt("Mai sau 19h");
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  expect(reply).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Đang gửi…" }).disabled).toBe(true);
+  expect(screen.getByRole("textbox", { name: "Thời gian khác" }).disabled).toBe(
+    true,
+  );
+  await act(async () => reject(new Error("Mất kết nối, thử lại.")));
+  expect(screen.getByRole("alert").textContent).toContain("Mất kết nối");
+  expect(screen.getByRole("textbox", { name: "Thời gian khác" }).value).toBe(
+    "Mai sau 19h",
+  );
+  expect(
+    screen.getByRole("button", { name: "Gửi thời gian khác" }).disabled,
+  ).toBe(false);
 });

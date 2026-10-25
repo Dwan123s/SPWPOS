@@ -6,6 +6,7 @@ import { transitionAuthPanel } from "./auth-panel-motion.js";
 import { validateNewPassword } from "./password-policy.js";
 import { PasswordChecklist } from "./password-checklist.jsx";
 import { notifyLoginPasswordRejected } from "./password-login-feedback.js";
+import { markForgotPasswordOtpSent } from "./forgot-password-resend.jsx";
 let currentMode = "login",
   onLogin = () => {};
 export function authSetup(callback) {
@@ -120,7 +121,8 @@ export function renderAuth(mode = "login") {
           "email",
           "email",
           state.authEmail,
-          'required maxlength="254" autocomplete="email" placeholder="Nhập Email của bạn"',
+          'required maxlength="254" autocomplete="email" placeholder="Nhập Email của bạn"' +
+            (mode === "forgotOtp" ? " readonly" : ""),
         )
       )}
       {["register", "reset"].includes(mode) && (
@@ -159,7 +161,15 @@ export function renderAuth(mode = "login") {
     currentMode = mode;
     history.replaceState(null, "", `#${mode}`);
     setScreen(
-      authView(mode, title, description, fields, buttons, onLogin),
+      authView(
+        mode,
+        title,
+        description,
+        fields,
+        buttons,
+        onLogin,
+        state.authEmail,
+      ),
       `auth-${mode}`,
     );
     $("#app input")?.focus({ preventScroll: true });
@@ -247,6 +257,7 @@ export async function handleAuthSubmit(form) {
           await api("/api/auth/forgot-password", "POST", {
             email,
           });
+          markForgotPasswordOtpSent(email);
           renderAuth("forgotOtp");
           toast("Nếu email có tài khoản, mã xác minh sẽ được gửi.");
           break;

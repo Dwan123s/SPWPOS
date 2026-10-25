@@ -24,6 +24,8 @@ export function NoteStudio({
   drafts,
   agent,
   imported,
+  hasHistory = imported,
+  autosaveStatus = "",
   busy,
   dirty,
   hasAiAnalysis,
@@ -210,13 +212,16 @@ export function NoteStudio({
                 </time>
                 <span
                   className={`note-save-status ${dirty || !note.id ? "is-unsaved" : ""}`}
+                  role="status"
                 >
                   <span className="note-save-dot" aria-hidden="true" />
-                  {note.id
-                    ? dirty
-                      ? "Có thay đổi chưa lưu"
-                      : "Đã lưu ghi chú"
-                    : "Ghi chú mới"}
+                  {autosaveStatus === "Đang tự động lưu…"
+                    ? autosaveStatus
+                    : note.id
+                      ? dirty
+                        ? "Chờ tự động lưu…"
+                        : autosaveStatus || "Đã lưu ghi chú"
+                      : "Ghi chú mới"}
                 </span>
               </div>
               <label className="note-body-field">
@@ -248,29 +253,18 @@ export function NoteStudio({
                 </div>
                 <div className="form-actions note-editor-actions">
                   <button type="submit" className="btn secondary">
-                    {imported ? "Lưu ghi chú" : "Lưu bản nháp"}
+                    {hasHistory ? "Lưu ghi chú" : "Lưu bản nháp"}
                   </button>
-                  {imported ? (
-                    <button
-                      type="button"
-                      className="btn primary"
-                      disabled={
-                        !agent?.aiAvailable || !note.content.trim() || !!busy
-                      }
-                      onClick={() => requestSchedule("auto")}
-                    >
-                      {icon("calendar")} Cập nhật công việc &amp; lịch trình
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn primary"
-                      disabled={!agent?.aiAvailable || !note.content.trim()}
-                      onClick={analyze}
-                    >
-                      {icon("spark")} Xem trước công việc {icon("arrow")}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={!agent?.aiAvailable || !note.content.trim()}
+                    onClick={analyze}
+                  >
+                    {icon("spark")}{" "}
+                    {hasHistory ? "Nhận diện việc mới" : "Xem trước công việc"}{" "}
+                    {icon("arrow")}
+                  </button>
                 </div>
               </div>
               {!busy && !agent?.aiAvailable && (
@@ -306,14 +300,13 @@ export function NoteStudio({
               </details>
             </fieldset>
           </form>
-          {imported && (
+          {hasHistory && (
             <div className="note-sync-banner info spaced">
               <p>
-                {icon("check")} Ghi chú đã tạo {note.createdTaskIds.length} công
-                việc trong hệ thống. Bạn có thể sửa nội dung và bấm{" "}
-                <strong>Lưu ghi chú</strong>, hoặc bấm{" "}
-                <strong>Cập nhật công việc &amp; lịch trình</strong> để đồng bộ
-                sang lịch.
+                {icon("check")} Bạn có thể tiếp tục viết vào ghi chú này. Bản
+                nháp tự động lưu; bấm <strong>Nhận diện việc mới</strong> để AI
+                tìm phần bổ sung rồi xem lịch đề xuất. Các công việc và sự kiện
+                đã tạo được giữ nguyên.
               </p>
               <div className="form-actions spaced">
                 <button
