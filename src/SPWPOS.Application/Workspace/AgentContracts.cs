@@ -3,7 +3,8 @@ namespace SPWPOS.Application.Workspace;
 
 public sealed record AgentTurnInput(Guid ConversationId, Guid RequestId,
     [Required, StringLength(2000)] string Text, bool AutoApply = true,
-    bool UseCapacityFactor = false, bool UseEstimateBias = false);
+    bool UseCapacityFactor = false, bool UseEstimateBias = false, AgentImage? Image = null);
+public sealed record AgentImage(string Name, string MimeType, string? Data = null, string? Url = null);
 public sealed record AgentTaskCommand(Guid? TaskId, string Name, DateTimeOffset? Deadline,
     int? EstimatedMinutes, int? Priority, string TaskType, bool? Splittable,
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null,
@@ -26,7 +27,7 @@ public sealed record AgentChangeView(string Kind, string Name, string Before, st
 public sealed record AgentTurnView(Guid Id, Guid ConversationId, Guid RequestId, string Text,
     string Reply, string Status, string Question, PlanView? Plan, AgentChangeView[] Changes,
     string[] Warnings, DateTimeOffset CreatedAt, bool CanUndo = false, string[]? Options = null, string? ErrorCode = null,
-    string Outcome = "");
+    string Outcome = "", AgentImage? Image = null);
 public sealed record AgentStreamEvent(string Type, string? Stage = null, string? Message = null,
     string? Delta = null, AgentTurnView? Turn = null, string? Code = null);
 public sealed record ConversationView(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
@@ -40,6 +41,9 @@ public interface IPlanningAgentInterpreter
     NoteAgentCapabilities Capabilities { get; }
     Task<AgentIntent> InterpretAsync(string text, string contextJson, AgentMessage[] history,
         string timeZoneId, DateTimeOffset now, CancellationToken ct);
+    Task<AgentIntent> InterpretImageAsync(string text, string contextJson, AgentMessage[] history,
+        string timeZoneId, DateTimeOffset now, AgentImage image, Func<string, CancellationToken, Task>? onReplyDelta, CancellationToken ct)
+        => throw new SPWPOS.Application.Authentication.AuthException("IMAGE_NOT_CONFIGURED", "Model hiện tại chưa hỗ trợ đọc ảnh trực tiếp.", 503);
     async Task<AgentIntent> InterpretStreamingAsync(string text, string contextJson, AgentMessage[] history,
         string timeZoneId, DateTimeOffset now, Func<string, CancellationToken, Task> onReplyDelta, CancellationToken ct)
     {
@@ -57,6 +61,7 @@ public interface IPlanningAgentService
     Task<ConversationExport> ExportConversationAsync(Guid uid, Guid conversationId, CancellationToken ct);
     NoteAgentCapabilities GetAgentCapabilities();
     Task<AgentTurnView[]> GetAgentTurnsAsync(Guid uid, CancellationToken ct);
+    Task<AgentImage> GetAgentImageAsync(Guid uid, Guid turnId, CancellationToken ct);
     Task<AgentTurnView> SendAgentTurnAsync(Guid uid, AgentTurnInput input, CancellationToken ct);
     Task<AgentTurnView> SendAgentTurnStreamingAsync(Guid uid, AgentTurnInput input,
         Func<AgentStreamEvent, CancellationToken, Task> publish, CancellationToken ct);

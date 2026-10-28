@@ -58,13 +58,17 @@ public static class DependencyInjection
         services.AddHostedService<SPWPOS.Infrastructure.Workspace.AdminBootstrapWorker>();
         services.AddSingleton<SPWPOS.Infrastructure.Workspace.IVertexAccessTokenProvider, SPWPOS.Infrastructure.Workspace.VertexAccessTokenProvider>();
         services.AddHttpClient<SPWPOS.Application.Workspace.ITaskInterpreter, SPWPOS.Infrastructure.Workspace.TaskInterpreter>(client =>
-        { client.Timeout = TimeSpan.FromSeconds(20); client.MaxResponseContentBufferSize = 131072; })
+        { client.Timeout = TimeSpan.FromSeconds(65); client.MaxResponseContentBufferSize = 131072; })
             // Vertex API-key compatibility includes a credential in the request URL.
             // Disable this client's URL/header logging even if the app enables Trace logging.
             .RemoveAllLoggers()
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHttpClient<SPWPOS.Application.Workspace.IAgentVoiceTranscriber, SPWPOS.Infrastructure.Workspace.TaskInterpreter>(client =>
         { client.Timeout = TimeSpan.FromSeconds(20); client.MaxResponseContentBufferSize = 131072; })
+            .RemoveAllLoggers()
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddHttpClient<SPWPOS.Application.Workspace.IAgentTimetableImageReader, SPWPOS.Infrastructure.Workspace.TaskInterpreter>(client =>
+        { client.Timeout = TimeSpan.FromSeconds(35); client.MaxResponseContentBufferSize = 131072; })
             .RemoveAllLoggers()
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddOptions<JwtSettings>().BindConfiguration("JwtSettings")

@@ -34,6 +34,23 @@ public sealed class AgentInterpreterTests
             ["AiSettings:Enabled"] = "true", ["AiSettings:Provider"] = "Gemini", ["AiSettings:Model"] = "gemini-3.5-flash-lite", ["AiSettings:GeminiApiKey"] = "test-key"
         }).Build(), NullLogger<TaskInterpreter>.Instance);
     [Theory] [InlineData(false)] [InlineData(true)]
+    public async Task Vision_sends_image_bytes_in_the_same_planning_request_without_an_OCR_roundtrip(bool streaming)
+    {
+        using var provider = new Provider(stream: streaming); using var client = new HttpClient(provider);
+        var image = new SPWPOS.Application.Workspace.AgentImage("Lịch.png", "image/png", "iVBORw0KGgo=");
+        var result = await Interpreter(client).InterpretImageAsync("Xếp lịch từ ảnh", "{}", [], "Asia/Ho_Chi_Minh",
+            DateTimeOffset.Parse("2026-10-14T06:00:00Z"), image, streaming ? (_, _) => Task.CompletedTask : null, TestContext.Current.CancellationToken);
+        Assert.Single(result.Events);
+        using var body = JsonDocument.Parse(provider.Body);
+        var parts = body.RootElement.GetProperty("contents")[0].GetProperty("parts");
+        Assert.Equal(2, parts.GetArrayLength());
+        Assert.Equal(image.Data, parts[1].GetProperty("inlineData").GetProperty("data").GetString());
+        Assert.Equal(image.MimeType, parts[1].GetProperty("inlineData").GetProperty("mimeType").GetString());
+        using var prompt = JsonDocument.Parse(parts[0].GetProperty("text").GetString()!);
+        Assert.Equal("Xếp lịch từ ảnh", prompt.RootElement.GetProperty("request").GetString());
+        Assert.False(body.RootElement.GetProperty("store").GetBoolean());
+    }
+    [Theory] [InlineData(false)] [InlineData(true)]
     public async Task Telex_reading_helps_the_provider_while_the_original_request_remains_available_for_evidence(bool streaming)
     {
         const string raw = "Tooi muoons lamf vieejc, vieetss baos caos 45 phuts truowsc 21h ngayf mai";

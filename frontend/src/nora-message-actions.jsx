@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { icon, state } from "./ui.jsx";
 
 export function NoraMessageTime({ value }) {
@@ -55,13 +55,51 @@ export function NoraCopyButton({ text, label, onError }) {
   );
 }
 
-export function NoraPromptMessage({ text, createdAt, busy, onEdit }) {
+export function NoraPromptMessage({ text, image, createdAt, busy, onEdit }) {
   const [copyError, setCopyError] = useState(false);
+  const preview = useRef(null);
+  const imageUrl =
+    image?.url &&
+    (/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(image.url) ||
+      /^\/api\/agent\/turns\/[a-f0-9-]+\/image$/i.test(image.url))
+      ? image.url
+      : null;
   return (
     <div className="nora-prompt-message">
       <div className="agent-user-message">
         <span>Bạn</span>
-        <p>{text}</p>
+        {imageUrl && (
+          <>
+            <button
+              type="button"
+              className="nora-message-image"
+              aria-label="Xem ảnh thời khóa biểu"
+              onClick={() => preview.current?.showModal()}
+            >
+              <img
+                src={imageUrl}
+                alt={image.name || "Ảnh thời khóa biểu"}
+                loading="lazy"
+              />
+            </button>
+            <dialog
+              ref={preview}
+              className="nora-image-dialog"
+              aria-label="Ảnh thời khóa biểu phóng to"
+            >
+              <button
+                type="button"
+                autoFocus
+                aria-label="Đóng ảnh"
+                onClick={() => preview.current?.close()}
+              >
+                {icon("close")}
+              </button>
+              <img src={imageUrl} alt={image.name || "Ảnh thời khóa biểu"} />
+            </dialog>
+          </>
+        )}
+        {text && <p>{text}</p>}
       </div>
       <div className="nora-message-footer nora-prompt-footer">
         <NoraMessageTime value={createdAt} />

@@ -29,6 +29,7 @@ const paths = {
   chat: "M4 4h16v12H9l-5 4z M8 8h8 M8 12h5",
   stop: "M6 6h12v12H6z",
   mic: "M9 5a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0z M6 10v1a6 6 0 0 0 12 0v-1 M12 17v4 M9 21h6",
+  image: "M3 4h18v16H3z M3 16l6-6 5 5 3-3 4 4 M16 8h.01",
   panel: "M3 4h18v16H3z M9 4v16 M5 8h2 M5 12h2",
   today: "M3 10l9-7 9 7v10H3z M9 20v-7h6v7",
   tasks: "M9 6h11 M9 12h11 M9 18h11 M3 6h1 M3 12h1 M3 18h1",

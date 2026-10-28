@@ -6,10 +6,10 @@ using SPWPOS.Application.Workspace;
 namespace SPWPOS.Api.Controllers;
 
 [Route("api/agent"), Tags("Planning Agent")]
-public sealed class AgentController(IPlanningAgentService service, ILogger<AgentController> logger, IAgentVoiceTranscriber voice) : WorkspaceController
+public sealed class AgentController(IPlanningAgentService service, ILogger<AgentController> logger, IAgentVoiceTranscriber voice, IAgentTimetableImageReader images) : WorkspaceController
 {
-    [HttpGet("capabilities")] public IActionResult Capabilities() { var caps = service.GetAgentCapabilities(); return Data(new { caps.AiAvailable, caps.MaxTasks, caps.Provider, VoiceAvailable = voice.VoiceAvailable,
-        PolicyVersion = "2026-10-19.4", Features = new[] { "conversation-lifecycle", "usage-ledger", "planning-policy", "work-category", "verified-outcomes", "scoped-event-replanning", "bounded-clarification-recovery", "concise-confirmations" } }); }
+    [HttpGet("capabilities")] public IActionResult Capabilities() { var caps = service.GetAgentCapabilities(); return Data(new { caps.AiAvailable, caps.MaxTasks, caps.Provider, VoiceAvailable = voice.VoiceAvailable, ImageAvailable = images.ImageAvailable,
+        PolicyVersion = "2026-10-28.1", Features = new[] { "conversation-lifecycle", "usage-ledger", "planning-policy", "work-category", "verified-outcomes", "scoped-event-replanning", "bounded-clarification-recovery", "concise-confirmations", "vision-timetable", "chat-images" } }); }
     [HttpGet("usage")] public async Task<IActionResult> Usage([FromServices] IAiUsageService usage, CancellationToken ct) => Data(await usage.SummaryAsync(UserId, ct));
     [HttpGet("turns")] public async Task<IActionResult> History(CancellationToken ct) => Data(await service.GetAgentTurnsAsync(UserId, ct));
     [HttpGet("conversations")] public async Task<IActionResult> Conversations(CancellationToken ct, string? search = null, bool archived = false, string? cursor = null, int pageSize = 30) => Data(await service.GetConversationsAsync(UserId, search, archived, cursor, pageSize, ct));
@@ -21,8 +21,16 @@ public sealed class AgentController(IPlanningAgentService service, ILogger<Agent
         var value = await service.ExportConversationAsync(UserId, id, ct);
         return Data(value);
     }
-    [HttpPost("turns")] public async Task<IActionResult> Send(AgentTurnInput input, CancellationToken ct) => Data(await service.SendAgentTurnAsync(UserId, input, ct));
-    [HttpPost("turns/stream")]
+    [HttpGet("turns/{id:guid}/image")]
+    public async Task<IActionResult> Image(Guid id, CancellationToken ct)
+    {
+        var image = await service.GetAgentImageAsync(UserId, id, ct);
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(Convert.FromBase64String(image.Data!), image.MimeType);
+    }
+    [HttpPost("turns"), RequestSizeLimit(8 * 1024 * 1024)] public async Task<IActionResult> Send(AgentTurnInput input, CancellationToken ct) => Data(await service.SendAgentTurnAsync(UserId, input, ct));
+    [HttpPost("turns/stream"), RequestSizeLimit(8 * 1024 * 1024)]
     public async Task Stream(AgentTurnInput input, CancellationToken ct)
     {
         Response.ContentType = "text/event-stream; charset=utf-8";

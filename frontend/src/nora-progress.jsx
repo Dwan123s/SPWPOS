@@ -39,6 +39,7 @@ export function NoraProgress({ pending, busy, onEdit }) {
     <article className="nora-live-turn">
       <NoraPromptMessage
         text={pending.text}
+        image={pending.image}
         createdAt={pending.startedAt}
         busy={busy}
         onEdit={onEdit}

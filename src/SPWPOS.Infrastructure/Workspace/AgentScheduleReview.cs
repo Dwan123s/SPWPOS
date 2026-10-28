@@ -12,12 +12,19 @@ public sealed partial class WorkspaceService
     private sealed record ReviewSuggestion(Guid TaskId, string Name, DateTimeOffset Start, DateTimeOffset End);
     private sealed record ReviewReport(object Facts, string Details, string Fallback);
 
+    private static bool ScheduleOverviewRequested(string request)
+    {
+        var text = MatchText(request);
+        return RequestMatches(text, @"\b(?:lich trinh|xem lich|lich (?:hom nay|ngay mai)|(?:hom nay|ngay mai) (?:toi |minh )?co (?:nhung )?gi)\b").Count > 0 &&
+            RequestMatches(text, @"\b(?:phan tich|danh gia|nhan xet|tu van|hop ly|review|analy[sz]e|gio ranh|gio trong|ranh (?:gio|luc|khi)|khoang (?:ranh|trong))\b").Count == 0;
+    }
+
     private static AgentIntent RecognizeScheduleReview(AgentIntent intent, string request)
     {
         // Older providers sometimes classify analysis as a free-time lookup.
         // Only promote an already read-only intent; never discard requested actions.
         if (intent.ScheduleReviewQuery is null && intent.FreeTimeQuery is not null && !HasAgentActions(intent) &&
-            RequestMatches(MatchText(request), @"\b(?:phan tich|danh gia|nhan xet|tu van|review|analy[sz]e)\b").Count > 0)
+            (ScheduleOverviewRequested(request) || RequestMatches(MatchText(request), @"\b(?:phan tich|danh gia|nhan xet|tu van|review|analy[sz]e)\b").Count > 0))
             return intent with { ScheduleReviewQuery = intent.FreeTimeQuery, FreeTimeQuery = null };
         return intent;
     }
@@ -36,6 +43,7 @@ public sealed partial class WorkspaceService
         var until = query.End > Now.AddDays(30) ? query.End : Now.AddDays(30);
         until = PlanningEngine.At(LocalDate(until, state.Preference).AddDays(1), 0, zone);
         var calendar = await CalendarStateAsync(uid, state, from, until, ct);
+        if (ScheduleOverviewRequested(request)) return VerifiedScheduleOverviewReply(query, calendar);
         var report = BuildScheduleReview(query, calendar);
         var context = JsonSerializer.Serialize(new {
             activeTaskTypes, verifiedScheduleReview = report.Facts,
@@ -56,6 +64,35 @@ public sealed partial class WorkspaceService
         catch (AuthException error) when (error.Code == "AGENT_INVALID_INTENT") { /* Never turn advice into a mutation. */ }
         return (advice.Length > 0 ? advice : report.Fallback) + "\n\n" + report.Details +
             "\n\nĐây là phân tích và gợi ý; lịch hiện tại chưa thay đổi. Nếu muốn, bạn có thể yêu cầu mình chuẩn bị phương án để xem trước và xác nhận.";
+    }
+
+    private string VerifiedScheduleOverviewReply(AgentFreeTimeQuery query, PlanningState state)
+    {
+        var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
+        var tasks = state.Tasks.ToDictionary(x => x.Id);
+        var entries = state.Events.Select(x => (x.Name, x.Start, x.End))
+            .Concat(state.Sessions.Select(x => (
+                Name: (tasks.GetValueOrDefault(x.TaskId)?.Name ?? "Phiên làm việc") + (x.Status == WorkSessionStatus.Completed ? " (đã hoàn tất)" : ""), x.Start, x.End)))
+            .Concat(state.Exceptions.Where(x => !x.IsAvailable).Select(x => (
+                Name: string.IsNullOrWhiteSpace(x.Note) ? "Giờ bận" : x.Note,
+                Start: PlanningEngine.At(x.Date, x.StartMinute, zone), End: PlanningEngine.At(x.Date, x.EndMinute, zone))))
+            .Where(x => x.Start < query.End && x.End > query.Start).OrderBy(x => x.Start).ThenBy(x => x.End).ThenBy(x => x.Name).ToArray();
+        var label = CalendarQueryLabel(query, state.Preference);
+        var lines = new List<string> { entries.Length == 0
+            ? $"{label}, bạn chưa có cuộc hẹn hay phiên làm việc nào được lưu."
+            : $"{label}, bạn có {entries.Length} mục trong lịch. Mình sắp theo giờ để bạn dễ theo dõi nhé:\n" };
+        foreach (var item in entries.Take(12))
+        {
+            var start = TimeZoneInfo.ConvertTime(item.Start, zone);
+            var end = TimeZoneInfo.ConvertTime(item.End, zone);
+            var sameDay = LocalDate(query.Start, state.Preference) == LocalDate(query.End.AddTicks(-1), state.Preference);
+            var window = sameDay && start.Date == end.Date ? $"{start:HH:mm}–{end:HH:mm}"
+                : $"{start:dd/MM HH:mm}–{end:dd/MM HH:mm}";
+            lines.Add($"- {window}: {item.Name}");
+        }
+        if (entries.Length > 12) lines.Add($"Mình đang hiển thị 12/{entries.Length} mục; bạn có thể hỏi riêng một buổi để xem tiếp.");
+        lines.Add("\n" + VerifiedFreeTimeReply(query, state, partOfOverview: true));
+        return string.Join("\n", lines);
     }
 
     private ReviewReport BuildScheduleReview(AgentFreeTimeQuery query, PlanningState state)

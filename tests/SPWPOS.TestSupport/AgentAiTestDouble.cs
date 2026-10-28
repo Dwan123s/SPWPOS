@@ -9,6 +9,15 @@ public sealed class AgentAiTestDouble : ITaskInterpreter, IPlanningAgentInterpre
     public int Calls { get; private set; }
     public string Context { get; private set; } = "";
     public AgentMessage[] History { get; private set; } = [];
+    public AgentImage? LastImage { get; private set; }
+    public async Task<AgentIntent> InterpretImageAsync(string text, string contextJson, AgentMessage[] history,
+        string timeZoneId, DateTimeOffset now, AgentImage image, Func<string, CancellationToken, Task>? onReplyDelta, CancellationToken ct)
+    {
+        LastImage = image;
+        var result = await InterpretAsync(text, contextJson, history, timeZoneId, now, ct);
+        if (onReplyDelta is not null) await onReplyDelta(result.Reply, ct);
+        return result;
+    }
     public static AgentIntent Empty() => new("Đã đọc lịch hiện tại.", "", false, [], [], [], [], [], false, 14);
     public async Task<AgentIntent> InterpretAsync(string text, string contextJson, AgentMessage[] history, string timeZoneId, DateTimeOffset now, CancellationToken ct)
     {

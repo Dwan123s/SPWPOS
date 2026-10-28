@@ -94,7 +94,7 @@ public sealed partial class AgentFreeTimeTests
             await db.SaveChangesAsync(Ct);
         });
         var turn = await Send(h, user.Id);
-        Assert.Contains("không còn khoảng rảnh khả dụng", turn.Reply); Assert.DoesNotContain("19:00", turn.Reply);
+        Assert.Contains(fullyOccupied ? "không tìm thấy khoảng rảnh nào" : "bạn chưa đặt giờ rảnh", turn.Reply); Assert.DoesNotContain("19:00", turn.Reply);
         Assert.Equal("ANSWERED", turn.Status);
     }
 

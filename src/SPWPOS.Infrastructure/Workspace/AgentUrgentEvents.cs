@@ -5,45 +5,58 @@ namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService
 {
+    private const string EventUrgencyPattern = @"(?:khẩn(?:\s+cấp)?|khan(?:\s+cap)?|gấp|gap|cấp bách|cap bach|đột xuất|dot xuat|urgent|emergency)";
+
     private static bool ExplicitEventUrgency(string text)
     {
         // Keep accents here: “gặp” (meet) must never become “gấp” (urgent).
         var reading = VietnameseTelex.Normalize(text).ToLowerInvariant();
-        const string urgent = @"(?:khẩn(?:\s+cấp)?|khan(?:\s+cap)?|gấp|gap|cấp bách|cap bach|đột xuất|dot xuat|urgent|emergency)";
-        return Regex.IsMatch(reading, @"\b" + urgent + @"\b", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)) &&
-            !Regex.IsMatch(reading, @"\b(?:không|khong|chưa|chua|chẳng|chang|not)\s+(?:phải\s+|phai\s+|quá\s+|qua\s+)?" + urgent + @"\b",
+        return Regex.IsMatch(reading, @"\b" + EventUrgencyPattern + @"\b", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)) &&
+            !Regex.IsMatch(reading, @"\b(?:không|khong|chưa|chua|chẳng|chang|not)\s+(?:phải\s+|phai\s+|quá\s+|qua\s+)?" + EventUrgencyPattern + @"\b",
                 RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     }
 
     private static bool IsUrgentEvent(FixedEvent item) => item.IsUrgent ?? ExplicitEventUrgency(item.Name + " " + item.Description);
 
-    private static bool RequestedUrgentEvent(FixedEvent item, string request) =>
-        Regex.Split(VietnameseTelex.Normalize(request), @"[,.!?;\r\n]+", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))
+    private static bool RequestedUrgentEvent(FixedEvent item, string request)
+    {
+        // AI may use “khẩn cấp” in the title when the user only said “khẩn”.
+        // Match the activity itself; urgency must still come from the user's clause.
+        var activity = MatchText(Regex.Replace(VietnameseTelex.Normalize(item.Name).ToLowerInvariant(), @"\b" + EventUrgencyPattern + @"\b", "",
+            RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))).Trim();
+        return Regex.Split(VietnameseTelex.Normalize(request), @"[,.!?;\r\n]+", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))
             .Any(clause => ExplicitEventUrgency(clause) && (MatchText(clause).Contains(MatchText(item.Name), StringComparison.Ordinal) ||
+                activity.Length > 0 && MatchText(clause).Contains(activity, StringComparison.Ordinal) ||
                 item.EventType == "MEETING" && ChatMatch(clause, @"\b(hop|meeting)\b").Success));
+    }
 
     private static bool CanProposeEventMove(FixedEvent item, string request) =>
         (IsUrgentEvent(item) || item.EventType == "WORK" || item.EventType == "OTHER" &&
-            ChatMatch(item.Name, @"\b(mua sam|shopping|di cho|di sieu thi|di dao|don dep|giat do|tap the duc)\b").Success) &&
+            ChatMatch(item.Name, @"\b(mua sam|shopping|di cho|di sieu thi|di dao|don dep|giat do|tap the duc|di ia|di ve sinh|ve sinh ca nhan|an sang|an trua|an toi|di an|an uong|nghi ngoi|giai tri|choi game|doc sach)\b").Success) &&
         !ChatMatch(item.Description, @"\b(co dinh|khong (?:the |duoc )?(?:doi|doi gio|di chuyen)|bat buoc dung gio)\b").Success &&
         !ChatMatch(request, @"\b(khong|dung|cho)\s+(?:tu dong\s+)?(?:doi|di chuyen|thay doi)\b[^.!?;\r\n]{0,50}" +
             Regex.Escape(MatchText(item.Name).Replace("di ", "")) + @"\b").Success;
 
-    private (FixedEvent[] Events, Guid[] UrgentIds) PrepareUrgentEvents(PlanningState state, FixedEvent[] incoming, string request)
+    private (FixedEvent[] Events, Guid[] UrgentIds) PrepareAgentEvents(PlanningState state, FixedEvent[] incoming, string request, bool timetableContext = false)
     {
         var urgent = incoming.Where(item => RequestedUrgentEvent(item, request)).ToArray();
         foreach (var item in urgent) item.IsUrgent = true;
         bool Overlaps(DateTimeOffset start, DateTimeOffset end) => urgent.Any(item => start < item.End && item.Start < end);
+        var classes = timetableContext || IsTimetableRequest(request)
+            ? incoming.Where(item => item.EventType == "CLASS").ToArray() : [];
+        bool NeedsReplan(DateTimeOffset start, DateTimeOffset end) => Overlaps(start, end) || classes.Any(item => start < item.End && item.Start < end);
         var existing = state.Events.Where(item => !incoming.Any(change => change.Id == item.Id)).ToArray();
         var movable = existing.Where(item => item.Start >= Now.AddMinutes(5) && Overlaps(item.Start, item.End) && CanProposeEventMove(item, request)).ToArray();
         var released = state.Sessions.Where(session => session.Status == WorkSessionStatus.Scheduled && !session.IsLocked &&
-            session.Start >= Now.AddMinutes(5) && Overlaps(session.Start, session.End) &&
+            session.Start >= Now.AddMinutes(5) && NeedsReplan(session.Start, session.End) &&
             state.Tasks.Any(task => task.Id == session.TaskId && !task.IsDeleted &&
                 task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled)).Select(session => session.Id).ToHashSet();
         var calendar = state with { Events = existing.Where(item => !movable.Any(move => move.Id == item.Id)).Concat(incoming).ToArray(),
             Sessions = state.Sessions.Where(session => !released.Contains(session.Id)).ToArray() };
         // Work shifts can be proposed conditionally, never silently moved.
         // Other appointments, locked/active work and busy exceptions remain protected.
+        // Imported classes keep their actual hours. Overlapping flexible sessions
+        // are regenerated below by the planner; class imports cannot move old events.
         ValidateEventConflicts(calendar with { Events = calendar.Events.Where(item => !incoming.Any(change => change.Id == item.Id)).ToArray() }, incoming, null);
         var moved = new List<FixedEvent>();
         var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);

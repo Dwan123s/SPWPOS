@@ -33,6 +33,11 @@ import {
 } from "./nora-message-actions.jsx";
 import { useVoiceInput } from "./voice-input.js";
 import {
+  useTimetableImage,
+  TimetableImageButton,
+  TimetableImagePreview,
+} from "./timetable-image.jsx";
+import {
   NoraReply,
   groupConversations,
   planSessionName,
@@ -119,6 +124,7 @@ function Turn({
     <article className="agent-turn">
       <NoraPromptMessage
         text={turn.text}
+        image={turn.image}
         createdAt={turn.createdAt}
         busy={busy}
         onEdit={onEdit}
@@ -344,6 +350,18 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     [conversationId],
   );
   const accountKey = `planora:agent:${state.workspace?.profile?.id || "current"}`;
+  const image = useTimetableImage({
+    enabled:
+      !busy &&
+      !loading &&
+      !conversationArchived &&
+      capabilities?.imageAvailable,
+  });
+  const composedText = text;
+  const remainingCharacters = 2000 - composedText.length;
+  useEffect(() => {
+    image.remove();
+  }, [accountKey]);
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1081px)");
     const sync = () => setWide(media.matches);
@@ -425,40 +443,40 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     );
   async function send(event, overrideText) {
     if (event?.preventDefault) event.preventDefault();
-    const messageText = (
+    const draftText = (
       typeof overrideText === "string" ? overrideText : text
     ).trim();
+    const withImage = typeof overrideText !== "string" && !!image.attachment;
     if (
       busy ||
       conversationArchived ||
       voice.isActive() ||
-      !messageText ||
+      image.active ||
+      (!draftText && !withImage) ||
       !conversationId ||
       !capabilities?.aiAvailable
     )
       return;
     setBusy(true);
     setError("");
-    const body =
-      retry.current?.text === messageText &&
-      retry.current.conversationId === conversationId
-        ? retry.current
-        : {
-            conversationId,
-            requestId: crypto.randomUUID(),
-            text: messageText,
-            autoApply,
-            useCapacityFactor: false,
-            useEstimateBias: false,
-          };
-    retry.current = body;
+    let body = null;
     const controller = new AbortController();
     streamAbort.current = controller;
     streamState.current = {
-      requestId: body.requestId,
-      text: messageText,
+      requestId: crypto.randomUUID(),
+      text: draftText || "Xếp lịch theo thời khóa biểu trong ảnh.",
+      image: withImage
+        ? { name: image.attachment.file.name, url: image.attachment.preview }
+        : null,
       reply: "",
-      phases: [],
+      phases: withImage
+        ? [
+            {
+              stage: "READING_IMAGE",
+              message: "Đang đọc thời khóa biểu trong ảnh",
+            },
+          ]
+        : [],
       startedAt: Date.now(),
       cancelled: false,
     };
@@ -466,6 +484,42 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     followBottom.current = true;
     scrollToBottomActive.current = false;
     try {
+      const attachedImage = withImage
+        ? {
+            name: image.attachment.file.name,
+            mimeType: image.attachment.file.type,
+            data: image.attachment.preview.split(",")[1],
+          }
+        : null;
+      controller.signal.throwIfAborted();
+      if (!mounted.current) return;
+      const messageText =
+        draftText || "Xếp lịch theo thời khóa biểu trong ảnh.";
+      if (messageText.length > 2000)
+        throw new Error(
+          "Yêu cầu kèm thời khóa biểu vượt 2000 ký tự. Bạn rút gọn lời nhắn hoặc chia thời khóa biểu thành từng phần nhé.",
+        );
+      body =
+        retry.current?.text === messageText &&
+        retry.current?.image?.data === attachedImage?.data &&
+        retry.current.conversationId === conversationId
+          ? retry.current
+          : {
+              conversationId,
+              requestId: streamState.current.requestId,
+              text: messageText,
+              autoApply,
+              useCapacityFactor: false,
+              useEstimateBias: false,
+              ...(attachedImage ? { image: attachedImage } : {}),
+            };
+      retry.current = body;
+      streamState.current = {
+        ...streamState.current,
+        requestId: body.requestId,
+        text: messageText,
+      };
+      setPending(streamState.current);
       const result = await sendAgentStream(
         body,
         (item) => {
@@ -501,7 +555,10 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         setCalendarRevision((value) => value + 1);
       }
       setPending(null);
-      if (!overrideText) setText("");
+      if (!overrideText) {
+        setText("");
+        image.remove();
+      }
       retry.current = null;
       try {
         if (result.status === "APPLIED") await onWorkspaceChanged();
@@ -536,6 +593,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             : failure.message,
         );
         try {
+          if (!body) return;
           const history = await api("/api/agent/turns");
           if (mounted.current) {
             setTurns(history);
@@ -680,6 +738,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   ) {
     voice.cancel();
     voice.clearError();
+    image.remove();
     setConversationId(id);
     setConversationDetails(details);
     setConversationArchived(archived);
@@ -1349,6 +1408,15 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
               onSubmit={send}
               aria-label="Gửi yêu cầu cho NORA"
             >
+              <TimetableImagePreview
+                image={image}
+                disabled={busy || loading || conversationArchived}
+                provider={
+                  capabilities?.provider === "VertexAI"
+                    ? "Google Cloud"
+                    : capabilities?.provider
+                }
+              />
               <label htmlFor="agent-request" className="field">
                 <span className="nora-sr-only">Yêu cầu của bạn</span>
                 <textarea
@@ -1368,6 +1436,9 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                       : "NORA ơi, giúp mình lên lịch…"
                   }
                   onChange={(event) => setText(event.target.value)}
+                  onPaste={(event) => {
+                    if (!voice.isActive()) image.paste(event);
+                  }}
                   onKeyDown={(event) => {
                     if (
                       event.key === "Enter" &&
@@ -1405,13 +1476,25 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                 <div className="nora-composer-tools">
                   <span
                     id="nora-request-count"
-                    hidden={2000 - text.length >= 500}
-                    className={`nora-composer-count${text.length >= 1800 ? " is-near-limit" : ""}`}
-                    aria-label={`Còn ${2000 - text.length} ký tự`}
-                    title={`Còn ${2000 - text.length} / 2000 ký tự`}
+                    hidden={remainingCharacters >= 500}
+                    className={`nora-composer-count${remainingCharacters <= 200 ? " is-near-limit" : ""}`}
+                    aria-label={`Còn ${remainingCharacters} ký tự`}
+                    title={`Còn ${remainingCharacters} / 2000 ký tự`}
                   >
-                    Còn {2000 - text.length}
+                    Còn {remainingCharacters}
                   </span>
+                  {capabilities?.imageAvailable && (
+                    <TimetableImageButton
+                      image={image}
+                      disabled={
+                        busy ||
+                        loading ||
+                        voice.active ||
+                        conversationArchived ||
+                        image.active
+                      }
+                    />
+                  )}
                   {capabilities?.voiceAvailable && (
                     <button
                       type="button"
@@ -1450,7 +1533,10 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                     <button
                       type="button"
                       className="nora-stop-button"
-                      onClick={() => streamAbort.current?.abort()}
+                      onClick={() => {
+                        streamAbort.current?.abort();
+                        image.cancelRead();
+                      }}
                       disabled={pending.phases.at(-1)?.stage === "SAVING"}
                     >
                       {icon("stop")}
@@ -1468,7 +1554,9 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                         voice.active ||
                         loading ||
                         !capabilities?.aiAvailable ||
-                        !text.trim()
+                        image.active ||
+                        remainingCharacters < 0 ||
+                        (!text.trim() && !image.attachment)
                       }
                     >
                       {icon("arrow")}
@@ -1518,6 +1606,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             <div className="nora-composer-footer">
               <span id="nora-composer-hint">
                 Enter gửi · Shift + Enter xuống dòng
+                {capabilities?.imageAvailable && " · Ctrl + V dán ảnh"}
               </span>
               <PopupDetails className="nora-composer-info">
                 <summary aria-label="Trợ giúp NORA" title="Trợ giúp NORA">
@@ -1538,6 +1627,18 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                     <strong>Lịch của bạn.</strong> NORA dùng yêu cầu và thông
                     tin lịch của bạn để hỗ trợ sắp xếp thời gian.
                   </p>
+                  {capabilities?.imageAvailable && (
+                    <p>
+                      <strong>Ảnh thời khóa biểu.</strong> Chọn một ảnh PNG, JPG
+                      hoặc WebP (tối đa 5 MB), ghi thêm ngày áp dụng nếu cần rồi
+                      bấm Gửi. NORA đọc ảnh bằng{" "}
+                      {capabilities.provider === "VertexAI"
+                        ? "Google Cloud"
+                        : capabilities.provider}{" "}
+                      và xếp lịch theo chế độ tự động lưu ở trên. Thiếu ngày
+                      hoặc giờ theo tiết, NORA sẽ hỏi thêm.
+                    </p>
+                  )}
                   {capabilities?.voiceAvailable ? (
                     <details className="nora-voice-help">
                       <summary>Nhập bằng giọng nói</summary>

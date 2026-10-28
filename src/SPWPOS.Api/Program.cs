@@ -11,6 +11,7 @@ using System.IO.Compression;
 using Microsoft.AspNetCore.ResponseCompression;
 using SPWPOS.Api.Middleware;
 using SPWPOS.Application.Authentication;
+using SPWPOS.Application.Workspace;
 using SPWPOS.Infrastructure;
 using SPWPOS.Infrastructure.Persistence;
 
@@ -114,6 +115,9 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("agent-voice", c => RateLimitPartition.GetSlidingWindowLimiter(
         $"voice:{c.User.FindFirst("sub")?.Value ?? c.Connection.RemoteIpAddress?.ToString()}", _ => new SlidingWindowRateLimiterOptions
         { PermitLimit = 24, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
+    o.AddPolicy("agent-image", c => RateLimitPartition.GetSlidingWindowLimiter(
+        $"image:{c.User.FindFirst("sub")?.Value ?? c.Connection.RemoteIpAddress?.ToString()}", _ => new SlidingWindowRateLimiterOptions
+        { PermitLimit = 6, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
     o.OnRejected = async (context, ct) =>
     {
         context.HttpContext.Response.Headers.RetryAfter = "60";
@@ -235,7 +239,9 @@ app.Use(async (context, next) =>
         context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
         if (!context.Request.IsHttps)
         { await ApiProblems.WriteAsync(context, 400, "HTTPS_REQUIRED", "HTTPS is required.", context.RequestAborted); return; }
-        if (context.Request.ContentLength > 3 * 1024 * 1024)
+        var requestLimit = context.Request.Path.Value is "/api/agent/turns" or "/api/agent/turns/stream" ? 8 * 1024 * 1024
+            : context.Request.Path.Value == "/api/agent/images/timetable" ? TimetableImageLimits.MaxBytes : 3 * 1024 * 1024;
+        if (context.Request.ContentLength > requestLimit)
         { await ApiProblems.WriteAsync(context, 413, "REQUEST_TOO_LARGE", "Request body is too large.", context.RequestAborted); return; }
         var browserSession = context.Request.Path.StartsWithSegments("/api/browser-session");
         var cookieAuthentication = context.Request.Cookies.ContainsKey(SPWPOS.Api.Controllers.BrowserSessionController.AccessCookie) && !context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);

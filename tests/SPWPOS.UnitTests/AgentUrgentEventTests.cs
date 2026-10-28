@@ -7,6 +7,62 @@ namespace SPWPOS.UnitTests;
 
 public sealed partial class AgentFreeTimeTests
 {
+    [Theory]
+    [InlineData("khẩn cấp", "Đi ỉa", "WORK", false)]
+    [InlineData("khẩn", "Đi vệ sinh", "WORK", true)]
+    [InlineData("khẩn cấp", "Ăn trưa", "OTHER", true)]
+    [InlineData("khẩn", "Nghỉ ngơi", "OTHER", false)]
+    public async Task Urgent_work_keeps_requested_hours_and_proposes_moving_personal_routines(
+        string urgency, string routine, string eventType, bool streaming)
+    {
+        var name = "Đi làm khẩn cấp";
+        var ai = new AgentAiTestDouble { Response = _ => AgentAiTestDouble.Empty() with {
+            Events = [new(name, At(840), At(900), EventType: eventType)] } };
+        await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        var old = new FixedEvent { UserId = user.Id, Name = routine, EventType = "OTHER", Start = At(840), End = At(900) };
+        await h.DbAsync(async db => { db.FixedEvents.Add(old); await db.SaveChangesAsync(Ct); });
+        var input = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), $"Mai tôi đi làm {urgency} vào lúc 2 giờ chiều trong 1 tiếng.", true);
+        var preview = await UseAgent(h, service => streaming
+            ? service.SendAgentTurnStreamingAsync(user.Id, input, (_, _) => Task.CompletedTask, Ct)
+            : service.SendAgentTurnAsync(user.Id, input, Ct));
+        Assert.Equal("PREVIEW", preview.Status); Assert.True(preview.Plan!.RequiresConfirmation);
+        var requested = Assert.Single(preview.Changes, change => change.Name == name);
+        Assert.Contains("14:00", requested.After); Assert.Contains("15:00", requested.After);
+        var move = Assert.Single(preview.Changes, change => change.Name == routine);
+        Assert.Contains("14:00", move.Before); Assert.Contains("15:00", move.Before);
+        Assert.Contains("15:00", move.After); Assert.Contains("16:00", move.After);
+        Assert.Equal(At(840), (await h.DbAsync(db => db.FixedEvents.SingleAsync(Ct))).Start);
+        await UseAgent(h, service => service.ApplyAgentTurnAsync(user.Id, preview.Id, Ct));
+        var saved = await h.DbAsync(db => db.FixedEvents.SingleAsync(item => item.Name == name, Ct));
+        Assert.True(saved.IsUrgent); Assert.Equal(At(840), saved.Start); Assert.Equal(At(900), saved.End);
+        var moved = await h.DbAsync(db => db.FixedEvents.SingleAsync(item => item.Id == old.Id, Ct));
+        Assert.Equal(At(900), moved.Start); Assert.Equal(At(960), moved.End);
+        await UseAgent(h, service => service.UndoAgentTurnAsync(user.Id, preview.Id, Ct));
+        Assert.Equal(old.Id, (await h.DbAsync(db => db.FixedEvents.SingleAsync(Ct))).Id);
+        Assert.Equal(At(840), (await h.DbAsync(db => db.FixedEvents.SingleAsync(Ct))).Start);
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("không khẩn", "")]
+    [InlineData("khẩn cấp", "Không được dời giờ")]
+    [InlineData("khẩn", "Lịch cố định")]
+    public async Task Personal_routines_still_require_explicit_urgency_and_respect_no_move_constraints(string urgency, string description)
+    {
+        var name = "Đi làm " + urgency;
+        var ai = new AgentAiTestDouble { Response = _ => AgentAiTestDouble.Empty() with {
+            Events = [new(name.Trim(), At(840), At(900), EventType: "WORK")] } };
+        await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        await h.DbAsync(async db => {
+            db.FixedEvents.Add(new() { UserId = user.Id, Name = "Đi ỉa", Description = description, EventType = "OTHER", Start = At(840), End = At(900) });
+            await db.SaveChangesAsync(Ct);
+        });
+        var error = await Assert.ThrowsAsync<AuthException>(() => UseAgent(h, service => service.SendAgentTurnAsync(user.Id,
+            new(Guid.NewGuid(), Guid.NewGuid(), $"Mai tôi đi làm {urgency} lúc 14:00–15:00.", true), Ct)));
+        Assert.Equal("FIXED_EVENT_OVERLAP", error.Code);
+        Assert.Equal(At(840), (await h.DbAsync(db => db.FixedEvents.SingleAsync(Ct))).Start);
+    }
+
     [Theory] [InlineData(false)] [InlineData(true)]
     public async Task Urgency_survives_a_duration_clarification_but_can_be_explicitly_cancelled(bool cancelUrgency)
     {

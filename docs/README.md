@@ -33,6 +33,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [Notes and scheduling agent / Ghi chú và agent](features/NOTES_AGENT_GUIDE.md)
 - [Planning and chat agent / Agent lập kế hoạch](features/PLANNING_AGENT_GUIDE.md)
 - [NORA voice / Giọng nói NORA](features/NORA_VOICE.md)
+- [NORA timetable images / Đọc thời khóa biểu từ ảnh](features/NORA_TIMETABLE_IMAGES.md)
 - [Tasks and reminders / Công việc và nhắc nhở](features/PLANORA_TASK_AND_REMINDER_UPDATE.md)
 
 ## Integrations / Tích hợp
