@@ -9,7 +9,7 @@ public sealed partial class PlanningEngine
         UrgentReplanPolicy? urgency = null, bool urgentFirst = true)
     {
         var best = GenerateGreedy(state, input, now, urgency, urgentFirst);
-        if (urgentFirst && urgency?.ProtectedTaskIds is { Count: > 0 } &&
+        if (urgentFirst &&
             best.Warnings.Any(x => x.UnscheduledMinutes > 0))
         {
             var deadlineFirst = GenerateGreedy(state, input, now, urgency, urgentFirst: false);

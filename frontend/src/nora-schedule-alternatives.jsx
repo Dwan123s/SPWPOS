@@ -38,10 +38,13 @@ export function scheduleAlternativeView(turn) {
           const match = item
             .trim()
             .match(
-              /^(\d{2}\/\d{2}\/\d{4})\s+([0-2]\d:[0-5]\d)\s*[–→-]\s*(?:(\d{2}\/\d{2}\/\d{4})\s+)?([0-2]\d:[0-5]\d)$/,
+              /^(\d{2}[/-]\d{2}[/-]\d{4})\s+([0-2]\d:[0-5]\d)\s*[–→-]\s*(?:(\d{2}[/-]\d{2}[/-]\d{4})\s+)?([0-2]\d:[0-5]\d)$/,
             );
           if (!match) return null;
-          const [, date, start, endDate = date, end] = match;
+          const date = match[1].replaceAll("-", "/");
+          const start = match[2];
+          const endDate = (match[3] || date).replaceAll("-", "/");
+          const end = match[4];
           const validDate = (value) => {
             const [day, month, year] = value.split("/").map(Number);
             const check = new Date(Date.UTC(year, month - 1, day));

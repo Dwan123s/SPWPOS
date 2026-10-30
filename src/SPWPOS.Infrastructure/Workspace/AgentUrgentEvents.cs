@@ -44,11 +44,22 @@ public sealed partial class WorkspaceService
         bool Overlaps(DateTimeOffset start, DateTimeOffset end) => urgent.Any(item => start < item.End && item.Start < end);
         var classes = timetableContext || IsTimetableRequest(request)
             ? incoming.Where(item => item.EventType == "CLASS").ToArray() : [];
+        // Consent can name the work or identify only sessions overlapping the new event.
+        // Unrelated work, fixed events and locked/active sessions stay protected.
+        var preserved = ExplicitlyPreservedTasks(request, state);
+        var editsEventTime = incoming.Any(item => state.Events.Any(original => original.Id == item.Id &&
+            (original.Start != item.Start || original.End != item.End))) &&
+            ChatMatch(request, @"\b(?:doi|chuyen|sua|cap nhat|move|reschedule|edit)\b").Success && !ForbidsSessionMoves(request);
+        var conflictingMoves = RequestsConflictingSessionMove(request) || editsEventTime;
+        var authorizedMoves = state.Tasks.Where(task => !preserved.Contains(task.Id) && (conflictingMoves || ChatMatch(request,
+            @"\b(?:doi|doi lich|doi gio|di chuyen|xep lai|sap xep lai)\s+(?:(?:rieng|lich|phien|cho|cong viec)\s+)*" +
+            Regex.Escape(MatchText(task.Name)) + @"\b").Success)).Select(task => task.Id).ToHashSet();
         bool NeedsReplan(DateTimeOffset start, DateTimeOffset end) => Overlaps(start, end) || classes.Any(item => start < item.End && item.Start < end);
         var existing = state.Events.Where(item => !incoming.Any(change => change.Id == item.Id)).ToArray();
         var movable = existing.Where(item => item.Start >= Now.AddMinutes(5) && Overlaps(item.Start, item.End) && CanProposeEventMove(item, request)).ToArray();
         var released = state.Sessions.Where(session => session.Status == WorkSessionStatus.Scheduled && !session.IsLocked &&
-            session.Start >= Now.AddMinutes(5) && NeedsReplan(session.Start, session.End) &&
+            session.Start >= Now.AddMinutes(5) && (NeedsReplan(session.Start, session.End) || authorizedMoves.Contains(session.TaskId) &&
+                incoming.Any(item => session.Start < item.End && item.Start < session.End)) &&
             state.Tasks.Any(task => task.Id == session.TaskId && !task.IsDeleted &&
                 task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled)).Select(session => session.Id).ToHashSet();
         var calendar = state with { Events = existing.Where(item => !movable.Any(move => move.Id == item.Id)).Concat(incoming).ToArray(),

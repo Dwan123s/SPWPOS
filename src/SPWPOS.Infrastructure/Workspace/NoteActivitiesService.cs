@@ -133,9 +133,9 @@ public sealed partial class WorkspaceService
             if (state.Exceptions.Where(x => !x.IsAvailable).Any(x =>
                 PlanningEngine.At(x.Date, x.StartMinute, zone) < to && PlanningEngine.At(x.Date, x.EndMinute, zone) > from))
                 return warning with { Code = "NOTE_UNAVAILABLE_TIME",
-                    Message = $"Khung giờ {localStart:dd/MM HH:mm}–{localEnd:HH:mm} trùng thời gian đã đánh dấu không rảnh. Chọn giờ khác hoặc chỉnh thời gian không rảnh rồi xem lại lịch." };
+                    Message = $"Khung giờ {localStart:dd'/'MM HH:mm}–{localEnd:HH:mm} trùng thời gian đã đánh dấu không rảnh. Chọn giờ khác hoặc chỉnh thời gian không rảnh rồi xem lại lịch." };
             return warning with { Code = "NOTE_OUTSIDE_AVAILABILITY",
-                Message = $"Khung giờ {localStart:dd/MM HH:mm}–{localEnd:HH:mm} nằm ngoài giờ rảnh đã thiết lập. Cho phép dùng giờ đã chọn cho lần này hoặc chỉnh giờ rảnh rồi xem lại lịch." };
+                Message = $"Khung giờ {localStart:dd'/'MM HH:mm}–{localEnd:HH:mm} nằm ngoài giờ rảnh đã thiết lập. Cho phép dùng giờ đã chọn cho lần này hoặc chỉnh giờ rảnh rồi xem lại lịch." };
         }).ToArray()
     };
 

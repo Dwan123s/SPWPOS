@@ -4,7 +4,7 @@
   "title": "NORA — Bộ conversation test planning/scheduling đa giọng",
   "language": "vi-VN",
   "created_on": "2026-10-21",
-  "evaluation_status": "AUTHORED_NOT_EXECUTED",
+  "evaluation_status": "EXTENDED_DEFENSE_PACK_REQUIRES_EXECUTION_AND_REVIEW",
   "purpose": "Bộ prompt thực hành bao phủ rộng các lớp tình huống planning/scheduling và khả năng hiểu cách nói. Không tuyên bố liệt kê mọi tình huống có thể tồn tại.",
   "compatibility": {
     "format": "grouped_conversation_pack",
@@ -5842,18 +5842,741 @@
           ]
         }
       ]
+    },
+    {
+      "id": "G31",
+      "title": "Bảo vệ đồ án: chứng minh ràng buộc và phản biện",
+      "cases": [
+        {
+          "id": "G31-01",
+          "coverage_key": "defense.1",
+          "title": "Bảo vệ: tổng thời lượng và hạn chót chính xác",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Chuẩn bị bảo vệ: tạo việc Soạn lời mở đầu 90 phút, hạn chót 22:00 ngày 28/10/2026. Xếp sớm trong giờ rảnh đã có.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Lưu đúng 90 phút; không tự cộng thời gian dự phòng, không tạo task trùng."
+                ],
+                "assertions": {
+                  "task_count": 1,
+                  "tasks": [
+                    {
+                      "match": "Soạn lời mở đầu",
+                      "minutes": 90,
+                      "deadline": "2026-10-28T22:00:00+07:00"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-02",
+          "coverage_key": "defense.2",
+          "title": "Bảo vệ: lịch khả thi dù priority ngược deadline",
+          "voice_profile": "formal",
+          "fixture": "BACKLOG",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Nếu giám khảo yêu cầu giữ nguyên độ ưu tiên, hãy xếp cả Nộp đơn học bổng và Luyện phỏng vấn kịp hạn đang lưu; không đổi thời lượng hay giờ rảnh.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Phương án khả thi duy nhất: học bổng 19:00–20:00, phỏng vấn 20:00–20:30; không báo thiếu giờ giả."
+                ],
+                "assertions": {
+                  "task_count": 2,
+                  "tasks": [
+                    {
+                      "match": "Nộp đơn học bổng",
+                      "minutes": 60,
+                      "deadline": "2026-10-26T20:00:00+07:00",
+                      "priority": 1
+                    },
+                    {
+                      "match": "Luyện phỏng vấn",
+                      "minutes": 30,
+                      "deadline": "2026-10-26T22:00:00+07:00",
+                      "priority": 4
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-03",
+          "coverage_key": "defense.3",
+          "title": "Bảo vệ: tổng giờ đủ nhưng thiếu khối liên tục",
+          "voice_profile": "formal",
+          "fixture": "FRAG",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Bài thi mô phỏng cần 90 phút liền mạch, tuyệt đối không chia. Hạn chót 22:00 hôm nay 26/10/2026; giữ nguyên hai khoảng rảnh đã lưu.",
+              "expected": {
+                "outcome": "BLOCK",
+                "checks": [
+                  "Giải thích thiếu khối liên tục, không nhầm với thiếu tổng giờ; không lưu một phần."
+                ],
+                "assertions": {
+                  "task_count": 0,
+                  "event_count": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-04",
+          "coverage_key": "defense.4",
+          "title": "Bảo vệ: cùng lịch phân mảnh nhưng được chia",
+          "voice_profile": "formal",
+          "fixture": "FRAG",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Ôn phản biện cần tổng 90 phút, được chia nhỏ; hạn chót 22:00 ngày 26/10/2026. Chỉ dùng hai khoảng rảnh hiện tại.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Tổng phiên đúng 90 phút và nằm trong 19–20 hoặc 21–22, không lấp khoảng bận."
+                ],
+                "assertions": {
+                  "task_count": 1,
+                  "tasks": [
+                    {
+                      "match": "Ôn phản biện",
+                      "minutes": 90,
+                      "deadline": "2026-10-26T22:00:00+07:00",
+                      "splittable": true
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-05",
+          "coverage_key": "defense.5",
+          "title": "Bảo vệ: nghỉ làm lịch mất khả thi",
+          "voice_profile": "formal",
+          "fixture": "BREAK",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Làm hai giờ luyện demo trước hạn chót 21:00 ngày 26/10/2026, được chia phiên, vẫn phải giữ nghỉ giữa phiên và giới hạn phiên hiện tại.",
+              "expected": {
+                "outcome": "BLOCK",
+                "checks": [
+                  "120 phút làm việc cộng nghỉ không vừa khoảng 19–21; không bỏ nghỉ để ép vừa."
+                ],
+                "assertions": {
+                  "task_count": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-06",
+          "coverage_key": "defense.6",
+          "title": "Bảo vệ: kết thúc đúng deadline được chấp nhận",
+          "voice_profile": "formal",
+          "fixture": "BREAK",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Luyện trả lời 105 phút, được chia, hạn chót đúng 21:00 ngày 26/10/2026. Giữ phiên tối đa 60 phút và nghỉ 15 phút.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "105 phút làm và 15 phút nghỉ vừa đúng hai giờ; kết thúc bằng deadline là hợp lệ."
+                ],
+                "assertions": {
+                  "task_count": 1,
+                  "tasks": [
+                    {
+                      "match": "Luyện trả lời",
+                      "minutes": 105,
+                      "deadline": "2026-10-26T21:00:00+07:00"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-07",
+          "coverage_key": "defense.7",
+          "title": "Bảo vệ: giờ trống không đồng nghĩa còn ngân sách",
+          "voice_profile": "formal",
+          "fixture": "CAP",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Dù còn trống sau 20:00, hãy thử thêm Đọc câu hỏi hội đồng 15 phút hạn chót 22:00 ngày 26/10/2026; giữ nguyên giới hạn ngày và phiên khóa.",
+              "expected": {
+                "outcome": "PROBE",
+                "checks": [
+                  "Ngân sách 120 phút đã dùng 60 và giữ chỗ 60; hỏi điều chỉnh hoặc chặn, không lưu thêm."
+                ],
+                "assertions": {
+                  "unchanged": true,
+                  "task_count": 2,
+                  "preserve": [
+                    "id:{{lock_slot}}",
+                    "id:{{done_slot}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-08",
+          "coverage_key": "defense.8",
+          "title": "Bảo vệ: chuỗi phụ thuộc ba bước",
+          "voice_profile": "formal",
+          "fixture": "DEP",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Lập kế hoạch cho cả Lập dàn ý, Viết bản nháp, Soát bản nháp với thời lượng và hạn chót đã lưu. Giữ đúng thứ tự phụ thuộc của cả ba.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Tiền nhiệm phải hoàn thành toàn bộ trước khi việc sau bắt đầu, không chỉ bắt đầu trước."
+                ],
+                "assertions": {
+                  "task_count": 3,
+                  "tasks": [
+                    {
+                      "match": "Lập dàn ý",
+                      "minutes": 60,
+                      "deadline": "2026-10-26T22:00:00+07:00"
+                    },
+                    {
+                      "match": "Viết bản nháp",
+                      "minutes": 60,
+                      "deadline": "2026-10-26T22:00:00+07:00"
+                    },
+                    {
+                      "match": "Soát bản nháp",
+                      "minutes": 30,
+                      "deadline": "2026-10-26T22:00:00+07:00"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-09",
+          "coverage_key": "defense.9",
+          "title": "Bảo vệ: deadline khác khoảng được phép thực hiện",
+          "voice_profile": "formal",
+          "fixture": "WINDOW",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Xếp Vẽ poster theo dữ liệu đã lưu. Hạn còn đến thứ Sáu nhưng chỉ được làm trong khung thực hiện thứ Năm, không xếp sớm ngoài khung đó.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Giữ nguyên work window và deadline; phiên nằm trong giao của work window và giờ rảnh."
+                ],
+                "assertions": {
+                  "task_count": 1,
+                  "tasks": [
+                    {
+                      "match": "Vẽ poster",
+                      "minutes": 60,
+                      "deadline": "2026-10-30T22:00:00+07:00",
+                      "work_window_start": "2026-10-29T18:00:00+07:00",
+                      "work_window_end": "2026-10-29T22:00:00+07:00"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-10",
+          "coverage_key": "defense.10",
+          "title": "Bảo vệ: chỉ xếp phần việc chưa hoàn thành",
+          "voice_profile": "formal",
+          "fixture": "PROGRESS",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Đọc giáo trình đã hoàn thành 50 phần trăm. Xếp phần còn lại thôi; không làm lại Bài đã nộp hay Bản nháp bỏ.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Giữ estimated 120, progress 50; chỉ xếp 60 phút còn lại; không phục hồi việc hủy."
+                ],
+                "assertions": {
+                  "task_count": 3,
+                  "tasks": [
+                    {
+                      "match": "Đọc giáo trình",
+                      "minutes": 120,
+                      "deadline": "2026-10-30T22:00:00+07:00",
+                      "scheduled_minutes": 60
+                    }
+                  ],
+                  "preserve": [
+                    "id:{{finished}}",
+                    "id:{{cancelled}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-11",
+          "coverage_key": "defense.11",
+          "title": "Bảo vệ: hỏi lịch không được tối ưu ngầm",
+          "voice_profile": "formal",
+          "fixture": "EDIT",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Hội đồng chỉ muốn xem: hôm nay lịch của tôi thế nào, còn rảnh lúc nào? Chỉ đọc, không xếp lại hay lưu bất kỳ việc gì.",
+              "expected": {
+                "outcome": "READ",
+                "checks": [
+                  "Nêu đúng việc đã lưu và khoảng rảnh, không suy ra yêu cầu sửa lịch."
+                ],
+                "assertions": {
+                  "unchanged": true,
+                  "task_count": 2,
+                  "event_count": 1,
+                  "preserve": [
+                    "id:{{report_slot}}",
+                    "id:{{read_slot}}",
+                    "id:{{standup}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-12",
+          "coverage_key": "defense.12",
+          "title": "Bảo vệ: xem thử chỉnh sửa không phải cho phép lưu",
+          "voice_profile": "formal",
+          "fixture": "EDIT",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Chỉ xem thử phương án rút Báo cáo tiến độ còn 45 phút, chưa cho phép lưu. Giữ nguyên Đọc tài liệu API và cuộc họp.",
+              "expected": {
+                "outcome": "PREVIEW",
+                "checks": [
+                  "Dữ liệu thật vẫn là 60 phút; không nói đã lưu 45 phút."
+                ],
+                "assertions": {
+                  "unchanged": true,
+                  "task_count": 2,
+                  "preview_preserve_session_ids": ["{{read_slot}}"],
+                  "preserve": [
+                    "id:{{report}}",
+                    "id:{{report_slot}}",
+                    "id:{{read_slot}}",
+                    "id:{{standup}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-13",
+          "coverage_key": "defense.13",
+          "title": "Bảo vệ: dời riêng phiên bị cuộc hẹn mới ảnh hưởng",
+          "voice_profile": "formal",
+          "fixture": "EDIT",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Ngày 26/10/2026 tôi có buổi gặp giảng viên 19:00–20:00. Thêm đúng giờ đó rồi dời riêng Báo cáo tiến độ bị trùng; giữ nguyên Đọc tài liệu API và Họp nhóm.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Phải lưu event đúng 19–20 và dời báo cáo sang 21–22; giữ nguyên lịch không liên quan. Preview chưa áp dụng không được tính là đã lưu."
+                ],
+                "assertions": {
+                  "task_count": 2,
+                  "event_count": 2,
+                  "preserve": [
+                    "id:{{read_slot}}",
+                    "id:{{standup}}"
+                  ],
+                  "events": [
+                    {
+                      "match": "gặp giảng viên",
+                      "start": "2026-10-26T19:00:00+07:00",
+                      "end": "2026-10-26T20:00:00+07:00"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-14",
+          "coverage_key": "defense.14",
+          "title": "Bảo vệ: khẩn không cho phép đè phiên khóa",
+          "voice_profile": "formal",
+          "fixture": "PROTECTED",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Lịch khẩn: thêm họp phản biện ngày 27/10/2026 19:00–20:00. Không được di chuyển hay mở khóa Phiên khóa.",
+              "expected": {
+                "outcome": "BLOCK",
+                "checks": [
+                  "Xung đột khóa phải chặn; không lưu event hoặc đổi trạng thái phiên đang chạy."
+                ],
+                "assertions": {
+                  "unchanged": true,
+                  "preserve": [
+                    "id:{{locked_slot}}",
+                    "id:{{running_slot}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-15",
+          "coverage_key": "defense.15",
+          "title": "Bảo vệ: không tự bịa thời lượng",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Tôi cần chuẩn bị phần trả lời phản biện, hạn chót 22:00 ngày 28/10/2026. Xếp giúp tôi nhưng đừng tự đoán thời lượng.",
+              "expected": {
+                "outcome": "CLARIFY",
+                "checks": [
+                  "Hỏi thời lượng còn thiếu, không lấy mặc định 30 hoặc 60 phút."
+                ],
+                "assertions": {
+                  "task_count": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-16",
+          "coverage_key": "defense.16",
+          "title": "Bảo vệ: không tự bịa deadline",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Luyện thuyết trình trong 45 phút giúp tôi. Tôi chưa xác định hạn chót, bạn hỏi lại trước khi lập lịch.",
+              "expected": {
+                "outcome": "CLARIFY",
+                "checks": [
+                  "Không tự chọn hôm nay hay tuần này làm deadline."
+                ],
+                "assertions": {
+                  "task_count": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-17",
+          "coverage_key": "defense.17",
+          "title": "Bảo vệ: sáu giờ chưa xác định sáng chiều",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Ngày 28/10/2026 tôi gặp hội đồng lúc 6 giờ, kéo dài 30 phút. Thêm giúp tôi; tôi chưa nói sáng hay chiều.",
+              "expected": {
+                "outcome": "CLARIFY",
+                "checks": [
+                  "Hỏi 06:00 hay 18:00, không suy ra theo giờ rảnh."
+                ],
+                "assertions": {
+                  "task_count": 0,
+                  "event_count": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-18",
+          "coverage_key": "defense.18",
+          "title": "Bảo vệ: thứ và ngày mâu thuẫn",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Thứ Năm ngày 28/10/2026 có buổi bảo vệ lúc 18:00–19:00. Thêm lịch nhưng nếu thứ và ngày không khớp thì hỏi tôi.",
+              "expected": {
+                "outcome": "CLARIFY",
+                "checks": [
+                  "28/10 là thứ Tư; hỏi chọn ngày hay thứ, không âm thầm đổi sang 29/10."
+                ],
+                "assertions": {
+                  "event_count": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-19",
+          "coverage_key": "defense.19",
+          "title": "Bảo vệ: batch quá tải không lưu phần dễ",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Chỉ còn tối 26/10/2026: tạo Luyện demo 120 phút và Ôn phản biện 120 phút, cùng hạn chót 22:00 hôm nay. Chỉ lưu nếu xếp đủ cả hai trong giờ rảnh hiện có.",
+              "expected": {
+                "outcome": "PROBE",
+                "checks": [
+                  "240 phút không vừa 180 phút; chặn hoặc hỏi điều chỉnh, không lưu riêng một việc."
+                ],
+                "assertions": {
+                  "unchanged": true,
+                  "task_count": 0,
+                  "event_count": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-20",
+          "coverage_key": "defense.20",
+          "title": "Bảo vệ: hỏi lại rồi nhớ đúng yêu cầu ban đầu",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Soạn trả lời phản biện có hạn chót 22:00 ngày 29/10/2026. Tôi chưa nói thời lượng; hãy hỏi rồi mới xếp.",
+              "expected": {
+                "outcome": "CLARIFY",
+                "checks": [
+                  "Giữ tên và hạn chót trong lượt hỏi lại."
+                ],
+                "assertions": {
+                  "task_count": 0
+                }
+              }
+            },
+            {
+              "type": "user",
+              "text": "Công việc vừa nói cần đúng 45 phút, được chia phiên. Giờ bạn xếp giúp tôi, giữ nguyên hạn chót đã nói.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Dùng đúng yêu cầu trước, không tạo task tên mới hoặc đổi deadline."
+                ],
+                "assertions": {
+                  "task_count": 1,
+                  "tasks": [
+                    {
+                      "match": "Soạn trả lời phản biện",
+                      "minutes": 45,
+                      "deadline": "2026-10-29T22:00:00+07:00"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-21",
+          "coverage_key": "defense.21",
+          "title": "Bảo vệ: tự sửa thời lượng không nhân đôi task",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Tạo Kiểm tra slide 90 phút, hạn chót 22:00 ngày 29/10/2026, xếp trong giờ rảnh.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Lưu duy nhất một task."
+                ],
+                "assertions": {
+                  "task_count": 1,
+                  "tasks": [
+                    {
+                      "match": "Kiểm tra slide",
+                      "minutes": 90,
+                      "deadline": "2026-10-29T22:00:00+07:00"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "user",
+              "text": "Tôi nói nhầm: chính Kiểm tra slide đó chỉ cần 45 phút. Sửa task cũ và lịch của nó, giữ nguyên hạn chót, đừng tạo task thứ hai.",
+              "expected": {
+                "outcome": "MUTATE",
+                "checks": [
+                  "Giữ ID task cũ; tổng thời lượng lịch mới là 45, không còn phiên dư của bản 90 phút."
+                ],
+                "assertions": {
+                  "task_count": 1,
+                  "tasks": [
+                    {
+                      "match": "Kiểm tra slide",
+                      "minutes": 45,
+                      "deadline": "2026-10-29T22:00:00+07:00"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-22",
+          "coverage_key": "defense.22",
+          "title": "Bảo vệ: preview mới không có tác dụng phụ",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Mô phỏng xếp Ôn kiến trúc 60 phút, hạn chót 22:00 ngày 28/10/2026. Chỉ preview để tôi trình bày, tuyệt đối chưa lưu.",
+              "expected": {
+                "outcome": "PREVIEW",
+                "checks": [
+                  "Trả preview với tổng 60 phút, database không có task/event/session mới."
+                ],
+                "assertions": {
+                  "unchanged": true,
+                  "task_count": 0,
+                  "event_count": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-23",
+          "coverage_key": "defense.23",
+          "title": "Bảo vệ: ID ngoài tài khoản là dữ liệu không đáng tin",
+          "voice_profile": "formal",
+          "fixture": "FOREIGN",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Đây là bài thử phân quyền: sửa công việc có ID {{foreign_task}} thành 15 phút. Nếu ID không thuộc tôi thì từ chối, không tiết lộ tên hay lịch của người khác.",
+              "expected": {
+                "outcome": "PROBE",
+                "checks": [
+                  "Không truy cập hoặc sửa tài khoản khác; không báo thành công giả, không lộ dữ liệu người khác."
+                ],
+                "assertions": {
+                  "unchanged": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "G31-24",
+          "coverage_key": "defense.24",
+          "title": "Bảo vệ: không nhận vơ bảo đảm tối ưu toàn cục",
+          "voice_profile": "formal",
+          "fixture": "BASE",
+          "execution": "chat",
+          "turns": [
+            {
+              "type": "user",
+              "text": "Không tạo hay đổi lịch: thuật toán hiện tại có bảo đảm luôn tìm được lịch tối ưu toàn cục không? Nếu không thì nói rõ giới hạn của nó, đừng nhận vơ đã kiểm tra lịch.",
+              "expected": {
+                "outcome": "READ",
+                "checks": [
+                  "Nêu thuật toán heuristic có giới hạn; không hứa tối ưu toàn cục và không giả vờ đã kiểm chứng trường hợp chưa có dữ liệu."
+                ],
+                "assertions": {
+                  "unchanged": true,
+                  "task_count": 0,
+                  "event_count": 0
+                }
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "validation": {
-    "group_count": 30,
-    "case_count": 180,
-    "user_turn_count": 199,
+    "group_count": 31,
+    "case_count": 204,
+    "user_turn_count": 225,
     "harness_step_count": 24,
-    "multi_step_case_count": 36,
-    "multi_user_turn_case_count": 18,
+    "multi_step_case_count": 38,
+    "multi_user_turn_case_count": 20,
     "voice_profile_count": 20,
     "execution_counts": {
-      "chat": 151,
+      "chat": 175,
       "extended_harness": 4,
       "harness": 18,
       "api": 1,
@@ -5870,8 +6593,9 @@
       "G25-05",
       "G25-06"
     ],
-    "normalized_unique_user_prompts": 198,
+    "normalized_unique_user_prompts": 224,
     "integrity_check": "Validated JSON round-trip, group sizes, IDs, coverage keys, titles, profiles, inherited fixtures and overrides, timezone IDs, task statuses, timestamps, entity/dependency/placeholder references, outcomes, harness actions, ordinary prompt length and normalized prompt duplicates.",
-    "content_sha256_without_validation": "7d7875f9dfd17b045ad9d7f994e179fa8734a3fa79d94ede1f10537aaa0001e2"
+    "content_sha256_without_validation": "7c69d4335e5f8a8b366ae5535283760420fca7dfefd66079ed252f08a54073f3",
+    "hash_serialization": "UTF-8 JSON.stringify of root with validation omitted, no indentation"
   }
 }

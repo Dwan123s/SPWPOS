@@ -93,11 +93,13 @@ public sealed partial class WorkspaceService
         Require(start >= Now && end > start && (!task!.IsHardDeadline || end <= task.Deadline), "DEADLINE_CONFLICT", "Phiên phải ở tương lai và không vượt deadline cứng.", 409);
         Require(PlanningEngine.InsideWorkWindow(task!, start, end), "TASK_WORK_WINDOW", "Phiên nằm ngoài khung giờ thực hiện đã yêu cầu cho công việc.", 409);
         var duration = (end - start).TotalMinutes;
-        Require(duration >= Math.Max(state.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) && duration <= state.Preference.MaximumSessionMinutes,
+        var others = occupied.Where(x => x.Id != excludeId).ToArray();
+        var bias = useEstimateBias ? engine.Biases(state) : [new BiasView("All", 0, 1, false)];
+        var remaining = engine.Remaining(task, bias) - others.Where(x => x.TaskId == taskId).Sum(x => (x.End - x.Start).TotalMinutes);
+        Require((duration >= Math.Max(state.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) || duration == remaining && remaining > 0) && duration <= state.Preference.MaximumSessionMinutes,
             "SESSION_LENGTH", "Thời lượng phiên vượt giới hạn.");
         RequireSessionTime(engine.FreeSlots(state, start, end).Any(x => x.Start <= start && x.End >= end), "OUTSIDE_AVAILABILITY", "Phiên ngoài thời gian rảnh hoặc trùng sự kiện cố định.",
             state, taskId, start, end, occupied, excludeId, dependenciesMustBeCompleted, useEstimateBias, suggestAlternatives);
-        var others = occupied.Where(x => x.Id != excludeId).ToArray();
         RequireSessionTime(!others.Any(x => x.Start < end && start < x.End), "SESSION_OVERLAP", "Phiên làm việc trùng lịch.",
             state, taskId, start, end, occupied, excludeId, dependenciesMustBeCompleted, useEstimateBias, suggestAlternatives);
         RequireSessionTime(!others.Any(x => x.Start < end.AddMinutes(state.Preference.BreakMinutes) && start.AddMinutes(-state.Preference.BreakMinutes) < x.End),
@@ -114,7 +116,6 @@ public sealed partial class WorkspaceService
         var elapsed = state.Sessions.Where(x => x.Status == WorkSessionStatus.Completed).Sum(x => MinutesOnDay(x.Start, x.End));
         Require(elapsed + others.Sum(x => MinutesOnDay(x.Start, x.End)) + duration <= state.Preference.MaximumDailyMinutes,
             "DAILY_LIMIT", "Tổng thời gian làm việc vượt giới hạn mỗi ngày.", 409);
-        var bias = useEstimateBias ? engine.Biases(state) : [new BiasView("All", 0, 1, false)];
         var completion = engine.CompletionTimes(state, others, bias, Now);
         foreach (var edge in state.Dependencies.Where(x => x.TaskId == taskId))
         {

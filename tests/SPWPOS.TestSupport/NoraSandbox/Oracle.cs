@@ -104,7 +104,8 @@ public static class SandboxOracle
             {
                 var total = after.Sessions.Where(x => x.TaskId == task.Id && x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused)
                     .Sum(x => (x.End - x.Start).TotalMinutes);
-                Check("scheduled-minutes:" + target.Match, total == target.Minutes, $"Expected {target.Minutes}; actual {total}.", true);
+                var required = target.ScheduledMinutes ?? target.Minutes;
+                Check("scheduled-minutes:" + target.Match, total == required, $"Expected {required}; actual {total}.", true);
             }
         }
         foreach (var target in expected.Events)
@@ -128,6 +129,13 @@ public static class SandboxOracle
             };
             Check("preserved:" + descriptor, !changes.Any(x => x.Entity == pair[0] && ids.Any(id => id.ToString() == x.Id)), "Referenced saved entities must be untouched.", true);
         }
+        foreach (var id in expected.PreviewPreserveSessionIds)
+        {
+            var original = before.Sessions.SingleOrDefault(x => x.Id.ToString() == id);
+            Check("preview-preserved-session:" + id, original is not null && result?.Plan?.Sessions.Any(x =>
+                x.Id == original.Id && x.TaskId == original.TaskId && x.Start == original.Start && x.End == original.End && x.Preserved) == true,
+                "Preview must retain the saved session ID, task and interval.", true);
+        }
         if (expected.Weekly is { } weekly)
         {
             static string Key(int day, int start, int end) => $"{day}:{start}:{end}";
@@ -146,7 +154,10 @@ public static class SandboxOracle
         {
             var task = after.Tasks.Single(x => x.Id == session.TaskId);
             var length = (session.End - session.Start).TotalMinutes;
-            Check("session-length:" + session.Id, length >= Math.Max(after.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) && length <= after.Preference.MaximumSessionMinutes,
+            var remaining = Math.Ceiling(task.EstimatedMinutes * (1 - task.Progress / 100d));
+            var otherWork = future.Where(x => x.TaskId == task.Id && x.Id != session.Id).Sum(x => (x.End - x.Start).TotalMinutes);
+            Check("session-length:" + session.Id, (length >= Math.Max(after.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) ||
+                length > 0 && length + otherWork == remaining) && length <= after.Preference.MaximumSessionMinutes,
                 $"Actual {length} minutes.", true);
             Check("session-deadline:" + session.Id, !task.IsHardDeadline || session.End <= task.Deadline, "Hard deadline enforced.", true);
             Check("session-work-window:" + session.Id, (task.WorkWindowStart is null || session.Start >= task.WorkWindowStart) &&

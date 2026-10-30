@@ -21,7 +21,7 @@ public sealed partial class WorkspaceService
         var notices = new List<string>();
         if (active.Length > tasks.Count(x=>active.Any(t=>t.Id==x.Id))) notices.Add($"NORA đang đọc {tasks.Count(x=>active.Any(t=>t.Id==x.Id))}/{active.Length} công việc đang hoạt động, ưu tiên tên khớp yêu cầu và deadline. Hãy nêu tên cụ thể để xem phần khác.");
         if (events.Length > 100 || sessions.Length > 100) notices.Add("Danh sách chi tiết gửi NORA gồm tối đa 100 sự kiện và 100 phiên trong 30 ngày tới. Các khoảng giờ rảnh vẫn được tính từ toàn bộ lịch đã lưu trong phạm vi này.");
-        if (notices.Count > 0) notices.Add($"Phạm vi lịch đang đọc: {Local(Now):dd/MM/yyyy HH:mm} đến {Local(Now.AddDays(30)):dd/MM/yyyy HH:mm} ({state.Preference.TimeZoneId}).");
+        if (notices.Count > 0) notices.Add($"Phạm vi lịch đang đọc: {Local(Now):dd'/'MM'/'yyyy HH:mm} đến {Local(Now.AddDays(30)):dd'/'MM'/'yyyy HH:mm} ({state.Preference.TimeZoneId}).");
         var json = JsonSerializer.Serialize(new {
             activeTaskTypes, pendingRequest = pending is null ? null : pending with {
                 WorkWindowStart = LocalOrNull(pending.WorkWindowStart), WorkWindowEnd = LocalOrNull(pending.WorkWindowEnd), Deadline = LocalOrNull(pending.Deadline) },

@@ -42,7 +42,8 @@ public static class AgentInputRules
         if (!match.Success || Regex.IsMatch(text, @"\b(sang|chieu|toi|trua|dem|am|pm)\b", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))) return null;
         var words = new[] { "", "mot", "hai", "ba", "bon", "nam", "sau", "bay", "tam", "chin", "muoi", "muoi mot", "muoi hai" };
         var hour = int.TryParse(match.Groups[1].Value, out var parsed) ? parsed : Array.IndexOf(words, match.Groups[1].Value);
-        if (hour is < 1 or > 12 || match.Groups[1].Value.StartsWith('0')) return null;
+        if (hour is < 1 or > 12 || match.Groups[1].Value.StartsWith('0') ||
+            match.Value.Contains(':') && match.Groups[2].Value.Length == 2) return null;
         var minute = match.Groups[2].Success ? int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
         if (text[(match.Index + match.Length)..].TrimStart().StartsWith("ruoi", StringComparison.Ordinal)) minute = 30;
         if (minute >= 60) return ("Bạn cho mình giờ hẹn chính xác, gồm giờ và phút nhé.", []);

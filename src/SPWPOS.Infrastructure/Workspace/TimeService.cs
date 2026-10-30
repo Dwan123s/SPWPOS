@@ -105,7 +105,7 @@ public sealed partial class WorkspaceService
             var busy = state.Exceptions.Where(x => !x.IsAvailable).FirstOrDefault(x =>
                 PlanningEngine.At(x.Date, x.StartMinute, zone) < item.End && item.Start < PlanningEngine.At(x.Date, x.EndMinute, zone));
             if (busy is not null)
-                throw CalendarConflict("BUSY_TIME_CONFLICT", $"Sự kiện nằm trong giờ đã đánh dấu bận ({busy.Date:dd/MM/yyyy} {busy.StartMinute / 60:00}:{busy.StartMinute % 60:00}–{busy.EndMinute / 60:00}:{busy.EndMinute % 60:00}).",
+                throw CalendarConflict("BUSY_TIME_CONFLICT", $"Sự kiện nằm trong giờ đã đánh dấu bận ({busy.Date:dd'/'MM'/'yyyy} {busy.StartMinute / 60:00}:{busy.StartMinute % 60:00}–{busy.EndMinute / 60:00}:{busy.EndMinute % 60:00}).",
                     calendar, item.Start, item.End, occupied, FitsSeries);
         }
     }

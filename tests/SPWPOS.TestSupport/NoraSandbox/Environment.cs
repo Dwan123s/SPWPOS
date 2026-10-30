@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,7 +23,26 @@ public sealed class SandboxTransportHandler : DelegatingHandler
         try
         {
             var response = await base.SendAsync(request, ct);
-            Events.Add(new((int)response.StatusCode, null, null)); return response;
+            string? finish = null; int? outputTokens = null; int? thinkingTokens = null;
+            // Export only completion metadata, never raw provider text, private
+            // reasoning, headers or credential-bearing request URLs.
+            if (response.IsSuccessStatusCode && request.RequestUri?.AbsolutePath.EndsWith(":generateContent", StringComparison.Ordinal) == true)
+            {
+                try
+                {
+                    using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+                    if (payload.RootElement.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0 &&
+                        candidates[0].TryGetProperty("finishReason", out var reason)) finish = reason.GetString();
+                    if (payload.RootElement.TryGetProperty("usageMetadata", out var usage))
+                    {
+                        if (usage.TryGetProperty("candidatesTokenCount", out var output)) outputTokens = output.GetInt32();
+                        if (usage.TryGetProperty("thoughtsTokenCount", out var thinking)) thinkingTokens = thinking.GetInt32();
+                    }
+                }
+                catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException)
+                { /* Interpreter retains responsibility for invalid output. */ }
+            }
+            Events.Add(new((int)response.StatusCode, null, null, finish, outputTokens, thinkingTokens)); return response;
         }
         catch (Exception error)
         {
@@ -47,7 +67,7 @@ public sealed class SandboxRecorder
 {
     public List<SandboxTrace> Traces { get; } = [];
     public Func<DateTimeOffset, AgentIntent>? Script { get; set; }
-    public bool FailNext { get; set; }
+    public int FailuresRemaining { get; set; }
 }
 
 public sealed class SandboxInterpreter(IPlanningAgentInterpreter? live, SandboxRecorder recorder, SandboxBudget budget) : ITaskInterpreter, IPlanningAgentInterpreter
@@ -57,8 +77,8 @@ public sealed class SandboxInterpreter(IPlanningAgentInterpreter? live, SandboxR
     {
         budget.Reserve(); var index = recorder.Traces.Count;
         recorder.Traces.Add(new(text, contextJson, history, null, now, timeZoneId,
-            recorder.FailNext ? "InjectedFailure" : recorder.Script is not null ? "Scripted" : "Live"));
-        if (recorder.FailNext) { recorder.FailNext = false; throw new AuthException("AGENT_AI_TIMEOUT", "Injected sandbox failure.", 503); }
+            recorder.FailuresRemaining > 0 ? "InjectedFailure" : recorder.Script is not null ? "Scripted" : "Live"));
+        if (recorder.FailuresRemaining > 0) { recorder.FailuresRemaining--; throw new AuthException("AGENT_AI_TIMEOUT", "Injected sandbox failure.", 503); }
         var result = recorder.Script is not null ? recorder.Script(now)
             : live is not null ? await live.InterpretAsync(text, contextJson, history, timeZoneId, now, ct)
             : throw new InvalidOperationException("No scripted response configured.");
@@ -84,7 +104,7 @@ public sealed class SandboxEnvironment : IAsyncDisposable
     public Dictionary<string, Guid> Ids { get; } = new(StringComparer.Ordinal);
     public string Provider { get; private set; } = "Scripted";
     public string? Model { get; private set; }
-    private SandboxEnvironment() => http = new(Transport) { Timeout = TimeSpan.FromSeconds(55), MaxResponseContentBufferSize = 131072 };
+    private SandboxEnvironment() => http = new(Transport) { Timeout = TimeSpan.FromSeconds(65), MaxResponseContentBufferSize = 131072 };
 
     public static IConfiguration LoadConfiguration(string repositoryRoot, bool live)
     {
@@ -141,6 +161,11 @@ public sealed class SandboxEnvironment : IAsyncDisposable
     {
         await using var scope = provider.CreateAsyncScope();
         return await action(scope.ServiceProvider.GetRequiredService<IPlanningAgentService>());
+    }
+    public async Task<T> Work<T>(Func<IWorkspaceService, Task<T>> action)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        return await action(scope.ServiceProvider.GetRequiredService<IWorkspaceService>());
     }
     public async Task<SandboxSnapshot> Snapshot(CancellationToken ct) => await Db(async db => new SandboxSnapshot(
         await db.WorkPreferences.AsNoTracking().SingleAsync(x => x.UserId == UserId, ct),

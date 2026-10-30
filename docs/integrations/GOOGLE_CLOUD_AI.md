@@ -4,7 +4,9 @@
 
 Lúc 01:06 (Asia/Ho_Chi_Minh), kiểm tra Cloud thật đạt cả ba yêu cầu mẫu: cuộc họp ngày mai 14:00–16:00, báo cáo SWP 120 phút liên tục trước 18:00 và trích xuất task từ ghi chú. Kết quả `cloud-ai-check.result.json` là success=true/code=OK; trạng thái setup là activated. User Secrets đã lưu Provider=VertexAI, Enabled=true, VertexAuthentication=ApiKey, VertexExpressMode=true, VertexLocation=global, project planora-511614, model gemini-3.5-flash-lite; key đã có trong secret store. Backend khởi động lại và trang chính trả HTTP 200. Không ghi dữ liệu mẫu vào lịch thật. Chưa xác minh việc khấu trừ credit trên Cloud Billing.
 
-Backend hỗ trợ `AiSettings:Provider=VertexAI` cho chat agent, phân tích ghi chú, nhập task và chia task. Model giữ `gemini-3.5-flash-lite`, project `planora-511614`, location `global`.
+Backend hỗ trợ `AiSettings:Provider=VertexAI` cho chat agent, phân tích ghi chú, nhập task và chia task. Model mặc định từ 31/10/2026 là `gemini-3.8-flash`, project `planora-511614`, location `global`.
+
+Gemini 3.8 dùng mức thinking LOW cho trích xuất ý định tương tác, ngân sách reasoning/output tối đa 16.384 token và timeout agent 60 giây. Xem [kiểm tra chuyển model](../reviews/NORA_GEMINI_38_DEFAULT.md). Kết quả 15/10 ở trên thuộc model cũ, không phải bằng chứng kiểm thử 3.8.
 
 Thêm adapter không tự bật API, tạo credential hoặc chuyển billing. User Secrets chỉ được đổi sau khi kiểm tra Cloud thật thành công. Chưa có key/ADC thì chưa chuyển hệ thống đang chạy.
 
@@ -37,18 +39,18 @@ Trạng thái không chứa key nằm trong `artifacts/cloud-ai-setup.status.jso
 |---|---|
 | `AiSettings:Provider` | `VertexAI` |
 | `AiSettings:Enabled` | `true` |
-| `AiSettings:Model` | `gemini-3.5-flash-lite` |
+| `AiSettings:Model` | `gemini-3.8-flash` |
 | `AiSettings:VertexProjectId` | `planora-511614` |
 | `AiSettings:VertexLocation` | `global` |
 | `AiSettings:VertexAuthentication` | `ApiKey` hoặc `ADC` |
 | `AiSettings:VertexApiKey` | Chỉ lưu trong secret store khi dùng key |
 | `AiSettings:VertexExpressMode` | `true` khi dùng API key; `false` khi dùng ADC |
 
-Khi dùng API key, gọi `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-3.5-flash-lite:generateContent?key=<encoded-key>` và gửi cùng key qua `x-goog-api-key` theo yêu cầu tương thích kép. Project/billing được xác định từ key; `VertexProjectId` là project dự kiến để hiển thị cấu hình, không ghi đè project của key. Key phải được tạo trong project PLANORA và gắn đúng tài khoản dịch vụ. Google hỗ trợ cả header và query; query không phải điều kiện bắt buộc, và thay đổi này chưa đủ để kết luận hết lỗi 401. Tài liệu: [Express mode](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start/express-mode/overview), [API quickstart dùng key](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start?usertype=apikey). Không dùng key AI Studio/OpenAI để thay thế Cloud key và không tự chuyển provider khi gặp lỗi.
+Khi dùng API key, gọi `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-3.8-flash:generateContent?key=<encoded-key>` và gửi cùng key qua `x-goog-api-key` theo yêu cầu tương thích kép. Project/billing được xác định từ key; `VertexProjectId` là project dự kiến để hiển thị cấu hình, không ghi đè project của key. Key phải được tạo trong project PLANORA và gắn đúng tài khoản dịch vụ. Google hỗ trợ cả header và query; query không phải điều kiện bắt buộc, và thay đổi này chưa đủ để kết luận hết lỗi 401. Tài liệu: [Express mode](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start/express-mode/overview), [API quickstart dùng key](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start?usertype=apikey). Không dùng key AI Studio/OpenAI để thay thế Cloud key và không tự chuyển provider khi gặp lỗi.
 
 Key trên query được mã hóa bằng Uri.EscapeDataString; HTTP logging của riêng client AI bị tắt bằng RemoveAllLoggers để không ghi URL/header vào log ứng dụng dù bật Trace. Không ghi raw request, URI, provider response hoặc exception message vào log. Công cụ theo dõi HTTP bên ngoài ứng dụng cần che query `key` nếu được sử dụng.
 
-Khi dùng ADC, gọi `https://aiplatform.googleapis.com/v1/projects/planora-511614/locations/global/publishers/google/models/gemini-3.5-flash-lite:generateContent`. Location regional dùng host `{location}-aiplatform.googleapis.com`. Chế độ API key yêu cầu location global; cấu hình regional bị từ chối trước khi gửi key.
+Khi dùng ADC, gọi `https://aiplatform.googleapis.com/v1/projects/planora-511614/locations/global/publishers/google/models/gemini-3.8-flash:generateContent`. Location regional dùng host `{location}-aiplatform.googleapis.com`. Chế độ API key yêu cầu location global; cấu hình regional bị từ chối trước khi gửi key.
 
 Cloud v1 dùng `generationConfig.responseMimeType=application/json` và `responseJsonSchema`. Developer API hiện dùng `responseFormat.text.mimeType=APPLICATION_JSON`. Backend giữ kiểm tra schema và thời gian có UTC offset.
 

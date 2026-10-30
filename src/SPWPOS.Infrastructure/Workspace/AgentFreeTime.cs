@@ -64,7 +64,7 @@ public sealed partial class WorkspaceService
             return $"{from:HH:mm}–{endText} ({(int)(slot.End - slot.Start).TotalMinutes} phút)";
         }
         var days = slots.GroupBy(x => LocalDate(x.Start, state.Preference)).Select(day =>
-            $"{day.Key:dd/MM/yyyy}: " + string.Join(", ", day.Select(Window)));
+            $"{day.Key:dd'/'MM'/'yyyy}: " + string.Join(", ", day.Select(Window)));
         var total = (int)slots.Sum(x => (x.End - x.Start).TotalMinutes);
         var opening = $"{range}, bạn còn {slots.Length} khoảng rảnh trong giờ đã đặt:";
         var next = slots.All(x => (x.End - x.Start).TotalMinutes < state.Preference.MinimumSessionMinutes)
@@ -75,7 +75,7 @@ public sealed partial class WorkspaceService
         if (slots.Length == 1)
         {
             var day = LocalDate(slots[0].Start, state.Preference);
-            var when = firstDate == lastDate ? "" : $" ngày {day:dd/MM/yyyy}";
+            var when = firstDate == lastDate ? "" : $" ngày {day:dd'/'MM'/'yyyy}";
             var lead = partOfOverview ? "Bạn còn rảnh từ " : $"{range}, bạn còn rảnh từ ";
             return lead + Window(slots[0]) + when + ". " + next;
         }
@@ -87,9 +87,9 @@ public sealed partial class WorkspaceService
     {
         var first = LocalDate(query.Start, preference);
         var last = LocalDate(query.End.AddTicks(-1), preference);
-        if (first != last) return $"Từ {first:dd/MM/yyyy} đến {last:dd/MM/yyyy}";
+        if (first != last) return $"Từ {first:dd'/'MM'/'yyyy} đến {last:dd'/'MM'/'yyyy}";
         var today = LocalDate(Now, preference);
-        return first == today ? $"Hôm nay ({first:dd/MM/yyyy})"
-            : first == today.AddDays(1) ? $"Ngày mai ({first:dd/MM/yyyy})" : $"Ngày {first:dd/MM/yyyy}";
+        return first == today ? $"Hôm nay ({first:dd'/'MM'/'yyyy})"
+            : first == today.AddDays(1) ? $"Ngày mai ({first:dd'/'MM'/'yyyy})" : $"Ngày {first:dd'/'MM'/'yyyy}";
     }
 }

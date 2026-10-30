@@ -12,6 +12,30 @@ public sealed class NoraSandboxTests
     private static AgentTurnView Result(string status = "APPLIED") => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
         "Yêu cầu mẫu", "Kết quả mẫu", status, "", null, [], [], Now);
 
+    [Theory] [InlineData(5, 5, true)] [InlineData(60, 5, false)] [InlineData(5, 15, false)]
+    public void Oracle_allows_exact_short_work_but_rejects_short_fragments_or_extra_work(int estimate, int scheduled, bool passes)
+    {
+        var before = State();
+        var task = new WorkTask { Name = "Short", EstimatedMinutes = estimate, Deadline = Now.AddDays(1), MinimumSessionMinutes = 15 };
+        var after = before with { Tasks = [task], Sessions = [new() { TaskId = task.Id, Start = Now.AddHours(10), End = Now.AddHours(10).AddMinutes(scheduled) }] };
+        var checks = SandboxOracle.Evaluate(new(), Result(), null, before, after, Now);
+        Assert.Equal(passes, checks.All(x => !x.Critical || x.Passed));
+    }
+
+    [Theory] [InlineData(false)] [InlineData(true)]
+    public void Oracle_checks_preserved_sessions_inside_the_preview_even_without_database_writes(bool moved)
+    {
+        var task = new WorkTask { Name = "Read", EstimatedMinutes = 60, Deadline = Now.AddDays(5) };
+        var session = new WorkSession { TaskId = task.Id, Start = Now.AddDays(1), End = Now.AddDays(1).AddHours(1) };
+        var before = State() with { Tasks = [task], Sessions = [session] };
+        var plan = new PlanView(Guid.NewGuid(), before.Preference.Revision, Now, Now.AddDays(7),
+            [new(moved ? Guid.NewGuid() : session.Id, task.Id, moved ? Now : session.Start,
+                moved ? Now.AddHours(1) : session.End, "", !moved)], [], [], false);
+        var checks = SandboxOracle.Evaluate(new() { Statuses = ["PREVIEW"], PreviewPreserveSessionIds = [session.Id.ToString()] },
+            Result("PREVIEW") with { Plan = plan }, null, before, before, Now);
+        Assert.Equal(!moved, Assert.Single(checks, x => x.Name.StartsWith("preview-preserved-session:", StringComparison.Ordinal)).Passed);
+    }
+
     [Fact] public void Oracle_ignores_only_internal_mutation_token_and_still_detects_calendar_revision_and_preferences()
     {
         var before = State();

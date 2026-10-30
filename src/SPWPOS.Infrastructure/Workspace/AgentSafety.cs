@@ -9,10 +9,14 @@ public sealed partial class WorkspaceService
 {
     private PlanView RespectSchedulingExclusions(PlanView plan, PlanningState state, Guid[] affected, AgentTurnInput input)
     {
-        var excluded = state.Tasks.Where(task => !affected.Contains(task.Id) &&
-            plan.Sessions.Any(session => session.TaskId == task.Id && !session.Preserved) &&
-            ChatMatch(input.Text, @"\b(?:khong|dung|cho)\s+(?:xep|len)\s+(?:lich\s+)?(?:cho\s+)?" +
-                Regex.Escape(MatchText(task.Name)) + @"\b").Success).ToArray();
+        var preserved = ExplicitlyPreservedTasks(input.Text, state);
+        var excluded = state.Tasks.Where(task =>
+            (plan.Sessions.Any(session => session.TaskId == task.Id && !session.Preserved) ||
+                state.Sessions.Any(session => session.TaskId == task.Id && session.Status == WorkSessionStatus.Scheduled &&
+                    session.Start >= plan.Start && session.Start < plan.End && !plan.Sessions.Any(x => x.Id == session.Id && x.Preserved))) &&
+            (preserved.Contains(task.Id) || !affected.Contains(task.Id) &&
+                ChatMatch(input.Text, @"\b(?:khong|dung|cho)\s+(?:xep|len)\s+(?:lich\s+)?(?:cho\s+)?" +
+                    Regex.Escape(MatchText(task.Name)) + @"\b").Success)).ToArray();
         if (excluded.Length == 0) return plan;
         var bias = input.UseEstimateBias ? engine.Biases(state) : [new BiasView("All", 0, 1, false)];
         var warnings = excluded.Select(task => new PlanWarning(task.Id, task.Name,
@@ -32,12 +36,23 @@ public sealed partial class WorkspaceService
     // can manufacture evidence from model prose or a completed request.
     private static bool SourceQuote(string? quote, string source) => !string.IsNullOrWhiteSpace(quote) &&
         quote.Length <= 500 && (source.Contains(quote, StringComparison.OrdinalIgnoreCase) ||
-            VietnameseTelex.Normalize(source).Contains(VietnameseTelex.Normalize(quote), StringComparison.OrdinalIgnoreCase));
+            VietnameseTelex.Normalize(source.Normalize(System.Text.NormalizationForm.FormC)).Contains(
+                VietnameseTelex.Normalize(quote.Normalize(System.Text.NormalizationForm.FormC)), StringComparison.OrdinalIgnoreCase));
 
     private static int? QuotedMinutes(string? quote)
     {
         var text = MatchText(quote ?? "");
         if (text.Contains("nua tieng") || text.Contains("nua gio")) return 30;
+        var hours = ChatMatch(text, @"\b(?<hours>\d{1,3}(?:[.,]\d{1,2})?)\s*(?:tieng|gio|hours?|hrs?|h)(?:\s*(?<minutes>\d{1,2})\s*(?:phut|minutes?|mins?|p|m))?\b");
+        if (hours.Success && decimal.TryParse(hours.Groups["hours"].Value.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture, out var countHours))
+        {
+            var minutes = countHours * 60 + (hours.Groups["minutes"].Success ? int.Parse(hours.Groups["minutes"].Value, CultureInfo.InvariantCulture) : 0)
+                + (text.Contains("ruoi") ? 30 : 0);
+            return minutes == decimal.Truncate(minutes) && minutes <= 10080 ? (int)minutes : null;
+        }
+        var english = ChatMatch(text, @"\b(\d{1,4})\s*(?:minutes?|mins?|p)\b");
+        if (english.Success) return int.Parse(english.Groups[1].Value, CultureInfo.InvariantCulture);
         var match = ChatMatch(text, @"\b(\d{1,4}|mot|hai|ba|bon|nam|sau|bay|tam|chin|muoi)\s*(phut|tieng|gio)\b");
         if (!match.Success) return null;
         var words = new[] { "", "mot", "hai", "ba", "bon", "nam", "sau", "bay", "tam", "chin", "muoi" };
@@ -62,7 +77,7 @@ public sealed partial class WorkspaceService
     {
         if (!SourceQuote(quote, source)) return false;
         quote = VietnameseTelex.Normalize(quote); source = VietnameseTelex.Normalize(source);
-        const string marker = @"\b(truoc|han|deadline|xong|hoan thanh|before|due)\b";
+        const string marker = @"\b(truoc|han|chot|deadline|dl|xong|hoan thanh|before|due)\b";
         if (ChatMatch(quote, marker).Success) return true;
         // A short verbatim time quote may omit the immediately preceding deadline label.
         // Keep the label and quote in the same clause; do not borrow one across punctuation.
@@ -74,8 +89,17 @@ public sealed partial class WorkspaceService
 
     private TimeSlot? RequestedWorkWindow(string text, WorkPreference preference, DateTimeOffset? reference = null)
     {
-        var period = ChatMatch(AgentInputRules.NormalizeTimeText(text), @"\b(toi|sang|chieu)\s+(?:thu\b|ngay\b|\d|mai\b|hom\b|do\b)");
-        var exact = ChatMatch(text, @"\btu\s+(\d{1,2})\s*(?:h|gio|:)(\d{2})?\s*(?:den|[-–])\s*(\d{1,2})\s*(?:h|gio|:)(\d{2})?");
+        var normalized = AgentInputRules.NormalizeTimeText(text);
+        // “đổi hạn chót sang 22:00” uses sang as “to”, not “morning”.
+        normalized = Regex.Replace(normalized, @"\b(?:han(?: chot)?|deadline|dl)\s+sang\b", "deadline",
+            RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+        const string periodPattern = @"\b(toi|sang|chieu)\s+(?:thu\b|ngay\b|\d|nay\b|mai\b|hom\b|do\b)";
+        // Multiple allowed days/periods cannot be represented by choosing one.
+        if (RequestMatches(normalized, periodPattern).Count > 1) return null;
+        var period = ChatMatch(normalized, periodPattern);
+        const string rangePattern = @"\b(?:tu\s+)?(\d{1,2})\s*(?:h|gio|:)(\d{2})?\s*(?:den|[-–])\s*(\d{1,2})\s*(?:h|gio|:)(\d{2})?";
+        if (RequestMatches(MatchText(text), rangePattern).Count > 1) return null;
+        var exact = ChatMatch(text, rangePattern);
         if (!period.Success && !exact.Success) return null;
         var zone = PlanningEngine.Zone(preference.TimeZoneId);
         var date = LocalDate(reference ?? Now, preference);
@@ -100,7 +124,7 @@ public sealed partial class WorkspaceService
                 var requested = weekday.Value == "chu nhat" ? 0 : int.TryParse(weekday.Groups[1].Value, out var n) ? n - 1 : Array.IndexOf(names, weekday.Groups[1].Value);
                 date = date.AddDays((requested - (int)date.DayOfWeek + 7) % 7);
             }
-            else if (reference is null && !MatchText(text).Contains("hom nay")) return null;
+            else if (reference is null && !MatchText(text).Contains("hom nay") && !normalized.Contains("toi nay")) return null;
         }
         var hours = period.Groups[1].Value switch { "sang" => (360, 720), "chieu" => (720, 1080), _ => (1080, 1440) };
         if (exact.Success)
@@ -143,14 +167,21 @@ public sealed partial class WorkspaceService
     private AgentIntent NormalizeAgentIntent(AgentIntent intent, string request, PlanningState state, AgentPendingRequest? pending)
     {
         var source = pending is null ? request : pending.OriginalText + "\n" + string.Join("\n", pending.Answers ?? []) + "\n" + request;
-        var window = RequestedWorkWindow(request, state.Preference, pending?.WorkWindowStart) ??
-            (pending is null ? null : RequestedWorkWindow(pending.OriginalText, state.Preference, pending.WorkWindowStart));
         var first = intent.Tasks.FirstOrDefault();
+        var windowReference = pending?.WorkWindowStart ?? state.Tasks.FirstOrDefault(x => x.Id == first?.TaskId)?.WorkWindowStart;
+        // Use task-specific source text in mixed requests. Availability, event
+        // hours and another task's dates must not override an execution window.
+        var taskWindowSource = first?.WorkWindowEvidence is { Length: > 0 } evidence && SourceQuote(evidence, source) ? evidence : null;
+        var canInfer = intent.Tasks.Length <= 1 && intent.WeeklySlots.Length == 0 && intent.Exceptions.Length == 0 && intent.Events.Length == 0;
+        var window = taskWindowSource is not null ? RequestedWorkWindow(taskWindowSource, state.Preference, windowReference) :
+            canInfer ? RequestedWorkWindow(request, state.Preference, pending?.WorkWindowStart) ??
+                (pending is null ? null : RequestedWorkWindow(pending.OriginalText, state.Preference, pending.WorkWindowStart)) : null;
         AgentIntent Ask(string question, string[]? options = null) => intent with
         {
             Reply = ClarificationReply(intent.Reply), Question = question, Options = options ?? [],
             ResultKind = "CLARIFICATION",
             ReplaceWeeklyAvailability = false, WeeklySlots = [], Exceptions = [], Events = [], Tasks = [], ScheduleTaskIds = [], Reschedule = false,
+            FreeTimeQuery = null, ScheduleReviewQuery = null,
             Pending = new(pending?.OriginalText ?? request, first?.TaskId ?? pending?.TaskId,
                 window?.Start ?? pending?.WorkWindowStart, window?.End ?? pending?.WorkWindowEnd,
                 first?.DurationEvidence is { } duration && SourceQuote(duration, source) ? QuotedMinutes(duration) : QuotedMinutes(request) ?? pending?.EstimatedMinutes,
@@ -160,23 +191,49 @@ public sealed partial class WorkspaceService
         // Recover one mixed response as clarification. The mutation guard below
         // remains mandatory, including when applying a persisted preview.
         if (!string.IsNullOrWhiteSpace(intent.Question)) return Ask(intent.Question, intent.Options);
+        if (ConsequentialRequestQuestion(intent, request, state) is { } safetyQuestion) return Ask(safetyQuestion);
         if (AgentInputRules.AmbiguousClock(request) is { } unresolved) return Ask(unresolved.Question, unresolved.Options);
+        var protectedIds = ExplicitlyPreservedTasks(request, state);
+        if (protectedIds.Count > 0)
+            intent = intent with { Tasks = intent.Tasks.Where(x => x.TaskId is null || !protectedIds.Contains(x.TaskId.Value)).ToArray(),
+                ScheduleTaskIds = (intent.Reschedule && intent.ScheduleTaskIds.Length == 0 ? state.Tasks.Where(x =>
+                    x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled &&
+                    MatchText(request).Contains(MatchText(x.Name), StringComparison.Ordinal)).Select(x => x.Id) : intent.ScheduleTaskIds)
+                    .Where(id => !protectedIds.Contains(id)).Distinct().ToArray(), Reschedule = false };
         var tasks = new List<AgentTaskCommand>();
         foreach (var item in intent.Tasks)
         {
             var original = item.TaskId is { } id ? state.Tasks.SingleOrDefault(x => x.Id == id) : null;
-            var task = item;
+            // Model schemas often repeat stored fields. They are not edits and
+            // do not require the user to quote facts already saved in their account.
+            var task = item with { EstimatedMinutes = item.EstimatedMinutes == original?.EstimatedMinutes ? null : item.EstimatedMinutes,
+                Deadline = item.Deadline == original?.Deadline ? null : item.Deadline };
+            if (intent.Tasks.Length == 1 && item.DurationEvidence is not null)
+            {
+                var continuity = ChatMatch(source, @"\b(?:lien tuc|lien mach|lam lien|mot mach|mot leo|khong (?:duoc |the )?(?:chia|cat|ngat quang)|uninterrupted|continuous|in one sitting|without (?:a )?break)\b").Success;
+                var withoutNegatedSplitting = Regex.Replace(MatchText(request),
+                    @"\bkhong(?: (?:duoc|the))? (?:chia(?: nho)?|cat|ngat quang)\b", " ",
+                    RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+                var splitting = ChatMatch(withoutNegatedSplitting, @"\b(?:chia (?:duoc|phien|nho)|co the chia|splittable)\b").Success;
+                if (continuity && !splitting) task = task with { Splittable = false };
+                else if (splitting) task = task with { Splittable = true };
+                else if (original is null && !continuity) task = task with { Splittable = true };
+                else if (original is not null && !continuity && !splitting) task = task with { Splittable = original.Splittable };
+            }
+            if (original?.WorkWindowStart is not null && window is null &&
+                !ChatMatch(request, @"\b(?:doi|chuyen|mo rong|thu hep)\b[^.!?;\r\n]{0,60}\b(?:khung|gio|ngay)\b").Success)
+                task = task with { WorkWindowStart = original.WorkWindowStart, WorkWindowEnd = original.WorkWindowEnd };
             if (item.TaskId is null && (item.EstimatedMinutes is null || item.Deadline is null && window is null))
                 return Ask(item.EstimatedMinutes is null ? $"Bạn bổ sung thời lượng (phút) cho “{item.Name}” nhé?" : $"Bạn bổ sung hạn hoàn thành (ngày, giờ) cho “{item.Name}” nhé?");
             // Non-null evidence is required by the live provider schema. Null is
             // reserved for older persisted commands/adapters, not a model escape.
-            if (item.DurationEvidence is not null && item.EstimatedMinutes is not null)
+            if (item.DurationEvidence is not null && task.EstimatedMinutes is not null)
             {
                 var duration = GroundDurationQuote(item, source);
                 if (duration is null) return Ask("Bạn muốn dành bao nhiêu phút cho công việc này? Mình chưa lưu thời lượng chưa được xác nhận.");
                 task = task with { DurationEvidence = duration };
             }
-            if (item.DeadlineEvidence is not null && item.Deadline is not null &&
+            if (item.DeadlineEvidence is not null && task.Deadline is not null &&
                 !GroundDeadlineQuote(item.DeadlineEvidence, source))
                 return Ask("Bạn cần hoàn thành công việc trước ngày, giờ nào? Ngày thực hiện và deadline được giữ riêng.");
             if (window is not null)
@@ -207,7 +264,24 @@ public sealed partial class WorkspaceService
             }
             tasks.Add(task);
         }
-        return intent with { Tasks = tasks.ToArray(), Pending = null };
+        // Repeated existing fields still mean "schedule this task", even when
+        // BuildAgentChanges correctly drops the resulting no-op update.
+        return intent with { Tasks = tasks.ToArray(), ScheduleTaskIds = intent.ScheduleTaskIds.Concat(
+            tasks.Where(x => x.TaskId is not null && !state.Sessions.Any(s => s.TaskId == x.TaskId &&
+                s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused && s.End > Now))
+                .Select(x => x.TaskId!.Value)).Distinct().ToArray(), Pending = null };
+    }
+
+    private static AgentIntent? SavedTaskReviewIntent(string request, PlanningState state)
+    {
+        // A clearly read-only question about named saved work needs no model
+        // interpretation. Keep mixed actions and unfamiliar tasks on the AI path.
+        if (!request.Contains('?') || !ChatMatch(request, @"\b(?:chi kiem tra|chi xem|(?:dung|khong) (?:sua|thay doi) lich)\b").Success ||
+            !ChatMatch(request, @"\b(?:kip|deadline|han chot)\b").Success ||
+            ChatMatch(request, @"\b(?:tao|them|cap nhat)\b|^\s*(?:doi|chuyen|sua|xep|len lich|sap xep)\b").Success ||
+            !state.Tasks.Any(task => !task.IsDeleted && task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled &&
+                MatchText(task.Name).Length > 0 && MatchText(request).Contains(MatchText(task.Name), StringComparison.Ordinal))) return null;
+        return new("", "", false, [], [], [], [], [], false, 14, ResultKind: "ANSWER");
     }
 
     private string ScopedReadOnlyReply(AgentIntent intent, string request, PlanningState state, AgentMessage[] history, string[] notices)
@@ -232,6 +306,7 @@ public sealed partial class WorkspaceService
         if (named.Length == 0) return "Mình chưa xác định được công việc bạn muốn kiểm tra trong dữ liệu đã lưu. Bạn cho mình tên công việc cụ thể nhé; hiện chưa thể xác nhận kịp deadline.";
         var bias = new[] { new BiasView("All", 0, 1, false) };
         var sessions = state.Sessions.Where(x => (x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused) && x.End > Now).ToArray();
+        var listSessions = ChatMatch(request, @"\b(?:neu|liet ke|hien thi|xem)\b[^.!?;\r\n]{0,80}\bphien\b").Success;
         return string.Join("\n", named.Take(12).Select(task =>
         {
             var work = sessions.Where(x => x.TaskId == task.Id).ToArray();
@@ -242,9 +317,12 @@ public sealed partial class WorkspaceService
             var dependenciesValid = state.Dependencies.Where(x => x.TaskId == task.Id).All(x => completion.TryGetValue(x.PredecessorId, out var finished) && valid.All(s => s.Start >= finished));
             var minutes = (int)valid.Sum(x => (x.End - x.Start).TotalMinutes);
             var remaining = engine.Remaining(task, bias);
-            return $"{task.Name}: " + (minutes >= remaining && dependenciesValid && (task.Splittable || valid.Any(x => (x.End - x.Start).TotalMinutes >= remaining))
+            var answer = $"{task.Name}: " + (minutes >= remaining && dependenciesValid && (task.Splittable || valid.Any(x => (x.End - x.Start).TotalMinutes >= remaining))
                 ? $"đã có {minutes} phút trong lịch trước hạn {LocalTime(task.Deadline, state.Preference)}."
                 : $"chưa đủ phiên hợp lệ trước hạn {LocalTime(task.Deadline, state.Preference)} (có {minutes}/{remaining} phút). Cần xem phương án xếp lại.");
+            return answer + (listSessions && work.Length > 0 ? "\nPhiên đang lưu: " + string.Join("; ", work.OrderBy(x => x.Start).Take(12)
+                .Select(x => LocalWindow(x.Start, x.End, state.Preference) + (valid.Any(s => s.Id == x.Id) ? "" : " (cần kiểm tra)"))) +
+                (work.Length > 12 ? $"; còn {work.Length - 12} phiên khác trong lịch." : "") : "");
         })) + (failed.Length > 0 ? "\nCó yêu cầu trước thất bại; các công việc chưa được tạo không nằm trong kết quả trên." : "");
     }
 

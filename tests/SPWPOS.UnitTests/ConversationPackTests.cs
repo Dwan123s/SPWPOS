@@ -5,6 +5,24 @@ namespace SPWPOS.UnitTests;
 
 public sealed class ConversationPackTests
 {
+    [Fact]
+    public async Task Prepared_fixture_coverage_validates_supported_extra_cases_without_claiming_model_success_or_enabling_missing_adapters()
+    {
+        var directory = Directory.CreateTempSubdirectory("nora-prepared-").FullName;
+        try
+        {
+            var selected = new[] { "G07-05", "G07-06", "G16-06", "G20-03", "G20-06", "G21-06", "G22-04", "G22-05", "G15-06", "G24-01" };
+            var report = await SandboxRunner.RunAsync(new(Root(), directory, Catalog: "Conversations", CaseIds: selected) {
+                IncludePreparedFixtures = true }, null, TestContext.Current.CancellationToken);
+            Assert.Equal(8, report.Cases.Count(c => c.Status == "VALIDATED"));
+            Assert.Equal("NOT_RUN", report.Cases.Single(c => c.Id == "G15-06").Status);
+            Assert.Equal("NOT_RUN", report.Cases.Single(c => c.Id == "G24-01").Status);
+            Assert.All(report.Cases, c => { Assert.Empty(c.Turns); Assert.Equal("NOT_EVALUATED", c.ResponseReview); });
+            Assert.Equal(0, report.CallsUsed);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
     private static string Root()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
@@ -16,8 +34,8 @@ public sealed class ConversationPackTests
     [Fact] public void Pack_loads_all_groups_and_allows_repetition_only_in_the_declared_group()
     {
         var pack = ConversationPack.Load(Root());
-        Assert.Equal(30, pack.Groups.Length); Assert.Equal(180, pack.Cases.Length);
-        Assert.Equal(199, pack.Cases.SelectMany(c => c.Turns).Count(t => t.Type == "user"));
+        Assert.Equal(31, pack.Groups.Length); Assert.Equal(204, pack.Cases.Length);
+        Assert.Equal(225, pack.Cases.SelectMany(c => c.Turns).Count(t => t.Type == "user"));
         Assert.All(pack.Cases.Where(c => c.IntentionalRepetition), c => Assert.StartsWith("G25-", c.Id));
     }
 

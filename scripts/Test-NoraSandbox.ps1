@@ -4,6 +4,8 @@ param(
     [ValidateSet('Legacy', 'Conversations')][string]$Catalog = 'Legacy',
     [string[]]$GroupId = @(),
     [string[]]$CaseId = @(),
+    [switch]$IncludePreparedFixtures,
+    [switch]$IncludeLifecycleActions,
     [ValidateRange(1, 5)][int]$Repeats = 1,
     [ValidateRange(1, 500)][int]$MaxCalls = 30,
     [ValidateRange(5, 120)][int]$TimeoutSeconds = 60,
@@ -26,7 +28,7 @@ if ($Catalog -eq 'Legacy' -and $taskSandboxGroups.Count -gt 0) { throw 'GroupId 
 [IO.Directory]::CreateDirectory($taskSandboxOutput) | Out-Null
 $taskSandboxOptions = Join-Path $taskSandboxOutput 'options.json'
 @{ repositoryRoot=$taskSandboxRoot; outputDirectory=$taskSandboxOutput; mode=$Mode; suite=$Suite; caseIds=$taskSandboxCases; catalog=$Catalog; groupIds=$taskSandboxGroups;
-    repeats=$Repeats; maxCalls=$MaxCalls; timeoutSeconds=$TimeoutSeconds } | ConvertTo-Json -Depth 5 |
+    repeats=$Repeats; maxCalls=$MaxCalls; timeoutSeconds=$TimeoutSeconds; includePreparedFixtures=[bool]$IncludePreparedFixtures; includeLifecycleActions=[bool]$IncludeLifecycleActions } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath $taskSandboxOptions -Encoding UTF8
 . (Join-Path $PSScriptRoot 'Initialize-Dotnet.ps1')
 $taskSandboxPreviousOptions = $env:SPWPOS_NORA_SANDBOX_OPTIONS

@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 namespace SPWPOS.TestSupport.NoraSandbox;
 
 public sealed record ConversationTurn(string Type, string? Text, string? Action, JsonObject? Params, ConversationExpectation Expected);
-public sealed record ConversationExpectation(string Outcome, string[] Checks);
+public sealed record ConversationExpectation(string Outcome, string[] Checks, SandboxExpectation? Assertions = null);
 public sealed record ConversationCase(string Id, string CoverageKey, string Title, string VoiceProfile, string Fixture,
     string Execution, bool IntentionalRepetition, JsonObject? FixtureOverrides, ConversationTurn[] Turns);
 public sealed record ConversationGroup(string Id, string Title, ConversationCase[] Cases);

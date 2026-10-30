@@ -78,7 +78,7 @@ public sealed partial class WorkspaceService
                 var localStart = TimeZoneInfo.ConvertTime(x.Start, zone);
                 var localEnd = TimeZoneInfo.ConvertTime(x.End, zone);
                 var endText = localEnd.TimeOfDay == TimeSpan.Zero && localEnd.Date > localStart.Date ? "24:00" : localEnd.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
-                return $"{localStart:dd/MM/yyyy HH:mm}–{endText}";
+                return $"{localStart:dd'/'MM'/'yyyy HH:mm}–{endText}";
             })) + ". Bạn chọn một khung giờ để thử lại.";
         return new(code, $"{message} Chưa lưu thay đổi. {suggestion}", 409);
     }

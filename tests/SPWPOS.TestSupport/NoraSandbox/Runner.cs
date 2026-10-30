@@ -105,7 +105,9 @@ public static class SandboxRunner
                     AgentTurnView? result = null; string? code = null; string? exceptionType = null; string? errorMessage = null; JsonElement? command = null;
                     var scripted = !live || step.Operation == "MixedClarification";
                     env.Recorder.Script = scripted ? _ => SandboxScriptedResponses.Build(scenario, stepIndex, step, before) : null;
-                    env.Recorder.FailNext = step.Operation == "InjectedFailure";
+                    // This scenario tests a terminal failure and its conversation
+                    // history, so both the original and recovery attempt must fail.
+                    env.Recorder.FailuresRemaining = step.Operation == "InjectedFailure" ? 2 : 0;
                     using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct); timeout.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
                     var token = timeout.Token;
                     try
@@ -148,8 +150,10 @@ public static class SandboxRunner
                         .Select(x => new { x.InputTokens, x.OutputTokens, x.ModelVersion }).ToArrayAsync(CancellationToken.None), CancellationToken.None);
                     var traces = env.Recorder.Traces.Skip(traceStart).ToArray();
                     turns.Add(new(step.Prompt, step.Operation, result, code, exceptionType, before, after, SandboxOracle.Diff(before, after), traces, command,
-                        checks.ToArray(), watch.ElapsedMilliseconds, traces.Length > 0 ? usage.SingleOrDefault()?.InputTokens : null,
-                        traces.Length > 0 ? usage.SingleOrDefault()?.OutputTokens : null, traces.Length > 0 ? usage.SingleOrDefault()?.ModelVersion : null,
+                        checks.ToArray(), watch.ElapsedMilliseconds,
+                        traces.Length > 0 && usage.Any(x => x.InputTokens.HasValue) ? usage.Sum(x => x.InputTokens ?? 0) : null,
+                        traces.Length > 0 && usage.Any(x => x.OutputTokens.HasValue) ? usage.Sum(x => x.OutputTokens ?? 0) : null,
+                        traces.Length > 0 ? usage.Select(x => x.ModelVersion).FirstOrDefault(x => x is not null) : null,
                         env.Transport.Events.Skip(transportStart).ToArray(), storedView, errorMessage));
                     results[resultIndex] = results[resultIndex] with { Turns = turns.ToArray() };
                     await SandboxExport.WriteAsync(Current(), output, CancellationToken.None);

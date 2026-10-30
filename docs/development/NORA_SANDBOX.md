@@ -10,7 +10,7 @@ It does not start the web server, connect to the configured SQL Server database,
 
 ### Grouped conversation pack
 
-`tests/nora-sandbox/planning-conversations.vi.json` adds 180 cases in 30 groups, including regional Vietnamese, teencode, Gen Alpha slang, multi-turn clarification, calendar boundaries and failure scenarios. The original flat catalog remains the default (`-Catalog Legacy`). Select the new pack explicitly:
+`tests/nora-sandbox/planning-conversations.vi.json` contains 204 cases in 31 groups, including regional Vietnamese, teencode, Gen Alpha slang, multi-turn clarification, calendar boundaries and failure scenarios. The original flat catalog remains the default (`-Catalog Legacy`). Select the new pack explicitly:
 
 ```powershell
 # No provider calls: validate catalog and load isolated database fixtures.
@@ -25,9 +25,16 @@ Comma-separated IDs work in Windows PowerShell and pwsh. Unknown IDs and empty i
 
 **Offline `VALIDATED` is fixture validation, not a planning test or model pass.** It consumes zero interpreter calls. Live user-only `execution=chat` cases run through the real interpreter/service. They check outcome, read-only/clarification atomicity and generic scheduling invariants. A successful automatic check sequence ends in **`REVIEW_REQUIRED`**, because the pack's natural-language `expected.checks` still need a reviewer to assess exact intent, fields, scope and response quality. These checks are not translated into invented scripted answers. No expected answers or voice tags enter model context.
 
-The 29 cases requiring API, harness, extended, fault, streaming or concurrency adapters remain **`NOT_RUN`**. Their actions and expectations are retained in the exported `catalog.json`; the runner does not execute a partial sequence and call it a pass. The 151 user-only chat cases are selectable for live execution. A failed prerequisite stops dependent turns. Provider failures are errors; the call cap and three-consecutive-error circuit breaker remain in effect. Full results, before/after snapshots, public responses and interpreted/stored commands are exported using the normal report files. No live run is triggered by ordinary unit tests.
+By default, the 29 cases requiring API, harness, extended, fault, streaming or concurrency adapters remain **`NOT_RUN`**. The 175 user-only chat cases are selectable for live execution. Two optional switches extend service-level coverage:
+
+- `-IncludePreparedFixtures` enables eight additional cases: G07-05/G07-06 (DST), G16-06 (dependency cycle), G20-03/G20-06 (exact/foreign IDs), G21-06 (long history), and G22-04/G22-05 (large fixtures). Foreign tasks must remain unchanged and their names must not enter model context or public responses.
+- `-IncludeLifecycleActions` enables twelve additional cases: G23-05/G23-06, G24-01 through G24-06, and G25-01/G25-02/G25-05/G25-06. These call the actual public services for apply, undo, archive, delete and request replay; they also advance the fixture clock or make external fixture edits. Harness steps are recorded separately and are never sent to the model as user prompts. Stale/expired/reused/deleted/archived cases require their exact rejection codes.
+
+Together these switches enable 195 of 204 conversation cases. The remaining nine need learned-analytics, HTTP, controlled-fault, streaming or coordinated-concurrency adapters. This does not establish browser or HTTP transport behavior. Their actions and expectations remain in the exported `catalog.json`; the runner does not execute a partial sequence and call it a pass. A failed prerequisite stops dependent turns. Provider failures are errors; the call cap and three-consecutive-error circuit breaker remain in effect. Full results, before/after snapshots, public responses and interpreted/stored commands are exported using the normal report files. No live run is triggered by ordinary unit tests.
 
 The selected `catalog.json` preserves all manual review criteria and a `selection` section; original suite counts/hash are under `source_validation`. The actual input pack SHA-256 and runtime assembly hashes are recorded in `results.json`. Offline and live reports use schema 1.2 for this catalog, while legacy reports retain schema 1.1.
+
+Group G31 adds 24 defense cases with machine-readable saved-state assertions. See [the defense guide](../reviews/NORA_DEFENSE_TEST_GUIDE.md) and run `scripts/Test-NoraDefense.ps1` for the combined deterministic/frontend/fixture checks. Optional `-Live` runs a bounded real-model selection. In conversation expectations, optional `assertions` use snake_case keys for task counts, durations, deadlines, preserved IDs and event times; `scheduled_minutes` can differ from the original estimate for partially completed work. Preview/read/error safety rules cannot be relaxed by these assertions.
 
 ### Legacy sandbox catalog
 
@@ -99,6 +106,8 @@ SQLite uses the existing test model's UTC timestamp conversion. It exercises app
 Edit `tests/nora-sandbox/cases.json`: each case has `id`, `title`, `fixture`, `smoke`, `automation`, `limitation` and `steps`. A step has a prompt, a public service operation and expected results. Cases in a sequence use the same synthetic account/conversation. Supported fixtures and operation names are implemented in `tests/SPWPOS.TestSupport/NoraSandbox`.
 
 Expectations include allowed statuses (`REJECTED` means a known backend rejection, not any provider failure), zero-write requirements, entity counts, task/event field checks, preserved entities, weekly slots and effective availability. `{TARGET}`, `{F}`, `{A}` and similar ID tokens are substituted from the fixture in prompts and expectations. No expected answer prose is sent to the model. Unknown case IDs or invalid execution options are rejected before calls.
+
+Conversation assertions may include `preview_preserve_session_ids` to check a proposal's saved session IDs, tasks, times and preserved flags, independently of zero-write checks. Short tasks may use their exact remaining duration below the preferred minimum session length; the oracle still rejects excess scheduled work and incomplete short fragments. It never calls planner helpers to determine validity.
 
 When extending Offline coverage, add a controlled response in `ScriptedResponses.cs`; do not use its success as evidence for the live interpreter. Run `NoraSandboxTests` to verify the runner/oracle, then do a small bounded Live selection. Record code changes and preserve earlier run folders so comparisons remain auditable.
 

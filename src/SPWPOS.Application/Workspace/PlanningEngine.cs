@@ -141,9 +141,9 @@ public sealed partial class PlanningEngine
         while (tasks.Count > 0)
         {
             var task = tasks.Values.Where(t => state.Dependencies.Where(d => d.TaskId == t.Id).All(d => done.ContainsKey(d.PredecessorId)))
-                .OrderByDescending(t => urgentFirst && t.Priority == 4)
+                .OrderByDescending(t => promoted?.Contains(t.Id) == true)
+                .ThenByDescending(t => urgentFirst && t.Priority == 4)
                 .ThenByDescending(t => urgentFirst && urgency?.RequestedUrgentTaskIds?.Contains(t.Id) == true)
-                .ThenByDescending(t => promoted?.Contains(t.Id) == true)
                 .ThenBy(t => t.Deadline).ThenByDescending(t => t.Priority).ThenBy(t => t.Id).FirstOrDefault();
             if (task is null)
             {
@@ -153,8 +153,9 @@ public sealed partial class PlanningEngine
             tasks.Remove(task.Id);
             var earliest = state.Dependencies.Where(d => d.TaskId == task.Id).Select(d => done[d.PredecessorId]).DefaultIfEmpty(start).Max();
             var remaining = Math.Max(0, Remaining(task, bias) - (int)preserve.Where(x => x.TaskId == task.Id).Sum(x => (x.End - x.Start).TotalMinutes));
-            var minimum = Math.Max(task.MinimumSessionMinutes, state.Preference.MinimumSessionMinutes);
-            if (remaining > 0 && remaining < minimum) remaining = minimum;
+            // A minimum session preference must never manufacture extra work.
+            // Allow a whole short task (or its final remaining work) in one session.
+            var minimum = Math.Min(remaining, Math.Max(task.MinimumSessionMinutes, state.Preference.MinimumSessionMinutes));
             if (!task.Splittable && preserve.Any(x => x.TaskId == task.Id) && remaining > 0)
             { warnings.Add(new(task.Id, task.Name, "NON_SPLITTABLE_PRESERVED", "Phiên đã giữ không đủ thời lượng cho công việc không thể chia nhỏ.", remaining)); continue; }
             var tentative = new List<ProposedSession>(); var trialBudgets = new Dictionary<DateOnly, int>(budgets);

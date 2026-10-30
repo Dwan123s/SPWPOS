@@ -75,11 +75,20 @@ public sealed partial class TaskInterpreter
 
     private HttpContent GoogleContent(string instructions, string prompt, JsonElement schema, int maxTokens, bool includeStore = false, object[]? contentParts = null)
     {
+        // Gemini 3.8 counts thinking and the structured answer in the same
+        // output budget. The earlier 6,000-token cap truncated real agent turns.
+        var outputLimit = UsesGemini38 ? Math.Max(maxTokens, 16384) : maxTokens;
         // Vertex v1 uses responseJsonSchema. Developer API uses responseFormat.
-        object generation = Provider == "VertexAI"
-            ? new { candidateCount = 1, maxOutputTokens = maxTokens, responseMimeType = "application/json", responseJsonSchema = schema }
-            : new { candidateCount = 1, maxOutputTokens = maxTokens,
-                responseFormat = new { text = new { mimeType = "APPLICATION_JSON", schema } } };
+        var generation = new Dictionary<string, object> { ["maxOutputTokens"] = outputLimit };
+        if (Provider == "VertexAI")
+        {
+            generation["responseMimeType"] = "application/json";
+            generation["responseJsonSchema"] = schema;
+        }
+        else generation["responseFormat"] = new { text = new { mimeType = "APPLICATION_JSON", schema } };
+        // NORA extracts structured intent; deterministic planning happens on
+        // the server. Avoid unbounded deliberation over feasibility in the model.
+        if (UsesGemini38) generation["thinkingConfig"] = new { thinkingLevel = "LOW" };
         var body = new Dictionary<string, object> {
             ["systemInstruction"] = new { parts = new[] { new { text = instructions } } },
             ["contents"] = new[] { new { role = "user", parts = contentParts ?? [new { text = prompt }] } },
@@ -88,6 +97,8 @@ public sealed partial class TaskInterpreter
         if (includeStore && Provider == "Gemini") body["store"] = false;
         return JsonContent.Create(body);
     }
+
+    private bool UsesGemini38 => IsGoogle && (config["AiSettings:Model"] is "gemini-3.8-flash" or "models/gemini-3.8-flash");
 
     private async Task<AuthException> GoogleFailureDetailsAsync(HttpResponseMessage response, AuthException failure, CancellationToken ct)
     {

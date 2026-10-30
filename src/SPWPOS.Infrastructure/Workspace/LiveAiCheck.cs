@@ -14,7 +14,7 @@ public static class LiveAiCheck
         var now = clock.GetUtcNow(); var zone = PlanningEngine.Zone(zoneId);
         var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime).AddDays(1);
         while (day.DayOfWeek != DayOfWeek.Thursday) day = day.AddDays(1);
-        var request = $"Tối thứ Năm {day:dd/MM/yyyy} mình muốn dành thời gian ôn tiếng Anh. Bạn xếp giúp mình nhé.";
+        var request = $"Tối thứ Năm {day:dd'/'MM'/'yyyy} mình muốn dành thời gian ôn tiếng Anh. Bạn xếp giúp mình nhé.";
         object Context(AgentPendingRequest? pending = null) => new {
             activeTaskTypes = new[] { "OTHER", "STUDY", "WRITING" }, pendingRequest = pending,
             tasks = Array.Empty<object>(), events = Array.Empty<object>(), exceptions = Array.Empty<object>(), sessions = Array.Empty<object>(), dependencies = Array.Empty<object>(),
@@ -32,7 +32,7 @@ public static class LiveAiCheck
             followup.Tasks[0].Deadline == PlanningEngine.At(day, 1260, zone) && followup.Tasks[0].WorkWindowStart >= PlanningEngine.At(day, 1080, zone) &&
             followup.Tasks[0].WorkWindowStart < PlanningEngine.At(day, 1260, zone) && followup.Tasks[0].WorkWindowEnd <= PlanningEngine.At(day, 1440, zone), "T10 must retain Thursday and apply both duration and deadline.");
         Console.WriteLine("LIVE AI QUALITY: T10 keeps Thursday evening, 45 minutes and 21:00 deadline.");
-        var appointment = $"Ngày {day:dd/MM/yyyy} mình có hẹn với thầy lúc 6 giờ, kéo dài khoảng nửa tiếng. Thêm vào lịch giúp mình nhé.";
+        var appointment = $"Ngày {day:dd'/'MM'/'yyyy} mình có hẹn với thầy lúc 6 giờ, kéo dài khoảng nửa tiếng. Thêm vào lịch giúp mình nhé.";
         var ambiguous = await agent.InterpretAsync(appointment, JsonSerializer.Serialize(Context(), json), [], zoneId, now, ct);
         Check(ambiguous.ResultKind == "CLARIFICATION" && ambiguous.Question.Length > 0 && ambiguous.Events.Length == 0 && ambiguous.Tasks.Length == 0, "T11 must resolve AM/PM before writes.");
         Console.WriteLine("LIVE AI QUALITY: T11 deterministic input guard asks AM/PM before a provider request or event creation.");

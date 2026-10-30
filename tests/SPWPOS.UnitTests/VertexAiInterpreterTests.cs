@@ -52,9 +52,10 @@ public sealed class VertexAiInterpreterTests
         }
     }
     private static TaskInterpreter Interpreter(HttpClient http, IVertexAccessTokenProvider? tokens = null,
-        string? key = "cloud-key", string location = "global", string project = "planora-511614", string auth = "ApiKey", bool express = false) => new(http,
+        string? key = "cloud-key", string location = "global", string project = "planora-511614", string auth = "ApiKey", bool express = false,
+        string model = "models/gemini-3.5-flash-lite", string provider = "VertexAI") => new(http,
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
-            ["AiSettings:Enabled"] = "true", ["AiSettings:Provider"] = "VertexAI", ["AiSettings:Model"] = "models/gemini-3.5-flash-lite",
+            ["AiSettings:Enabled"] = "true", ["AiSettings:Provider"] = provider, ["AiSettings:Model"] = model,
             ["AiSettings:VertexApiKey"] = key, ["AiSettings:VertexProjectId"] = project, ["AiSettings:VertexLocation"] = location,
             ["AiSettings:VertexAuthentication"] = auth, ["AiSettings:VertexExpressMode"] = express.ToString(),
             ["AiSettings:GeminiApiKey"] = "old-studio-key", ["AiSettings:ApiKey"] = "unrelated-openai-key"
@@ -62,6 +63,23 @@ public sealed class VertexAiInterpreterTests
     private static Task<SPWPOS.Application.Workspace.AgentIntent> Interpret(TaskInterpreter interpreter) =>
         interpreter.InterpretAsync("Họp ngày mai 14h–16h", "{}", [], "Asia/Ho_Chi_Minh",
             DateTimeOffset.Parse("2026-10-14T06:00:00Z"), TestContext.Current.CancellationToken);
+
+    [Theory] [InlineData("VertexAI")] [InlineData("Gemini")]
+    public async Task Gemini_38_requests_omit_options_rejected_by_the_provider(string providerName)
+    {
+        using var provider = new Provider(); using var http = new HttpClient(provider);
+        var result = await Interpret(Interpreter(http, model: "gemini-3.8-flash", provider: providerName));
+        Assert.Single(result.Events);
+        Assert.EndsWith("/models/gemini-3.8-flash:generateContent", provider.Url!.AbsolutePath);
+        using var request = JsonDocument.Parse(provider.Body);
+        var generation = request.RootElement.GetProperty("generationConfig");
+        foreach (var unsupported in new[] { "candidateCount", "frequencyPenalty", "presencePenalty", "thinkingBudget" })
+            Assert.False(generation.TryGetProperty(unsupported, out _), $"Gemini 3.8 rejects {unsupported}.");
+        // The live 3.8 probe exhausted 6,000 tokens in reasoning before its
+        // structured answer finished. Keep room for both, within Google's cap.
+        Assert.InRange(generation.GetProperty("maxOutputTokens").GetInt32(), 8192, 65536);
+        Assert.Equal("LOW", generation.GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString());
+    }
 
     [Fact]
     public async Task Cloud_agent_uses_the_documented_api_key_route_with_a_separate_header_key()

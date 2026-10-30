@@ -16,11 +16,18 @@ public sealed partial class WorkspaceService
     {
         var text = MatchText(request);
         return RequestMatches(text, @"\b(?:lich trinh|xem lich|lich (?:hom nay|ngay mai)|(?:hom nay|ngay mai) (?:toi |minh )?co (?:nhung )?gi)\b").Count > 0 &&
-            RequestMatches(text, @"\b(?:phan tich|danh gia|nhan xet|tu van|hop ly|review|analy[sz]e|gio ranh|gio trong|ranh (?:gio|luc|khi)|khoang (?:ranh|trong))\b").Count == 0;
+            RequestMatches(text, @"\b(?:phan tich|danh gia|nhan xet|tu van|hop ly|review|analy[sz]e)\b").Count == 0;
     }
+
+    private static AgentIntent CoalesceEquivalentCalendarQueries(AgentIntent intent) =>
+        intent.ScheduleReviewQuery is not null && intent.FreeTimeQuery == intent.ScheduleReviewQuery && intent.Question == "" &&
+        !intent.ReplaceWeeklyAvailability && !intent.Reschedule && intent.Tasks is { Length: 0 } && intent.Events is { Length: 0 } &&
+        intent.Exceptions is { Length: 0 } && intent.WeeklySlots is { Length: 0 } && intent.ScheduleTaskIds is { Length: 0 }
+            ? intent with { FreeTimeQuery = null } : intent;
 
     private static AgentIntent RecognizeScheduleReview(AgentIntent intent, string request)
     {
+        intent = CoalesceEquivalentCalendarQueries(intent);
         // Older providers sometimes classify analysis as a free-time lookup.
         // Only promote an already read-only intent; never discard requested actions.
         if (intent.ScheduleReviewQuery is null && intent.FreeTimeQuery is not null && !HasAgentActions(intent) &&
@@ -87,7 +94,7 @@ public sealed partial class WorkspaceService
             var end = TimeZoneInfo.ConvertTime(item.End, zone);
             var sameDay = LocalDate(query.Start, state.Preference) == LocalDate(query.End.AddTicks(-1), state.Preference);
             var window = sameDay && start.Date == end.Date ? $"{start:HH:mm}–{end:HH:mm}"
-                : $"{start:dd/MM HH:mm}–{end:dd/MM HH:mm}";
+                : $"{start:dd'/'MM HH:mm}–{end:dd'/'MM HH:mm}";
             lines.Add($"- {window}: {item.Name}");
         }
         if (entries.Length > 12) lines.Add($"Mình đang hiển thị 12/{entries.Length} mục; bạn có thể hỏi riêng một buổi để xem tiếp.");
@@ -101,7 +108,7 @@ public sealed partial class WorkspaceService
         DateTimeOffset Local(DateTimeOffset value) => TimeZoneInfo.ConvertTime(value, zone);
         string Stamp(DateTimeOffset value) => Local(value).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
         string Window(DateTimeOffset start, DateTimeOffset end) => $"{Stamp(start)}–{Local(end):HH:mm}" +
-            (Local(start).Date != Local(end).Date ? $" ({Local(end):dd/MM/yyyy})" : "");
+            (Local(start).Date != Local(end).Date ? $" ({Local(end):dd'/'MM'/'yyyy})" : "");
         TimeSlot Clip(DateTimeOffset start, DateTimeOffset end) => new(start < query.Start ? query.Start : start, end > query.End ? query.End : end);
         var tasks = state.Tasks.ToDictionary(x => x.Id);
         var entries = state.Events.Where(x => x.Start < query.End && x.End > query.Start)

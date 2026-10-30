@@ -13,9 +13,14 @@ public static class SandboxJson
 
 public sealed record SandboxOptions(string RepositoryRoot, string OutputDirectory, string Mode = "Offline",
     string Suite = "Smoke", string[]? CaseIds = null, int Repeats = 1, int MaxCalls = 30, int TimeoutSeconds = 60,
-    string Catalog = "Legacy", string[]? GroupIds = null);
+    string Catalog = "Legacy", string[]? GroupIds = null)
+{
+    public bool IncludePreparedFixtures { get; init; }
+    public bool IncludeLifecycleActions { get; init; }
+}
 public sealed record SandboxTaskExpectation(string Match, int Minutes, string Deadline, bool? Splittable = null,
-    int? Priority = null, bool Scheduled = true, string? Id = null, string? WorkWindowStart = null, string? WorkWindowEnd = null);
+    int? Priority = null, bool Scheduled = true, string? Id = null, string? WorkWindowStart = null, string? WorkWindowEnd = null,
+    int? ScheduledMinutes = null);
 public sealed record SandboxEventExpectation(string Match, string Start, string End, string? EventType = null);
 public sealed record SandboxFreeExpectation(string Date, int StartMinute, int EndMinute);
 public sealed record SandboxExpectation {
@@ -27,6 +32,7 @@ public sealed record SandboxExpectation {
     public SandboxTaskExpectation[] Tasks { get; init; } = [];
     public SandboxEventExpectation[] Events { get; init; } = [];
     public string[] Preserve { get; init; } = [];
+    public string[] PreviewPreserveSessionIds { get; init; } = [];
     public int[][]? Weekly { get; init; }
     public SandboxFreeExpectation[] Free { get; init; } = [];
 }
@@ -40,7 +46,8 @@ public sealed record SandboxChange(string Entity, string Id, string Operation, J
 public sealed record SandboxCheck(string Name, bool Passed, string Detail, bool Critical = false);
 public sealed record SandboxTrace(string Prompt, string ContextJson, AgentMessage[] History, AgentIntent? InterpretedIntent,
     DateTimeOffset CurrentUtc, string TimeZoneId, string Source);
-public sealed record SandboxTransportEvent(int? HttpStatus, string? ExceptionType, string? SocketError);
+public sealed record SandboxTransportEvent(int? HttpStatus, string? ExceptionType, string? SocketError,
+    string? FinishReason = null, int? OutputTokens = null, int? ThinkingTokens = null);
 public sealed record SandboxTurnResult(string Prompt, string Operation, AgentTurnView? Result, string? ErrorCode,
     string? ExceptionType, SandboxSnapshot Before, SandboxSnapshot After, SandboxChange[] Actions,
     SandboxTrace[] Traces, JsonElement? StoredCommand, SandboxCheck[] Checks, long ElapsedMilliseconds,
