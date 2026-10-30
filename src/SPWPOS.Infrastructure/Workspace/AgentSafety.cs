@@ -182,6 +182,7 @@ public sealed partial class WorkspaceService
             ResultKind = "CLARIFICATION",
             ReplaceWeeklyAvailability = false, WeeklySlots = [], Exceptions = [], Events = [], Tasks = [], ScheduleTaskIds = [], Reschedule = false,
             FreeTimeQuery = null, ScheduleReviewQuery = null,
+            OptimizationQuery = null,
             Pending = new(pending?.OriginalText ?? request, first?.TaskId ?? pending?.TaskId,
                 window?.Start ?? pending?.WorkWindowStart, window?.End ?? pending?.WorkWindowEnd,
                 first?.DurationEvidence is { } duration && SourceQuote(duration, source) ? QuotedMinutes(duration) : QuotedMinutes(request) ?? pending?.EstimatedMinutes,

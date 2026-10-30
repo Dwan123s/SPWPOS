@@ -102,8 +102,10 @@ public static class LiveAiCheck
         {
             var note = await interpreter.AnalyzeNoteAsync($"Viết báo cáo SWP trong 120 phút, hạn chót bắt buộc 18:00 ngày {tomorrow:yyyy-MM-dd}.",
                 true, zoneId, now, ct);
-            Check(note.Source == "VertexAI" && note.Tasks.Length == 1 && note.Tasks[0].EstimatedMinutes == 120 &&
-                note.Tasks[0].Deadline == due && note.Tasks[0].IsHardDeadline, "Cloud note extraction did not preserve duration or deadline.");
+            var validNote = note.Activities is { } activities
+                ? activities is [{ Kind: "TASK", EstimatedMinutes: 120, IsHardDeadline: true, Question: "" } activity] && activity.Deadline == due
+                : note.Tasks is [{ EstimatedMinutes: 120, IsHardDeadline: true } legacyTask] && legacyTask.Deadline == due;
+            Check(note.Source == "VertexAI" && !note.NeedsReview && validNote, "Cloud note extraction did not preserve duration or deadline.");
             Console.WriteLine("LIVE AI: Google Cloud note extraction and source verified.");
         }
         Console.WriteLine($"LIVE AI: {agent.Capabilities.Provider} structured output and planner checks passed. No calendar data was saved.");

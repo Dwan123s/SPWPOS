@@ -26,6 +26,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 ## Guides / Hướng dẫn
 
+- [Kịch bản demo PLANORA / Demo script](guides/DEMO_SCRIPT.md)
 - [Workspace phases 1–4 / Kiến trúc, EMA, XP và ghi nhận bù](features/WORKSPACE_UPGRADE_PHASES_1_TO_4.md)
 - [Independent builds, same origin / Build riêng, chung địa chỉ](development/INDEPENDENT_BUILD_SAME_ORIGIN.md)
 - [Upgrade verification 28/10/2026 / Kết quả kiểm chứng](development/WORKSPACE_UPGRADE_VERIFICATION_2026-10-28.md)
@@ -35,6 +36,8 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [Username and email login / Đăng nhập](features/USERNAME_LOGIN.md)
 - [Notes and scheduling agent / Ghi chú và agent](features/NOTES_AGENT_GUIDE.md)
 - [Planning and chat agent / Agent lập kế hoạch](features/PLANNING_AGENT_GUIDE.md)
+- [NORA Agent runtime / Vòng công cụ, cấu hình và kiểm thử](features/NORA_AGENT_RUNTIME.md)
+- [NORA Agent verification / Kiểm chứng ngày 31/10/2026](development/NORA_AGENT_VERIFICATION_2026-10-31.md)
 - [NORA voice / Giọng nói NORA](features/NORA_VOICE.md)
 - [NORA timetable images / Đọc thời khóa biểu từ ảnh](features/NORA_TIMETABLE_IMAGES.md)
 - [Tasks and reminders / Công việc và nhắc nhở](features/PLANORA_TASK_AND_REMINDER_UPDATE.md)
@@ -71,6 +74,8 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 ## Plans and reviews / Kế hoạch và đánh giá
 
+- [NORA agent architecture audit, 31 October / Đối chiếu Agent và workflow theo source](reviews/NORA_AGENT_ARCHITECTURE_AUDIT_2026-10-31.md)
+- [NORA agent upgrade plan, 31 October / Kế hoạch triển khai agent hoạch định](plans/NORA_AGENT_UPGRADE_PLAN_2026-10-31.md)
 - [Note flow audit, 25 October / Kiểm thử và đánh giá luồng Note](reviews/NOTE_FLOW_AUDIT_2026-10-25.md) · [Luồng chi tiết](features/NOTE_FLOW_2026-10-25.md) · [208 bản ghi kiểm thử](evidence/note-audit-2026-10-25/cases.csv)
 - [Upgrade plan](plans/PLANORA_UPGRADE_PLAN.md) · [AI agent implementation plan](plans/AI_AGENT_IMPLEMENTATION_PLAN.md)
 - [Remediation plan](plans/PLANORA_REMEDIATION_PLAN_2026-10-15.md) · [Fix progress](plans/PLANORA_FIX_PROGRESS.md)

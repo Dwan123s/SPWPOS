@@ -139,7 +139,24 @@ function Turn({
             {statuses[turn.status] || turn.status}
           </span>
         </div>
-        {process && (
+        {turn.run?.mode === "Agent" && (
+          <details className="nora-completed-process">
+            <summary>
+              {icon("check")}NORA Agent · {turn.run.toolCalls} lần dùng công cụ
+            </summary>
+            <ol aria-label="Các hành động đã thực hiện">
+              {(turn.run.steps || []).map((step) => (
+                <li key={step.sequence}>
+                  {step.label}
+                  {step.status === "ERROR"
+                    ? " · cần điều chỉnh"
+                    : " · đã kiểm tra"}
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
+        {process && !turn.run && (
           <details className="nora-completed-process">
             <summary>
               {icon("check")}Đã xử lý trong {process.seconds}s ·{" "}
@@ -297,6 +314,8 @@ function Turn({
 export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const [turns, setTurns] = useState([]);
   const [capabilities, setCapabilities] = useState(null);
+  const [checkingAi, setCheckingAi] = useState(false);
+  const aiCheckInFlight = useRef(false);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [conversationId, setConversationId] = useState(null);
   const [text, setText] = useState("");
@@ -425,6 +444,37 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       streamAbort.current?.abort();
     };
   }, [accountKey, connectionAttempt]);
+  const checkAiConnection = useCallback(async (quiet = false) => {
+    if (aiCheckInFlight.current) return;
+    aiCheckInFlight.current = true;
+    setCheckingAi(true);
+    try {
+      const caps = await api("/api/agent/capabilities");
+      if (mounted.current) {
+        setCapabilities(caps);
+        if (caps.aiAvailable) setError("");
+      }
+    } catch (failure) {
+      if (mounted.current && !quiet) setError(failure.message);
+    } finally {
+      aiCheckInFlight.current = false;
+      if (mounted.current) setCheckingAi(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (capabilities?.aiAvailable !== false) return;
+    const refresh = () => {
+      if (!document.hidden) void checkAiConnection(true);
+    };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    const timer = setInterval(refresh, 30000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      clearInterval(timer);
+    };
+  }, [capabilities?.aiAvailable, checkAiConnection]);
   useEffect(() => {
     if (conversationId)
       try {
@@ -525,7 +575,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         (item) => {
           if (!mounted.current) return;
           const next = { ...streamState.current };
-          if (item.type === "phase")
+          if (item.type === "phase" || item.type === "tool")
             next.phases = [
               ...next.phases.filter((step) => step.stage !== item.stage),
               { stage: item.stage, message: item.message },
@@ -960,6 +1010,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       text: "Tôi rảnh thứ Hai đến thứ Sáu từ 19h đến 22h, riêng ngày mai bận từ 20h đến 21h.",
     },
     {
+      title: "Tối ưu lịch",
+      subtitle: "Xem phương án xếp lại tuần này",
+      icon: "calendar",
+      text: "Tối ưu lịch tuần này cho tôi. Cho tôi xem giờ cũ và giờ đề xuất trước khi xác nhận lưu.",
+    },
+    {
       title: "Xem lịch hôm nay",
       subtitle: "Biết việc nào cần ưu tiên",
       icon: "today",
@@ -1346,7 +1402,15 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           {capabilities && !capabilities.aiAvailable && (
             <p className="info">
               Trợ lý AI chưa được cấu hình. Bạn vẫn có thể nhập lịch ở mục Giờ
-              rảnh và Công việc.
+              rảnh và Công việc.{" "}
+              <button
+                type="button"
+                className="btn small secondary"
+                disabled={checkingAi}
+                onClick={() => checkAiConnection()}
+              >
+                {checkingAi ? "Đang kiểm tra AI…" : "Kiểm tra lại AI"}
+              </button>
             </p>
           )}
           {error && !confirmDeleteCurrent && (
@@ -1384,6 +1448,10 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                   [
                     "Tìm giờ trống",
                     "Ngày mai tôi có thể làm việc trong khoảng giờ rảnh nào? Chỉ xem giờ rảnh trong cài đặt và các mục lịch đã lưu, chưa thay đổi lịch.",
+                  ],
+                  [
+                    "Tối ưu lịch",
+                    "Tối ưu lịch tuần này cho tôi. Cho tôi xem giờ cũ và giờ đề xuất trước khi xác nhận lưu.",
                   ],
                   [
                     "Dời một sự kiện",

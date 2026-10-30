@@ -80,6 +80,7 @@ public sealed partial class TaskInterpreter
         var outputLimit = UsesGemini38 ? Math.Max(maxTokens, 16384) : maxTokens;
         // Vertex v1 uses responseJsonSchema. Developer API uses responseFormat.
         var generation = new Dictionary<string, object> { ["maxOutputTokens"] = outputLimit };
+        if (!UsesGemini38) generation["candidateCount"] = 1;
         if (Provider == "VertexAI")
         {
             generation["responseMimeType"] = "application/json";
@@ -88,6 +89,8 @@ public sealed partial class TaskInterpreter
         else generation["responseFormat"] = new { text = new { mimeType = "APPLICATION_JSON", schema } };
         // NORA extracts structured intent; deterministic planning happens on
         // the server. Avoid unbounded deliberation over feasibility in the model.
+        // Scheduling decisions are deterministic in PlanningEngine. Bound the
+        // interpreter's reasoning overhead; 3.8 supports LOW, not MINIMAL.
         if (UsesGemini38) generation["thinkingConfig"] = new { thinkingLevel = "LOW" };
         var body = new Dictionary<string, object> {
             ["systemInstruction"] = new { parts = new[] { new { text = instructions } } },

@@ -2,7 +2,6 @@ import { nodeList } from "./react-ui.jsx";
 import {
   state,
   button,
-  badge,
   icon,
   statusLabels,
   dateFmt,
@@ -10,7 +9,6 @@ import {
   dayKey,
   minutes,
 } from "./ui.jsx";
-import { sessionCard } from "./calendar.jsx";
 import {
   CalendarClock,
   CalendarTimeTag,
@@ -67,10 +65,11 @@ export function calendarPage() {
     const phase = calendarPhase(e.start, e.end, now);
     const from = dayKey(e.start) < date ? "00:00" : timeFmt(e.start),
       to = dayKey(e.end) > date ? "24:00" : timeFmt(e.end);
-    return compact ? (
+    return (
       <button
+        key={`event-${e.id}-${date}`}
         type="button"
-        className={`calendar-block fixed-event calendar-timed-card calendar-time-${phase}`}
+        className={`calendar-block fixed-event calendar-timed-card calendar-time-${phase}${compact ? "" : " calendar-agenda-entry"}`}
         data-action="edit-event"
         data-id={e.id}
       >
@@ -79,35 +78,20 @@ export function calendarPage() {
           {" — "}
           {to}
         </span>
-        <strong>{e.name}</strong>
+        <strong title={e.name}>{e.name}</strong>
         <CalendarTimeTag phase={phase} />
         <span className="block-meta">
           {icon("lock")}
           Sự kiện cố định
         </span>
       </button>
-    ) : (
-      <div
-        className={`session-card fixed-event calendar-timed-card calendar-time-${phase}`}
-      >
-        <div className="session-top">
-          <h3>{e.name}</h3>
-          <CalendarTimeTag phase={phase} />
-          {badge("Cố định")}
-        </div>
-        <p className="session-time">
-          {from}
-          {" — "}
-          {to}
-        </p>
-        {button("Chi tiết sự kiện", "edit-event", "small ghost", e.id, "edit")}
-      </div>
     );
   };
-  const block = (s, now) => (
+  const block = (s, now, agenda = false) => (
     <button
+      key={`session-${s.id}`}
       type="button"
-      className={`calendar-block calendar-timed-card calendar-time-${calendarPhase(s.start, s.end, now)} ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}`}
+      className={`calendar-block calendar-timed-card calendar-time-${calendarPhase(s.start, s.end, now)} ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}${agenda ? " calendar-agenda-entry" : ""}`}
       data-action="session-detail"
       data-id={s.id}
     >
@@ -117,7 +101,7 @@ export function calendarPage() {
         {timeFmt(s.end)}
         {s.isLocked ? icon("lock") : ""}
       </span>
-      <strong>{s.taskName}</strong>
+      <strong title={s.taskName}>{s.taskName}</strong>
       <CalendarTimeTag phase={calendarPhase(s.start, s.end, now)} />
       <span className="block-meta">
         {minutes(Math.round((new Date(s.end) - new Date(s.start)) / 60000))}
@@ -298,13 +282,14 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
             <div
               className="calendar-scroll"
               role="region"
-              aria-label="Lịch 7 ngày, cuộn ngang để xem thêm"
+              aria-label="Lịch 7 ngày, cuộn dọc và ngang để xem thêm"
               tabIndex="0"
             >
               <div className="week-grid">
                 {nodeList(
                   dates.map((date) => (
                     <section
+                      key={date}
                       className={`week-day ${date === dayKey(now) ? "today" : ""}`}
                     >
                       <div className="week-day-header">
@@ -338,18 +323,17 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
                 )}
               </div>
             </div>
-            <p className="calendar-hint">
-              {icon("clock")}
-              {"Lịch theo múi giờ "}
-              {state.workspace.preference.timeZoneId}. Bấm một phiên để xem và
-              điều chỉnh.
-            </p>
           </>
         ) : (
-          <div className="agenda-week">
+          <div
+            className="agenda-week"
+            role="region"
+            aria-label="Danh sách lịch 7 ngày, cuộn để xem thêm"
+            tabIndex="0"
+          >
             {nodeList(
               dates.map((date) => (
-                <section className="agenda-day">
+                <section key={date} className="agenda-day">
                   <div
                     className={`agenda-day-label ${date === dayKey(now) ? "today" : ""}`}
                   >
@@ -365,14 +349,7 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
                     {nodeList(
                       entries(date).map((e) =>
                         e.session
-                          ? sessionCard(
-                              e.session,
-                              calendarPhase(
-                                e.session.start,
-                                e.session.end,
-                                now,
-                              ),
-                            )
+                          ? block(e.session, now, true)
                           : fixed(e.event, date, false, now),
                       ),
                     ) || (
@@ -386,6 +363,12 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
             )}
           </div>
         )}
+        <p className="calendar-hint">
+          {icon("clock")}
+          Cuộn trong khung lịch để xem thêm. Bấm một mục để xem chi tiết.
+          {" Múi giờ "}
+          {state.workspace.preference.timeZoneId}.
+        </p>
       </section>
       <div className="calendar-bottom">
         {icon("shield")}

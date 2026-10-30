@@ -1,0 +1,275 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using SPWPOS.Application.Authentication;
+using SPWPOS.Application.Workspace;
+using SPWPOS.Domain.Entities;
+
+namespace SPWPOS.Infrastructure.Workspace;
+
+public sealed partial class WorkspaceService
+{
+    private async Task<NoraRunView?> RuntimeTraceAsync(Guid uid, Guid turnId, CancellationToken ct)
+    {
+        var run = await Mine<AgentRun>(uid).AsNoTracking().SingleOrDefaultAsync(x => x.TurnId == turnId, ct);
+        if (run is null) return null;
+        var labels = NoraToolRegistry.Create([]).ToDictionary(x => x.Name, x => x.Label);
+        var rows = await Mine<AgentToolCall>(uid).AsNoTracking().Where(x => x.RunId == run.Id).OrderBy(x => x.Sequence).ToArrayAsync(ct);
+        return new(run.Id, "Agent", run.Status, run.ModelTurns, run.ToolCalls,
+            rows.Select(x => new NoraToolTrace(x.Sequence, x.Tool, labels.GetValueOrDefault(x.Tool, x.Tool), x.Status, x.DurationMilliseconds)).ToArray());
+    }
+
+    private async Task<RuntimeExecution> RunNoraAgentAsync(Guid uid, Guid turnId, AgentTurnInput input,
+        PlanningState snapshot, AgentMessage[] history, AgentPendingRequest? pending, string[] types, AgentImage? image,
+        Func<AgentStreamEvent, CancellationToken, Task>? publish, CancellationToken ct)
+    {
+        var limits = noraOptions?.Value ?? new NoraAgentOptions();
+        var provider = (INoraAgentModel)interpreter;
+        var run = await Mutate(uid, async () =>
+        {
+            var rows = await Mine<AgentRun>(uid).Where(x => x.ConversationId == input.ConversationId).ToArrayAsync(ct);
+            Require(!rows.Any(x => x.Status == "RUNNING" && x.LeaseUntil > Now), "AGENT_BUSY", "NORA đang xử lý một yêu cầu trong hội thoại này.", 409);
+            var previous = rows.OrderByDescending(x => x.UpdatedAt).FirstOrDefault();
+            var same = rows.SingleOrDefault(x => x.TurnId == turnId);
+            var resume = same ?? (history.LastOrDefault()?.Status == "NEEDS_INPUT" && previous?.Status == "WAITING_FOR_INPUT" &&
+                previous.UpdatedAt > Now.AddMinutes(-30) ? previous : null);
+            foreach (var abandoned in rows.Where(x => x.Status == "RUNNING")) { abandoned.Status = "INTERRUPTED"; abandoned.Version = Guid.NewGuid(); }
+            if (resume is null)
+            {
+                resume = new AgentRun { UserId = uid, ConversationId = input.ConversationId, TurnId = turnId,
+                    Goal = input.Text, CreatedAt = Now };
+                db.AgentRuns.Add(resume);
+            }
+            else if (resume.TurnId != turnId)
+            {
+                Require(resume.Continuations < 3, "AGENT_CONTINUATION_LIMIT", "Yêu cầu đã hỏi lại nhiều lần. Hãy bắt đầu yêu cầu mới với các điều kiện đầy đủ.", 409);
+                resume.Continuations++; resume.TurnId = turnId;
+                var combined = resume.Goal + "\nBổ sung: " + input.Text;
+                resume.Goal = combined[..Math.Min(8000, combined.Length)];
+            }
+            resume.SnapshotRevision = snapshot.Preference.Revision;
+            resume.Status = "RUNNING"; resume.Version = Guid.NewGuid(); resume.UpdatedAt = Now;
+            resume.LeaseUntil = Now.AddSeconds(limits.TimeoutSeconds + 60);
+            return resume;
+        }, ct, false);
+        var runId = run.Id; var leaseVersion = run.Version;
+        agentFileLog?.RunStarted(runId, turnId, input.ConversationId, input, run.Continuations);
+        var source = run.Goal;
+        var drafts = new Dictionary<string, AgentIntent>(StringComparer.Ordinal);
+        var candidates = new Dictionary<string, RuntimeCandidate>(StringComparer.Ordinal);
+        var state = Copy(snapshot);
+        AgentIntent? lastDraft = null;
+        string? verifiedReply = null;
+        var readObserved = false;
+        var calendarObserved = false;
+        var modelTurns = run.ModelTurns; var toolCalls = run.ToolCalls; var simulations = run.Simulations;
+        var priorSteps = await Mine<AgentToolCall>(uid).AsNoTracking().Where(x => x.RunId == runId).OrderBy(x => x.Sequence)
+            .Select(x => new NoraToolTrace(x.Sequence, x.Tool, "", x.Status, x.DurationMilliseconds)).ToArrayAsync(ct);
+        var catalog = NoraToolRegistry.Create(types);
+        priorSteps = priorSteps.Select(x => x with { Label = catalog.FirstOrDefault(t => t.Name == x.Tool)?.Label ?? x.Tool }).ToArray();
+
+        async Task Checkpoint(string status, CancellationToken token, NoraToolTrace? step = null, string hash = "", string code = "")
+        {
+            db.ChangeTracker.Clear();
+            await Mutate(uid, async () =>
+            {
+                var saved = await Find<AgentRun>(uid, runId, token);
+                Require(saved.Version == leaseVersion && saved.Status == "RUNNING", "AGENT_STALE", "Phiên xử lý đã được thay thế. Lịch chưa thay đổi.", 409);
+                Require((await Preference(uid, token)).Revision == snapshot.Preference.Revision,
+                    "AGENT_STALE", "Lịch vừa thay đổi. Gửi lại yêu cầu để NORA đọc dữ liệu mới.", 409);
+                saved.Status = status; saved.ModelTurns = modelTurns; saved.ToolCalls = toolCalls; saved.Simulations = simulations;
+                saved.StateJson = status == "WAITING_FOR_INPUT" ? JsonSerializer.Serialize(lastDraft, AgentJson) : "";
+                saved.Version = Guid.NewGuid(); saved.UpdatedAt = Now;
+                if (status != "RUNNING") saved.LeaseUntil = Now;
+                if (step is not null) db.AgentToolCalls.Add(new() { UserId = uid, RunId = runId, Sequence = step.Sequence,
+                    Tool = step.Tool, Status = step.Status, ArgumentsHash = hash, ResultCode = code,
+                    DurationMilliseconds = step.DurationMs, CreatedAt = Now });
+                leaseVersion = saved.Version;
+            }, token, false);
+        }
+
+        async Task<PlanningState> Calendar(AgentFreeTimeQuery range, CancellationToken token)
+        {
+            var result = await CalendarStateAsync(uid, state, range.Start, range.End, token);
+            state = state with { Sessions = result.Sessions.Concat(state.Sessions).DistinctBy(x => x.Id).ToArray() };
+            return result;
+        }
+        RuntimeCandidate Candidate(JsonElement args)
+        {
+            Require(candidates.TryGetValue(args.GetProperty("candidateId").GetString()!, out var value),
+                "CANDIDATE_NOT_FOUND", "Chỉ được dùng mã phương án do công cụ thử lịch của lượt này cấp.");
+            return value;
+        }
+        string Text(JsonElement args, string name, int max)
+        {
+            var value = args.GetProperty(name).GetString()!;
+            Require(value.Length <= max, "TEXT_LIMIT", "Nội dung trả lời vượt giới hạn.");
+            return value.Trim();
+        }
+        async Task<NoraToolResult> Execute(NoraToolCall call, CancellationToken token)
+        {
+            var args = call.Arguments;
+            switch (call.Name)
+            {
+                case "get_tasks":
+                {
+                    readObserved = true;
+                    var query = Text(args, "query", 200);
+                    var tasks = state.Tasks.Where(x => !x.IsDeleted && x.Status != WorkTaskStatus.Completed &&
+                        (query.Length == 0 || x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || x.Id.ToString() == query)).ToArray();
+                    return new("OK", new { total = tasks.Length, truncated = tasks.Length > 100,
+                        tasks = tasks.Take(100).Select(x => new { x.Id, x.Name, x.TaskType, x.Priority, x.EstimatedMinutes,
+                            x.Deadline, x.WorkWindowStart, x.WorkWindowEnd, x.Splittable, status = x.Status.ToString() }),
+                        dependencies = state.Dependencies.Where(x => tasks.Take(100).Any(t => t.Id == x.TaskId)).Take(300).ToArray() });
+                }
+                case "get_preferences":
+                    readObserved = true;
+                    return new("OK", new { preference = new { state.Preference.TimeZoneId, state.Preference.MaximumDailyMinutes,
+                        state.Preference.MinimumSessionMinutes, state.Preference.MaximumSessionMinutes, state.Preference.BreakMinutes,
+                        state.Preference.PreferredPeriod, state.Preference.PreferredStartMinute, state.Preference.PreferredEndMinute },
+                        weeklyAvailability = state.Availability.Select(x => new { x.DayOfWeek, x.StartMinute, x.EndMinute }),
+                        datedOverrides = state.Exceptions.Where(x => x.Date >= LocalDate(Now, state.Preference) && x.Date <= LocalDate(Now.AddDays(31), state.Preference))
+                            .Take(200).Select(x => new { x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note }),
+                        overridesTruncated = state.Exceptions.Count(x => x.Date >= LocalDate(Now, state.Preference) && x.Date <= LocalDate(Now.AddDays(31), state.Preference)) > 200 });
+                case "get_calendar":
+                case "find_free_slots":
+                case "analyze_workload":
+                {
+                    var range = RuntimeRange(args, state.Preference);
+                    var calendar = await Calendar(range, token); readObserved = true; calendarObserved = true;
+                    if (call.Name == "get_calendar")
+                    {
+                        verifiedReply = VerifiedScheduleOverviewReply(range, calendar);
+                        var events = calendar.Events.Where(x => x.Start < range.End && x.End > range.Start).ToArray();
+                        return new("OK", new { range, totalEvents = events.Length, totalSessions = calendar.Sessions.Length,
+                            truncated = events.Length > 100 || calendar.Sessions.Length > 100,
+                            events = events.Take(100).Select(x => new { x.Id, x.Name, x.Start, x.End, x.EventType }),
+                            sessions = calendar.Sessions.Take(100).Select(x => new { x.Id, x.TaskId, x.Start, x.End, x.IsLocked, status = x.Status.ToString() }),
+                            busyOverrides = calendar.Exceptions.Where(x => !x.IsAvailable && x.Date >= LocalDate(range.Start, calendar.Preference) && x.Date <= LocalDate(range.End, calendar.Preference)).ToArray() });
+                    }
+                    if (call.Name == "find_free_slots")
+                    {
+                        verifiedReply = VerifiedFreeTimeReply(range, calendar);
+                        var slots = AgentFreeTimeSlots(calendar, range.Start > Now ? range.Start : Now, range.End);
+                        return new("OK", new { range, total = slots.Length, truncated = slots.Length > 100, slots = slots.Take(100).ToArray() });
+                    }
+                    verifiedReply = null;
+                    return new("OK", engine.Analyze(calendar, new PlanInput(range.Start, Math.Clamp((int)Math.Ceiling((range.End - range.Start).TotalDays), 1, 30)) { WindowEnd = range.End }, Now));
+                }
+                case "prepare_changes":
+                {
+                    lastDraft = NormalizeRuntimeDraft(args.GetProperty("intent"), source, state, pending, types);
+                    Require(lastDraft.Question.Length == 0, "CLARIFICATION_REQUIRED", lastDraft.Question);
+                    var id = Guid.NewGuid().ToString("N"); drafts[id] = lastDraft;
+                    return new("OK", new { draftId = id, businessDataSaved = false,
+                        effectiveTasks = lastDraft.Tasks.Select(x => new { x.TaskId, x.Name, x.Deadline, x.EstimatedMinutes,
+                            x.Priority, x.Splittable, x.WorkWindowStart, x.WorkWindowEnd }) });
+                }
+                case "simulate_plan":
+                {
+                    Require(drafts.TryGetValue(args.GetProperty("draftId").GetString()!, out var draft), "DRAFT_NOT_FOUND", "Bản nháp không thuộc lượt xử lý này.");
+                    Require(simulations < limits.MaxSimulations, "SIMULATION_LIMIT", "Đã đạt giới hạn thử lịch. Hãy chọn phương án đã kiểm tra hoặc hỏi người dùng.");
+                    simulations++;
+                    // Load the complete affected calendar before planning; the ordinary
+                    // history cap must never hide reservations from a simulation.
+                    await Calendar(new(Now, Now.AddDays(31)), token);
+                    var candidate = await SimulateRuntimeAsync(uid, draft, Copy(state), input, source,
+                        image is not null || IsTimetableRequest(source), args.GetProperty("strategy").GetString()!, token);
+                    candidates[candidate.Id] = candidate;
+                    return new("OK", RuntimeCandidateFacts(candidate, state));
+                }
+                case "evaluate_candidate":
+                    return new("OK", RuntimeCandidateFacts(Candidate(args), state));
+                case "finish_proposal":
+                {
+                    var candidate = Candidate(args);
+                    Require(candidate.Feasible, "CANDIDATE_INFEASIBLE", "Phương án còn thiếu thời gian hoặc vi phạm hạn. Hãy sửa điều kiện được cho phép hoặc hỏi người dùng.");
+                    return new("TERMINAL", new NoraTerminal("PROPOSAL", AgentExplanation(Text(args, "reply", 4000)), CandidateId: candidate.Id));
+                }
+                case "finish_answer":
+                    Require(readObserved, "ANSWER_NOT_GROUNDED", "Đọc dữ liệu thật bằng công cụ trước khi trả lời.");
+                    Require(calendarObserved || !(ScheduleOverviewRequested(source) || ChatMatch(source,
+                        @"\b(?:gio ranh|gio trong|khoang ranh|khoang trong|phan tich lich|danh gia lich|nhan xet lich)\b").Success),
+                        "CALENDAR_NOT_OBSERVED", "Cần đọc lịch thật trong phạm vi yêu cầu trước khi kết luận về lịch hoặc giờ rảnh.");
+                    return new("TERMINAL", new NoraTerminal("ANSWER", verifiedReply ?? AgentExplanation(Text(args, "reply", 4000))));
+                case "ask_user":
+                {
+                    var question = Text(args, "question", 1000);
+                    var options = args.GetProperty("options").EnumerateArray().Select(x => x.GetString()!).ToArray();
+                    Require(question.Length > 0 && options.Length <= 6 && options.All(x => x.Length is > 0 and <= 120), "INVALID_QUESTION", "Hỏi một câu ngắn, tối đa 6 lựa chọn.");
+                    return new("TERMINAL", new NoraTerminal("QUESTION", AgentExplanation(Text(args, "reply", 4000)), question, options));
+                }
+                default: return new("ERROR", ErrorCode: "UNKNOWN_TOOL");
+            }
+        }
+
+        var localNow = TimeZoneInfo.ConvertTime(Now, PlanningEngine.Zone(state.Preference.TimeZoneId));
+        var today = LocalDate(Now, state.Preference);
+        var monday = today.AddDays(-((int)today.DayOfWeek + 6) % 7);
+        var initialData = new { currentTime = localNow,
+            clock = new { currentLocal = localNow, today, tomorrow = today.AddDays(1), currentWeekStart = monday, nextWeekStart = monday.AddDays(7) },
+            timeZone = state.Preference.TimeZoneId, activeTaskTypes = types, request = source, latestMessage = input.Text, history, pendingRequest = pending,
+            remainingModelTurns = limits.MaxModelTurns - modelTurns, remainingToolCalls = limits.MaxToolCalls - toolCalls,
+            remainingSimulations = limits.MaxSimulations - simulations,
+            policy = "Read data using tools. All actions are drafts until a server-validated proposal is applied. Fixed/locked/running commitments are protected." };
+        var parts = new List<object> { new { text = JsonSerializer.Serialize(initialData, AgentJson) } };
+        if (image?.Data is { Length: > 0 }) parts.Add(new { inlineData = new { mimeType = image.MimeType, data = image.Data } });
+        try
+        {
+            var result = await new NoraAgentRunner().RunAsync(TaskInterpreter.AgentRuntimeInstructions,
+                JsonSerializer.SerializeToElement(new { role = "user", parts }), catalog, limits, modelTurns, toolCalls,
+                async (request, token) =>
+                {
+                    modelTurns++; await Checkpoint("RUNNING", token);
+                    agentFileLog?.ModelStarted(runId, turnId, modelTurns);
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    var reply = await RunJob(uid, "AI_REQUEST", () => provider.NextAgentStepAsync(request, token), token);
+                    agentFileLog?.ModelCompleted(runId, turnId, modelTurns, watch.ElapsedMilliseconds, reply);
+                    return reply;
+                }, Execute, async (step, hash, observation, token) =>
+                {
+                    toolCalls = step.Sequence;
+                    await Checkpoint("RUNNING", token, step, hash, observation.ErrorCode ?? "");
+                    agentFileLog?.ToolCompleted(runId, turnId, step, hash, observation);
+                    if (publish is not null) await publish(new("tool", $"TOOL_{step.Sequence}",
+                        step.Label + (step.Status == "ERROR" ? ": cần điều chỉnh" : ": đã kiểm tra")), token);
+                }, ct);
+            var terminal = result.Terminal;
+            var status = terminal.Kind switch { "PROPOSAL" => "PROPOSED", "ANSWER" => "COMPLETED", "QUESTION" => "WAITING_FOR_INPUT", _ => "BLOCKED" };
+            // The bounded timeout may have expired. Final metadata uses a separate,
+            // short token; it cannot apply any business changes.
+            using var finish = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await Checkpoint(status, finish.Token);
+            agentFileLog?.RunCompleted(runId, turnId, status, modelTurns, toolCalls, simulations);
+            var view = new NoraRunView(runId, "Agent", status, modelTurns, toolCalls, priorSteps.Concat(result.Trace).ToArray());
+            if (terminal.Kind == "PROPOSAL")
+            {
+                var candidate = candidates[terminal.CandidateId!];
+                return new(candidate.Intent with { Reply = terminal.Reply }, candidate, null, view);
+            }
+            if (terminal.Kind == "QUESTION")
+                return new(EmptyRuntimeIntent(terminal.Reply) with { Question = terminal.Question, Options = terminal.Options, Pending = pending }, null, null, view);
+            if (terminal.Kind == "ANSWER") return new(EmptyRuntimeIntent(terminal.Reply), null, terminal.Reply, view);
+            return new(EmptyRuntimeIntent("Mình chưa tìm được phương án hoàn chỉnh trong giới hạn xử lý. Lịch chưa thay đổi. Bạn có thể thu hẹp khoảng ngày hoặc bổ sung điều kiện rồi thử lại."), null, null, view, terminal.Reply);
+        }
+        catch (Exception failure)
+        {
+            agentFileLog?.Failed(runId, turnId, "EXECUTION", failure, ct.IsCancellationRequested);
+            // Do not leave an abandoned lease after cancellation or provider errors.
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try
+            {
+                db.ChangeTracker.Clear();
+                var saved = await Mine<AgentRun>(uid).SingleAsync(x => x.Id == runId, cleanup.Token);
+                if (saved.Version == leaseVersion && saved.Status == "RUNNING")
+                {
+                    saved.Status = ct.IsCancellationRequested ? "CANCELLED" : "FAILED";
+                    saved.ModelTurns = modelTurns; saved.ToolCalls = toolCalls; saved.Simulations = simulations;
+                    saved.StateJson = ""; saved.LeaseUntil = Now; saved.UpdatedAt = Now; saved.Version = Guid.NewGuid();
+                    await db.SaveChangesAsync(cleanup.Token);
+                }
+            }
+            catch (Exception error) when (error is OperationCanceledException or DbUpdateException) { }
+            throw;
+        }
+    }
+}

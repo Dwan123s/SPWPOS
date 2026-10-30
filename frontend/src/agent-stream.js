@@ -68,7 +68,7 @@ export async function sendAgentStream(body, onEvent, signal, retry = true) {
       if (!event.turn?.id || !event.turn?.status)
         throw new Error("Kết quả NORA chưa hợp lệ.");
       result = event.turn;
-    } else if (!result && ["phase", "delta"].includes(event.type))
+    } else if (!result && ["phase", "tool", "delta"].includes(event.type))
       onEvent(event);
   }
   try {

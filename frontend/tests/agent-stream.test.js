@@ -23,7 +23,7 @@ function response(parts, signal) {
   );
 }
 it("parses split UTF8 bytes, CRLF boundaries and multiple SSE frames without losing Vietnamese or emoji", async () => {
-  const payload = `: heartbeat\r\n\r\ndata: ${JSON.stringify({ type: "phase", stage: "READING", message: "Đang đọc lịch" })}\r\n\r\ndata: ${JSON.stringify({ type: "delta", delta: "Chào bạn 🦉" })}\r\n\r\ndata: ${JSON.stringify({ type: "result", turn: { id: "turn", status: "PREVIEW" } })}\r\n\r\n`;
+  const payload = `: heartbeat\r\n\r\ndata: ${JSON.stringify({ type: "phase", stage: "READING", message: "Đang đọc lịch" })}\r\n\r\ndata: ${JSON.stringify({ type: "tool", stage: "TOOL_1", message: "Đọc lịch đã lưu: đã kiểm tra" })}\r\n\r\ndata: ${JSON.stringify({ type: "delta", delta: "Chào bạn 🦉" })}\r\n\r\ndata: ${JSON.stringify({ type: "result", turn: { id: "turn", status: "PREVIEW" } })}\r\n\r\n`;
   const bytes = new TextEncoder().encode(payload);
   const pieces = Array.from(bytes, (byte) => new Uint8Array([byte]));
   vi.stubGlobal(
@@ -33,8 +33,9 @@ it("parses split UTF8 bytes, CRLF boundaries and multiple SSE frames without los
   const events = [];
   const result = await sendAgentStream(input, (event) => events.push(event));
   expect(result.id).toBe("turn");
-  expect(events.map((event) => event.type)).toEqual(["phase", "delta"]);
-  expect(events[1].delta).toBe("Chào bạn 🦉");
+  expect(events.map((event) => event.type)).toEqual(["phase", "tool", "delta"]);
+  expect(events[1].message).toBe("Đọc lịch đã lưu: đã kiểm tra");
+  expect(events[2].delta).toBe("Chào bạn 🦉");
 });
 it("an interrupted stream cannot be mistaken for a successfully saved schedule", async () => {
   vi.stubGlobal(

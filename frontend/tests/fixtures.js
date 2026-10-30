@@ -1,5 +1,7 @@
 const date = (day, hour = 17, minute = 0) => {
-  const d = new Date();
+  // Fixture days follow the account's UTC+7 calendar, including after local
+  // midnight while UTC still belongs to the previous date.
+  const d = new Date(Date.now() + 7 * 60 * 60 * 1000);
   d.setUTCHours(0, 0, 0, 0);
   d.setUTCDate(d.getUTCDate() + day);
   d.setUTCHours(hour - 7, minute);

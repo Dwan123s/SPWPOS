@@ -94,7 +94,7 @@ public sealed class NoteWorkflowTests
     [Fact] public async Task Note_automatic_scheduling_returns_an_urgent_displacement_proposal_without_applying_it()
     {
         await using var h = await CreateHarnessAsync(); var user = await h.RegisterAsync();
-        var now = h.Clock.GetUtcNow(); var start = now.AddDays(1);
+        var now = h.Clock.GetUtcNow(); var start = new DateTimeOffset(now.UtcDateTime.Date.AddDays(1).AddHours(12), TimeSpan.Zero);
         await Call(h, async s => {
             await s.SetPreferenceAsync(user.Id, new("UTC", 25, 240, 0, 0, 1440), Ct);
             await s.SetAvailabilityAsync(user.Id, new(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()), Ct);
@@ -110,6 +110,8 @@ public sealed class NoteWorkflowTests
             var urgent = await db.WorkTasks.SingleAsync(Ct); urgent.WorkWindowStart = start; urgent.WorkWindowEnd = start.AddHours(1);
             db.WorkTasks.Add(old); db.WorkSessions.Add(original); await db.SaveChangesAsync(Ct);
         });
+        var savedUrgent = await h.DbAsync(db => db.WorkTasks.SingleAsync(x => x.Name == "Báo cáo", Ct));
+        Assert.Equal(4, savedUrgent.Priority);
         var result = await Call(h, s => s.ScheduleNoteAsync(user.Id, note.Id, new(note.Version, true, 7), Ct));
         Assert.True(result.Plan.HasUrgentReplan); Assert.False(result.Plan.IsApplied);
         Assert.Empty(result.Plan.Warnings);

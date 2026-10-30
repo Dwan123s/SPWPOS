@@ -19,6 +19,7 @@ public sealed class WorkspaceHistoryMaintenance(ApplicationDbContext db, TimePro
             db.RiskAssessments.RemoveRange(risks);
         }
         db.SystemJobRuns.RemoveRange(await db.SystemJobRuns.Where(x => x.FinishedAt != null && x.FinishedAt < cutoff).Take(1000).ToArrayAsync(ct));
+        db.AgentRuns.RemoveRange(await db.AgentRuns.Where(x => x.Status != "RUNNING" && x.UpdatedAt < cutoff).Take(1000).ToArrayAsync(ct));
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
     }
 }

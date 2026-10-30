@@ -1,12 +1,14 @@
 # Gemini trên Google Cloud cho PLANORA
 
-## Trạng thái đã xác nhận — 15/10/2026
+## Cập nhật model — 31/10/2026
+
+Đã kiểm tra thực tế `gemini-3.8-flash` với ba yêu cầu mẫu: cuộc họp có giờ cố định, công việc liên tục 120 phút có deadline cứng và trích xuất công việc từ ghi chú. Cả ba đạt kiểm tra dữ liệu có cấu trúc và hoạch định; không lưu dữ liệu mẫu vào lịch người dùng. Tên model được cập nhật trong User Secrets bằng credential Google Cloud hiện có. Các bằng chứng đánh giá dùng 3.5 Flash-Lite trước đây là lịch sử, không phải kết quả đo chất lượng của model mới.
+
+## Lịch sử kết nối — 15/10/2026
 
 Lúc 01:06 (Asia/Ho_Chi_Minh), kiểm tra Cloud thật đạt cả ba yêu cầu mẫu: cuộc họp ngày mai 14:00–16:00, báo cáo SWP 120 phút liên tục trước 18:00 và trích xuất task từ ghi chú. Kết quả `cloud-ai-check.result.json` là success=true/code=OK; trạng thái setup là activated. User Secrets đã lưu Provider=VertexAI, Enabled=true, VertexAuthentication=ApiKey, VertexExpressMode=true, VertexLocation=global, project planora-511614, model gemini-3.5-flash-lite; key đã có trong secret store. Backend khởi động lại và trang chính trả HTTP 200. Không ghi dữ liệu mẫu vào lịch thật. Chưa xác minh việc khấu trừ credit trên Cloud Billing.
 
-Backend hỗ trợ `AiSettings:Provider=VertexAI` cho chat agent, phân tích ghi chú, nhập task và chia task. Model mặc định từ 31/10/2026 là `gemini-3.8-flash`, project `planora-511614`, location `global`.
-
-Gemini 3.8 dùng mức thinking LOW cho trích xuất ý định tương tác, ngân sách reasoning/output tối đa 16.384 token và timeout agent 60 giây. Xem [kiểm tra chuyển model](../reviews/NORA_GEMINI_38_DEFAULT.md). Kết quả 15/10 ở trên thuộc model cũ, không phải bằng chứng kiểm thử 3.8.
+Backend hỗ trợ `AiSettings:Provider=VertexAI` cho chat agent, phân tích ghi chú, nhập task và chia task. Model mặc định hiện tại là `gemini-3.8-flash`, project `planora-511614`, location `global`. Gemini 3.8 dùng `thinkingLevel=LOW` cho các yêu cầu có cấu trúc; model này hỗ trợ LOW/MEDIUM/HIGH, không hỗ trợ MINIMAL. Chat văn bản có giới hạn chờ 60 giây; structured interpreter nâng ngân sách đầu ra tối thiểu lên 16.384 token để tính cả reasoning và JSON. Xem [tài liệu model của Google](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-8-flash) và [kiểm tra chuyển model](../reviews/NORA_GEMINI_38_DEFAULT.md). Kết quả 15/10 ở trên thuộc model cũ, không phải bằng chứng kiểm thử 3.8.
 
 Thêm adapter không tự bật API, tạo credential hoặc chuyển billing. User Secrets chỉ được đổi sau khi kiểm tra Cloud thật thành công. Chưa có key/ADC thì chưa chuyển hệ thống đang chạy.
 
@@ -34,6 +36,8 @@ Script thử ba yêu cầu mẫu (cuộc họp, task SWP và ghi chú), kiểm t
 Trạng thái không chứa key nằm trong `artifacts/cloud-ai-setup.status.json`: `awaiting_credentials`, `validating`, `saved`, `activated`, `cancelled`, `failed`. Kiểm tra thất bại trước bước lưu giữ nguyên cấu hình đang hoạt động. `saved` là đã lưu, `activated` là đã nạp lại API và cổng 7043 đã mở. Xác nhận credit được trừ từ billing account nào trong Cloud Billing.
 
 ## Cấu hình
+
+Sau khi đổi cấu hình, khởi động lại bằng `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Restart-PlanoraApi.ps1`. Script cố định môi trường Development và thư mục cấu hình của checkout. Dòng `PLANORA AI: ready; provider=VertexAI; model=gemini-3.8-flash.` xác nhận tiến trình API thực tế đã nạp cấu hình; kiểm tra này không gọi Google và không chứng minh quota/kết nối provider. Có thể kiểm tra cấu hình riêng bằng `--check-ai-config`. NORA kiểm tra lại trạng thái khi quay lại tab hoặc bấm **Kiểm tra lại AI**, giữ nguyên bản nháp và hội thoại.
 
 | Trường | Giá trị |
 |---|---|

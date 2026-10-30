@@ -6,10 +6,13 @@ using SPWPOS.Application.Workspace;
 namespace SPWPOS.Api.Controllers;
 
 [Route("api/agent"), Tags("Planning Agent")]
-public sealed class AgentController(IPlanningAgentService service, ILogger<AgentController> logger, IAgentVoiceTranscriber voice, IAgentTimetableImageReader images) : WorkspaceController
+public sealed class AgentController(IPlanningAgentService service, ILogger<AgentController> logger, IAgentVoiceTranscriber voice, IAgentTimetableImageReader images,
+    Microsoft.Extensions.Options.IOptions<NoraAgentOptions> runtime, ITaskInterpreter interpreter,
+    SPWPOS.Infrastructure.Workspace.NoraAgentFileLog agentFileLog) : WorkspaceController
 {
     [HttpGet("capabilities")] public IActionResult Capabilities() { var caps = service.GetAgentCapabilities(); return Data(new { caps.AiAvailable, caps.MaxTasks, caps.Provider, VoiceAvailable = voice.VoiceAvailable, ImageAvailable = images.ImageAvailable,
-        PolicyVersion = "2026-10-28.1", Features = new[] { "conversation-lifecycle", "usage-ledger", "planning-policy", "work-category", "verified-outcomes", "scoped-event-replanning", "bounded-clarification-recovery", "concise-confirmations", "vision-timetable", "chat-images" } }); }
+        RuntimeMode = runtime.Value.Mode == "Agent" && interpreter is INoraAgentModel { AgentAvailable: true } ? "Agent" : "Workflow",
+        PolicyVersion = "2026-10-31.1", Features = new[] { "conversation-lifecycle", "usage-ledger", "planning-policy", "work-category", "verified-outcomes", "scoped-event-replanning", "bounded-clarification-recovery", "concise-confirmations", "vision-timetable", "chat-images", "bounded-tool-runtime", "persisted-tool-trace" } }); }
     [HttpGet("usage")] public async Task<IActionResult> Usage([FromServices] IAiUsageService usage, CancellationToken ct) => Data(await usage.SummaryAsync(UserId, ct));
     [HttpGet("turns")] public async Task<IActionResult> History(CancellationToken ct) => Data(await service.GetAgentTurnsAsync(UserId, ct));
     [HttpGet("conversations")] public async Task<IActionResult> Conversations(CancellationToken ct, string? search = null, bool archived = false, string? cursor = null, int pageSize = 30) => Data(await service.GetConversationsAsync(UserId, search, archived, cursor, pageSize, ct));
@@ -29,7 +32,12 @@ public sealed class AgentController(IPlanningAgentService service, ILogger<Agent
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return File(Convert.FromBase64String(image.Data!), image.MimeType);
     }
-    [HttpPost("turns"), RequestSizeLimit(8 * 1024 * 1024)] public async Task<IActionResult> Send(AgentTurnInput input, CancellationToken ct) => Data(await service.SendAgentTurnAsync(UserId, input, ct));
+    [HttpPost("turns"), RequestSizeLimit(8 * 1024 * 1024)] public async Task<IActionResult> Send(AgentTurnInput input, CancellationToken ct)
+    {
+        var turn = await service.SendAgentTurnAsync(UserId, input, ct);
+        agentFileLog.TurnCompleted(turn, "SEND");
+        return Data(turn);
+    }
     [HttpPost("turns/stream"), RequestSizeLimit(8 * 1024 * 1024)]
     public async Task Stream(AgentTurnInput input, CancellationToken ct)
     {
@@ -45,6 +53,7 @@ public sealed class AgentController(IPlanningAgentService service, ILogger<Agent
         try
         {
             var turn = await service.SendAgentTurnStreamingAsync(UserId, input, Publish, ct);
+            agentFileLog.TurnCompleted(turn, "SEND");
             await Publish(new("result", Turn: turn), ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -59,6 +68,16 @@ public sealed class AgentController(IPlanningAgentService service, ILogger<Agent
             if (!ct.IsCancellationRequested) await Publish(new("error", Message: "NORA chưa hoàn tất yêu cầu. Kiểm tra lịch sử rồi thử lại.", Code: "AGENT_STREAM_FAILED"), ct);
         }
     }
-    [HttpPost("turns/{id:guid}/apply")] public async Task<IActionResult> Apply(Guid id, CancellationToken ct) => Data(await service.ApplyAgentTurnAsync(UserId, id, ct));
-    [HttpPost("turns/{id:guid}/undo")] public async Task<IActionResult> Undo(Guid id, CancellationToken ct) => Data(await service.UndoAgentTurnAsync(UserId, id, ct));
+    [HttpPost("turns/{id:guid}/apply")] public async Task<IActionResult> Apply(Guid id, CancellationToken ct)
+    {
+        var turn = await service.ApplyAgentTurnAsync(UserId, id, ct);
+        agentFileLog.TurnCompleted(turn, "APPLY");
+        return Data(turn);
+    }
+    [HttpPost("turns/{id:guid}/undo")] public async Task<IActionResult> Undo(Guid id, CancellationToken ct)
+    {
+        var turn = await service.UndoAgentTurnAsync(UserId, id, ct);
+        agentFileLog.TurnCompleted(turn, "UNDO");
+        return Data(turn);
+    }
 }

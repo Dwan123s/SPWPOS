@@ -6,7 +6,7 @@ public sealed partial class PlanningEngine
     public PlanView GenerateForUrgentEvents(PlanningState state, PlanInput input, DateTimeOffset now, Guid[] eventIds)
     {
         var start = input.Start > now ? input.Start : now;
-        var end = start.AddDays(input.HorizonDays);
+        var end = input.WindowEnd ?? start.AddDays(input.HorizonDays);
         var urgent = state.Events.Where(item => eventIds.Contains(item.Id)).ToArray();
         var tasks = state.Tasks.ToDictionary(task => task.Id);
         var hits = state.Sessions.Where(session => session.Status == WorkSessionStatus.Scheduled && !session.IsLocked &&

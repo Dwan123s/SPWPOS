@@ -12,7 +12,7 @@ public sealed partial class PlanningEngine
     private PlanView GenerateUrgent(PlanningState state, PlanInput input, DateTimeOffset now, UrgentReplanPolicy? protection = null)
     {
         var start = input.Start > now ? input.Start : now;
-        var end = start.AddDays(input.HorizonDays);
+        var end = input.WindowEnd ?? start.AddDays(input.HorizonDays);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         var selected = input.AffectedTaskIds is null ? null : AffectedClosure(state, input.AffectedTaskIds);
         var urgent = state.Tasks.Where(x => x.Priority == 4 && Remaining(x, bias) > 0 &&

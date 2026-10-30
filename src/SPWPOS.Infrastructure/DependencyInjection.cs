@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<SPWPOS.Application.Calendar.IGoogleCalendarService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Calendar.GoogleCalendarService>());
         services.AddHostedService<SPWPOS.Infrastructure.Calendar.GoogleCalendarWorker>();
         services.AddScoped<SPWPOS.Infrastructure.Workspace.AiUsageCollector>();
+        services.AddSingleton<SPWPOS.Infrastructure.Workspace.NoraAgentFileLog>();
         services.AddScoped<SPWPOS.Application.Workspace.IAiUsageService, SPWPOS.Infrastructure.Workspace.AiUsageService>();
         services.AddSingleton<PasswordTiming>();
         services.AddScoped<IAuthService, AuthService>();
@@ -67,6 +68,9 @@ public static class DependencyInjection
         services.AddSingleton<SPWPOS.Application.Workspace.PlanningEngine>();
         services.AddScoped<SPWPOS.Infrastructure.Workspace.WorkspaceHistoryMaintenance>();
         services.AddScoped<SPWPOS.Infrastructure.Workspace.WorkspaceService>();
+        services.AddOptions<SPWPOS.Application.Workspace.NoraAgentOptions>().BindConfiguration("NoraAgent")
+            .Validate(x => (x.Mode is "Workflow" or "Agent") && x.MaxModelTurns is >= 2 and <= 16 && x.MaxToolCalls is >= 1 and <= 30 &&
+                x.MaxSimulations is >= 1 and <= 5 && x.TimeoutSeconds is >= 15 and <= 180, "Invalid NORA runtime limits.").ValidateOnStart();
         services.AddScoped<SPWPOS.Application.Workspace.IWorkspaceService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
         services.AddScoped<SPWPOS.Application.Workspace.IPlanningAgentService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
         services.AddSingleton<SPWPOS.Infrastructure.Workspace.NotificationJobStatus>();

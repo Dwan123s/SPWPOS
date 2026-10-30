@@ -168,3 +168,6 @@ jobs:
       - name: Google Cloud AI configuration regression tests
         shell: powershell
         run: .\tests\scripts\CloudAiConfiguration.Tests.ps1
+      - name: API restart and AI readiness regression tests
+        shell: powershell
+        run: .\tests\scripts\RestartPlanoraApi.Tests.ps1

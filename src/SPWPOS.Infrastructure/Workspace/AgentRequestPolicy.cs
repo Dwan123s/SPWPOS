@@ -68,7 +68,7 @@ public sealed partial class WorkspaceService
 
     private static AgentIntent ClarifyAgentIntent(AgentIntent intent, string question) => intent with {
         Reply = ClarificationReply(intent.Reply), Question = question.Trim(), ResultKind = "CLARIFICATION",
-        ReplaceWeeklyAvailability = false, WeeklySlots = [], Exceptions = [], Events = [], Tasks = [], ScheduleTaskIds = [], Reschedule = false, FreeTimeQuery = null, ScheduleReviewQuery = null
+        ReplaceWeeklyAvailability = false, WeeklySlots = [], Exceptions = [], Events = [], Tasks = [], ScheduleTaskIds = [], Reschedule = false, FreeTimeQuery = null, ScheduleReviewQuery = null, OptimizationQuery = null
     };
 
     private static MatchCollection RequestMatches(string text, string pattern) => Regex.Matches(text, pattern,
@@ -114,7 +114,7 @@ public sealed partial class WorkspaceService
                 return AskCalendar("Thứ và ngày trong yêu cầu không khớp nhau.",
                     $"Ngày {date:dd'/'MM'/'yyyy} là {(date.DayOfWeek == DayOfWeek.Sunday ? "Chủ nhật" : "thứ " + ((int)date.DayOfWeek + 1))}. Bạn muốn dùng ngày này hay thứ đã nêu?");
         }
-        if ((intent.ScheduleReviewQuery ?? intent.FreeTimeQuery) is { } query)
+        if ((intent.OptimizationQuery ?? intent.ScheduleReviewQuery ?? intent.FreeTimeQuery) is { } query)
         {
             var queryDay = RequestMatches(text, @"\b(ngay mai|hom nay|tomorrow|today|ngay kia)\b");
             if (queryDay.Count == 1 && RequestMatches(text, @"\d{1,2}/\d{1,2}|\d{4}-\d{2}-\d{2}").Count == 0)

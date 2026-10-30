@@ -21,13 +21,13 @@ public sealed record AgentIntent(string Reply, string Question, bool ReplaceWeek
     AvailabilityInput[] WeeklySlots, AgentExceptionCommand[] Exceptions, AgentEventCommand[] Events,
     AgentTaskCommand[] Tasks, Guid[] ScheduleTaskIds, bool Reschedule, int HorizonDays, string[]? Options = null,
     AgentPendingRequest? Pending = null, string? ResultKind = null, AgentFreeTimeQuery? FreeTimeQuery = null,
-    AgentFreeTimeQuery? ScheduleReviewQuery = null);
+    AgentFreeTimeQuery? ScheduleReviewQuery = null, AgentFreeTimeQuery? OptimizationQuery = null);
 public sealed record AgentMessage(string Text, string Reply, string Status);
 public sealed record AgentChangeView(string Kind, string Name, string Before, string After, Guid? TaskId = null, string Reason = "");
 public sealed record AgentTurnView(Guid Id, Guid ConversationId, Guid RequestId, string Text,
     string Reply, string Status, string Question, PlanView? Plan, AgentChangeView[] Changes,
     string[] Warnings, DateTimeOffset CreatedAt, bool CanUndo = false, string[]? Options = null, string? ErrorCode = null,
-    string Outcome = "", AgentImage? Image = null);
+    string Outcome = "", AgentImage? Image = null, NoraRunView? Run = null);
 public sealed record AgentStreamEvent(string Type, string? Stage = null, string? Message = null,
     string? Delta = null, AgentTurnView? Turn = null, string? Code = null);
 public sealed record ConversationView(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
