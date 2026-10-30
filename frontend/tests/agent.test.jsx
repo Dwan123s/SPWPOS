@@ -181,6 +181,50 @@ async function ready() {
   });
 }
 
+it("keeps the verified agent tool trace visible after loading a conversation", async () => {
+  result.status = "ANSWERED";
+  result.changes = [];
+  result.plan = null;
+  result.canUndo = false;
+  result.run = {
+    id: "run",
+    mode: "Agent",
+    status: "COMPLETED",
+    modelTurns: 3,
+    toolCalls: 3,
+    steps: [
+      {
+        sequence: 1,
+        tool: "get_calendar",
+        label: "Đọc lịch đã lưu",
+        status: "OK",
+        durationMs: 12,
+      },
+      {
+        sequence: 2,
+        tool: "simulate_plan",
+        label: "Thử phương án lịch",
+        status: "ERROR",
+        durationMs: 22,
+      },
+      {
+        sequence: 3,
+        tool: "finish_answer",
+        label: "Trả kết quả đã đối chiếu",
+        status: "TERMINAL",
+        durationMs: 1,
+      },
+    ],
+  };
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  await screen.findByText(/NORA Agent · 3 lần dùng công cụ/);
+  expect(screen.getByText("Đọc lịch đã lưu · đã kiểm tra")).toBeTruthy();
+  expect(screen.getByText("Thử phương án lịch · cần điều chỉnh")).toBeTruthy();
+  expect(screen.queryByText(/thoughtSignature/)).toBeNull();
+});
+
 it("renders detailed schedule advice as readable paragraphs and sections without apply actions", async () => {
   result.status = "ANSWERED";
   result.canUndo = false;

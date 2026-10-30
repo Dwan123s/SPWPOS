@@ -12,6 +12,25 @@ public sealed class UmlMigrationTests
 {
     public static bool SqlServerAvailable => SqlServerConcurrencyTests.SqlServerAvailable;
     [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
+    public async Task Agent_runtime_migration_is_additive_and_tool_logs_follow_run_deletion()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = new ApiFactory(true); using var client = await factory.ClientAsync();
+        await WorkspaceFlowTests.Authorize(factory, client);
+        var taskId = await WorkspaceFlowTests.Create(client, factory.Clock.GetUtcNow());
+        await using var scope = factory.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var migrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();
+        var index = Array.FindIndex(migrations, x => x.EndsWith("_AddNoraAgentRuntime", StringComparison.Ordinal)); Assert.True(index > 0);
+        var migrator = db.GetService<IMigrator>(); await migrator.MigrateAsync(migrations[index - 1], ct); await migrator.MigrateAsync(null, ct);
+        Assert.True(await db.WorkTasks.AnyAsync(x => x.Id == taskId, ct));
+        var uid = await db.Users.Select(x => x.Id).SingleAsync(ct);
+        var run = new SPWPOS.Domain.Entities.AgentRun { UserId = uid, TurnId = Guid.NewGuid(), ConversationId = Guid.NewGuid(), Goal = "fictional", CreatedAt = factory.Clock.GetUtcNow(), UpdatedAt = factory.Clock.GetUtcNow() };
+        db.AgentRuns.Add(run); db.AgentToolCalls.Add(new() { UserId = uid, RunId = run.Id, Sequence = 1, Tool = "get_calendar", Status = "OK", CreatedAt = factory.Clock.GetUtcNow() });
+        await db.SaveChangesAsync(ct); db.ChangeTracker.Clear();
+        await db.AgentRuns.Where(x => x.Id == run.Id).ExecuteDeleteAsync(ct);
+        Assert.False(await db.AgentToolCalls.AnyAsync(x => x.RunId == run.Id, ct));
+    }
+    [Fact(SkipUnless = nameof(SqlServerAvailable), Skip = "Requires SPWPOS_TEST_SQLSERVER."), Trait("Category", "SqlServer")]
     public async Task Task_version_upgrade_backfills_distinct_tokens_without_changing_existing_tasks()
     {
         var ct = TestContext.Current.CancellationToken;

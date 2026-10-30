@@ -77,6 +77,7 @@ public sealed partial class WorkspaceService
             turn.Status = "DELETED"; turn.UpdatedAt = Now;
         }
         row.Title = ""; row.DeletedAt = Now; row.ArchivedAt = null; row.Version = Guid.NewGuid(); row.UpdatedAt = Now;
+        db.AgentRuns.RemoveRange(await Mine<AgentRun>(uid).Where(x => x.ConversationId == conversationId).ToArrayAsync(ct));
     }, ct, false);
     public async Task<ConversationExport> ExportConversationAsync(Guid uid, Guid conversationId, CancellationToken ct)
     {

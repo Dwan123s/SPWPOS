@@ -224,6 +224,124 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.ToTable("AgentConversations");
                 });
 
+            modelBuilder.Entity("SPWPOS.Domain.Entities.AgentRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Continuations")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Goal")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("LeaseUntil")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("ModelTurns")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Simulations")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SnapshotRevision")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("StateJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("ToolCalls")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TurnId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "TurnId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "ConversationId", "UpdatedAt");
+
+                    b.ToTable("AgentRuns");
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.AgentToolCall", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ArgumentsHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("DurationMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ResultCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.Property<string>("Tool")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunId", "Sequence")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "RunId");
+
+                    b.ToTable("AgentToolCalls");
+                });
+
             modelBuilder.Entity("SPWPOS.Domain.Entities.AgentTurn", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2270,6 +2388,25 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.AgentRun", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.AgentToolCall", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.AgentRun", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "RunId")
+                        .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

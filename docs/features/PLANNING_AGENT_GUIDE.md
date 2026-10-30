@@ -1,5 +1,7 @@
 # NORA — Trợ lý AI lập lịch
 
+Từ bản nâng cấp 31/10/2026, chat NORA trên Gemini/Vertex AI có vòng gọi công cụ do model điều phối. Xem [runtime Agent, cấu hình, giới hạn và kịch bản kiểm thử](NORA_AGENT_RUNTIME.md). Chế độ `Workflow` vẫn có thể được chọn trong cấu hình.
+
 ## Tiếng Việt gõ Telex chưa chuyển dấu
 
 NORA hỗ trợ đọc các từ Telex thông dụng trong yêu cầu lập lịch, kể cả khi trộn với chữ đã có dấu hoặc gõ lặp phím dấu:

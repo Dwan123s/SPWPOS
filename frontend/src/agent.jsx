@@ -139,7 +139,24 @@ function Turn({
             {statuses[turn.status] || turn.status}
           </span>
         </div>
-        {process && (
+        {turn.run?.mode === "Agent" && (
+          <details className="nora-completed-process">
+            <summary>
+              {icon("check")}NORA Agent · {turn.run.toolCalls} lần dùng công cụ
+            </summary>
+            <ol aria-label="Các hành động đã thực hiện">
+              {(turn.run.steps || []).map((step) => (
+                <li key={step.sequence}>
+                  {step.label}
+                  {step.status === "ERROR"
+                    ? " · cần điều chỉnh"
+                    : " · đã kiểm tra"}
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
+        {process && !turn.run && (
           <details className="nora-completed-process">
             <summary>
               {icon("check")}Đã xử lý trong {process.seconds}s ·{" "}
@@ -558,7 +575,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         (item) => {
           if (!mounted.current) return;
           const next = { ...streamState.current };
-          if (item.type === "phase")
+          if (item.type === "phase" || item.type === "tool")
             next.phases = [
               ...next.phases.filter((step) => step.stage !== item.stage),
               { stage: item.stage, message: item.message },

@@ -17,6 +17,8 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
     public DbSet<PlanningNote> PlanningNotes => Set<PlanningNote>();
     public DbSet<AgentTurn> AgentTurns => Set<AgentTurn>();
     public DbSet<AgentConversation> AgentConversations => Set<AgentConversation>();
+    public DbSet<AgentRun> AgentRuns => Set<AgentRun>();
+    public DbSet<AgentToolCall> AgentToolCalls => Set<AgentToolCall>();
     public DbSet<AiUsageRecord> AiUsageRecords => Set<AiUsageRecord>();
     public DbSet<RecoverySetting> RecoverySettings => Set<RecoverySetting>();
     public DbSet<RecoveryCase> RecoveryCases => Set<RecoveryCase>();
@@ -71,5 +73,6 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
         WorkspaceModel.Configure(builder);
         WorkloadHistoryModel.Configure(builder);
         CalendarModel.Configure(builder);
+        AgentRuntimeModel.Configure(builder);
     }
 }

@@ -133,6 +133,7 @@ builder.Services.AddSwaggerGen(o =>
     o.TagActionsBy(api => api.ActionDescriptor.EndpointMetadata.OfType<Microsoft.AspNetCore.Http.TagsAttribute>().FirstOrDefault()?.Tags.ToList() ?? ["Authentication"]);
 });
 var app = builder.Build();
+app.Services.GetRequiredService<SPWPOS.Infrastructure.Workspace.NoraAgentFileLog>().Initialize();
 string AiConfigurationStatus()
 {
     using var scope = app.Services.CreateScope();

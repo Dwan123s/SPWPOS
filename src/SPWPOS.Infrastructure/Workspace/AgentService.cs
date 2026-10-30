@@ -108,37 +108,50 @@ public sealed partial class WorkspaceService
             var pending = latest?.Status is "NEEDS_INPUT" or "BLOCKED" && latest.CommandJson.Length > 0
                 ? JsonSerializer.Deserialize<AgentIntent>(latest.CommandJson, AgentJson)?.Pending : null;
             var activeTaskTypes = await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).Select(x => x.Code).OrderBy(x => x).ToArrayAsync(ct);
-            var (context, contextNotices) = BuildAgentContext(await AgentCalendarStateAsync(uid, state, ct), input.Text, activeTaskTypes, pending);
+            var nativeAgent = noraOptions?.Value.Mode == "Agent" && interpreter is INoraAgentModel { AgentAvailable: true };
+            var (context, contextNotices) = nativeAgent ? ("", Array.Empty<string>())
+                : BuildAgentContext(await AgentCalendarStateAsync(uid, state, ct), input.Text, activeTaskTypes, pending);
             await Phase("UNDERSTANDING", "Đang hiểu yêu cầu và soạn phản hồi");
             var agent = (IPlanningAgentInterpreter)interpreter;
-            var intent = await RunJob(uid, "AI_REQUEST", () => visionImage is not null
-                ? agent.InterpretImageAsync(input.Text, context, history, state.Preference.TimeZoneId, Now, visionImage,
-                    publish is null ? null : (delta, token) => publish(new("delta", Delta: delta), token), ct)
-                : publish is null
-                ? agent.InterpretAsync(input.Text, context, history, state.Preference.TimeZoneId, Now, ct)
-                : agent.InterpretStreamingAsync(input.Text, context, history, state.Preference.TimeZoneId, Now,
-                    (delta, token) => publish(new("delta", Delta: delta), token), ct), ct);
-            ValidateIntent(intent, true);
-            if (ClarificationRecoveryContext(intent, input.Text, context, activeTaskTypes) is { } recoveredContext)
-            {
-                await Phase("RECHECKING", "Đang đối chiếu chi tiết bạn đã cung cấp");
-                // Exactly one bounded recheck. A separate reservation records its
-                // provider usage and respects the ordinary quota/concurrency limits.
-                intent = await RunJob(uid, "AI_REQUEST", () => visionImage is not null
-                    ? agent.InterpretImageAsync(input.Text, recoveredContext, history, state.Preference.TimeZoneId, Now, visionImage, null, ct)
-                    : agent.InterpretAsync(input.Text, recoveredContext, history, state.Preference.TimeZoneId, Now, ct), ct);
-            }
-            intent = RecognizeAgentOptimization(intent, input.Text, state.Preference);
-            intent = RecognizeScheduleReview(intent, input.Text);
+            RuntimeExecution? runtime = null;
             string? scheduleReviewReply = null;
-            if (intent.ScheduleReviewQuery is not null)
+            AgentIntent intent;
+            if (nativeAgent)
             {
-                intent = GroundAgentDates(intent, input.Text, state.Preference, Now);
-                ValidateIntent(intent);
+                runtime = await RunNoraAgentAsync(uid, turnId, input, state, history, pending, activeTaskTypes, visionImage, publish, ct);
+                intent = runtime.Intent;
+                scheduleReviewReply = runtime.ReadReply;
+            }
+            else
+            {
+                intent = await RunJob(uid, "AI_REQUEST", () => visionImage is not null
+                    ? agent.InterpretImageAsync(input.Text, context, history, state.Preference.TimeZoneId, Now, visionImage,
+                        publish is null ? null : (delta, token) => publish(new("delta", Delta: delta), token), ct)
+                    : publish is null
+                    ? agent.InterpretAsync(input.Text, context, history, state.Preference.TimeZoneId, Now, ct)
+                    : agent.InterpretStreamingAsync(input.Text, context, history, state.Preference.TimeZoneId, Now,
+                        (delta, token) => publish(new("delta", Delta: delta), token), ct), ct);
+                ValidateIntent(intent, true);
+                if (ClarificationRecoveryContext(intent, input.Text, context, activeTaskTypes) is { } recoveredContext)
+                {
+                    await Phase("RECHECKING", "Đang đối chiếu chi tiết bạn đã cung cấp");
+                    // Exactly one bounded recheck. A separate reservation records its
+                    // provider usage and respects the ordinary quota/concurrency limits.
+                    intent = await RunJob(uid, "AI_REQUEST", () => visionImage is not null
+                        ? agent.InterpretImageAsync(input.Text, recoveredContext, history, state.Preference.TimeZoneId, Now, visionImage, null, ct)
+                        : agent.InterpretAsync(input.Text, recoveredContext, history, state.Preference.TimeZoneId, Now, ct), ct);
+                }
+                intent = RecognizeAgentOptimization(intent, input.Text, state.Preference);
+                intent = RecognizeScheduleReview(intent, input.Text);
                 if (intent.ScheduleReviewQuery is not null)
                 {
-                    await Phase("ANALYZING", "Đang phân tích lịch đã lưu, việc gần hạn và các phương án phù hợp");
-                    scheduleReviewReply = await ExplainScheduleReviewAsync(uid, intent, input.Text, state, activeTaskTypes, ct);
+                    intent = GroundAgentDates(intent, input.Text, state.Preference, Now);
+                    ValidateIntent(intent);
+                    if (intent.ScheduleReviewQuery is not null)
+                    {
+                        await Phase("ANALYZING", "Đang phân tích lịch đã lưu, việc gần hạn và các phương án phù hợp");
+                        scheduleReviewReply = await ExplainScheduleReviewAsync(uid, intent, input.Text, state, activeTaskTypes, ct);
+                    }
                 }
             }
             await Phase("PLANNING", "Đang kiểm tra khung giờ, deadline và xung đột");
@@ -151,11 +164,14 @@ public sealed partial class WorkspaceService
                 ValidateIntent(intent, true);
                 var currentTaskTypes = intent.Tasks.Length == 0 ? [] : await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).Select(x => x.Code).ToArrayAsync(ct);
                 var interpreted = intent;
-                intent = NormalizeAgentCategories(intent, current, currentTaskTypes, input.Text);
+                if (runtime is null)
+                {
+                    intent = NormalizeAgentCategories(intent, current, currentTaskTypes, input.Text);
+                    intent = ConstrainEventReplanning(intent, input.Text, current);
+                    intent = NormalizeAgentIntent(intent, input.Text, current, pending);
+                    intent = GroundAgentDates(intent, input.Text, current.Preference, Now);
+                }
                 var categoryNotices = AgentCategoryNotices(interpreted, intent, input.Text, currentTaskTypes);
-                intent = ConstrainEventReplanning(intent, input.Text, current);
-                intent = NormalizeAgentIntent(intent, input.Text, current, pending);
-                intent = GroundAgentDates(intent, input.Text, current.Preference, Now);
                 ValidateIntent(intent);
                 if (intent.FreeTimeQuery is not null) current = await AgentCalendarStateAsync(uid, current, ct);
                 if (intent.OptimizationQuery is { } optimizationScope)
@@ -164,26 +180,32 @@ public sealed partial class WorkspaceService
                     current = current with { Sessions = calendar.Sessions.Concat(current.Sessions).DistinctBy(x => x.Id).ToArray() };
                 }
                 turn.ExpectedRevision = revision; turn.CommandJson = JsonSerializer.Serialize(intent, AgentJson); turn.ExpiresAt = Now.AddMinutes(30);
+                if (runtime?.BlockCode is { } blockCode)
+                    return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text, intent.Reply,
+                        "BLOCKED", "", null, [], [], turn.CreatedAt, ErrorCode: blockCode, Run: runtime.View));
                 if (intent.Question.Length > 0)
                 {
                     var options = intent.Options ?? [];
                     return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text, intent.Reply,
-                        "NEEDS_INPUT", intent.Question, null, [], contextNotices, turn.CreatedAt, false, options));
+                        "NEEDS_INPUT", intent.Question, null, [], contextNotices, turn.CreatedAt, false, options, Run: runtime?.View));
                 }
                 var eventRequest = ChatMatch(input.Text, @"\b(khong (?:can )?(?:khan|gap|uu tien)|binh thuong)\b").Success ? input.Text :
                     string.Join("\n", historyRows.TakeWhile(row => row.Status == "NEEDS_INPUT").Reverse().Select(row => row.Text).Append(input.Text));
                 var timetableContext = visionImage is not null || IsTimetableRequest(input.Text) ||
                     historyRows.TakeWhile(row => row.Status is "NEEDS_INPUT" or "FAILED" or "BLOCKED").Any(row => IsTimetableRequest(row.Text));
-                var (changes, candidate, affected, summary, timetableNotices) = await BuildAgentChangesAsync(uid, intent, current, input.Text, ct, eventRequest, timetableContext);
+                var selected = runtime?.Candidate;
+                var (changes, candidate, affected, summary, timetableNotices) = selected is null
+                    ? await BuildAgentChangesAsync(uid, intent, current, input.Text, ct, eventRequest, timetableContext)
+                    : (selected.Changes, selected.State, selected.Affected, selected.Summary, selected.Notices);
                 var hasChanges = changes.Weekly is not null || changes.Exceptions.Length > 0 || changes.Events.Length > 0 || changes.Tasks.Length > 0;
                 var planInput = new PlanInput(intent.OptimizationQuery is { } scope && scope.Start > Now.AddMinutes(5) ? scope.Start : Now.AddMinutes(5),
                     intent.HorizonDays, affected, true, "AVAILABILITY_CHANGED", UseCapacityFactor: input.UseCapacityFactor, UseEstimateBias: input.UseEstimateBias)
                     { WindowEnd = intent.OptimizationQuery?.End };
-                PlanView? plan = changes.UrgentEventIds is { Length: > 0 } urgentEventIds
+                PlanView? plan = selected is not null ? selected.Plan : changes.UrgentEventIds is { Length: > 0 } urgentEventIds
                     ? engine.GenerateForUrgentEvents(candidate, planInput, Now, urgentEventIds)
                     : affected.Length > 0 ? engine.Generate(candidate, planInput, Now) : null;
                 if (plan is not null && intent.OptimizationQuery is not null) plan = plan with { IsOptimization = true };
-                if (plan?.HasDeadlineProtection == true)
+                if (selected is null && plan?.HasDeadlineProtection == true)
                     plan = RespectSchedulingExclusions(plan, candidate, affected, input);
                 if (plan is not null)
                 {
@@ -242,7 +264,7 @@ public sealed partial class WorkspaceService
                 return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text,
                     replyMessage,
                     blocked ? "BLOCKED" : hasChanges ? "PREVIEW" : "ANSWERED", "", hasChanges || blocked ? plan : null, summary, warnings.Concat(contextNotices).Concat(categoryNotices).Concat(hasChanges || blocked ? timetableNotices : []).ToArray(), turn.CreatedAt,
-                    Outcome: hasChanges && !blocked ? "Đã kiểm tra phương án. Các thay đổi đang chờ bạn áp dụng." : ""));
+                    Outcome: hasChanges && !blocked ? "Đã kiểm tra phương án. Các thay đổi đang chờ bạn áp dụng." : "", Run: runtime?.View));
             }, ct, false);
             if (autoApply && view.Status == "PREVIEW" && view.Plan?.RequiresConfirmation != true)
             {
@@ -262,7 +284,9 @@ public sealed partial class WorkspaceService
                     var turn = await Find<AgentTurn>(uid, turnId, cleanup.Token);
                     if (turn.Status is "APPLIED" or "UNDONE") return;
                     var message = e is AuthException error ? error.Message : "Yêu cầu đã dừng. Lịch chưa thay đổi; bạn có thể thử lại.";
-                    SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text, message, "FAILED", "", null, [], [], turn.CreatedAt, ErrorCode: e is AuthException failure ? failure.Code : "AGENT_CANCELLED"));
+                    var runView = noraOptions?.Value.Mode == "Agent" ? await RuntimeTraceAsync(uid, turn.Id, cleanup.Token) : null;
+                    SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text, message, "FAILED", "", null, [], [], turn.CreatedAt,
+                        ErrorCode: e is AuthException failure ? failure.Code : "AGENT_CANCELLED", Run: runView));
                 }, cleanup.Token, false);
             }
             catch (Exception cleanupError) when (cleanupError is AuthException or OperationCanceledException or DbUpdateException) { /* Retry can reclaim PROCESSING after its lease expires. */ }
@@ -557,6 +581,12 @@ public sealed partial class WorkspaceService
             plan?.Sessions.Where(x => !x.Preserved).Select(x => x.Id).ToArray() ?? [], planId), AgentJson);
         state.Preference.Revision = Guid.NewGuid(); turn.AppliedRevision = state.Preference.Revision; turn.UpdatedAt = Now;
         await db.SaveChangesAsync(ct); await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, state.Preference.PlanningHorizonDays), ct);
+        if (view.Run is { } appliedRun)
+        {
+            var run = await Mine<AgentRun>(uid).SingleOrDefaultAsync(x => x.Id == appliedRun.Id, ct);
+            if (run is not null) { run.Status = "APPLIED"; run.UpdatedAt = Now; run.Version = Guid.NewGuid(); }
+            view = view with { Run = appliedRun with { Status = "APPLIED" } };
+        }
         return SaveTurn(turn, view with { Status = "APPLIED",
             Reply = plan?.IsOptimization == true ? "Đã lưu phương án tối ưu bạn vừa xác nhận. Bạn có thể xem lịch mới bên dưới hoặc hoàn tác nếu muốn quay lại lịch cũ."
                 : plan?.HasUrgentReplan == true
@@ -605,6 +635,13 @@ public sealed partial class WorkspaceService
         preference.Revision = Guid.NewGuid(); turn.UpdatedAt = Now;
         await AddNotification(uid, "SCHEDULE_CHANGE", "Đã hoàn tác yêu cầu trợ lý", "Đã khôi phục các thay đổi của yêu cầu gần nhất.", "undo:" + turn.Id, null, ct);
         await db.SaveChangesAsync(ct); await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, preference.PlanningHorizonDays), ct);
-        return SaveTurn(turn, TurnView(turn) with { Status = "UNDONE", Reply = "Đã hoàn tác yêu cầu và khôi phục lịch trước đó.", Outcome = "", CanUndo = false });
+        var undoneView = TurnView(turn);
+        if (undoneView.Run is { } undoneRun)
+        {
+            var run = await Mine<AgentRun>(uid).SingleOrDefaultAsync(x => x.Id == undoneRun.Id, ct);
+            if (run is not null) { run.Status = "UNDONE"; run.UpdatedAt = Now; run.Version = Guid.NewGuid(); }
+            undoneView = undoneView with { Run = undoneRun with { Status = "UNDONE" } };
+        }
+        return SaveTurn(turn, undoneView with { Status = "UNDONE", Reply = "Đã hoàn tác yêu cầu và khôi phục lịch trước đó.", Outcome = "", CanUndo = false });
     }, ct, false);
 }

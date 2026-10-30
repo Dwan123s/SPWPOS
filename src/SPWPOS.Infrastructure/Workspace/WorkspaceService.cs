@@ -8,7 +8,9 @@ namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEngine engine, TimeProvider clock,
     ITaskInterpreter interpreter, IAiUsageService aiUsage, IEmailService? email = null,
-    Microsoft.Extensions.Options.IOptions<EmailSettings>? emailOptions = null) : IWorkspaceService, IPlanningAgentService
+    Microsoft.Extensions.Options.IOptions<EmailSettings>? emailOptions = null,
+    Microsoft.Extensions.Options.IOptions<NoraAgentOptions>? noraOptions = null,
+    NoraAgentFileLog? agentFileLog = null) : IWorkspaceService, IPlanningAgentService
 {
     private DateTimeOffset Now => clock.GetUtcNow();
     private static void Require([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string code, string message, int status = 400)
