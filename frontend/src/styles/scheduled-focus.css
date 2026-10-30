@@ -1,0 +1,36 @@
+.planning-console .scheduled-focus.is-active {
+  border-color: #91d8b5;
+  background: linear-gradient(130deg, #e6fbf1, #f4fcff);
+}
+.planning-console
+  .scheduled-focus.is-active
+  :is(.console-kicker, .cockpit-timer > span:first-child) {
+  color: #176344;
+}
+.scheduled-focus-progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin: 12px 0;
+  accent-color: #188657;
+}
+.scheduled-focus .reason {
+  margin: 8px 0 12px;
+}
+.daily-agenda-row[class*="calendar-time-"] .daily-agenda-session,
+.daily-schedule .runway-block[class*="calendar-time-"] {
+  border-color: var(--calendar-time-border);
+  border-left-color: var(--calendar-time-accent);
+  background: var(--calendar-time-bg);
+  color: var(--calendar-time-text);
+  opacity: 1;
+}
+.daily-agenda-row[class*="calendar-time-"] .daily-agenda-status {
+  color: var(--calendar-time-text);
+}
+.daily-agenda-row.calendar-time-current .daily-agenda-time strong {
+  color: #176344;
+}
+.daily-agenda-row.calendar-time-current .daily-agenda-session {
+  box-shadow: 0 0 0 1px #86d7aa;
+}

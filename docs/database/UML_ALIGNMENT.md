@@ -59,7 +59,7 @@ Ngoài ERD có các bảng bảo mật cần giữ theo yêu cầu Authenticatio
 8. **R8:** xóa mềm ghi DeletedAt, hủy session Scheduled, giữ completed session/execution/observations; cấm xóa task có timer active.
 9. **R9:** scenario và ad-hoc conflict chạy trên state trong bộ nhớ; không ghi task/plan/session/risk/job. Gợi ý NLP/AI chưa xác nhận cũng không tạo task; riêng yêu cầu AI có job vận hành để UC72 theo dõi lỗi.
 
-Capacity cold start <5 phiên đến hạn =0.8; sau đó completed planned / total elapsed planned, clamp .25–1. Đây là heuristic theo execution history trong báo cáo, không giả định toàn bộ lịch rảnh đều thực hiện được. Snapshot `AvailableMinutes` ghi mẫu planned time của công thức này; CalendarFreeMinutes được tính riêng từ giờ rảnh.
+Capacity cập nhật 28/10/2026: cold start <5 phiên có kết quả =0.8; sau đó EMA alpha .2 của completed planned / total elapsed planned theo từng ngày địa phương, clamp .25–1. NeedsReview chưa xác nhận không bị coi là thất bại. Đây là heuristic theo execution history, không giả định toàn bộ lịch rảnh đều thực hiện được. Snapshot `AvailableMinutes` ghi mẫu planned time; CalendarFreeMinutes được tính riêng từ giờ rảnh. Xem [nâng cấp phases 1–4](../features/WORKSPACE_UPGRADE_PHASES_1_TO_4.md).
 
 Deadline cứng không được vượt. Deadline mềm ưu tiên trước hạn; khi thiếu chỗ có thể đề xuất phiên sau hạn và **luôn** hiển thị cảnh báo trước apply. Buổi ưu tiên là soft preference, có fallback giờ rảnh khác.
 

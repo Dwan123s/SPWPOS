@@ -80,6 +80,7 @@ export const statusLabels = {
   Paused: "Tạm dừng",
   Skipped: "Đã bỏ qua",
   Missed: "Đã lỡ",
+  NeedsReview: "Chờ ghi nhận kết quả",
 };
 export const riskLabels = {
   Unknown: "Chưa xác định",
@@ -113,11 +114,13 @@ export const reasons = {
   EARLIEST_FEASIBLE_SLOT: "Khoảng thời gian phù hợp đầu tiên",
   DEADLINE_PRIORITY_CAPACITY: "Theo deadline, ưu tiên và khả năng thực hiện",
   URGENT_TASK_FIRST: "Ưu tiên công việc khẩn",
-  URGENT_NEAR_DEADLINE_MOVE: "Nhường giờ cho việc khẩn, dời gần nhất và vẫn kịp hạn",
+  URGENT_NEAR_DEADLINE_MOVE:
+    "Nhường giờ cho việc khẩn, dời gần nhất và vẫn kịp hạn",
   URGENT_FLEXIBLE_MOVE: "Nhường giờ cho việc khẩn, lùi trong tối đa hai ngày",
   PRESERVED_SESSION: "Giữ nguyên phiên đã khóa hoặc không bị ảnh hưởng",
   USER_ADJUSTMENT: "Thời gian do bạn điều chỉnh",
   USER_SPLIT: "Phiên được chia nhỏ",
+  AUTO_HEAL: "Phiên bù tự động, giữ nguyên các lịch khác",
 };
 export const zone = () =>
   state.workspace?.preference.timeZoneId || "Asia/Ho_Chi_Minh";

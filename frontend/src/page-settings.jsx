@@ -21,6 +21,8 @@ import { avatarPreview, avatarRemove } from "./interactive.jsx";
 import { AccountPassword } from "./account-password.jsx";
 import { GoogleAccountCard } from "./google-signin.jsx";
 import { Loading } from "./loading.jsx";
+import { NoraInventory } from "./nora-inventory.jsx";
+import { GoogleCalendarCard } from "./google-calendar.jsx";
 export function settingsPage() {
   const p = state.workspace.profile || {},
     n = state.workspace.notificationSettings || {};
@@ -72,6 +74,9 @@ export function settingsPage() {
         </div>
       </div>
       <div className="settings-tabs-bar">
+        <button type="button" className={`settings-tab-btn ${currentTab === "connections" ? "active" : ""}`} data-action="settings-tab" data-id="connections">
+          {icon("calendar")} Kết nối
+        </button>
         <button
           type="button"
           className={`settings-tab-btn ${currentTab === "profile" ? "active" : ""}`}
@@ -110,6 +115,7 @@ export function settingsPage() {
           {" Thông báo"}
         </button>
       </div>
+      {currentTab === "connections" ? <GoogleCalendarCard /> : null}
       {currentTab === "profile" ? (
         <section className="card settings-content-card">
           <div className="card-header">
@@ -252,6 +258,7 @@ export function settingsPage() {
           {" "}
           <section className="card settings-content-card">
             <GoogleAccountCard />
+            <NoraInventory />
             <AccountPassword email={p.email || ""} />
           </section>{" "}
           <section className="card danger-card">

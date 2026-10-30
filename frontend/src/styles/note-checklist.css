@@ -1,0 +1,220 @@
+.note-studio .note-checklist {
+  margin: 22px 0;
+  padding: 22px 0 8px;
+  border-top: 1px solid var(--note-paper-line, #dce6f1);
+  min-width: 0;
+}
+.note-checklist-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.note-checklist-heading h2 {
+  margin: 0;
+  color: var(--note-ink, #304968);
+  font-size: 17px;
+  font-weight: 650;
+}
+.note-checklist-heading > span {
+  font-size: 12px;
+  color: #54748a;
+}
+.note-checklist progress {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 4px;
+  border: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #e8eff6;
+  margin-bottom: 14px;
+}
+.note-checklist progress::-webkit-progress-bar {
+  background: #e8eff6;
+}
+.note-checklist progress::-webkit-progress-value {
+  background: #3b9c82;
+  border-radius: 4px;
+}
+.note-checklist progress::-moz-progress-bar {
+  background: #3b9c82;
+  border-radius: 4px;
+}
+.note-check-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.note-check-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: start;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--note-paper-line, #e6edf5);
+}
+.note-check-hit {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.note-studio .note-check-hit input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: #2879e8;
+  cursor: pointer;
+}
+.note-check-hit input:focus-visible {
+  outline: 2px solid #2879e8;
+  outline-offset: 4px;
+}
+.note-check-hit input:disabled {
+  cursor: default;
+}
+.note-check-content {
+  min-width: 0;
+}
+.note-check-content details > summary {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.note-check-content details > summary::-webkit-details-marker {
+  display: none;
+}
+.note-check-content details > summary:hover {
+  background: #e7f1ff70;
+}
+.note-check-content details > summary:focus-visible,
+.note-check-completed > summary:focus-visible {
+  outline: 2px solid #2879e8;
+  outline-offset: 2px;
+}
+.note-check-name {
+  font-size: 15px;
+  color: var(--note-ink, #304968);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.note-check-meta {
+  font-size: 11px;
+  color: #6a7d91;
+}
+.note-check-meta.is-overdue {
+  color: #ad522b;
+}
+.note-check-row.is-done .note-check-name {
+  text-decoration: line-through;
+  color: #788797;
+}
+.note-check-row.is-cancelled .note-check-name {
+  color: #788797;
+}
+.note-check-details {
+  padding: 8px;
+  color: #536c84;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.note-check-details p {
+  margin: 0 0 10px;
+}
+.note-check-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.note-check-details > ul {
+  padding-left: 18px;
+  margin: 8px 0 12px;
+}
+.note-check-completed {
+  margin-top: 16px;
+}
+.note-check-completed > summary {
+  width: fit-content;
+  padding: 10px 0;
+  cursor: pointer;
+  color: #64788c;
+  font-size: 12px;
+  font-weight: 600;
+}
+.note-check-progress,
+.note-check-running {
+  margin: 4px 8px 8px;
+  color: #63788e;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.note-check-link {
+  border: 0;
+  background: none;
+  color: #246bc8;
+  text-decoration: underline;
+  padding: 3px;
+  cursor: pointer;
+  font: inherit;
+}
+.note-check-empty {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #63788e;
+}
+.note-check-notice {
+  font-size: 12px;
+  color: #28785e;
+  line-height: 1.7;
+}
+.note-check-notice:empty {
+  margin: 0;
+}
+.note-check-error {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #b42318;
+}
+.note-checklist-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.note-checklist-footer > span {
+  flex: 1 1 220px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #6b7e91;
+}
+:is(.planning-console, #modal)
+  .note-studio.has-checklist
+  .note-body-field
+  textarea {
+  height: clamp(120px, 18dvh, 200px);
+  min-height: 120px;
+}
+@media (max-width: 600px) {
+  .note-checklist-heading h2 {
+    font-size: 16px;
+  }
+  .note-check-name {
+    font-size: 14px;
+  }
+  .note-checklist-footer {
+    align-items: flex-start;
+  }
+}

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { dateFmt, icon, localInput, minutes, toUtc } from "./ui.jsx";
 import { NotePlanPreview } from "./note-plan-preview.jsx";
 import "./styles/note-activities.css";
@@ -8,7 +8,6 @@ const taskTypes = {
   WRITING: "Viết nội dung",
   STUDY: "Học tập",
   PROGRAMMING: "Lập trình",
-  DESIGN: "Thiết kế",
   MEETING_PREP: "Chuẩn bị họp",
   ADMIN: "Hành chính",
   OTHER: "Khác",
@@ -22,6 +21,50 @@ const eventTypes = {
 };
 const invalidDate = (value) =>
   !value || !Number.isFinite(new Date(value).getTime());
+function explainWarning(warning, proposal, workspace) {
+  if (warning.code !== "SOFT_DEADLINE_EXCEEDED") return warning.message;
+  const context = proposal.noteContext;
+  const tasks = (context?.activities || []).filter(
+    (activity) => activity.kind === "TASK",
+  );
+  const index = (context?.taskIds || []).indexOf(warning.taskId);
+  const activity =
+    tasks[index] || tasks.find((task) => task.name === warning.taskName);
+  const id = warning.taskId || context?.taskIds?.[tasks.indexOf(activity)];
+  const existing = (workspace?.tasks || []).find((task) => task.id === id);
+  const deadline =
+    activity?.deadline ||
+    activity?.end ||
+    existing?.deadline ||
+    (!invalidDate(activity?.start) &&
+    Number.isFinite(activity?.estimatedMinutes)
+      ? new Date(
+          new Date(activity.start).getTime() +
+            activity.estimatedMinutes * 60000,
+        ).toISOString()
+      : null);
+  const finishes = proposal.sessions
+    .filter((session) => session.taskId === id)
+    .map((session) => new Date(session.end).getTime())
+    .filter(Number.isFinite);
+  const finish = finishes.length ? Math.max(...finishes) : null;
+  if (
+    !invalidDate(deadline) &&
+    finish !== null &&
+    finish > new Date(deadline).getTime()
+  ) {
+    const format = (value) =>
+      dateFmt(value, {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    return `Hạn chót: ${format(deadline)}. Lịch đề xuất làm xong lúc ${format(finish)}, trễ ${minutes(Math.ceil((finish - new Date(deadline).getTime()) / 60000))}.`;
+  }
+  return "Lịch đề xuất có phiên làm sau hạn chót của công việc này.";
+}
 function fieldIssues(activity) {
   const errors = {};
   if (!activity.name?.trim()) errors.name = "Nhập tên hoạt động.";
@@ -110,10 +153,15 @@ export function NoteActivitiesReview({
   onReviewDirty,
 }) {
   const [drafts, setDrafts] = useState(() =>
-    note.analysis.activities.map((activity) => ({
-      ...activity,
-      selected: true,
-    })),
+    note.analysis.activities.map((activity) => {
+      const types = activity.kind === "EVENT" ? eventTypes : taskTypes;
+      const type = (activity.type || "OTHER").trim().toUpperCase();
+      return {
+        ...activity,
+        type: types[type] ? type : "OTHER",
+        selected: true,
+      };
+    }),
   );
   // Validation can open an incomplete activity initially; only the user closes it.
   const [expanded, setExpanded] = useState(() =>
@@ -127,6 +175,8 @@ export function NoteActivitiesReview({
   const [editError, setEditError] = useState("");
   const [allowRequestedHours, setAllowRequestedHours] = useState(false);
   const previewHeading = useRef(null);
+  const selectionHintId = useId();
+  const saveHintId = useId();
   const selected = drafts.filter((x) => x.selected);
   const incomplete = selected.filter(issue);
   const analysisMessages = (note.analysis.messages || []).filter(
@@ -139,6 +189,14 @@ export function NoteActivitiesReview({
     (x) => x.kind === "TASK" && (!x.start || !allowRequestedHours),
   );
   const blocked = !!busy || dirty || !hasAiAnalysis;
+  const blockingWarnings = (proposal?.warnings || []).filter(
+    (warning) =>
+      warning.unscheduledMinutes > 0 ||
+      warning.code === "SOFT_DEADLINE_EXCEEDED",
+  );
+  const hasLateTask = blockingWarnings.some(
+    (warning) => warning.code === "SOFT_DEADLINE_EXCEEDED",
+  );
   const update = (index, field, value) => {
     setDrafts((items) =>
       items.map((item, i) =>
@@ -175,12 +233,17 @@ export function NoteActivitiesReview({
       >
         <div className="note-task-list-heading">
           <h3>
-            {selected.length}/{drafts.length} hoạt động được chọn
+            {selected.length}/{drafts.length} mục được chọn để tạo
           </h3>
           <span>
             {countEvents} sự kiện · {countTasks} công việc
           </span>
         </div>
+        <p id={selectionHintId} className="note-review-help">
+          Các ô tick này dùng để chọn mục muốn thêm, chưa phải đánh dấu hoàn
+          thành.
+          {proposal && " Muốn đổi lựa chọn, bấm Quay lại chỉnh sửa."}
+        </p>
         {!drafts.length && (
           <p>Chưa tìm thấy hoạt động. Bổ sung nội dung rồi phân tích lại.</p>
         )}
@@ -215,6 +278,7 @@ export function NoteActivitiesReview({
                   <input
                     type="checkbox"
                     aria-label={`Chọn ${activity.name}`}
+                    aria-describedby={selectionHintId}
                     checked={activity.selected}
                     onChange={(e) =>
                       update(index, "selected", e.target.checked)
@@ -234,7 +298,9 @@ export function NoteActivitiesReview({
                         hour: "2-digit",
                         minute: "2-digit",
                       })
-                    : "Chưa có giờ bắt đầu"}
+                    : fixed
+                      ? "Cần bổ sung giờ bắt đầu"
+                      : "AI sẽ chọn giờ rảnh để xếp việc"}
                   {activity.end
                     ? ` – ${dateFmt(activity.end, { hour: "2-digit", minute: "2-digit" })}`
                     : !fixed && activity.estimatedMinutes
@@ -244,6 +310,18 @@ export function NoteActivitiesReview({
                     ? ` · Lặp ${activity.repeatWeeks} tuần`
                     : ""}
                 </p>
+                {!fixed && !invalidDate(activity.deadline) && (
+                  <p className="note-activity-time">
+                    Hạn hoàn thành:{" "}
+                    {dateFmt(activity.deadline, {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                )}
                 <details
                   open={expanded[index]}
                   onToggle={(event) => {
@@ -538,16 +616,30 @@ export function NoteActivitiesReview({
               }}
               horizonDays={horizon}
               confirmation
+              saveBlocked={blockingWarnings.length > 0}
             />
             {!!proposal.warnings.length && (
               <div role="alert" className="warning spaced">
+                <strong>
+                  {blockingWarnings.length
+                    ? "Chưa thể lưu các việc mới và lịch đề xuất"
+                    : "Lưu ý về lịch đề xuất"}
+                </strong>
                 <ul>
                   {proposal.warnings.map((warning, i) => (
                     <li key={i}>
-                      {warning.taskName}: {warning.message}
+                      <strong>{warning.taskName}</strong>:{" "}
+                      {explainWarning(warning, proposal, workspace)}
                     </li>
                   ))}
                 </ul>
+                {blockingWarnings.length > 0 && (
+                  <p className="note-warning-next-step">
+                    {hasLateTask
+                      ? "Bấm Quay lại chỉnh sửa, mở Chỉnh sửa ở việc bị quá hạn để đổi hạn chót hoặc thời lượng. Bạn cũng có thể bổ sung giờ rảnh trước hạn rồi xem lại lịch đề xuất."
+                      : "Bấm Quay lại chỉnh sửa để điều chỉnh thời lượng, giờ thực hiện hoặc giờ rảnh, rồi xem lại lịch đề xuất."}
+                  </p>
+                )}
                 {proposal.warnings.some(
                   (x) => x.code === "NOTE_OUTSIDE_AVAILABILITY",
                 ) &&
@@ -570,20 +662,19 @@ export function NoteActivitiesReview({
               <strong>
                 {countEvents} sự kiện cố định · {countTasks} công việc
               </strong>
-              <p>
-                Kiểm tra ngày giờ trước khi lưu. Các phiên hiện có cần điều
-                chỉnh được thể hiện trong lịch đề xuất.
+              <p id={saveHintId}>
+                {blockingWarnings.length
+                  ? hasLateTask
+                    ? "Nút lưu đang tắt vì có việc được xếp sau hạn chót. Các việc mới và lịch trong đề xuất này chưa được lưu."
+                    : "Nút lưu đang tắt vì còn việc chưa được xếp đủ thời gian. Các việc mới và lịch trong đề xuất này chưa được lưu."
+                  : countTasks
+                    ? "Các mục mới vẫn chưa được lưu. Bấm Lưu sự kiện & công việc để tạo việc và lưu lịch; sau đó bạn có thể tick hoàn thành các công việc trong Note."
+                    : "Các sự kiện mới vẫn chưa được lưu. Bấm Lưu sự kiện & công việc để xác nhận; sau đó các sự kiện sẽ xuất hiện trên Lịch."}
               </p>
               <button
                 className="btn primary"
-                disabled={
-                  blocked ||
-                  proposal.warnings.some(
-                    (x) =>
-                      x.unscheduledMinutes > 0 ||
-                      x.code === "SOFT_DEADLINE_EXCEEDED",
-                  )
-                }
+                aria-describedby={saveHintId}
+                disabled={blocked || blockingWarnings.length > 0}
                 onClick={() => apply(proposal.id)}
               >
                 Lưu sự kiện & công việc
@@ -591,7 +682,18 @@ export function NoteActivitiesReview({
               <button
                 className="btn ghost"
                 disabled={!!busy}
-                onClick={() => setProposal(null)}
+                onClick={() => {
+                  setExpanded((items) =>
+                    items.map(
+                      (open, index) =>
+                        open ||
+                        blockingWarnings.some(
+                          (warning) => warning.taskName === drafts[index].name,
+                        ),
+                    ),
+                  );
+                  setProposal(null);
+                }}
               >
                 Quay lại chỉnh sửa
               </button>

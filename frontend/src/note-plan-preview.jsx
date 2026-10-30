@@ -8,6 +8,7 @@ export function NotePlanPreview({
   chosenDate,
   onChooseDate,
   confirmation = false,
+  saveBlocked = false,
   headingRef,
 }) {
   const [chosen, setChosen] = useState(null);
@@ -22,16 +23,27 @@ export function NotePlanPreview({
     },
   );
   const requestedDate = chosenDate ?? chosen;
+  const newIds = new Set(
+    result.proposedPlan.noteContext?.taskIds ??
+      (result.after.tasks || []).map((task) => task.taskId),
+  );
+  const newSessions = sessions.filter(
+    (session) => !session.preserved && newIds.has(session.taskId),
+  );
   const date = dates.includes(requestedDate)
     ? requestedDate
-    : dates.find(
+    : dates.find((value) =>
+        newSessions.some((session) => dayKey(session.start) === value),
+      ) ||
+      dates.find(
         (value) =>
           sessions.some((session) => dayKey(session.start) === value) ||
           (confirmation &&
             (workspace?.events || []).some(
               (event) => dayKey(event.start) === value,
             )),
-      ) || dates[0];
+      ) ||
+      dates[0];
   const names = new Map([
     ...(workspace?.tasks || []).map((task) => [task.id, task.name]),
     ...(result.after.tasks || []).map((task) => [task.taskId, task.name]),
@@ -43,7 +55,11 @@ export function NotePlanPreview({
         ...session,
         name:
           session.taskName || names.get(session.taskId) || "Phiên công việc",
-        kind: session.preserved ? "existing" : "new",
+        kind: session.preserved
+          ? "existing"
+          : newIds.has(session.taskId)
+            ? "new"
+            : "adjusted",
       })),
     ...(workspace?.events || [])
       .filter(
@@ -81,6 +97,17 @@ export function NotePlanPreview({
           ))}
         </select>
       </label>
+      {confirmation && (
+        <p className="note-preview-date-help">
+          {newSessions.some((session) => dayKey(session.start) === date)
+            ? "Ngày đang xem có các phiên việc mới từ ghi chú. Bạn có thể đổi ngày để xem phần lịch còn lại."
+            : newSessions.length
+              ? "Ngày đang xem không có phiên việc mới từ ghi chú. Chọn ngày khác trong Xem ngày để xem các phiên được đề xuất."
+              : result.after.tasks?.length
+                ? "Chưa xếp được phiên làm cho các việc mới. Xem cảnh báo bên dưới để biết lý do."
+                : "Đề xuất này không có công việc mới cần xếp phiên."}
+        </p>
+      )}
       <div className="note-preview-agenda">
         {entries.map((entry, index) => (
           <article
@@ -102,7 +129,9 @@ export function NotePlanPreview({
                   ? "Sự kiện cố định"
                   : entry.kind === "existing"
                     ? "Lịch đang có · giữ nguyên"
-                    : "Việc mới từ ghi chú"}
+                    : entry.kind === "adjusted"
+                      ? "Lịch đang có · đề xuất điều chỉnh"
+                      : "Việc mới từ ghi chú"}
               </span>
             </div>
           </article>
@@ -116,7 +145,11 @@ export function NotePlanPreview({
       </div>
       <p className="note-preview-footnote">
         {confirmation ? (
-          "Đây là lịch đề xuất, chưa lưu. Chọn Lưu sự kiện & công việc để xác nhận."
+          saveBlocked ? (
+            "Đây là bản xem trước. Các việc mới và lịch đề xuất chưa được lưu. Sửa các vấn đề bên dưới rồi xem lại đề xuất."
+          ) : (
+            "Đây là lịch đề xuất, chưa lưu. Chọn Lưu sự kiện & công việc để xác nhận."
+          )
         ) : (
           <>
             Đây là lịch thử. Chọn <strong>Tạo công việc & xem lịch</strong> để

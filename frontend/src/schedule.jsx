@@ -11,6 +11,12 @@ import {
   minutes,
 } from "./ui.jsx";
 import { sessionCard } from "./calendar.jsx";
+import {
+  CalendarClock,
+  CalendarTimeTag,
+  calendarPhase,
+  calendarPhases,
+} from "./calendar-time.jsx";
 import { workflowSteps } from "./workflow.js";
 export function weekStart(key) {
   const date = new Date(`${key}T12:00:00Z`);
@@ -57,13 +63,14 @@ export function calendarPage() {
           event: e,
         })),
     ].sort((a, b) => new Date(a.start) - new Date(b.start));
-  const fixed = (e, date, compact = false) => {
+  const fixed = (e, date, compact = false, now) => {
+    const phase = calendarPhase(e.start, e.end, now);
     const from = dayKey(e.start) < date ? "00:00" : timeFmt(e.start),
       to = dayKey(e.end) > date ? "24:00" : timeFmt(e.end);
     return compact ? (
       <button
         type="button"
-        className="calendar-block fixed-event"
+        className={`calendar-block fixed-event calendar-timed-card calendar-time-${phase}`}
         data-action="edit-event"
         data-id={e.id}
       >
@@ -73,15 +80,19 @@ export function calendarPage() {
           {to}
         </span>
         <strong>{e.name}</strong>
+        <CalendarTimeTag phase={phase} />
         <span className="block-meta">
           {icon("lock")}
           Sự kiện cố định
         </span>
       </button>
     ) : (
-      <div className="session-card fixed-event">
+      <div
+        className={`session-card fixed-event calendar-timed-card calendar-time-${phase}`}
+      >
         <div className="session-top">
           <h3>{e.name}</h3>
+          <CalendarTimeTag phase={phase} />
           {badge("Cố định")}
         </div>
         <p className="session-time">
@@ -93,10 +104,10 @@ export function calendarPage() {
       </div>
     );
   };
-  const block = (s) => (
+  const block = (s, now) => (
     <button
       type="button"
-      className={`calendar-block ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}`}
+      className={`calendar-block calendar-timed-card calendar-time-${calendarPhase(s.start, s.end, now)} ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}`}
       data-action="session-detail"
       data-id={s.id}
     >
@@ -107,6 +118,7 @@ export function calendarPage() {
         {s.isLocked ? icon("lock") : ""}
       </span>
       <strong>{s.taskName}</strong>
+      <CalendarTimeTag phase={calendarPhase(s.start, s.end, now)} />
       <span className="block-meta">
         {minutes(Math.round((new Date(s.end) - new Date(s.start)) / 60000))}
         {" · "}
@@ -160,12 +172,20 @@ export function calendarPage() {
         </details>
       </aside>
       <div className="calendar-schedule-main">
-        {calendarMarkup(dates, view, sessions, entries, block, fixed)}
+        <CalendarClock
+          boundaries={[...sessions, ...state.workspace.events].flatMap(
+            (entry) => [Date.parse(entry.start), Date.parse(entry.end)],
+          )}
+        >
+          {(now) =>
+            calendarMarkup(dates, view, sessions, entries, block, fixed, now)
+          }
+        </CalendarClock>
       </div>
     </div>
   );
 }
-function calendarMarkup(dates, view, sessions, entries, block, fixed) {
+function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
   return (
     <>
       {state.conflicts?.length ? (
@@ -247,19 +267,16 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed) {
           </div>
         </div>
         <div className="calendar-context">
-          <div className="calendar-legend">
-            <span>
-              <i className="legend-scheduled" />
-              Phiên làm việc
-            </span>
-            <span>
-              <i className="legend-active" />
-              Đang tập trung
-            </span>
-            <span>
-              <i className="legend-fixed" />
-              Sự kiện cố định
-            </span>
+          <div
+            className="calendar-legend calendar-time-legend"
+            aria-label="Màu lịch theo thời gian"
+          >
+            {Object.entries(calendarPhases).map(([phase, label]) => (
+              <span key={phase} className={`calendar-time-${phase}`}>
+                <i aria-hidden="true" />
+                {label}
+              </span>
+            ))}
           </div>
           <span>
             {sessions.length}
@@ -288,7 +305,7 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed) {
                 {nodeList(
                   dates.map((date) => (
                     <section
-                      className={`week-day ${date === dayKey(Date.now()) ? "today" : ""}`}
+                      className={`week-day ${date === dayKey(now) ? "today" : ""}`}
                     >
                       <div className="week-day-header">
                         <span>
@@ -307,8 +324,8 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed) {
                         {nodeList(
                           entries(date).map((e) =>
                             e.session
-                              ? block(e.session)
-                              : fixed(e.event, date, true),
+                              ? block(e.session, now)
+                              : fixed(e.event, date, true, now),
                           ),
                         ) || (
                           <div className="calendar-empty">
@@ -334,7 +351,7 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed) {
               dates.map((date) => (
                 <section className="agenda-day">
                   <div
-                    className={`agenda-day-label ${date === dayKey(Date.now()) ? "today" : ""}`}
+                    className={`agenda-day-label ${date === dayKey(now) ? "today" : ""}`}
                   >
                     <strong>{date.slice(8)}</strong>
                     <span>
@@ -348,8 +365,15 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed) {
                     {nodeList(
                       entries(date).map((e) =>
                         e.session
-                          ? sessionCard(e.session)
-                          : fixed(e.event, date),
+                          ? sessionCard(
+                              e.session,
+                              calendarPhase(
+                                e.session.start,
+                                e.session.end,
+                                now,
+                              ),
+                            )
+                          : fixed(e.event, date, false, now),
                       ),
                     ) || (
                       <p className="reason agenda-free">

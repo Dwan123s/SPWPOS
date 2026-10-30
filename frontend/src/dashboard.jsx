@@ -1,5 +1,4 @@
 import { useState, Fragment } from "react";
-import { SessionTimer } from "./react-ui.jsx";
 import {
   state,
   button,
@@ -11,7 +10,14 @@ import {
 } from "./ui.jsx";
 import { dashboardModel } from "./dashboard-model.js";
 import { nextWorkflowStep, workflowSteps } from "./workflow.js";
-import { StartSessionButton } from "./session-start.jsx";
+import { CatchUpCard } from "./catch-up.jsx";
+import { ScheduledFocus } from "./scheduled-focus.jsx";
+import "./styles/dashboard-insights.css";
+import {
+  CalendarClock,
+  calendarPhase,
+  calendarPhases,
+} from "./calendar-time.jsx";
 
 const clock = (value) =>
   `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
@@ -37,97 +43,7 @@ function ToolButton({
   );
 }
 export { CapacityRibbon } from "./capacity-ribbon.jsx";
-function FocusCockpit({ model }) {
-  const next = nextWorkflowStep(state.workspace);
-  const focus = model.focus;
-  const active = focus && ["Running", "Paused"].includes(focus.status);
-  const planned = focus
-    ? Math.max(
-        0,
-        Math.round((new Date(focus.end) - new Date(focus.start)) / 60000),
-      )
-    : 0;
-  return (
-    <section
-      className={`focus-cockpit ${active ? "is-active" : ""}`}
-      aria-label="Phiên tập trung"
-    >
-      <div className="cockpit-timer">
-        <span>{active ? "THỜI GIAN ĐÃ GHI NHẬN" : "PHIÊN TẬP TRUNG"}</span>
-        {active ? (
-          <SessionTimer id={focus.id} className="cockpit-time" compact />
-        ) : (
-          <strong className="cockpit-time">{clock(planned)}</strong>
-        )}
-        <small>
-          {focus
-            ? `${timeFmt(focus.start)} — ${timeFmt(focus.end)}`
-            : "Chưa có phiên trong hôm nay"}
-        </small>
-      </div>
-      <div className="cockpit-content">
-        <span className="console-kicker">
-          {focus?.status === "Paused"
-            ? "ĐANG TẠM DỪNG"
-            : active
-              ? "ĐANG TẬP TRUNG"
-              : focus
-                ? "TIẾP THEO TRONG NGÀY"
-                : "CHUẨN BỊ ĐỂ BẮT ĐẦU"}
-        </span>
-        <h2>{focus?.taskName || next.title}</h2>
-        {!focus && <p className="reason">{next.description}</p>}
-        {focus ? (
-          <div className="cockpit-actions">
-            {!active ? (
-              <StartSessionButton
-                session={focus}
-                workspace={state.workspace}
-                label="Bắt đầu phiên"
-              />
-            ) : (
-              button(
-                focus.status === "Running"
-                  ? "Tạm dừng"
-                  : focus.status === "Paused"
-                    ? "Tiếp tục"
-                    : "Bắt đầu phiên",
-                focus.status === "Running"
-                  ? "session-pause"
-                  : focus.status === "Paused"
-                    ? "session-resume"
-                    : "session-start",
-                "small secondary",
-                focus.id,
-                focus.status === "Running" ? "pause" : "play",
-              )
-            )}
-            {button("Chi tiết", "session-detail", "small ghost", focus.id)}
-            {active &&
-              button(
-                "Xong phiên",
-                "session-complete",
-                "small primary",
-                focus.id,
-                "check",
-              )}
-          </div>
-        ) : (
-          <div className="cockpit-actions">
-            {button(
-              next.label,
-              next.action || "nav",
-              "small primary",
-              next.route || "",
-              next.symbol,
-            )}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-function DayRunway({ model }) {
+function DayRunway({ model, now }) {
   const [view, setView] = useState("agenda");
   const next = nextWorkflowStep(state.workspace);
   const preference = state.workspace.preference;
@@ -159,9 +75,9 @@ function DayRunway({ model }) {
     <section className="runway-card daily-schedule" aria-label="Lịch hôm nay">
       <div className="runway-toolbar">
         <span>
-          {icon("calendar")} {dateFmt(Date.now(), { weekday: "long" })}
+          {icon("calendar")} {dateFmt(now, { weekday: "long" })}
         </span>
-        <span>{model.daySessions.length} phiên</span>
+        <span>{model.timeline.length} lịch</span>
         <ToolButton
           label="Mở lịch làm việc"
           id="calendar"
@@ -179,7 +95,7 @@ function DayRunway({ model }) {
           aria-pressed={view === "agenda"}
           onClick={() => setView("agenda")}
         >
-          Danh sách phiên
+          Danh sách lịch
         </button>
         <button
           type="button"
@@ -195,19 +111,13 @@ function DayRunway({ model }) {
             const rest = model.breaks.find(
               (rest) => rest.span[0] === item.span[1],
             );
+            const phase = calendarPhase(item.start, item.end, now);
             const status =
-              {
-                Scheduled: "Chờ làm",
-                Running: "Đang làm",
-                Paused: "Tạm dừng",
-                Completed: "Đã xong",
-                Skipped: "Bỏ qua",
-                Missed: "Lỡ phiên",
-              }[item.status] || "Lịch bận";
+              item.status === "Completed" ? "Đã xong" : calendarPhases[phase];
             return (
               <Fragment key={`${item.kind}-${item.id}`}>
                 <div
-                  className={`daily-agenda-row ${["Running", "Paused"].includes(item.status) ? "is-active" : ""} ${item.status === "Completed" ? "is-completed" : ""}`}
+                  className={`daily-agenda-row calendar-time-${phase} ${phase === "current" ? "is-active" : ""} ${item.status === "Completed" ? "is-completed" : ""}`}
                 >
                   <div className="daily-agenda-time">
                     <strong>{timeFmt(item.start)}</strong>
@@ -246,7 +156,7 @@ function DayRunway({ model }) {
                         {item.isLocked
                           ? "Đã khóa lịch"
                           : item.kind === "session"
-                            ? "Mở để bắt đầu hoặc xem chi tiết"
+                            ? "Tự động theo lịch · Mở để xem chi tiết"
                             : "Sự kiện cố định"}
                       </span>
                       {icon("arrow")}
@@ -324,7 +234,7 @@ function DayRunway({ model }) {
                   <button
                     key={`${item.kind}-${item.id}`}
                     type="button"
-                    className={`runway-block ${item.span[1] - item.span[0] < 45 ? "is-short" : ""} ${item.kind === "event" ? "runway-block--event" : cyan ? "runway-block--cyan" : "runway-block--blue"} ${item.status === "Completed" ? "is-completed" : ""}`}
+                    className={`runway-block calendar-time-${calendarPhase(item.start, item.end, now)} ${item.span[1] - item.span[0] < 45 ? "is-short" : ""} ${item.kind === "event" ? "runway-block--event" : cyan ? "runway-block--cyan" : "runway-block--blue"} ${item.status === "Completed" ? "is-completed" : ""}`}
                     data-action={
                       item.kind === "session" ? "session-detail" : "nav"
                     }
@@ -391,14 +301,20 @@ function DayRunway({ model }) {
   );
 }
 function EstimationGauge({ model }) {
+  const calendarMode = model.accuracy === null;
+  const stats = model.calendarStats;
+  const percent = calendarMode ? stats.percent : model.accuracy;
   return (
-    <section className="intelligence-card estimation-card">
+    <section
+      className="intelligence-card estimation-card"
+      aria-label={calendarMode ? "Tổng quan lịch hôm nay" : "Độ khớp ước lượng"}
+    >
       <div className="console-card-heading">
-        <h3>Độ khớp ước lượng</h3>
+        <h3>{calendarMode ? "Lịch hôm nay" : "Độ khớp ước lượng"}</h3>
         <ToolButton
-          label="Xem phân tích ước lượng"
-          id="insights"
-          symbol="insights"
+          label={calendarMode ? "Xem lịch" : "Xem phân tích ước lượng"}
+          id={calendarMode ? "calendar" : "insights"}
+          symbol={calendarMode ? "calendar" : "insights"}
         />
       </div>
       <div className="estimation-gauge">
@@ -408,64 +324,89 @@ function EstimationGauge({ model }) {
             className="gauge-value"
             d="M25 95 A85 85 0 0 1 195 95"
             pathLength="100"
-            strokeDasharray={`${model.accuracy ?? 0} 100`}
+            strokeDasharray={`${percent} 100`}
           />
         </svg>
         <div>
           <strong>
-            {model.accuracy === null ? "—" : `${model.accuracy}%`}
+            {calendarMode && !stats.total ? "0 lịch" : `${percent}%`}
           </strong>
           <span>
-            {model.accuracy === null
-              ? "Chưa có phiên ghi nhận"
+            {calendarMode
+              ? stats.total
+                ? "Thời lượng lịch đã trôi"
+                : "Hôm nay chưa có lịch"
               : "Dự kiến so với thực tế"}
           </span>
         </div>
       </div>
       <div className="gauge-caption">
-        <span>
-          {model.ratio
-            ? `${model.ratio.ratio.toFixed(2)}× hệ số`
-            : "Chưa đủ dữ liệu"}
-        </span>
-        <span>{model.ratio?.samples || 0} mẫu</span>
+        {calendarMode ? (
+          <>
+            <span>
+              {stats.total} lịch · {stats.past} đã qua · {stats.current} đang
+              diễn ra
+            </span>
+            <span>{minutes(stats.remainingMinutes)} còn lại</span>
+          </>
+        ) : (
+          <>
+            <span>
+              {model.ratio
+                ? `${model.ratio.ratio.toFixed(2)}× hệ số`
+                : "Chưa đủ dữ liệu"}
+            </span>
+            <span>{model.ratio?.samples || 0} mẫu</span>
+          </>
+        )}
       </div>
     </section>
   );
 }
 function CapacityHorizon({ model }) {
+  const additional = (day) =>
+    model.hasAvailability && day.capacity !== null
+      ? (day.schedulable ?? Math.max(0, day.capacity - day.reserved))
+      : null;
+  const knownCapacity = model.days.some((day) => additional(day) !== null);
   const maximum = Math.max(
     60,
-    ...model.days.flatMap((day) => [day.capacity || 0, day.planned]),
+    ...model.days.flatMap((day) => [additional(day) || 0, day.calendarBusy]),
   );
   return (
-    <section className="intelligence-card horizon-card">
+    <section
+      className="intelligence-card horizon-card"
+      aria-label="Khả năng trong 7 ngày"
+    >
       <div className="console-card-heading">
         <h3>Khả năng trong 7 ngày</h3>
         <ToolButton label="Thiết lập thời gian rảnh" id="time" symbol="clock" />
       </div>
-      <p>Lịch đã xếp và khả năng thực hiện</p>
+      <p>Tổng thời lượng lịch học, lịch hẹn và phiên công việc</p>
       <div
-        className="horizon-chart"
+        className={`horizon-chart ${knownCapacity ? "" : "is-calendar-only"}`}
         role="img"
-        aria-label="Lịch đã xếp và khả năng thực hiện trong bảy ngày tới"
+        aria-label="Thời lượng đã có lịch và giờ có thể xếp thêm trong bảy ngày tới"
       >
         {model.days.map((day, index) => (
           <div
             className="horizon-day"
             key={day.key}
-            title={`${dateFmt(`${day.key}T12:00:00Z`)}: ${minutes(day.planned)} đã xếp; ${minutes(day.capacity)} khả năng`}
+            title={`${dateFmt(`${day.key}T12:00:00Z`)}: ${minutes(day.calendarBusy)} đã có lịch; ${additional(day) === null ? "chưa xác định giờ có thể xếp thêm" : `${minutes(additional(day))} có thể xếp thêm`}`}
           >
+            <strong className="horizon-total">
+              {minutes(day.calendarBusy)}
+            </strong>
             <div className="horizon-bar-space">
-              <div
-                className="horizon-capacity"
-                style={{
-                  height: `${((day.capacity || 0) / maximum) * 100}%`,
-                }}
-              />
+              {additional(day) !== null && (
+                <div
+                  className="horizon-capacity"
+                  style={{ height: `${(additional(day) / maximum) * 100}%` }}
+                />
+              )}
               <div
                 className={`horizon-planned ${index % 2 ? "is-blue" : ""}`}
-                style={{ height: `${(day.planned / maximum) * 100}%` }}
+                style={{ height: `${(day.calendarBusy / maximum) * 100}%` }}
               />
             </div>
             <span>
@@ -482,56 +423,137 @@ function CapacityHorizon({ model }) {
       <div className="horizon-legend">
         <span>
           <i className="legend-cyan" />
-          Đã xếp
+          Đã có lịch
         </span>
-        <span>
-          <i className="legend-rest" />
-          Khả năng
-        </span>
+        {knownCapacity && (
+          <span>
+            <i className="legend-rest" />
+            Có thể xếp thêm
+          </span>
+        )}
       </div>
+      {!knownCapacity && (
+        <div className="horizon-missing">
+          <span>
+            {model.hasAvailability
+              ? "Chưa có dữ liệu khả năng thực hiện."
+              : "Chưa đặt giờ rảnh để tính khả năng xếp thêm."}
+          </span>
+          {!model.hasAvailability &&
+            button("Đặt giờ rảnh", "nav", "small ghost", "time", "clock")}
+        </div>
+      )}
     </section>
   );
 }
 function Deadlines({ model }) {
   const deadlines = model.due.filter((task) => task.isHardDeadline).slice(0, 4);
+  const calendarMode = !deadlines.length;
+  const entries = calendarMode
+    ? model.calendarMilestones.slice(0, 4)
+    : deadlines;
   return (
-    <section className="intelligence-card deadlines-card">
+    <section
+      className="intelligence-card deadlines-card"
+      aria-label={calendarMode ? "Lịch sắp tới" : "Deadline cần giữ"}
+    >
       <div className="console-card-heading">
-        <h3>Deadline cần giữ</h3>
-        <ToolButton label="Xem tất cả công việc" id="tasks" symbol="tasks" />
+        <h3>{calendarMode ? "Lịch sắp tới" : "Deadline cần giữ"}</h3>
+        <ToolButton
+          label={calendarMode ? "Mở lịch sắp tới" : "Xem tất cả công việc"}
+          id={calendarMode ? "calendar" : "tasks"}
+          symbol={calendarMode ? "calendar" : "tasks"}
+        />
       </div>
-      <p>Những mốc không thể bỏ lỡ</p>
-      {deadlines.length ? (
+      <p>
+        {calendarMode
+          ? "Những giờ bắt đầu và kết thúc cần giữ"
+          : "Những mốc không thể bỏ lỡ"}
+      </p>
+      {entries.length ? (
         <div className="deadline-list">
-          {deadlines.map((task) => (
-            <button
-              type="button"
-              key={task.id}
-              data-action="task-detail"
-              data-id={task.id}
-              className={`deadline-line ${new Date(task.deadline) < Date.now() ? "is-overdue" : ""}`}
-            >
-              <span className="deadline-day">
-                <strong>{dateFmt(task.deadline, { month: undefined })}</strong>
-                <small>
-                  {dateFmt(task.deadline, { day: undefined, month: "short" })}
-                </small>
-              </span>
-              <span className="deadline-info">
-                <strong>{task.name}</strong>
-                <small>
-                  {timeFmt(task.deadline)} · {minutes(task.remainingMinutes)}{" "}
-                  còn lại
-                </small>
-              </span>
-              {icon("arrow")}
-            </button>
-          ))}
+          {entries.map((item) => {
+            const at = calendarMode ? item.at : item.deadline;
+            return (
+              <button
+                type="button"
+                key={`${item.kind || "task"}-${item.id}`}
+                data-action={
+                  calendarMode
+                    ? item.kind === "event"
+                      ? "edit-event"
+                      : "session-detail"
+                    : "task-detail"
+                }
+                data-id={item.id}
+                className={`deadline-line ${!calendarMode && Date.parse(at) < model.now ? "is-overdue" : ""}`}
+              >
+                <span className="deadline-day">
+                  <strong>{dateFmt(at, { month: undefined })}</strong>
+                  <small>
+                    {dateFmt(at, { day: undefined, month: "short" })}
+                  </small>
+                </span>
+                <span className="deadline-info">
+                  <strong>{item.name}</strong>
+                  <small>
+                    {calendarMode
+                      ? `${item.ongoing ? "Đang diễn ra · Kết thúc" : item.kind === "event" ? "Lịch hẹn" : "Phiên làm việc"} ${timeFmt(at)}`
+                      : `${timeFmt(at)} · ${minutes(item.remainingMinutes)} còn lại`}
+                  </small>
+                </span>
+                {icon("arrow")}
+              </button>
+            );
+          })}
         </div>
       ) : (
-        <div className="console-empty">Chưa có deadline cố định.</div>
+        <div className="console-empty">Chưa có deadline hoặc lịch sắp tới.</div>
       )}
     </section>
+  );
+}
+function LiveIntelligence() {
+  const workspace = state.workspace;
+  return (
+    <CalendarClock
+      boundaries={[...workspace.sessions, ...workspace.events].flatMap(
+        (item) => [Date.parse(item.start), Date.parse(item.end)],
+      )}
+    >
+      {(now) => {
+        const model = dashboardModel(workspace, state.insights, now);
+        const insights = state.insights;
+        const calendarOnly = model.due.length === 0;
+        return (
+          <>
+            <EstimationGauge model={model} />
+            <CapacityHorizon model={model} />
+            <Deadlines model={model} />
+            <div className="console-workload">
+              <span
+                className={`workload-dot ${!calendarOnly && (insights?.riskLevel === "Overload" || insights?.riskLevel === "High") ? "is-high" : ""}`}
+              />
+              <span>
+                {calendarOnly
+                  ? `${model.calendarStats.horizonCount} lịch trong 7 ngày`
+                  : insights
+                    ? `Khối lượng việc ${riskLabels[insights.riskLevel] || insights.riskLevel}`
+                    : "Chưa xác định"}
+              </span>
+              <strong>
+                {minutes(
+                  calendarOnly
+                    ? model.calendarStats.horizonRemaining
+                    : insights?.remainingMinutes,
+                )}{" "}
+                còn lại
+              </strong>
+            </div>
+          </>
+        );
+      }}
+    </CalendarClock>
   );
 }
 export function todayPage({ onWorkspaceChanged } = {}) {
@@ -543,6 +565,7 @@ export function todayPage({ onWorkspaceChanged } = {}) {
     .every((step) => step.done);
   return (
     <>
+      <CatchUpCard onWorkspaceChanged={onWorkspaceChanged} />
       <div className="planning-dashboard">
         <section
           className="console-column backlog-column"
@@ -676,11 +699,23 @@ export function todayPage({ onWorkspaceChanged } = {}) {
               action={readyToPlan ? "generate-plan" : next.action || "nav"}
               id={readyToPlan ? "" : next.route || ""}
               symbol={readyToPlan ? "calendar" : next.symbol}
-              text={readyToPlan ? "Lịch đề xuất" : (next.title || next.label)}
+              text={readyToPlan ? "Lịch đề xuất" : next.title || next.label}
             />
           </div>
-          <FocusCockpit model={model} />
-          <DayRunway model={model} />
+          <ScheduledFocus workspace={state.workspace} />
+          <CalendarClock
+            boundaries={[
+              ...state.workspace.sessions,
+              ...state.workspace.events,
+            ].flatMap((item) => [Date.parse(item.start), Date.parse(item.end)])}
+          >
+            {(now) => (
+              <DayRunway
+                model={dashboardModel(state.workspace, state.insights, now)}
+                now={now}
+              />
+            )}
+          </CalendarClock>
         </section>
         <aside
           className="console-column intelligence-column"
@@ -691,20 +726,7 @@ export function todayPage({ onWorkspaceChanged } = {}) {
               <h2>Phân tích & khả năng</h2>
             </div>
           </div>
-          <EstimationGauge model={model} />
-          <CapacityHorizon model={model} />
-          <Deadlines model={model} />
-          <div className="console-workload">
-            <span
-              className={`workload-dot ${insights?.riskLevel === "Overload" || insights?.riskLevel === "High" ? "is-high" : ""}`}
-            />
-            <span>
-              {insights
-                ? `Khối lượng việc ${riskLabels[insights.riskLevel] || insights.riskLevel}`
-                : "Chưa xác định"}
-            </span>
-            <strong>{minutes(insights?.remainingMinutes)} còn lại</strong>
-          </div>
+          <LiveIntelligence />
         </aside>
       </div>
     </>

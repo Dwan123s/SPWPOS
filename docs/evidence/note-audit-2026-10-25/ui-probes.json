@@ -1,0 +1,46 @@
+{
+  "time": "2026-10-25T07:30:37.438Z",
+  "probes": [
+    {
+      "id": "U01",
+      "classification": "GAP",
+      "title": "Review metadata lost on reload",
+      "details": {
+        "editedMinutes": 45,
+        "reloadedMinutes": 30,
+        "serverWrites": 0,
+        "beforeUnloadProtected": false
+      }
+    },
+    {
+      "id": "U02",
+      "classification": "DESIGN_GAP",
+      "title": "Text checkbox is not task checkbox",
+      "details": {
+        "content": "☐ ",
+        "createdTaskIds": [],
+        "realCompletionCheckboxes": 0
+      }
+    },
+    {
+      "id": "U03",
+      "classification": "RECOVERY_RISK",
+      "title": "No persistent offline draft",
+      "details": {
+        "unloadWarning": true,
+        "recoveredAfterReload": false,
+        "serverNotes": 0
+      }
+    },
+    {
+      "id": "U04",
+      "classification": "RECOVERY_RISK",
+      "title": "Title-only draft has no autosave or reload protection",
+      "details": {
+        "serverWrites": 0,
+        "beforeUnloadProtected": false,
+        "recoveredTitle": ""
+      }
+    }
+  ]
+}

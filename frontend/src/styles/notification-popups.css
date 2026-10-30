@@ -1,0 +1,81 @@
+.reminder-popups {
+  position: fixed;
+  top: 84px;
+  right: 20px;
+  z-index: 200;
+  display: grid;
+  gap: 10px;
+  width: min(390px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.reminder-popup {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #b9d5f5;
+  border-left: 4px solid #0869dc;
+  border-radius: 14px;
+  background: #fff;
+  color: #173958;
+  box-shadow: 0 12px 36px #123c6c29;
+  pointer-events: auto;
+}
+.reminder-popup-icon {
+  color: #0869dc;
+  flex-shrink: 0;
+}
+.reminder-popup .icon {
+  width: 19px;
+  height: 19px;
+}
+.reminder-popup-content {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.reminder-popup strong {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.reminder-popup p {
+  margin: 6px 0 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #48647e;
+}
+.reminder-popup a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #075ebf;
+  font-size: 12px;
+  font-weight: 600;
+}
+.reminder-popup a .icon {
+  width: 14px;
+  height: 14px;
+}
+.reminder-popup-close {
+  border: 0;
+  background: transparent;
+  color: #526b82;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+.reminder-popup-close:focus-visible,
+.reminder-popup a:focus-visible {
+  outline: 2px solid #0869dc;
+  outline-offset: 3px;
+}
+.notice-popup-test {
+  margin-top: 10px;
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .reminder-popups {
+    top: 72px;
+    right: 16px;
+  }
+}

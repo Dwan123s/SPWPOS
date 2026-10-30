@@ -115,6 +115,40 @@ public sealed class NotesApiTests
         Assert.Equal(0, workspace.GetProperty("tasks").GetArrayLength()); Assert.Equal(0, workspace.GetProperty("sessions").GetArrayLength());
         var list = await Data(await client.GetAsync("/api/notes", Ct)); Assert.Equal(1, list.GetArrayLength());
     }
+    [Fact] public async Task Note_checkbox_completion_updates_the_real_task_and_calendar_without_changing_a_draft()
+    {
+        await using var factory = new AiFactory(); using var client = await factory.ClientAsync();
+        var tokens = await AuthFlowTests.RegisterLoginAsync(factory, client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Access);
+        await Data(await client.PutAsJsonAsync("/api/time/availability",
+            new WeeklyInput(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()), Ct));
+        var note = await Data(await client.PostAsJsonAsync("/api/notes", new NoteInput("Checklist", "Viết báo cáo 60 phút"), Ct));
+        var noteId = note.GetProperty("id").GetGuid();
+        var scheduled = await Data(await client.PostAsJsonAsync($"/api/notes/{noteId}/schedule", new NoteScheduleInput(note.GetProperty("version").GetGuid()), Ct));
+        note = scheduled.GetProperty("note");
+        var workspace = await Data(await client.GetAsync("/api/workspace", Ct));
+        var task = Assert.Single(workspace.GetProperty("tasks").EnumerateArray());
+        var taskId = task.GetProperty("id").GetGuid(); var taskVersion = task.GetProperty("version").GetGuid();
+        var draft = await Data(await client.PutAsJsonAsync($"/api/notes/{noteId}",
+            new NoteInput("Checklist", "Viết báo cáo 60 phút\nĐang bổ sung ý mới", note.GetProperty("version").GetGuid()), Ct));
+        var done = await Data(await client.PatchAsJsonAsync($"/api/notes/{noteId}/tasks/{taskId}/completion", new NoteTaskCompletionInput(taskVersion, true), Ct));
+        var doneTask = Assert.Single(done.GetProperty("tasks").EnumerateArray());
+        Assert.Equal("Completed", doneTask.GetProperty("status").GetString());
+        Assert.Empty(done.GetProperty("sessions").EnumerateArray());
+        var stale = await client.PatchAsJsonAsync($"/api/notes/{noteId}/tasks/{taskId}/completion", new NoteTaskCompletionInput(taskVersion, false), Ct);
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        var updatedNotes = await Data(await client.GetAsync("/api/notes", Ct));
+        var unchanged = Assert.Single(updatedNotes.EnumerateArray());
+        Assert.Equal(draft.GetProperty("version").GetGuid(), unchanged.GetProperty("version").GetGuid());
+        Assert.Equal(draft.GetProperty("content").GetString(), unchanged.GetProperty("content").GetString());
+        await Data(await client.PatchAsJsonAsync($"/api/notes/{noteId}/tasks/{taskId}/completion", new NoteTaskCompletionInput(doneTask.GetProperty("version").GetGuid(), false), Ct));
+        var detail = await Data(await client.GetAsync($"/api/tasks/{taskId}", Ct));
+        Assert.Equal("Todo", detail.GetProperty("status").GetString());
+        var other = await Data(await client.PostAsJsonAsync("/api/notes", new NoteInput("Khác", "Ghi chú khác"), Ct));
+        var wrongNote = await client.PatchAsJsonAsync($"/api/notes/{other.GetProperty("id").GetGuid()}/tasks/{taskId}/completion",
+            new NoteTaskCompletionInput(detail.GetProperty("version").GetGuid(), true), Ct);
+        Assert.Equal(HttpStatusCode.NotFound, wrongNote.StatusCode);
+    }
 
     [Fact] public async Task Note_can_be_deleted_via_api()
     {

@@ -41,7 +41,14 @@ jobs:
           mkdir -p ../TestResults/frontend
           node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../TestResults/frontend/session-refresh.xml ../tests/browser/session-refresh.test.mjs
       - name: Production build
+        env:
+          PLANORA_STANDALONE: "true"
         run: npm run build
+      - name: Upload standalone frontend
+        uses: actions/upload-artifact@v6
+        with:
+          name: frontend-dist
+          path: frontend/dist
       - name: Dependency vulnerability check
         run: npm audit --audit-level=high
       - name: Upload frontend test reports
@@ -66,17 +73,6 @@ jobs:
           cache-dependency-path: |
             src/**/packages.lock.json
             tests/**/packages.lock.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "^24.15.0"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      # The API project includes these generated files during its build.
-      - name: Build the frontend served by the API
-        working-directory: frontend
-        run: |
-          npm ci --no-fund
-          npm run build
       - name: Restore locked backend dependencies and EF tools
         run: |
           dotnet tool restore

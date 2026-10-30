@@ -40,6 +40,26 @@ beforeEach(() => {
         return response({ aiAvailable: true, provider: "Gemini" });
       if (url === "/api/notes" && method === "GET")
         return response(stored.map((x) => ({ ...x })));
+      if (url === "/api/workspace") return response(state.workspace);
+      if (url.endsWith("/completion") && method === "PATCH") {
+        const taskId = url.split("/").at(-2);
+        const task = state.workspace.tasks.find((item) => item.id === taskId);
+        expect(body.version).toBe(task.version);
+        state.workspace = {
+          ...state.workspace,
+          tasks: state.workspace.tasks.map((item) =>
+            item.id === taskId
+              ? {
+                  ...item,
+                  status: body.completed ? "Completed" : "Todo",
+                  progress: body.completed ? 100 : 0,
+                  version: "task-v2",
+                }
+              : item,
+          ),
+        };
+        return response(state.workspace);
+      }
       if (url.endsWith("/analyze")) {
         const note = stored.find((x) => x.id === url.split("/")[3]);
         expect(body.version).toBe(note.version);
@@ -213,4 +233,100 @@ it("autosaves additions to a previously processed note and offers analysis of ne
     screen.getByRole("button", { name: "Nhận diện việc mới" }),
   ).toBeTruthy();
   expect(calls.some((x) => x.url.endsWith("/schedule"))).toBe(false);
+});
+
+function linkedNote() {
+  stored = [
+    {
+      id: "note-1",
+      title: "Checklist của tôi",
+      content: "Ghi chú đang viết",
+      version: "v0",
+      createdTaskIds: ["task-1"],
+      analysisImported: true,
+      hasProcessedContent: true,
+      updatedAt: "2026-10-25T04:00:00Z",
+      analysis: null,
+    },
+  ];
+  state.workspace = {
+    ...state.workspace,
+    tasks: [
+      {
+        id: "task-1",
+        name: "Viết báo cáo",
+        description: "Nội dung báo cáo",
+        deadline: "2026-10-30T10:00:00Z",
+        estimatedMinutes: 60,
+        actualMinutes: 20,
+        progress: 25,
+        status: "InProgress",
+        version: "task-v1",
+      },
+    ],
+  };
+}
+it("ticks the linked task without losing unsaved text and autosaves that text with the unchanged note version", async () => {
+  linkedNote();
+  const changed = vi.fn();
+  render(<NotesPage onWorkspaceChanged={changed} />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: /^Checklist của tôi/ }));
+  write("Ghi chú đang viết\nThêm ý chưa kịp autosave");
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "Hoàn thành Viết báo cáo" }),
+  );
+  await screen.findByText("Đã hoàn thành · 1");
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toContain(
+    "Thêm ý chưa kịp autosave",
+  );
+  const request = calls.find((item) => item.url.endsWith("/completion"));
+  expect(request.url).toBe("/api/notes/note-1/tasks/task-1/completion");
+  expect(request.body).toEqual({ version: "task-v1", completed: true });
+  await waitFor(
+    () => expect(stored[0].content).toContain("Thêm ý chưa kịp autosave"),
+    { timeout: 3000 },
+  );
+  expect(saves()[0].body.version).toBe("v0");
+  expect(changed).toHaveBeenCalledTimes(1);
+});
+it("synchronizes status changed elsewhere without resetting the note editor", async () => {
+  linkedNote();
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: /^Checklist của tôi/ }));
+  write("Nội dung chưa lưu");
+  state.workspace = {
+    ...state.workspace,
+    tasks: state.workspace.tasks.map((item) => ({
+      ...item,
+      status: "Completed",
+      progress: 100,
+      version: "external-version",
+    })),
+  };
+  fireEvent(window, new Event("workspace-updated"));
+  expect(screen.getByText("Đã hoàn thành · 1")).toBeTruthy();
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(
+    "Nội dung chưa lưu",
+  );
+  expect(calls.some((item) => item.url.endsWith("/completion"))).toBe(false);
+});
+it("refreshes linked task status when returning from another tab", async () => {
+  linkedNote();
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: /^Checklist của tôi/ }));
+  state.workspace = {
+    ...state.workspace,
+    tasks: state.workspace.tasks.map((item) => ({
+      ...item,
+      status: "Completed",
+      progress: 100,
+      version: "external-version",
+    })),
+  };
+  fireEvent.focus(window);
+  await screen.findByText("Đã hoàn thành · 1");
+  expect(calls.some((item) => item.url === "/api/workspace")).toBe(true);
 });

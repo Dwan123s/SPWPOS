@@ -55,7 +55,6 @@ export function adminUsers(users) {
           <th>Người dùng</th>
           <th>Email</th>
           <th>Trạng thái</th>
-          <th>Công việc</th>
           <th>Hoạt động tài khoản</th>
           <th>Thao tác</th>
         </tr>
@@ -75,9 +74,6 @@ export function adminUsers(users) {
                   u.isActive ? "green" : "red",
                 )}{" "}
                 {badge(u.emailConfirmed ? "Đã xác minh" : "Chưa xác minh")}
-              </td>
-              <td>
-                {u.completedTasks ?? 0} / {u.totalTasks ?? 0} hoàn thành
               </td>
               <td>
                 <div>
@@ -114,7 +110,7 @@ export function adminUsers(users) {
         )}
         {!users.length && (
           <tr>
-            <td colSpan="6">Không tìm thấy tài khoản phù hợp.</td>
+            <td colSpan="5">Không tìm thấy tài khoản phù hợp.</td>
           </tr>
         )}
       </tbody>
@@ -134,7 +130,7 @@ export function adminStatus(s) {
       {stat(
         "Người dùng",
         s.users,
-        `${s.tasks} công việc trong hệ thống`,
+        `${s.activeUsersToday ?? 0} tài khoản đăng nhập hôm nay (UTC)`,
         "users",
       )}
       {stat(
@@ -142,6 +138,36 @@ export function adminStatus(s) {
         s.activeSessions,
         `${s.failedLoginsLast24Hours} đăng nhập thất bại / 24h`,
         "clock",
+      )}
+      {stat(
+        "Phiên đã hoàn thành",
+        s.completedSessions ?? 0,
+        "Số liệu tổng hợp, không xem nội dung công việc",
+        "check",
+      )}
+      {stat(
+        "Token AI",
+        (s.inputTokens ?? 0) + (s.outputTokens ?? 0),
+        s.inputTokens == null && s.outputTokens == null
+          ? "Provider chưa cung cấp số token"
+          : "Token đầu vào và đầu ra do provider báo cáo",
+        "spark",
+      )}
+      {stat(
+        "RAM tiến trình",
+        `${Math.round((s.processMemoryBytes ?? 0) / 1048576)} MB`,
+        `${s.failedJobs ?? 0} tác vụ lỗi`,
+        "sliders",
+      )}
+      {s.health?.ai && s.health?.email && (
+        <p className="muted">
+          AI: {s.health.ai.configured ? "Đã cấu hình" : "Chưa cấu hình"}
+          {s.health.ai.lastObservedLatencyMilliseconds != null
+            ? ` · lần thành công gần nhất ${s.health.ai.lastObservedLatencyMilliseconds} ms`
+            : " · chưa có số đo"}
+          . SMTP: {s.health.email.configured ? "Đã cấu hình" : "Chưa cấu hình"}.
+          Các trạng thái này không phải phép đo kết nối tức thời.
+        </p>
       )}
       {stat(
         "Thông báo định kỳ",

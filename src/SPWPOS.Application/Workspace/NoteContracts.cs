@@ -17,6 +17,7 @@ public sealed record NoteActivityPlanInput(Guid Version, [Required, MinLength(1)
 public sealed record NotePlanContext(Guid NoteId, Guid NoteVersion, NoteActivity[] Activities, Guid[] TaskIds, EventView[] Events,
     bool AllowRequestedTimeOutsideAvailability = false);
 public sealed record NoteApplyInput(Guid Version);
+public sealed record NoteTaskCompletionInput(Guid Version, bool Completed);
 public sealed record NoteAgentCapabilities(bool AiAvailable, int MaxTasks = 12, string Provider = "OpenAI");
 public sealed record NoteView(Guid Id, string Title, string Content, Guid Version,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, NoteAnalysis? Analysis, Guid[] CreatedTaskIds, Guid? PlanId = null,

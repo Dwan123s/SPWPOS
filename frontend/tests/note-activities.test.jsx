@@ -41,12 +41,13 @@ const activities = [
     question: "Bạn cần bao lâu để làm báo cáo RDS?",
   },
 ];
-let calls, note, failApply, outsideHours;
+let calls, note, failApply, outsideHours, customWarnings;
 beforeEach(() => {
   localStorage.clear();
   calls = [];
   failApply = false;
   outsideHours = false;
+  customWarnings = null;
   state.workspace = {
     profile: { id: "account" },
     tasks: [],
@@ -83,7 +84,8 @@ beforeEach(() => {
           start: "2026-10-20T12:10:00Z",
           end: "2026-11-03T12:10:00Z",
           warnings:
-            outsideHours && !body.allowRequestedTimeOutsideAvailability
+            customWarnings ??
+            (outsideHours && !body.allowRequestedTimeOutsideAvailability
               ? [
                   {
                     taskName: "Báo cáo RDS",
@@ -93,7 +95,7 @@ beforeEach(() => {
                     unscheduledMinutes: 30,
                   },
                 ]
-              : [],
+              : []),
           sessions: body.activities.some((x) => x.kind === "TASK")
             ? [
                 {
@@ -147,6 +149,76 @@ async function open() {
     await screen.findByRole("button", { name: "Thời gian biểu" }),
   );
 }
+it("explains the actual deadline and late finish, disables saving, and opens the affected task when returning to edit", async () => {
+  note.analysis.activities = [
+    {
+      ...activities[3],
+      start: null,
+      estimatedMinutes: 60,
+      deadline: "2026-10-21T14:00:00Z",
+    },
+  ];
+  customWarnings = [
+    {
+      taskId: "t1",
+      taskName: "Báo cáo RDS",
+      code: "SOFT_DEADLINE_EXCEEDED",
+      unscheduledMinutes: 0,
+      message: "Đề xuất có phiên sau deadline mềm; kiểm tra trước khi áp dụng.",
+    },
+  ];
+  await open();
+  expect(
+    screen.getByText(/Các ô tick này dùng để chọn mục muốn thêm/),
+  ).toBeTruthy();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  const save = await screen.findByRole("button", {
+    name: "Lưu sự kiện & công việc",
+  });
+  expect(save.disabled).toBe(true);
+  const warning = screen.getByRole("alert");
+  expect(warning.textContent).toContain(
+    "Chưa thể lưu các việc mới và lịch đề xuất",
+  );
+  expect(warning.textContent).toContain("Hạn chót:");
+  expect(warning.textContent).toContain("21:00");
+  expect(warning.textContent).toContain("21:30");
+  expect(warning.textContent).toContain("trễ 30p");
+  expect(warning.textContent).not.toContain("deadline mềm");
+  expect(
+    document.getElementById(save.getAttribute("aria-describedby")).textContent,
+  ).toContain("Nút lưu đang tắt");
+  expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Quay lại chỉnh sửa" }),
+  );
+  expect(
+    screen.getByLabelText("Hạn chót Báo cáo RDS").closest("details").open,
+  ).toBe(true);
+});
+it("replaces unsupported categories in older analysis with Other and sends the value actually shown in review", async () => {
+  note.analysis.activities = activities.map((activity) =>
+    activity.kind === "TASK"
+      ? { ...activity, type: "DESIGN", estimatedMinutes: 30 }
+      : activity,
+  );
+  await open();
+  expect(screen.queryByRole("option", { name: "Thiết kế" })).toBeNull();
+  expect(screen.getByRole("combobox", { name: "Loại Báo cáo RDS" }).value).toBe(
+    "OTHER",
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  await screen.findByRole("button", { name: "Lưu sự kiện & công việc" });
+  const request = calls.find((call) => call.url.endsWith("/proposals"));
+  expect(
+    request.body.activities.find((activity) => activity.kind === "TASK").type,
+  ).toBe("OTHER");
+  expect(request.body.activities[0].type).toBe("CLASS");
+});
 it("offers one-off requested hours after an availability warning without applying until confirmed", async () => {
   outsideHours = true;
   note.analysis.activities = activities.map((x) =>

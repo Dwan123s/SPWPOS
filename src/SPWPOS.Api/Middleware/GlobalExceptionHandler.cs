@@ -12,7 +12,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         var auth = exception as AuthException;
         var concurrency = exception is DbUpdateConcurrencyException;
         int status = auth?.StatusCode ?? (concurrency ? 409 : exception is BadHttpRequestException bad ? bad.StatusCode : 500);
-        string code = auth?.Code ?? (concurrency ? "DATA_STALE" : status == 413 ? "REQUEST_TOO_LARGE" : status == 400 ? "VALIDATION_ERROR" : "INTERNAL_ERROR");
+        string code = auth?.Code ?? (concurrency ? "CONCURRENCY_CONFLICT" : status == 413 ? "REQUEST_TOO_LARGE" : status == 400 ? "VALIDATION_ERROR" : "INTERNAL_ERROR");
         string message = auth?.Message ?? (concurrency ? "Dữ liệu đã thay đổi ở nơi khác. Tải lại bản mới trước khi chỉnh sửa." : status >= 500 ? "An unexpected error occurred." : "Invalid request.");
         if (status >= 500) logger.LogError("Request failed with {FailureType}; trace {TraceId}", exception.GetType().Name, context.TraceIdentifier);
         await ApiProblems.WriteAsync(context, status, code, message, ct); return true;

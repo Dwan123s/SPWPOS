@@ -128,3 +128,57 @@ it("uses the server's capacity day instead of reconstructing different business 
   expect(model.availableMinutes).toBe(240);
   expect(model.days[0].reserved).toBe(60);
 });
+
+it("includes fixed calendar entries in occupied time without counting overlaps twice", () => {
+  const w = workspace();
+  w.events = [
+    session("class", "07:00", "09:00"),
+    session("meeting", "08:30", "10:00"),
+  ];
+  w.sessions = [session("work", "09:30", "10:30")];
+  const before = JSON.stringify(w);
+  const model = dashboardModel(w, null, now);
+  expect(model.days[0].planned).toBe(60);
+  expect(model.days[0].calendarBusy).toBe(210);
+  expect(model.calendarStats.remainingMinutes).toBe(150);
+  expect(model.calendarStats.percent).toBe(29);
+  expect(model.calendarStats.total).toBe(3);
+  expect(model.calendarStats.current).toBe(1);
+  expect(model.accuracy).toBeNull();
+  expect(JSON.stringify(w)).toBe(before);
+});
+it("reports calendar data independently of missing free-time settings and estimation history", () => {
+  const w = workspace();
+  w.availability = [];
+  w.events = [{ ...session("class", "07:00", "09:00"), name: "PRN212" }];
+  const model = dashboardModel(
+    w,
+    { capacityFactor: 0.8, plannedMinutes: 0, actualMinutes: 0 },
+    now,
+  );
+  expect(model.hasAvailability).toBe(false);
+  expect(model.days[0].calendarBusy).toBe(120);
+  expect(model.calendarStats.percent).toBe(50);
+  expect(model.calendarStats.horizonCount).toBe(1);
+  expect(model.calendarMilestones[0].name).toBe("PRN212");
+  expect(model.calendarMilestones[0].ongoing).toBe(true);
+  expect(model.accuracy).toBeNull();
+});
+it("clips overnight calendar entries to each local day and excludes cancelled sessions", () => {
+  const w = workspace();
+  w.events = [
+    {
+      id: "overnight",
+      name: "Overnight",
+      start: "2026-10-11T23:30:00+07:00",
+      end: "2026-10-12T00:30:00+07:00",
+    },
+  ];
+  w.sessions = [session("cancel", "08:00", "12:00", "Cancelled")];
+  const model = dashboardModel(w, null, now);
+  expect(model.days[0].calendarBusy).toBe(30);
+  expect(model.calendarStats.percent).toBe(100);
+  expect(model.calendarStats.remainingMinutes).toBe(0);
+  expect(model.calendarStats.horizonCount).toBe(1);
+  expect(model.calendarMilestones).toHaveLength(0);
+});

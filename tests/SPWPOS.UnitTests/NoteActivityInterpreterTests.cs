@@ -63,6 +63,9 @@ public sealed class NoteActivityInterpreterTests
             : provider == "VertexAI" ? request.RootElement.GetProperty("generationConfig").GetProperty("responseJsonSchema")
             : request.RootElement.GetProperty("generationConfig").GetProperty("responseFormat").GetProperty("text").GetProperty("schema");
         Assert.Contains(schema.GetProperty("required").EnumerateArray(), x => x.GetString() == "activities");
+        var types = schema.GetProperty("properties").GetProperty("activities").GetProperty("items")
+            .GetProperty("properties").GetProperty("type").GetProperty("enum").EnumerateArray().Select(x => x.GetString()).ToArray();
+        Assert.Contains("WRITING", types); Assert.Contains("STUDY", types); Assert.DoesNotContain("DESIGN", types);
     }
     [Fact] public async Task Fixed_events_do_not_require_a_task_estimate_to_reach_review()
     {

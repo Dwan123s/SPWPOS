@@ -47,9 +47,9 @@ Các trang today, tasks, calendar, time, insights, scenario, notifications, sett
 
 ## 3. Persistence và tính nhất quán
 
-Controller nhận DTO, xác định user từ claims rồi gọi service. `WorkspaceService.Mutate` kiểm tra account, mở transaction, lấy account lock, thực hiện thay đổi, cập nhật revision/learning/risk khi cần rồi commit. Query theo UserId; nhiều FK composite `(UserId, Id)` ngăn tham chiếu task/category/parent/dependency/session giữa các tài khoản.
+Controller nhận DTO, xác định user từ claims rồi gọi service. Cập nhật 28/10/2026: `WorkspaceService.Mutate` dùng optimistic MutationVersion/Revision trong transaction, trả 409 khi có xung đột; không lấy account applock cho mutation workspace thông thường. Query theo UserId; nhiều FK composite `(UserId, Id)` ngăn tham chiếu task/category/parent/dependency/session giữa các tài khoản.
 
-SQL Server dùng `sp_getapplock` theo normalized email. Unique filtered indexes bảo vệ một phiên Running/Paused mỗi user, một execution segment đang mở và các quan hệ duy nhất. Proposal dùng revision, expiry và trạng thái áp dụng để chống áp dụng hai lần hoặc ghi đè dữ liệu mới. SQLite phục vụ test relational thường; concurrency được kiểm tra trên SQL Server thật.
+Authentication/refresh/quota và khóa tài khoản còn dùng `sp_getapplock` theo normalized email. Unique filtered indexes bảo vệ một phiên Running/Paused mỗi user, một execution segment đang mở và các quan hệ duy nhất. Proposal dùng revision, expiry và trạng thái áp dụng để chống áp dụng hai lần hoặc ghi đè dữ liệu mới. SQLite phục vụ test relational thường; concurrency được kiểm tra trên SQL Server thật.
 
 Năm migration giữ nguyên ID và Up/Down. `docs/database/schema.sql` được sinh lại bằng EF Core 8; annotation ProductVersion trong snapshot/designer được đồng bộ thành 8.0.31. Database hiện có không bị drop/recreate; startup EF 8 báo database đã up to date, không áp dụng migration mới.
 
@@ -57,7 +57,7 @@ Năm migration giữ nguyên ID và Up/Down. `docs/database/schema.sql` được
 
 `PlanningEngine` dựng khoảng rảnh theo timezone, trừ events/exceptions và phiên cần giữ. Chu trình được kiểm tra cả dependency và quan hệ hoàn thành cha/con. Lịch theo thứ tự tiền nhiệm, deadline, priority và khoảng phù hợp; task cha có con là container để tránh tính workload hai lần.
 
-Planner xét session bounds, splittable, preferred hours, break và hard deadline. Bias cần 3 mẫu, dùng tối đa 50 mẫu gần nhất, giới hạn 0.5–3; capacity cần 5 phiên đủ điều kiện, cold start 80%, giới hạn 25–100%. Horizon tối đa 30 ngày. Deadline ngoài horizon có reason riêng và không bị suy diễn thành thiếu capacity trước deadline.
+Planner xét session bounds, splittable, preferred hours, break và hard deadline. Cập nhật 28/10/2026: ứng viên có hàm phạt đa mục tiêu; bias dùng EMA alpha .2 với tối thiểu 3 mẫu, giới hạn 0.5–3; capacity dùng EMA tỷ lệ hoàn thành từng ngày với tối thiểu 5 phiên, cold start 80%, giới hạn 25–100%. Xem [công thức và cơ sở tham khảo](../features/WORKSPACE_UPGRADE_PHASES_1_TO_4.md). Horizon tối đa 30 ngày. Deadline ngoài horizon có reason riêng và không bị suy diễn thành thiếu capacity trước deadline.
 
 Thuật toán là heuristic xác định, có giải thích và test. Chưa có bằng chứng nghiệm tối ưu toàn cục hoặc cải thiện năng suất người dùng thực tế.
 

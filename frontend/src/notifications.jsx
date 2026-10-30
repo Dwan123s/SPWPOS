@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { dateFmt, dayKey, icon, timeFmt } from "./ui.jsx";
+import { useNotificationFeed } from "./notification-popups.jsx";
+import { previewNotificationPopup } from "./notification-feed.js";
 
 const types = {
   deadline: { label: "Hạn chót", glyph: "clock", tone: "amber" },
   session: { label: "Phiên làm việc", glyph: "calendar", tone: "blue" },
+  event: { label: "Lịch hẹn", glyph: "calendar", tone: "blue" },
   warning: { label: "Cảnh báo lịch", glyph: "alertCircle", tone: "coral" },
   schedule: { label: "Thay đổi lịch", glyph: "refresh", tone: "teal" },
   other: { label: "Cập nhật khác", glyph: "bell", tone: "blue" },
@@ -13,6 +16,8 @@ function notificationType(kind) {
     {
       DEADLINE: "deadline",
       SESSION_REMINDER: "session",
+      SESSION_REVIEW: "session",
+      EVENT_REMINDER: "event",
       WORKLOAD_WARNING: "warning",
       SCHEDULE_CHANGE: "schedule",
       SCHEDULE_CHANGED: "schedule",
@@ -30,7 +35,9 @@ export function NotificationCenter({ workspace }) {
   const [status, setStatus] = useState("all");
   const [type, setType] = useState("all");
   const [query, setQuery] = useState("");
-  const notifications = workspace.notifications || [];
+  const feed = useNotificationFeed();
+  const notifications = feed.userId && feed.userId === workspace.profile?.id
+    ? feed.items : workspace.notifications || [];
   const tasks = workspace.tasks || [];
   const settings = workspace.notificationSettings || {};
   const unread = notifications.filter((item) => !item.isRead).length;
@@ -346,6 +353,7 @@ export function NotificationCenter({ workspace }) {
             >
               Điều chỉnh nhắc nhở {icon("arrow")}
             </button>
+            <button type="button" className="btn secondary small notice-popup-test" disabled={settings.inAppEnabled === false} onClick={previewNotificationPopup}>Thử popup</button>
           </section>
           <p className="notice-read-hint">
             {icon("check")} Đã đọc chỉ ghi nhận bạn đã xem thông báo. Tiến độ
@@ -360,7 +368,9 @@ function NotificationItem({ item, task }) {
   const type = notificationType(item.kind);
   const meta = types[type];
   const target =
-    type === "session" || type === "schedule"
+    item.kind === "SESSION_REVIEW"
+      ? { label: "Ghi nhận kết quả", route: "today" }
+      : type === "session" || type === "event" || type === "schedule"
       ? { label: "Xem lịch làm việc", route: "calendar" }
       : task
         ? { label: "Xem công việc", taskId: task.id }

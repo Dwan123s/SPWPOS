@@ -14,7 +14,7 @@ public sealed partial class TaskInterpreter
       "needsReview":{"type":"boolean"},"messages":{"type":"array","items":{"type":"string"}},
       "activities":{"type":"array","items":{"type":"object","additionalProperties":false,
         "required":["kind","name","description","type","start","end","estimatedMinutes","deadline","priority","isHardDeadline","repeatWeeks","question"],
-        "properties":{"kind":{"type":"string","enum":["EVENT","TASK"]},"name":{"type":"string"},"description":{"type":"string"},"type":{"type":"string"},
+        "properties":{"kind":{"type":"string","enum":["EVENT","TASK"]},"name":{"type":"string"},"description":{"type":"string"},"type":{"type":"string","enum":["WORK","OTHER","PROGRAMMING","WRITING","STUDY","MEETING_PREP","ADMIN","CLASS","MEETING","APPOINTMENT"]},
           "start":{"type":["string","null"],"description":"ISO 8601 timestamp with timezone offset, or null"},"end":{"type":["string","null"],"description":"ISO 8601 timestamp with timezone offset, or null"},"estimatedMinutes":{"type":["integer","null"],"description":"Task duration in minutes when stated; null for events or unknown task durations"},
           "deadline":{"type":["string","null"],"description":"Explicit completion deadline with timezone offset, or null"},"priority":{"type":"integer","minimum":1,"maximum":4},"isHardDeadline":{"type":"boolean"},
           "repeatWeeks":{"type":"integer","minimum":1,"maximum":12},"question":{"type":"string"}}}}}}

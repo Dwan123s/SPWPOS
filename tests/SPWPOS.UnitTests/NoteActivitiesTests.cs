@@ -8,11 +8,12 @@ namespace SPWPOS.UnitTests;
 public sealed class NoteActivitiesTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
-    private sealed class Interpreter : ITaskInterpreter
+    private sealed class Interpreter(string taskType = "WRITING") : ITaskInterpreter
     {
         public NoteAgentCapabilities Capabilities => new(true, Provider: "Gemini");
         public Task<NoteAnalysis> AnalyzeNoteAsync(string text, bool useAi, string zone, DateTimeOffset now, CancellationToken ct) =>
-            Task.FromResult(new NoteAnalysis([], "Gemini", [], false, Activities(now)));
+            Task.FromResult(new NoteAnalysis([], "Gemini", [], false, Activities(now)
+                .Select(x => x.Kind == "TASK" ? x with { Type = taskType } : x).ToArray()));
         public Task<TaskSuggestion> CaptureAsync(CaptureInput input, string zone, DateTimeOffset now, CancellationToken ct) => throw new NotSupportedException();
         public Task<BreakdownView> BreakdownAsync(TaskInput task, bool useAi, CancellationToken ct) => throw new NotSupportedException();
     }
@@ -54,6 +55,26 @@ public sealed class NoteActivitiesTests
         await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, plan.Id, new(note.Version), Ct));
         Assert.Equal(3, (await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct))).Length);
         Assert.Single(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+    }
+    [Theory]
+    [InlineData("DESIGN", "OTHER")]
+    [InlineData("UNKNOWN_AI_TYPE", "OTHER")]
+    [InlineData(" writing ", "WRITING")]
+    [InlineData("RESEARCH", "STUDY")]
+    public async Task Ai_activity_task_types_are_normalized_against_the_active_catalog_before_review(string suggested, string expected)
+    {
+        await using var h = await ServiceHarness.CreateAsync(services => services.AddSingleton<ITaskInterpreter>(new Interpreter(suggested)));
+        var user = await h.RegisterAsync();
+        await Call(h, async s => { await s.SetAvailabilityAsync(user.Id, new(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()), Ct); return true; });
+        var note = await Call(h, s => s.SaveNoteAsync(user.Id, null, new("Kế hoạch", "Viết báo cáo, chuẩn bị slide và đọc tài liệu ngày mai"), Ct));
+        note = await Call(h, s => s.AnalyzeNoteAsync(user.Id, note.Id, new(note.Version), Ct));
+        var activities = note.Analysis!.Activities!;
+        Assert.Equal(expected, Assert.Single(activities, x => x.Kind == "TASK").Type);
+        Assert.Equal(new[] { "CLASS", "WORK", "MEETING" }, activities.Where(x => x.Kind == "EVENT").Select(x => x.Type));
+        var plan = await Call(h, s => s.PreviewNoteActivitiesAsync(user.Id, note.Id, new(note.Version, activities), Ct));
+        await Call(h, s => s.ApplyNoteActivitiesAsync(user.Id, note.Id, plan.Id, new(note.Version), Ct));
+        Assert.Equal(expected, Assert.Single(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct))).TaskType);
+        Assert.False(await h.DbAsync(db => db.TaskTypes.AnyAsync(x => x.Code == "DESIGN", Ct)));
     }
     [Fact] public async Task Missing_report_duration_never_becomes_an_invented_hour_or_partial_calendar()
     {

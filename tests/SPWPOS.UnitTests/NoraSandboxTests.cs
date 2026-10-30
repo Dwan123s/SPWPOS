@@ -12,6 +12,18 @@ public sealed class NoraSandboxTests
     private static AgentTurnView Result(string status = "APPLIED") => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
         "Yêu cầu mẫu", "Kết quả mẫu", status, "", null, [], [], Now);
 
+    [Fact] public void Oracle_ignores_only_internal_mutation_token_and_still_detects_calendar_revision_and_preferences()
+    {
+        var before = State();
+        var preference = System.Text.Json.JsonSerializer.Deserialize<WorkPreference>(System.Text.Json.JsonSerializer.Serialize(before.Preference))!;
+        preference.MutationVersion = Guid.NewGuid();
+        Assert.Empty(SandboxOracle.Diff(before, before with { Preference = preference }));
+        preference.Revision = Guid.NewGuid();
+        Assert.Single(SandboxOracle.Diff(before, before with { Preference = preference }));
+        preference.Revision = before.Preference.Revision; preference.BreakMinutes++;
+        Assert.Single(SandboxOracle.Diff(before, before with { Preference = preference }));
+    }
+
     [Theory] [InlineData("overlap")] [InlineData("deadline")] [InlineData("outside-free-time")] [InlineData("duration")] [InlineData("work-window")]
     public void Exported_schedule_violations_are_detected_independently_of_the_planning_engine(string defect)
     {

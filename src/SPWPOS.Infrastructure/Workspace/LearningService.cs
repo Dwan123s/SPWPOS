@@ -6,7 +6,7 @@ namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService
 {
-    // Called while holding the same account transaction as the task/session mutation.
+    // Called inside the optimistic workspace transaction of the mutation.
     private async Task UpdateLearningAsync(Guid uid, CancellationToken ct)
     {
         var tasks = await Mine<WorkTask>(uid).Where(x => !x.IsDeleted && x.Status == WorkTaskStatus.Completed).ToArrayAsync(ct);
@@ -39,9 +39,9 @@ public sealed partial class WorkspaceService
         {
             var record = await db.TaskTypeBiases.SingleOrDefaultAsync(x => x.UserId == uid && x.TaskType == bias.TaskType, ct);
             if (record is null) { record = new() { UserId = uid, TaskType = bias.TaskType }; db.TaskTypeBiases.Add(record); }
-            var samples = observations.Where(x => x.TaskType == bias.TaskType && x.ActualMinutes > 0).OrderByDescending(x => x.ObservedAt).Take(50).ToArray();
+            var samples = observations.Where(x => x.TaskType == bias.TaskType && x.ActualMinutes > 0 && x.EstimatedMinutes > 0).OrderBy(x => x.ObservedAt).ThenBy(x => x.Id).ToArray();
             record.BiasFactor = bias.Ratio; record.SampleCount = bias.Samples;
-            record.AverageErrorRatio = samples.Average(x => Math.Abs(x.ActualMinutes - x.EstimatedMinutes) / x.EstimatedMinutes); record.UpdatedAt = Now;
+            record.AverageErrorRatio = AdaptiveLearning.Ema(samples.Select(x => Math.Abs(x.ActualMinutes - x.EstimatedMinutes) / x.EstimatedMinutes), 0); record.UpdatedAt = Now;
         }
         var observedTypes = biases.Where(x => x.TaskType != "All").Select(x => x.TaskType).ToArray();
         foreach (var stale in await db.TaskTypeBiases.Where(x => x.UserId == uid && !observedTypes.Contains(x.TaskType)).ToArrayAsync(ct))
@@ -54,7 +54,7 @@ public sealed partial class WorkspaceService
             if (record is null) { record = new() { UserId = uid, WeekStart = group.Key }; db.CapacitySnapshots.Add(record); }
             record.AvailableMinutes = (int)group.Sum(x => (x.End - x.Start).TotalMinutes);
             record.CompletedPlannedMinutes = (int)group.Where(x => x.Status == WorkSessionStatus.Completed).Sum(x => (x.End - x.Start).TotalMinutes);
-            record.CapacityFactor = record.AvailableMinutes > 0 ? Math.Clamp((double)record.CompletedPlannedMinutes / record.AvailableMinutes, .25, 1) : .8;
+            record.CapacityFactor = engine.Capacity(state with { Sessions = group.ToArray() }, Now).Factor;
         }
     }
     private static DateOnly Week(DateOnly day) => day.AddDays(-((int)day.DayOfWeek + 6) % 7);

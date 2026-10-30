@@ -5,14 +5,17 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.31"><PrivateAssets>all</PrivateAssets></PackageReference>
   </ItemGroup>
-  <Target Name="BuildReactFrontend" Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipFrontendBuild)' != 'true'">
+  <Target Name="BuildReactFrontend" Condition="'$(DesignTimeBuild)' != 'true' and '$(BundleLegacyFrontend)' == 'true' and '$(SkipFrontendBuild)' != 'true'">
     <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)/../../scripts/Build-Frontend.ps1&quot; -Install" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
     <Exec Command="npm ci --no-fund &amp;&amp; npm run build" WorkingDirectory="$(MSBuildProjectDirectory)/../../frontend" Condition="!$([MSBuild]::IsOSPlatform('Windows'))" />
   </Target>
-  <Target Name="IncludeReactFrontend" BeforeTargets="AssignTargetPaths" DependsOnTargets="BuildReactFrontend" Condition="'$(DesignTimeBuild)' != 'true'">
+  <Target Name="IncludeReactFrontend" BeforeTargets="AssignTargetPaths" DependsOnTargets="BuildReactFrontend" Condition="'$(DesignTimeBuild)' != 'true' and '$(BundleLegacyFrontend)' == 'true'">
     <ItemGroup>
       <Content Remove="@(Content)" Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(Content.Identity)', '(^|[/\\])wwwroot[/\\](app[/\\]|index\.html$)'))" />
       <Content Include="wwwroot/app/**/*;wwwroot/index.html" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
+  <ItemGroup Condition="'$(BundleLegacyFrontend)' != 'true'">
+    <Content Remove="wwwroot/app/**/*;wwwroot/index.html" />
+  </ItemGroup>
 </Project>

@@ -16,8 +16,9 @@ public sealed partial class PlanningEngine
         {
             BiasView FromHistory(string type, IEnumerable<EstimationObservation> rows)
             {
-                var data = rows.Where(x => x.ActualMinutes > 0 && x.EstimatedMinutes > 0).OrderByDescending(x => x.ObservedAt).Take(50).ToArray();
-                var ratio = data.Length >= MinimumBiasSamples ? Math.Clamp(data.Sum(x => x.ActualMinutes) / data.Sum(x => x.EstimatedMinutes), .5, 3) : 1;
+                var data = rows.Where(x => x.ActualMinutes > 0 && x.EstimatedMinutes > 0).OrderBy(x => x.ObservedAt).ThenBy(x => x.Id).ToArray();
+                var ratio = data.Length >= MinimumBiasSamples ? AdaptiveLearning.Ema(data.Select(x => x.ActualMinutes / x.EstimatedMinutes),
+                    1, AdaptiveLearning.MinimumBias, AdaptiveLearning.MaximumBias) : 1;
                 return new(type, data.Length, Math.Round(ratio, 3), data.Length >= MinimumBiasSamples);
             }
             return new[] { FromHistory("All", history) }.Concat(history.Where(x => x.ActualMinutes > 0 && x.EstimatedMinutes > 0).GroupBy(x => x.TaskType).Select(g => FromHistory(g.Key, g))).ToArray();
@@ -27,7 +28,9 @@ public sealed partial class PlanningEngine
             .Where(x => x.Actual > 0).ToArray();
         BiasView Make(string type, IEnumerable<(WorkTask Task, double Actual)> rows)
         {
-            var data = rows.ToArray(); var ratio = data.Length >= MinimumBiasSamples ? Math.Clamp(data.Sum(x => x.Actual) / data.Sum(x => x.Task.EstimatedMinutes), .5, 3) : 1;
+            var data = rows.OrderBy(x => x.Task.CompletedAt).ThenBy(x => x.Task.Id).ToArray();
+            var ratio = data.Length >= MinimumBiasSamples ? AdaptiveLearning.Ema(data.Select(x => x.Actual / x.Task.EstimatedMinutes),
+                1, AdaptiveLearning.MinimumBias, AdaptiveLearning.MaximumBias) : 1;
             return new(type, data.Length, Math.Round(ratio, 3), data.Length >= MinimumBiasSamples);
         }
         return new[] { Make("All", observations) }.Concat(observations.GroupBy(x => x.Task.TaskType).Select(g => Make(g.Key, g))).ToArray();
@@ -39,12 +42,6 @@ public sealed partial class PlanningEngine
     }
     public int Remaining(WorkTask task, BiasView[] biases) => task.IsDeleted || task.Status is WorkTaskStatus.Completed or WorkTaskStatus.Cancelled ? 0 :
         (int)Math.Ceiling(Adjusted(task, biases) * (1 - task.Progress / 100d));
-    public (double Factor, int Samples) Capacity(PlanningState state, DateTimeOffset now)
-    {
-        var elapsed = state.Sessions.Where(x => x.End < now && x.Status is WorkSessionStatus.Completed or WorkSessionStatus.Skipped or WorkSessionStatus.Missed).ToArray();
-        var total = elapsed.Sum(x => (x.End - x.Start).TotalMinutes);
-        return (elapsed.Length < 5 || total <= 0 ? ColdCapacityFactor : Math.Clamp(elapsed.Where(x => x.Status == WorkSessionStatus.Completed).Sum(x => (x.End - x.Start).TotalMinutes) / total, .25, 1), elapsed.Length);
-    }
     public static TimeZoneInfo Zone(string id) => TimeZoneInfo.FindSystemTimeZoneById(id);
     public static bool InsideWorkWindow(WorkTask task, DateTimeOffset start, DateTimeOffset end) =>
         (task.WorkWindowStart is null || start >= task.WorkWindowStart) && (task.WorkWindowEnd is null || end <= task.WorkWindowEnd);
@@ -179,7 +176,15 @@ public sealed partial class PlanningEngine
                     task.WorkWindowEnd is { } to && to < x.End ? to : x.End)).Where(x => x.End > x.Start);
             if (urgency?.Displaced.TryGetValue(task.Id, out var move) == true)
                 candidates = DisplacedWindows(candidates, move, remaining, task.Splittable, state.Preference.MaximumSessionMinutes, zone);
-            foreach (var slot in candidates)
+            // Compare every feasible window against the explicit multi-objective
+            // penalty, then allocate with the same hard feasibility checks.
+            // Urgent displacement has an explicit proximity/day policy. Optimize
+            // ordinary work without overriding that higher-priority constraint.
+            var orderedCandidates = task.Priority == 4 || urgency?.Displaced.ContainsKey(task.Id) == true
+                ? candidates
+                : candidates.OrderBy(window => ScoreCandidate(task, window, remaining, state.Preference, earliest,
+                    trialBudgets.GetValueOrDefault(Day(window.Start))).PenaltyScore).ThenBy(window => window.Start);
+            foreach (var slot in orderedCandidates)
             {
                 // Preferred windows may be visited before earlier fallback windows.
                 // Reserve breaks on both sides of every tentative session.

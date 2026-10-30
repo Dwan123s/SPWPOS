@@ -95,7 +95,7 @@ public sealed class ReminderDeliveryTests
     }
 
     [Fact]
-    public async Task Email_is_opt_in_and_admin_counts_only_current_work_and_sessions()
+    public async Task Email_is_opt_in_and_admin_omits_personal_work_counts()
     {
         await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync(); await h.LoginAsync();
         await Call(h, async s => { await s.SaveTaskAsync(user.Id, null, new("Report", "", h.Clock.GetUtcNow().AddHours(2), 60), Ct); });
@@ -109,7 +109,9 @@ public sealed class ReminderDeliveryTests
         });
         await using var scope = h.Provider.CreateAsyncScope(); var service = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
         var account = Assert.Single(await service.SearchUsersAsync(ServiceHarness.UserName, Ct));
-        Assert.Equal(user.Id, account.Id); Assert.NotNull(account.LastLoginAt); Assert.Equal(2, account.TotalTasks); Assert.Equal(1, account.CompletedTasks); Assert.Equal(1, account.ActiveLoginSessions);
+        Assert.Equal(user.Id, account.Id); Assert.NotNull(account.LastLoginAt); Assert.Equal(0, account.TotalTasks); Assert.Equal(0, account.CompletedTasks); Assert.Equal(1, account.ActiveLoginSessions);
+        var json = System.Text.Json.JsonSerializer.Serialize(account, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        Assert.DoesNotContain("totalTasks", json); Assert.DoesNotContain("completedTasks", json);
     }
 
     [Fact]

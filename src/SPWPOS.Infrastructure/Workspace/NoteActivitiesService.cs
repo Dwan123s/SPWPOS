@@ -157,7 +157,7 @@ public sealed partial class WorkspaceService
                 (end.Value - activity.Start.Value).TotalMinutes >= activity.EstimatedMinutes && deadline >= end),
                 "NOTE_ACTIVITY_INCOMPLETE", $"Kiểm tra ngày và khung giờ của “{activity.Name}”.");
             var type = NormalizeTaskType(activity.Type);
-            Require(await db.TaskTypes.AnyAsync(x => x.Code == type && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không hợp lệ.");
+            Require(await db.TaskTypes.AnyAsync(x => x.Code == type && x.IsActive, ct), "INVALID_TASK_TYPE", $"Loại công việc của “{activity.Name}” không hợp lệ. Chọn lại loại công việc rồi xem lịch.");
             var input = new TaskInput(activity.Name, activity.Description, deadline, activity.EstimatedMinutes!.Value,
                 activity.Priority, type, activity.Start is null, Math.Max(5, Math.Min(state.Preference.MinimumSessionMinutes, activity.EstimatedMinutes.Value)),
                 IsHardDeadline: activity.IsHardDeadline, CreationSource: "NATURAL_LANGUAGE");

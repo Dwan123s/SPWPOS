@@ -389,6 +389,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<long>("ExperiencePoints")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -410,6 +413,10 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NoraSkin")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
@@ -437,6 +444,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("UserLevel")
+                        .HasColumnType("int");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
@@ -494,6 +504,166 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "Date");
 
                     b.ToTable("AvailabilityExceptions");
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.CalendarEventLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BaseJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ConflictJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Etag")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("GoogleEventId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid>("LocalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("ReadOnly")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RemoteDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("SeriesId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId", "GoogleEventId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "ConnectionId");
+
+                    b.HasIndex("ConnectionId", "Kind", "LocalId")
+                        .IsUnique();
+
+                    b.ToTable("CalendarEventLinks");
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.CalendarOAuthRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("RemindAtStart")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ReminderMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StateHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("StateHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CalendarOAuthRequests");
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.CalendarSyncOutbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid>("LocalId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("CalendarSyncOutbox");
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.CalendarWatchChannel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("UserId", "ConnectionId");
+
+                    b.ToTable("CalendarWatchChannels");
                 });
 
             modelBuilder.Entity("SPWPOS.Domain.Entities.CapacitySnapshot", b =>
@@ -696,6 +866,82 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "Start");
 
                     b.ToTable("FixedEvents");
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.GoogleCalendarConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CalendarId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<int>("FailureCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("GoogleSubject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("LastError")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("NextSyncAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ProtectedRefreshToken")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("RemindAtStart")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ReminderMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("SyncToken")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "NextSyncAt");
+
+                    b.ToTable("GoogleCalendarConnections");
                 });
 
             modelBuilder.Entity("SPWPOS.Domain.Entities.InAppNotification", b =>
@@ -1727,6 +1973,10 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<int>("MinimumSessionMinutes")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("MutationVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("PlanningHorizonDays")
                         .HasColumnType("int");
 
@@ -1742,6 +1992,7 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.Property<Guid>("Revision")
+                        .IsConcurrencyToken()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("TimeZoneId")
@@ -1780,6 +2031,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("End")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<bool>("ExperienceAwarded")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsLocked")
                         .HasColumnType("bit");
 
@@ -1787,6 +2041,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
+
+                    b.Property<Guid?>("RepairSourceSessionId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset?>("SegmentStartedAt")
                         .HasColumnType("datetimeoffset");
@@ -1822,6 +2079,10 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique()
                         .HasFilter("[Status] IN (1, 2)");
+
+                    b.HasIndex("UserId", "RepairSourceSessionId")
+                        .IsUnique()
+                        .HasFilter("[RepairSourceSessionId] IS NOT NULL");
 
                     b.HasIndex("UserId", "SourceItemId");
 
@@ -2039,6 +2300,44 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("SPWPOS.Domain.Entities.CalendarEventLink", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.GoogleCalendarConnection", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "ConnectionId")
+                        .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.CalendarOAuthRequest", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.CalendarSyncOutbox", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.CalendarWatchChannel", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.GoogleCalendarConnection", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "ConnectionId")
+                        .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SPWPOS.Domain.Entities.CapacitySnapshot", b =>
                 {
                     b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
@@ -2096,6 +2395,15 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("SPWPOS.Domain.Entities.FixedEvent", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.GoogleCalendarConnection", b =>
                 {
                     b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
                         .WithMany()
@@ -2440,6 +2748,12 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("SPWPOS.Domain.Entities.WorkSession", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "RepairSourceSessionId")
+                        .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SPWPOS.Domain.Entities.PlanItem", null)
                         .WithMany()

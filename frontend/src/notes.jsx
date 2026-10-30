@@ -6,6 +6,7 @@ import { planModal } from "./calendar.jsx";
 import { Loading } from "./loading.jsx";
 import { getGuide, completeGuideStep } from "./onboarding.js";
 import { NoteStudio } from "./note-studio.jsx";
+import { NoteChecklist } from "./note-checklist.jsx";
 import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import {
   clearNoteAppearance,
@@ -48,6 +49,7 @@ export function NotesPage({ onWorkspaceChanged }) {
   );
   const [notes, setNotes] = useState([]);
   const [note, setNote] = useState(blank);
+  const [workspace, setWorkspace] = useState(state.workspace);
   const [drafts, setDrafts] = useState([]);
   const [stage, setStage] = useState("write");
   const [agent, setAgent] = useState(null);
@@ -77,6 +79,7 @@ export function NotesPage({ onWorkspaceChanged }) {
   const savedNotes = useRef(notes);
   const editSession = useRef(0);
   const saving = useRef(null);
+  const workspaceEpoch = useRef(0);
   currentNote.current = note;
   savedNotes.current = notes;
   const imported =
@@ -143,6 +146,68 @@ export function NotesPage({ onWorkspaceChanged }) {
     };
   }, []);
 
+  const acceptWorkspace = (value) => {
+    if (!alive.current) return;
+    workspaceEpoch.current += 1;
+    state.workspace = value;
+    setWorkspace(value);
+  };
+  const refreshChecklist = async () => {
+    const epoch = workspaceEpoch.current;
+    const latest = await api("/api/workspace");
+    if (epoch === workspaceEpoch.current) acceptWorkspace(latest);
+  };
+  useEffect(() => {
+    let refreshing = false;
+    const sync = () => {
+      if (alive.current) {
+        workspaceEpoch.current += 1;
+        setWorkspace(state.workspace);
+      }
+    };
+    const refresh = async () => {
+      if (
+        refreshing ||
+        document.visibilityState === "hidden" ||
+        !currentNote.current.createdTaskIds?.length
+      )
+        return;
+      refreshing = true;
+      try {
+        await refreshChecklist();
+      } catch {
+        /* Keep the last loaded state; explicit refresh reports errors. */
+      } finally {
+        refreshing = false;
+      }
+    };
+    window.addEventListener("workspace-updated", sync);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("workspace-updated", sync);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
+  const completeNoteTask = async (task, completed) => {
+    const id = currentNote.current.id;
+    const latest = await api(
+      `/api/notes/${id}/tasks/${task.id}/completion`,
+      "PATCH",
+      { version: task.version, completed },
+    );
+    acceptWorkspace(latest);
+    try {
+      await onWorkspaceChanged?.();
+    } catch {
+      toast(
+        "Trạng thái đã lưu. Chưa cập nhật được tổng quan; hãy tải lại khi có kết nối.",
+        "error",
+      );
+    }
+  };
+
   const select = (item) => {
     editSession.current += 1;
     currentNote.current = item;
@@ -152,7 +217,9 @@ export function NotesPage({ onWorkspaceChanged }) {
     setSelectionTarget(null);
     setAppearance(readNoteAppearance(appearanceAccount, item.id));
     setNote(item);
-    setStage(item.analysis ? "review" : "write");
+    const processed =
+      item.analysisImported ?? (!!item.createdTaskIds?.length || !!item.planId);
+    setStage(item.analysis && !processed ? "review" : "write");
     setDrafts(
       (item.analysis?.tasks || []).map((task) => ({ ...task, selected: true })),
     );
@@ -654,7 +721,17 @@ export function NotesPage({ onWorkspaceChanged }) {
         requestSchedule={requestSchedule}
         updateDraft={updateDraft}
         proposalIssue={proposalIssue}
-        workspace={state.workspace}
+        workspace={workspace}
+        checklist={
+          <NoteChecklist
+            key={note.id || "new"}
+            note={note}
+            workspace={workspace}
+            busy={busy}
+            onComplete={completeNoteTask}
+            onRefresh={refreshChecklist}
+          />
+        }
         stage={stage}
         setStage={setStage}
         navigationPrompt={

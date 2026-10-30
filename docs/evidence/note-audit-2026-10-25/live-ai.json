@@ -1,0 +1,174 @@
+{
+  "time": "2026-10-25T07:26:25.5710501+00:00",
+  "provider": "VertexAI",
+  "aiAvailable": true,
+  "referenceTime": "2026-10-25T07:26:16.9407673+00:00",
+  "tomorrow": "2026-10-26",
+  "zone": "Asia/Ho_Chi_Minh",
+  "fictionalInputsOnly": true,
+  "databaseWrites": false,
+  "cases": [
+    {
+      "id": "L01",
+      "status": "PASS",
+      "expectation": "Exactly 3 tasks, 60/45/30 minutes, tomorrow 22:00 in Asia/Ho_Chi_Minh.",
+      "milliseconds": 2542,
+      "source": "VertexAI",
+      "needsReview": false,
+      "activities": [
+        {
+          "kind": "TASK",
+          "name": "Vi\u1EBFt b\u00E1o c\u00E1o tu\u1EA7n",
+          "description": "Vi\u1EBFt b\u00E1o c\u00E1o tu\u1EA7n, c\u1EA7n 60 ph\u00FAt, h\u1EA1n ch\u00F3t 22:00 ng\u00E0y mai.",
+          "type": "WRITING",
+          "start": null,
+          "end": null,
+          "estimatedMinutes": 60,
+          "deadline": "2026-10-26T22:00:00+07:00",
+          "priority": 2,
+          "isHardDeadline": false,
+          "repeatWeeks": 1,
+          "question": ""
+        },
+        {
+          "kind": "TASK",
+          "name": "Chu\u1EA9n b\u1ECB slide thuy\u1EBFt tr\u00ECnh",
+          "description": "Chu\u1EA9n b\u1ECB slide thuy\u1EBFt tr\u00ECnh, c\u1EA7n 45 ph\u00FAt, h\u1EA1n ch\u00F3t 22:00 ng\u00E0y mai.",
+          "type": "WORK",
+          "start": null,
+          "end": null,
+          "estimatedMinutes": 45,
+          "deadline": "2026-10-26T22:00:00+07:00",
+          "priority": 2,
+          "isHardDeadline": false,
+          "repeatWeeks": 1,
+          "question": ""
+        },
+        {
+          "kind": "TASK",
+          "name": "\u0110\u1ECDc t\u00E0i li\u1EC7u d\u1EF1 \u00E1n",
+          "description": "\u0110\u1ECDc t\u00E0i li\u1EC7u d\u1EF1 \u00E1n, c\u1EA7n 30 ph\u00FAt, h\u1EA1n ch\u00F3t 22:00 ng\u00E0y mai.",
+          "type": "STUDY",
+          "start": null,
+          "end": null,
+          "estimatedMinutes": 30,
+          "deadline": "2026-10-26T22:00:00+07:00",
+          "priority": 2,
+          "isHardDeadline": false,
+          "repeatWeeks": 1,
+          "question": ""
+        }
+      ]
+    },
+    {
+      "id": "L02",
+      "status": "PASS",
+      "expectation": "Keep one incomplete activity; do not invent a duration or deadline.",
+      "milliseconds": 1495,
+      "source": "VertexAI",
+      "needsReview": true,
+      "activities": [
+        {
+          "kind": "TASK",
+          "name": "G\u1ECDi \u0111i\u1EC7n cho m\u1EB9",
+          "description": "G\u1ECDi \u0111i\u1EC7n cho m\u1EB9.",
+          "type": "OTHER",
+          "start": null,
+          "end": null,
+          "estimatedMinutes": null,
+          "deadline": null,
+          "priority": 2,
+          "isHardDeadline": false,
+          "repeatWeeks": 1,
+          "question": "What is the deadline and estimated duration for this task?"
+        }
+      ]
+    },
+    {
+      "id": "L03",
+      "status": "PASS",
+      "expectation": "One meeting tomorrow 15:00-16:00 and one 45-minute task due tomorrow 20:00.",
+      "milliseconds": 1640,
+      "source": "VertexAI",
+      "needsReview": false,
+      "activities": [
+        {
+          "kind": "EVENT",
+          "name": "Cu\u1ED9c h\u1ECDp",
+          "description": "Cu\u1ED9c h\u1ECDp t\u1EEB 15:00 \u0111\u1EBFn 16:00 ng\u00E0y mai.",
+          "type": "MEETING",
+          "start": "2026-10-26T15:00:00+07:00",
+          "end": "2026-10-26T16:00:00+07:00",
+          "estimatedMinutes": null,
+          "deadline": null,
+          "priority": 2,
+          "isHardDeadline": false,
+          "repeatWeeks": 1,
+          "question": ""
+        },
+        {
+          "kind": "TASK",
+          "name": "Vi\u1EBFt b\u00E1o c\u00E1o",
+          "description": "Vi\u1EBFt b\u00E1o c\u00E1o 45 ph\u00FAt, h\u1EA1n ch\u00F3t 20:00 ng\u00E0y mai.",
+          "type": "WRITING",
+          "start": null,
+          "end": null,
+          "estimatedMinutes": 45,
+          "deadline": "2026-10-26T20:00:00+07:00",
+          "priority": 2,
+          "isHardDeadline": false,
+          "repeatWeeks": 1,
+          "question": ""
+        }
+      ]
+    },
+    {
+      "id": "L04",
+      "status": "PASS",
+      "expectation": "Incremental edit returns only the one new 20-minute task.",
+      "milliseconds": 1434,
+      "source": "VertexAI",
+      "needsReview": false,
+      "activities": [
+        {
+          "kind": "TASK",
+          "name": "R\u00E0 so\u00E1t s\u1ED1 li\u1EC7u trong b\u00E1o c\u00E1o",
+          "description": "R\u00E0 so\u00E1t s\u1ED1 li\u1EC7u trong b\u00E1o c\u00E1o, c\u1EA7n 20 ph\u00FAt, h\u1EA1n ch\u00F3t 23:00 ng\u00E0y mai.",
+          "type": "WORK",
+          "start": null,
+          "end": null,
+          "estimatedMinutes": 20,
+          "deadline": "2026-10-26T23:00:00+07:00",
+          "priority": 2,
+          "isHardDeadline": false,
+          "repeatWeeks": 1,
+          "question": ""
+        }
+      ]
+    },
+    {
+      "id": "L05",
+      "status": "PASS",
+      "expectation": "Raw Telex preserves a 30-minute task due tomorrow 22:00.",
+      "milliseconds": 1501,
+      "source": "VertexAI",
+      "needsReview": false,
+      "activities": [
+        {
+          "kind": "TASK",
+          "name": "\u0110\u1ECDc t\u00E0i li\u1EC7u d\u1EF1 \u00E1n",
+          "description": "\u0110\u1ECDc t\u00E0i li\u1EC7u d\u1EF1 \u00E1n trong 30 ph\u00FAt",
+          "type": "STUDY",
+          "start": null,
+          "end": null,
+          "estimatedMinutes": 30,
+          "deadline": "2026-10-26T22:00:00+07:00",
+          "priority": 2,
+          "isHardDeadline": false,
+          "repeatWeeks": 1,
+          "question": ""
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "time": "2026-10-25T07:23:22.8152433+00:00",
+  "probes": [
+    {
+      "id": "B01",
+      "title": "Same task name on a later date is silently removed",
+      "classification": "GAP",
+      "details": {
+        "aiReturned": 1,
+        "newActivities": 0,
+        "persistedTasks": 1,
+        "nextDeadlineDays": 3
+      }
+    },
+    {
+      "id": "B02",
+      "title": "Two occurrences with the same name in one analysis collapse to one",
+      "classification": "GAP",
+      "details": {
+        "providerActivities": 2,
+        "reviewedActivities": 1
+      }
+    },
+    {
+      "id": "B03",
+      "title": "Unselected activity is no longer suggested for unchanged content",
+      "classification": "GAP",
+      "details": {
+        "skipped": "Chu\u1EA9n b\u1ECB slide",
+        "persistedTasks": 1,
+        "suggestionsAfterRetry": 0,
+        "providerCalledAgain": false
+      }
+    },
+    {
+      "id": "B04",
+      "title": "Reanalyzing imported unscheduled tasks clears their continuation state",
+      "classification": "GAP",
+      "details": {
+        "pendingBefore": 1,
+        "pendingAfter": 0,
+        "code": "NOTE_NO_NEW_ACTIVITIES",
+        "persistedTasks": 1,
+        "sessions": 0
+      }
+    },
+    {
+      "id": "B05",
+      "title": "Renaming a selected subset lets the original source name reappear",
+      "classification": "GAP",
+      "details": {
+        "savedAs": "T\u00EAn \u0111\u00E3 ch\u1EC9nh trong b\u01B0\u1EDBc ki\u1EC3m tra",
+        "sourceOfferedAgain": "\u0110\u1ECDc t\u00E0i li\u1EC7u",
+        "suggestions": [
+          "\u0110\u1ECDc t\u00E0i li\u1EC7u",
+          "Chu\u1EA9n b\u1ECB slide",
+          "R\u00E0 so\u00E1t s\u1ED1 li\u1EC7u"
+        ]
+      }
+    },
+    {
+      "id": "B06",
+      "title": "A title-only checklist task cannot be created without scheduling metadata",
+      "classification": "DESIGN_GAP",
+      "details": {
+        "code": "NOTE_ACTIVITY_INCOMPLETE",
+        "tasks": 0
+      }
+    },
+    {
+      "id": "B07",
+      "title": "One task without capacity blocks all valid tasks and events in the batch",
+      "classification": "DESIGN_GAP",
+      "details": {
+        "code": "NOTE_PLAN_INCOMPLETE",
+        "tasks": 0,
+        "events": 0,
+        "warnings": [
+          "INSUFFICIENT_CAPACITY"
+        ]
+      }
+    },
+    {
+      "id": "B08",
+      "title": "A note can be deleted through the legacy API without a version",
+      "classification": "API_RISK",
+      "details": {
+        "versionOmitted": true,
+        "deleted": true
+      }
+    },
+    {
+      "id": "B09",
+      "title": "Other accounts cannot analyze, edit, delete, preview or tick this note",
+      "classification": "PASS",
+      "details": {
+        "operations": 6,
+        "codes": [
+          "NOT_FOUND",
+          "NOT_FOUND",
+          "NOT_FOUND",
+          "NOT_FOUND",
+          "NOT_FOUND"
+        ],
+        "ownerNoteCount": 1
+      }
+    },
+    {
+      "id": "B10",
+      "title": "Modern mixed activity analysis cannot use the legacy create-tasks-only endpoint",
+      "classification": "DESIGN_GAP",
+      "details": {
+        "code": "NOTE_NEEDS_REVIEW",
+        "tasks": 0
+      }
+    },
+    {
+      "id": "B11",
+      "title": "Concurrent SQL Server note saves have one winner and one NOTE_STALE",
+      "classification": "PASS",
+      "details": {
+        "statuses": [
+          200,
+          409
+        ],
+        "conflict": "NOTE_STALE",
+        "database": "isolated SPWPOS_Tests_\u003CGUID\u003E"
+      }
+    }
+  ]
+}

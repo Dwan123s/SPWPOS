@@ -75,7 +75,8 @@ public sealed record ScenarioView(IntelligenceView Before, IntelligenceView Afte
 public sealed record NotificationView(Guid Id, string Kind, string Title, string Message, Guid? TaskId, DateTimeOffset CreatedAt, bool IsRead);
 public sealed record WorkspaceView(ProfileView Profile, PreferenceView Preference, CategoryView[] Categories,
     TaskView[] Tasks, AvailabilityInput[] Availability, ExceptionView[] Exceptions, EventView[] Events,
-    SessionView[] Sessions, NotificationView[] Notifications, NotificationSettingInput NotificationSettings, string[]? Features = null);
+    SessionView[] Sessions, NotificationView[] Notifications, NotificationSettingInput NotificationSettings, string[]? Features = null,
+    GamificationProfile? Gamification = null);
 public sealed record NotificationSettingInput(bool InAppEnabled = true, [Range(1, 168)] int DeadlineLeadHours = 24,
     [Range(1, 120)] int SessionReminderLeadMinutes = 10, [RegularExpression("^(MODERATE|HIGH|OVERLOAD)$")] string WorkloadWarningLevel = "HIGH", bool EmailEnabled = false);
 public sealed record PlanItemView(Guid Id, Guid TaskId, Guid? PreviousSessionId, string Action, DateTimeOffset? Start, DateTimeOffset? End, int? PlannedMinutes, string[] ReasonCodes);
@@ -88,11 +89,20 @@ public sealed record TaskSuggestion(TaskInput Task, string Source, string[] Note
 public sealed record CaptureInput([Required, StringLength(2000)] string Text, bool UseAi = false);
 public sealed record BreakdownView(TaskInput[] Subtasks, string Source);
 public sealed record AdminUserView(Guid Id, string Email, string FirstName, string LastName, bool IsActive, bool EmailConfirmed, DateTimeOffset? LastLoginAt,
-    string? UserName = null, DateTimeOffset? CreatedAt = null, int TotalTasks = 0, int CompletedTasks = 0, int ActiveLoginSessions = 0);
+    string? UserName = null, DateTimeOffset? CreatedAt = null,
+    [property: System.Text.Json.Serialization.JsonIgnore] int TotalTasks = 0,
+    [property: System.Text.Json.Serialization.JsonIgnore] int CompletedTasks = 0, int ActiveLoginSessions = 0);
 public sealed record SystemStatusView(bool DatabaseHealthy, int Users, int Tasks, int ActiveSessions, int FailedLoginsLast24Hours, DateTimeOffset ServerTime, DateTimeOffset? LastNotificationRun, long FailedNotificationRuns);
 
 public interface IWorkspaceService
 {
+    Task<GamificationProfile> GetGamificationAsync(Guid userId, CancellationToken ct);
+    Task SelectSkinAsync(Guid userId, SkinInput input, CancellationToken ct);
+    Task<SessionView[]> GetCatchUpAsync(Guid userId, CancellationToken ct);
+    Task<CatchUpResult> CatchUpAsync(Guid userId, Guid sessionId, CatchUpInput input, CancellationToken ct);
+    Task<string> ExportCalendarAsync(Guid userId, CancellationToken ct);
+    Task<AdminMetrics> GetAdminMetricsAsync(CancellationToken ct);
+    Task<AdminHealth> GetAdminHealthAsync(CancellationToken ct);
     Task<RecoveryPage> GetRecoveryAsync(Guid userId, int page, CancellationToken ct);
     Task SetRecoverySettingsAsync(Guid userId, RecoverySettingInput input, CancellationToken ct);
     Task ScanRecoveryAsync(Guid userId, CancellationToken ct);
@@ -105,6 +115,7 @@ public interface IWorkspaceService
     Task<PlanView> PreviewNoteActivitiesAsync(Guid userId, Guid noteId, NoteActivityPlanInput input, CancellationToken ct);
     Task<NoteScheduleResult> ApplyNoteActivitiesAsync(Guid userId, Guid noteId, Guid planId, NoteApplyInput input, CancellationToken ct);
     Task<NoteView[]> GetNotesAsync(Guid userId, CancellationToken ct);
+    Task<WorkspaceView> SetNoteTaskCompletionAsync(Guid userId, Guid noteId, Guid taskId, NoteTaskCompletionInput input, CancellationToken ct);
     Task<NoteView> SaveNoteAsync(Guid userId, Guid? id, NoteInput input, CancellationToken ct);
     Task DeleteNoteAsync(Guid userId, Guid id, Guid version, CancellationToken ct);
     Task<NoteView> AnalyzeNoteAsync(Guid userId, Guid id, NoteAnalysisInput input, CancellationToken ct);
@@ -140,6 +151,7 @@ public interface IWorkspaceService
     Task<PlanItemView[]> GetPlanItemsAsync(Guid userId, Guid id, CancellationToken ct);
     Task DiscardPlanAsync(Guid userId, Guid id, CancellationToken ct);
     Task<ExecutionView?> GetExecutionAsync(Guid userId, Guid sessionId, CancellationToken ct);
+    Task<NotificationView[]> GetNotificationsAsync(Guid userId, CancellationToken ct);
     Task EnsureNotificationsAsync(Guid userId, CancellationToken ct);
     Task<TaskSuggestion> CaptureAsync(Guid userId, CaptureInput input, CancellationToken ct);
     Task<BreakdownView> BreakdownAsync(Guid userId, Guid taskId, bool useAi, CancellationToken ct);

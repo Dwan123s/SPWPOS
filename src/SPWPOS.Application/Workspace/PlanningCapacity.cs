@@ -3,6 +3,20 @@ namespace SPWPOS.Application.Workspace;
 
 public sealed partial class PlanningEngine
 {
+    // EMA of chronological local-day completion rates. Scheduled/NeedsReview
+    // sessions are not failures until the user confirms their actual outcome.
+    // Alpha=.2, the five-session cold start and clamps are product policies.
+    public (double Factor, int Samples) Capacity(PlanningState state, DateTimeOffset now)
+    {
+        var elapsed = state.Sessions.Where(x => x.End < now && x.End > x.Start &&
+            x.Status is WorkSessionStatus.Completed or WorkSessionStatus.Skipped or WorkSessionStatus.Missed).ToArray();
+        var zone = Zone(state.Preference.TimeZoneId);
+        var dailyRates = elapsed.GroupBy(x => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(x.Start, zone).DateTime)).OrderBy(x => x.Key)
+            .Select(day => day.Where(x => x.Status == WorkSessionStatus.Completed).Sum(x => (x.End - x.Start).TotalMinutes) /
+                day.Sum(x => (x.End - x.Start).TotalMinutes));
+        return (elapsed.Length < 5 ? ColdCapacityFactor : Math.Clamp(AdaptiveLearning.Ema(dailyRates, ColdCapacityFactor), .25, 1), elapsed.Length);
+    }
+
     // A daily work budget is calculated from the complete local day. Clipping the
     // requested range must not apply the capacity factor to the remainder again.
     // Consumed minutes are planned occupancy already completed/started, not a

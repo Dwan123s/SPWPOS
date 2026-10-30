@@ -83,7 +83,11 @@ public sealed class PlanningTests
     [Fact] public void Capacity_uses_completed_planned_work_not_actual_overruns()
     {
         var sessions = Enumerable.Range(0, 8).Select(i => new WorkSession { Start = Now.AddHours(-i - 2), End = Now.AddHours(-i - 1), Status = i < 6 ? WorkSessionStatus.Completed : WorkSessionStatus.Skipped, ActualSeconds = 120 * 60 }).ToArray();
-        Assert.Equal(.75, engine.Capacity(State() with { Sessions = sessions }, Now).Factor);
+        // Two skipped sessions on the older local day, then six completions:
+        // daily EMA = .2 * 1 + .8 * 0, limited by the safety floor .25.
+        Assert.Equal(.25, engine.Capacity(State() with { Sessions = sessions }, Now).Factor);
+        foreach (var session in sessions) session.ActualSeconds = 60;
+        Assert.Equal(.25, engine.Capacity(State() with { Sessions = sessions }, Now).Factor);
     }
     [Fact] public void Unavailable_exception_overrides_weekly_and_extra_availability()
     {

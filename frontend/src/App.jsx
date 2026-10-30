@@ -19,6 +19,7 @@ import { setupShell } from "./shell.jsx";
 import { Loading } from "./loading.jsx";
 import { revealModal } from "./workspace-motion.jsx";
 import { prefetchPage } from "./route-pages.jsx";
+import { NotificationPopups } from "./notification-popups.jsx";
 function prefetchNavigation(event) {
   const link = event.target.closest?.('[data-action="nav"][data-id]');
   if (link) prefetchPage(link.dataset.id);
@@ -67,6 +68,7 @@ export function App({ initialize = true }) {
       >
         {snapshot.screen || <Loading fullscreen />}
       </Fragment>
+      <NotificationPopups />
       <div id="toasts" aria-live="polite">
         {snapshot.toasts.map((toast) => (
           <div key={toast.id} className={`toast ${toast.type}`}>

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,21 @@ public static class DependencyInjection
         services.Replace(ServiceDescriptor.Scoped<IPasswordHasher<ApplicationUser>, Argon2PasswordHasher>());
         services.AddScoped<IPasswordValidator<ApplicationUser>, PasswordPolicyValidator>();
         services.AddSingleton(TimeProvider.System);
+        services.AddOptions<SPWPOS.Infrastructure.Calendar.GoogleCalendarOptions>().BindConfiguration("GoogleCalendar")
+            .Validate(x => x.Valid, "GoogleCalendar requires ClientId, ClientSecret, HTTPS RedirectUri, durable KeyRingPath and PollSeconds >= 30.").ValidateOnStart();
+        var calendarOptions = configuration.GetSection("GoogleCalendar").Get<SPWPOS.Infrastructure.Calendar.GoogleCalendarOptions>() ?? new();
+        var calendarProtection = services.AddDataProtection().SetApplicationName("PLANORA");
+        if (!string.IsNullOrWhiteSpace(calendarOptions.KeyRingPath))
+        {
+            calendarProtection.PersistKeysToFileSystem(new DirectoryInfo(calendarOptions.KeyRingPath));
+            if (OperatingSystem.IsWindows()) calendarProtection.ProtectKeysWithDpapi();
+        }
+        services.AddHttpClient<SPWPOS.Application.Calendar.IGoogleCalendarGateway, SPWPOS.Infrastructure.Calendar.GoogleCalendarGateway>(client =>
+            { client.Timeout = TimeSpan.FromSeconds(25); client.MaxResponseContentBufferSize = 4 * 1024 * 1024; })
+            .RemoveAllLoggers().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddScoped<SPWPOS.Infrastructure.Calendar.GoogleCalendarService>();
+        services.AddScoped<SPWPOS.Application.Calendar.IGoogleCalendarService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Calendar.GoogleCalendarService>());
+        services.AddHostedService<SPWPOS.Infrastructure.Calendar.GoogleCalendarWorker>();
         services.AddScoped<SPWPOS.Infrastructure.Workspace.AiUsageCollector>();
         services.AddScoped<SPWPOS.Application.Workspace.IAiUsageService, SPWPOS.Infrastructure.Workspace.AiUsageService>();
         services.AddSingleton<PasswordTiming>();

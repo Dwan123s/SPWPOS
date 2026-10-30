@@ -1,0 +1,124 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="2ad1fd27-8d9b-440c-bbe2-3a5d505f97c3" name="Lenovo@DWAN 2026-10-25 14:16:37" runUser="DWAN\Lenovo" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-25T14:16:37.5373321+07:00" queuing="2026-10-25T14:16:37.5373326+07:00" start="2026-10-25T14:16:29.7330851+07:00" finish="2026-10-25T14:16:44.2383886+07:00" />
+  <TestSettings name="default" id="d5332722-a060-43c1-ae2c-1749ee4d2cf0">
+    <Deployment runDeploymentRoot="Lenovo_DWAN_2026-10-25_14_16_37" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="87860e26-2747-4ead-aa40-c424a9244cfb" testId="cc7c1cd9-46f9-4f25-d051-9a0c1d391613" testName="SPWPOS.IntegrationTests.NotesApiTests.Note_checkbox_completion_updates_the_real_task_and_calendar_without_changing_a_draft" computerName="DWAN" duration="00:00:00.9728240" startTime="2026-10-25T14:16:37.5166262+07:00" endTime="2026-10-25T14:16:38.4895268+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="87860e26-2747-4ead-aa40-c424a9244cfb" />
+    <UnitTestResult executionId="e52d9a60-d9dd-4118-9445-012be583a6c2" testId="adc49f25-e568-a94f-129c-c491c22b3a47" testName="SPWPOS.IntegrationTests.NotesApiTests.Note_endpoints_support_automatic_schedule_and_idempotent_retry" computerName="DWAN" duration="00:00:00.5492299" startTime="2026-10-25T14:16:38.8945176+07:00" endTime="2026-10-25T14:16:39.4437998+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e52d9a60-d9dd-4118-9445-012be583a6c2" />
+    <UnitTestResult executionId="b0cc652e-5c15-49ac-9159-dbc635e36fb3" testId="8a39452d-ff6a-6411-625b-b0b4348c0fae" testName="SPWPOS.IntegrationTests.TaskVersionTests.Concurrent_updates_with_the_same_version_have_exactly_one_winner" computerName="DWAN" duration="00:00:05.8856200" startTime="2026-10-25T14:16:37.5181230+07:00" endTime="2026-10-25T14:16:43.4039279+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b0cc652e-5c15-49ac-9159-dbc635e36fb3" />
+    <UnitTestResult executionId="00364461-b4cc-43e4-81f0-ab4b0b1a171c" testId="893613b5-b09a-5686-eee3-ce4646c189f2" testName="SPWPOS.IntegrationTests.TaskVersionTests.A_status_change_invalidates_an_open_edit_even_when_the_clock_has_not_advanced" computerName="DWAN" duration="00:00:00.3445487" startTime="2026-10-25T14:16:43.4045376+07:00" endTime="2026-10-25T14:16:43.7491686+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="00364461-b4cc-43e4-81f0-ab4b0b1a171c" />
+    <UnitTestResult executionId="fcad127b-eee8-45da-9e06-4e753ed4026c" testId="23ea7b43-02b6-e6f2-bc6d-1dffea82a06c" testName="SPWPOS.IntegrationTests.NoteImpactTests.Every_additional_task_is_validated_before_simulation(invalid: &quot;limit&quot;)" computerName="DWAN" duration="00:00:00.3760775" startTime="2026-10-25T14:16:38.4189944+07:00" endTime="2026-10-25T14:16:38.7951384+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fcad127b-eee8-45da-9e06-4e753ed4026c" />
+    <UnitTestResult executionId="238c7919-f610-4edc-9071-3719a89164c2" testId="53af4911-037d-6915-d149-3cbdfb364e30" testName="SPWPOS.IntegrationTests.NotesApiTests.Missing_ai_returns_503_instead_of_creating_work_with_rules" computerName="DWAN" duration="00:00:04.6489117" startTime="2026-10-25T14:16:32.8470886+07:00" endTime="2026-10-25T14:16:37.5079402+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="238c7919-f610-4edc-9071-3719a89164c2" />
+    <UnitTestResult executionId="906fb787-86f9-4cdb-bb04-1d75e719d5d4" testId="4ef5a443-4a23-b7b5-ee8d-05f444d7be33" testName="SPWPOS.IntegrationTests.TaskVersionTests.Two_tabs_cannot_overwrite_each_other_and_can_retry_after_loading_the_new_version" computerName="DWAN" duration="00:00:00.3668995" startTime="2026-10-25T14:16:43.7501456+07:00" endTime="2026-10-25T14:16:44.1171019+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="906fb787-86f9-4cdb-bb04-1d75e719d5d4" />
+    <UnitTestResult executionId="e89c405f-e49b-40d7-9525-11a9f1efa75f" testId="cf0ab1d8-7ffd-3597-3855-023108bc3cf3" testName="SPWPOS.IntegrationTests.NoteImpactTests.Every_additional_task_is_validated_before_simulation(invalid: &quot;duration&quot;)" computerName="DWAN" duration="00:00:00.4036564" startTime="2026-10-25T14:16:38.0145783+07:00" endTime="2026-10-25T14:16:38.4183399+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e89c405f-e49b-40d7-9525-11a9f1efa75f" />
+    <UnitTestResult executionId="40aaf734-e560-433e-9939-d14fab03766f" testId="a5091ad1-b856-8811-a01e-805aecf1f453" testName="SPWPOS.IntegrationTests.NotesApiTests.Notes_require_authentication_and_validate_content" computerName="DWAN" duration="00:00:00.4027455" startTime="2026-10-25T14:16:38.4906683+07:00" endTime="2026-10-25T14:16:38.8934797+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="40aaf734-e560-433e-9939-d14fab03766f" />
+    <UnitTestResult executionId="a759958a-1e05-40df-9b32-2e49207f7e1c" testId="bb0fa2c2-80e3-6247-2e4e-b37051a85a57" testName="SPWPOS.IntegrationTests.NotesApiTests.Mixed_notes_preview_and_confirmation_preserve_events_and_task_times_over_http" computerName="DWAN" duration="00:00:00.5197271" startTime="2026-10-25T14:16:39.8108986+07:00" endTime="2026-10-25T14:16:40.3306850+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a759958a-1e05-40df-9b32-2e49207f7e1c" />
+    <UnitTestResult executionId="61eace91-bb00-421b-a866-6a5cd5c10bbe" testId="546ac5c2-45b0-c425-8581-182a4e18f5f6" testName="SPWPOS.IntegrationTests.TaskVersionTests.Updates_require_a_nonempty_version_but_creates_do_not" computerName="DWAN" duration="00:00:04.6488702" startTime="2026-10-25T14:16:32.8471015+07:00" endTime="2026-10-25T14:16:37.5079142+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="61eace91-bb00-421b-a866-6a5cd5c10bbe" />
+    <UnitTestResult executionId="03a111e3-27f9-4f0b-af68-f678bb64a7b5" testId="50a6f0be-f865-dde1-ef1b-1aa056fe3511" testName="SPWPOS.IntegrationTests.NoteImpactTests.Every_additional_task_is_validated_before_simulation(invalid: &quot;category&quot;)" computerName="DWAN" duration="00:00:00.4179344" startTime="2026-10-25T14:16:38.7956965+07:00" endTime="2026-10-25T14:16:39.2136926+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="03a111e3-27f9-4f0b-af68-f678bb64a7b5" />
+    <UnitTestResult executionId="edd2c29b-b36d-484e-8613-9ead13853844" testId="ddfcc4c4-7702-1306-f294-a21ada45435a" testName="SPWPOS.IntegrationTests.NoteImpactTests.Selected_tasks_are_checked_together_and_overload_is_not_persisted" computerName="DWAN" duration="00:00:04.6488988" startTime="2026-10-25T14:16:32.8471125+07:00" endTime="2026-10-25T14:16:37.5079078+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="edd2c29b-b36d-484e-8613-9ead13853844" />
+    <UnitTestResult executionId="d2640f5c-2e23-4ac1-a538-6c6d2ba9c666" testId="f8b6fe9f-0cfa-99d2-a994-9d74b2bee36d" testName="SPWPOS.IntegrationTests.NoteImpactTests.Note_impact_preserves_existing_sessions_and_checks_only_new_work_for_scheduling" computerName="DWAN" duration="00:00:00.5065737" startTime="2026-10-25T14:16:39.2143610+07:00" endTime="2026-10-25T14:16:39.7209876+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d2640f5c-2e23-4ac1-a538-6c6d2ba9c666" />
+    <UnitTestResult executionId="9873859c-6896-408f-a378-81ae44f5dd17" testId="e8557655-9e84-8eaf-e678-4c90536ea295" testName="SPWPOS.IntegrationTests.NotesApiTests.Note_can_be_deleted_via_api" computerName="DWAN" duration="00:00:00.3648744" startTime="2026-10-25T14:16:39.4452275+07:00" endTime="2026-10-25T14:16:39.8102204+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9873859c-6896-408f-a378-81ae44f5dd17" />
+    <UnitTestResult executionId="92889542-02f3-4f67-b2a3-551d6f44b62d" testId="9287c03d-e0f7-f7d0-9e50-224e5312e2c2" testName="SPWPOS.IntegrationTests.NoteImpactTests.Every_additional_task_is_validated_before_simulation(invalid: &quot;parent&quot;)" computerName="DWAN" duration="00:00:00.4962613" startTime="2026-10-25T14:16:37.5170752+07:00" endTime="2026-10-25T14:16:38.0134549+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="92889542-02f3-4f67-b2a3-551d6f44b62d" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="SPWPOS.IntegrationTests.TaskVersionTests.Two_tabs_cannot_overwrite_each_other_and_can_retry_after_loading_the_new_version" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="4ef5a443-4a23-b7b5-ee8d-05f444d7be33">
+      <Execution id="906fb787-86f9-4cdb-bb04-1d75e719d5d4" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.TaskVersionTests" name="Two_tabs_cannot_overwrite_each_other_and_can_retry_after_loading_the_new_version" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NotesApiTests.Note_checkbox_completion_updates_the_real_task_and_calendar_without_changing_a_draft" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="cc7c1cd9-46f9-4f25-d051-9a0c1d391613">
+      <Execution id="87860e26-2747-4ead-aa40-c424a9244cfb" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NotesApiTests" name="Note_checkbox_completion_updates_the_real_task_and_calendar_without_changing_a_draft" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NotesApiTests.Mixed_notes_preview_and_confirmation_preserve_events_and_task_times_over_http" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="bb0fa2c2-80e3-6247-2e4e-b37051a85a57">
+      <Execution id="a759958a-1e05-40df-9b32-2e49207f7e1c" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NotesApiTests" name="Mixed_notes_preview_and_confirmation_preserve_events_and_task_times_over_http" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.TaskVersionTests.A_status_change_invalidates_an_open_edit_even_when_the_clock_has_not_advanced" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="893613b5-b09a-5686-eee3-ce4646c189f2">
+      <Execution id="00364461-b4cc-43e4-81f0-ab4b0b1a171c" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.TaskVersionTests" name="A_status_change_invalidates_an_open_edit_even_when_the_clock_has_not_advanced" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NotesApiTests.Notes_require_authentication_and_validate_content" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="a5091ad1-b856-8811-a01e-805aecf1f453">
+      <Execution id="40aaf734-e560-433e-9939-d14fab03766f" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NotesApiTests" name="Notes_require_authentication_and_validate_content" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NotesApiTests.Note_can_be_deleted_via_api" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="e8557655-9e84-8eaf-e678-4c90536ea295">
+      <Execution id="9873859c-6896-408f-a378-81ae44f5dd17" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NotesApiTests" name="Note_can_be_deleted_via_api" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NotesApiTests.Missing_ai_returns_503_instead_of_creating_work_with_rules" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="53af4911-037d-6915-d149-3cbdfb364e30">
+      <Execution id="238c7919-f610-4edc-9071-3719a89164c2" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NotesApiTests" name="Missing_ai_returns_503_instead_of_creating_work_with_rules" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NoteImpactTests.Note_impact_preserves_existing_sessions_and_checks_only_new_work_for_scheduling" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="f8b6fe9f-0cfa-99d2-a994-9d74b2bee36d">
+      <Execution id="d2640f5c-2e23-4ac1-a538-6c6d2ba9c666" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NoteImpactTests" name="Note_impact_preserves_existing_sessions_and_checks_only_new_work_for_scheduling" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NoteImpactTests.Every_additional_task_is_validated_before_simulation(invalid: &quot;limit&quot;)" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="23ea7b43-02b6-e6f2-bc6d-1dffea82a06c">
+      <Execution id="fcad127b-eee8-45da-9e06-4e753ed4026c" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NoteImpactTests" name="Every_additional_task_is_validated_before_simulation" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NoteImpactTests.Every_additional_task_is_validated_before_simulation(invalid: &quot;duration&quot;)" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="cf0ab1d8-7ffd-3597-3855-023108bc3cf3">
+      <Execution id="e89c405f-e49b-40d7-9525-11a9f1efa75f" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NoteImpactTests" name="Every_additional_task_is_validated_before_simulation" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.TaskVersionTests.Updates_require_a_nonempty_version_but_creates_do_not" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="546ac5c2-45b0-c425-8581-182a4e18f5f6">
+      <Execution id="61eace91-bb00-421b-a866-6a5cd5c10bbe" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.TaskVersionTests" name="Updates_require_a_nonempty_version_but_creates_do_not" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NoteImpactTests.Selected_tasks_are_checked_together_and_overload_is_not_persisted" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="ddfcc4c4-7702-1306-f294-a21ada45435a">
+      <Execution id="edd2c29b-b36d-484e-8613-9ead13853844" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NoteImpactTests" name="Selected_tasks_are_checked_together_and_overload_is_not_persisted" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NoteImpactTests.Every_additional_task_is_validated_before_simulation(invalid: &quot;parent&quot;)" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="9287c03d-e0f7-f7d0-9e50-224e5312e2c2">
+      <Execution id="92889542-02f3-4f67-b2a3-551d6f44b62d" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NoteImpactTests" name="Every_additional_task_is_validated_before_simulation" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NoteImpactTests.Every_additional_task_is_validated_before_simulation(invalid: &quot;category&quot;)" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="50a6f0be-f865-dde1-ef1b-1aa056fe3511">
+      <Execution id="03a111e3-27f9-4f0b-af68-f678bb64a7b5" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NoteImpactTests" name="Every_additional_task_is_validated_before_simulation" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.NotesApiTests.Note_endpoints_support_automatic_schedule_and_idempotent_retry" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="adc49f25-e568-a94f-129c-c491c22b3a47">
+      <Execution id="e52d9a60-d9dd-4118-9445-012be583a6c2" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.NotesApiTests" name="Note_endpoints_support_automatic_schedule_and_idempotent_retry" />
+    </UnitTest>
+    <UnitTest name="SPWPOS.IntegrationTests.TaskVersionTests.Concurrent_updates_with_the_same_version_have_exactly_one_winner" storage="c:\users\lenovo\downloads\swp\swp\artifacts\note-audit-2026-10-25\build-integration\spwpos.integrationtests.dll" id="8a39452d-ff6a-6411-625b-b0b4348c0fae">
+      <Execution id="b0cc652e-5c15-49ac-9159-dbc635e36fb3" />
+      <TestMethod codeBase="C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="SPWPOS.IntegrationTests.TaskVersionTests" name="Concurrent_updates_with_the_same_version_have_exactly_one_winner" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="cc7c1cd9-46f9-4f25-d051-9a0c1d391613" executionId="87860e26-2747-4ead-aa40-c424a9244cfb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="adc49f25-e568-a94f-129c-c491c22b3a47" executionId="e52d9a60-d9dd-4118-9445-012be583a6c2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8a39452d-ff6a-6411-625b-b0b4348c0fae" executionId="b0cc652e-5c15-49ac-9159-dbc635e36fb3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="893613b5-b09a-5686-eee3-ce4646c189f2" executionId="00364461-b4cc-43e4-81f0-ab4b0b1a171c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="23ea7b43-02b6-e6f2-bc6d-1dffea82a06c" executionId="fcad127b-eee8-45da-9e06-4e753ed4026c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="53af4911-037d-6915-d149-3cbdfb364e30" executionId="238c7919-f610-4edc-9071-3719a89164c2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4ef5a443-4a23-b7b5-ee8d-05f444d7be33" executionId="906fb787-86f9-4cdb-bb04-1d75e719d5d4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cf0ab1d8-7ffd-3597-3855-023108bc3cf3" executionId="e89c405f-e49b-40d7-9525-11a9f1efa75f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a5091ad1-b856-8811-a01e-805aecf1f453" executionId="40aaf734-e560-433e-9939-d14fab03766f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bb0fa2c2-80e3-6247-2e4e-b37051a85a57" executionId="a759958a-1e05-40df-9b32-2e49207f7e1c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="546ac5c2-45b0-c425-8581-182a4e18f5f6" executionId="61eace91-bb00-421b-a866-6a5cd5c10bbe" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="50a6f0be-f865-dde1-ef1b-1aa056fe3511" executionId="03a111e3-27f9-4f0b-af68-f678bb64a7b5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ddfcc4c4-7702-1306-f294-a21ada45435a" executionId="edd2c29b-b36d-484e-8613-9ead13853844" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f8b6fe9f-0cfa-99d2-a994-9d74b2bee36d" executionId="d2640f5c-2e23-4ac1-a538-6c6d2ba9c666" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e8557655-9e84-8eaf-e678-4c90536ea295" executionId="9873859c-6896-408f-a378-81ae44f5dd17" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9287c03d-e0f7-f7d0-9e50-224e5312e2c2" executionId="92889542-02f3-4f67-b2a3-551d6f44b62d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="16" executed="16" passed="16" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 8.0.31)&#xD;
+[xUnit.net 00:00:01.59]   Discovering: SPWPOS.IntegrationTests&#xD;
+[xUnit.net 00:00:01.91]   Discovered:  SPWPOS.IntegrationTests&#xD;
+[xUnit.net 00:00:02.18]   Starting:    SPWPOS.IntegrationTests&#xD;
+[xUnit.net 00:00:13.53]   Finished:    SPWPOS.IntegrationTests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

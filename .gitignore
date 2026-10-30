@@ -5,6 +5,7 @@
 TestResults/
 artifacts/
 **/node_modules/
+frontend/dist/
 src/SPWPOS.Api/wwwroot/app/
 src/SPWPOS.Api/wwwroot/index.html
 .env
@@ -15,6 +16,9 @@ src/SPWPOS.Api/wwwroot/index.html
 *.pfx
 *.key
 *.pem
+**/CalendarKeys/
+**/calendar-keys/
+client_secret_*.json
 *.p12
 *firebase-adminsdk*.json
 firebase-service-account*.json

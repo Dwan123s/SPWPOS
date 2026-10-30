@@ -45,7 +45,7 @@ public sealed partial class TaskInterpreter(HttpClient http, IConfiguration conf
         var result = await Ask(incremental + (context is null ? "List EVERY activity in this note, up to 12, in its original language. " : "List every NEW activity in its original language. ") +
             $"Current UTC time: {now:O}; user timezone: {timeZoneId}. Resolve relative deadlines in that timezone. " +
             "Use kind EVENT for classes, school, work shifts, appointments and meetings, with type CLASS, WORK, APPOINTMENT, MEETING or OTHER. " +
-            "Use kind TASK for actionable work, with type WORK, OTHER, PROGRAMMING, WRITING, STUDY, MEETING_PREP, DESIGN or ADMIN. " +
+            "Use kind TASK for actionable work, with type WORK, OTHER, PROGRAMMING, WRITING, STUDY, MEETING_PREP or ADMIN. " +
             "Preserve explicit start/end times, durations, deadlines and same-day sequential context across sentences. " +
             "For example a 15-minute meeting after a work shift ending 17:00 is 17:00–17:15 on that same day. " +
             "A task starting at 20:30 must retain that start; it is not a deadline. When duration, deadline or a time is absent, return null, never guess 60 minutes or seven days. " +

@@ -1,3 +1,4 @@
 @import "./notes.css" layer(components);
 @import "./note-studio.css" layer(components);
 @import "./note-notebook.css" layer(components);
+@import "./note-checklist.css" layer(components);

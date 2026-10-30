@@ -1,4 +1,4 @@
-const excludedSessions = new Set(["Skipped", "Missed"]);
+const excludedSessions = new Set(["Skipped", "Missed", "Cancelled"]);
 function dayKey(value, zone) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: zone,
@@ -75,6 +75,17 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
   const sessions = workspace.sessions.filter(
     (session) => !excludedSessions.has(session.status),
   );
+  const calendarEntries = [
+    ...sessions.map((item) => ({
+      ...item,
+      kind: "session",
+      name: item.taskName || "Phiên làm việc",
+    })),
+    ...(workspace.events || []).map((item) => ({ ...item, kind: "event" })),
+  ];
+  const hasAvailability =
+    !!workspace.availability?.length ||
+    !!workspace.exceptions?.some((item) => item.isAvailable);
   const daySessions = sessions.filter((session) =>
     interval(session, today, calendar),
   );
@@ -126,6 +137,27 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
       ),
     );
     const free = duration(available);
+    const calendarBusy = duration(
+      merge(
+        calendarEntries
+          .map((item) => interval(item, key, calendar))
+          .filter(Boolean),
+      ),
+    );
+    const minuteNow = calendar.minute(now, key);
+    const calendarRemaining = duration(
+      merge(
+        calendarEntries
+          .filter(
+            (item) =>
+              item.kind === "event" ||
+              ["Scheduled", "Running", "Paused"].includes(item.status),
+          )
+          .map((item) => interval(item, key, calendar))
+          .filter(Boolean)
+          .map(([start, end]) => [Math.max(start, minuteNow), end]),
+      ),
+    );
     const capacityDay = insights?.days?.find((day) => day.date === key);
     const dailyLimit = workspace.preference.maximumDailyMinutes ?? 480;
     const consumed = duration(
@@ -150,6 +182,8 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
       key,
       free: capacityDay?.calendarFreeMinutes ?? free,
       planned,
+      calendarBusy,
+      calendarRemaining,
       reserved: capacityDay?.reservedMinutes ?? reserved,
       schedulable: capacityDay?.schedulableMinutes ?? null,
       capacity: Number.isFinite(insights?.capacityFactor)
@@ -177,6 +211,42 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
     .filter((item) => item.span)
     .sort((a, b) => a.span[0] - b.span[0]);
   const occupied = merge(timeline.map((item) => item.span));
+  const minuteNow = calendar.minute(now, today);
+  const calendarMinutes = duration(occupied);
+  const elapsedCalendarMinutes = duration(
+    merge(occupied.map(([start, end]) => [start, Math.min(end, minuteNow)])),
+  );
+  const calendarStats = {
+    total: timeline.length,
+    past: timeline.filter((item) => Date.parse(item.end) <= now).length,
+    current: timeline.filter(
+      (item) => Date.parse(item.start) <= now && Date.parse(item.end) > now,
+    ).length,
+    upcoming: timeline.filter((item) => Date.parse(item.start) > now).length,
+    percent: calendarMinutes
+      ? Math.round((100 * elapsedCalendarMinutes) / calendarMinutes)
+      : 0,
+    remainingMinutes: days[0].calendarRemaining,
+    horizonCount: calendarEntries.filter(
+      (item) =>
+        calendar.minute(item.start, today) < 7 * 1440 &&
+        calendar.minute(item.end, today) > 0,
+    ).length,
+    horizonRemaining: days.reduce((sum, day) => sum + day.calendarRemaining, 0),
+  };
+  const calendarMilestones = calendarEntries
+    .filter(
+      (item) =>
+        Date.parse(item.end) > now &&
+        (item.kind === "event" ||
+          ["Scheduled", "Running", "Paused"].includes(item.status)),
+    )
+    .map((item) => ({
+      ...item,
+      ongoing: Date.parse(item.start) <= now,
+      at: Date.parse(item.start) <= now ? item.end : item.start,
+    }))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const breaks = [];
   const breakMinutes = workspace.preference.breakMinutes || 0;
   for (let index = 0; index < occupied.length - 1; index++) {
@@ -219,6 +289,10 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
     due,
     ratio,
     accuracy,
+    now,
+    hasAvailability,
+    calendarStats,
+    calendarMilestones,
     availableMinutes: days[0].free,
     capacityMinutes: days[0].capacity,
   };

@@ -25,7 +25,10 @@ export function adminPage() {
         <div className="card-header">
           <div>
             <h2>Trạng thái hệ thống</h2>
-            <p>Database, hoạt động và tác vụ thông báo.</p>
+            <p>
+              Số liệu vận hành tổng hợp. Không truy cập nội dung công việc, ghi
+              chú hoặc lịch cá nhân.
+            </p>
           </div>
           {button(
             "Cập nhật",

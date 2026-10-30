@@ -10,7 +10,19 @@ public static class SandboxOracle
 {
     public static string Fold(string text) => string.Concat(text.Normalize(NormalizationForm.FormD)
         .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)).ToLowerInvariant().Replace('đ', 'd');
-    private static bool Same<T>(T left, T right) => JsonSerializer.Serialize(left, SandboxJson.Options) == JsonSerializer.Serialize(right, SandboxJson.Options);
+    private static bool Same<T>(T left, T right)
+    {
+        static string Comparable(object? row)
+        {
+            var json = JsonSerializer.SerializeToNode(row, SandboxJson.Options);
+            // This token serializes writes, including chat bookkeeping. It is
+            // not a change to the user's calendar. Keep Revision and every
+            // actual preference in the independent business-change oracle.
+            if (row is WorkPreference) json?.AsObject().Remove("mutationVersion");
+            return json?.ToJsonString() ?? "null";
+        }
+        return Comparable(left) == Comparable(right);
+    }
     public static bool IsProviderError(string? code) => code is "AGENT_AI_NOT_CONFIGURED" or "AGENT_AI_AUTH_FAILED" or
         "AGENT_AI_MODEL_UNAVAILABLE" or "AGENT_AI_QUOTA_EXCEEDED" or "AGENT_AI_TIMEOUT" or "AGENT_AI_INVALID_RESPONSE" or "AI_DAILY_LIMIT" or "AI_CONCURRENT_LIMIT";
     public static bool SafeRejection(string? code) => code is "AGENT_INVALID_INTENT" or "VALIDATION_ERROR" or "INVALID_TASK_TYPE" or

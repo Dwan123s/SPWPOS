@@ -1,5 +1,7 @@
 # payOS — quyết định tích hợp
 
+**Cập nhật 28/10/2026:** đóng băng thanh toán tiền thật; skin NORA mở bằng XP nội bộ. Endpoint tạo thanh toán trả `410 REAL_PAYMENTS_DISABLED`. Phần dưới lưu lại thiết kế nghiên cứu lịch sử, không phải luồng đang hoạt động. Xem [XP và inventory hiện tại](../features/WORKSPACE_UPGRADE_PHASES_1_TO_4.md).
+
 Người dùng chọn payOS ngày 15/10/2026 và chưa có merchant. Trạng thái: nghiên cứu/chuẩn bị, chưa tạo checkout hay xác minh thanh toán thật.
 
 Tài liệu chính thức đã kiểm tra:

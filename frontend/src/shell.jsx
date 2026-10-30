@@ -9,6 +9,7 @@ import {
 } from "./workspace-motion.jsx";
 import { $, state, icon, button, userAvatar, dateFmt, modal } from "./ui.jsx";
 import { nextWorkflowStep } from "./workflow.js";
+import { NotificationBell, NotificationUnreadCount } from "./notification-popups.jsx";
 
 const menuKey = "planora.menu.compact";
 function readStorage(key) {
@@ -54,10 +55,7 @@ export function MenuLabelsControl() {
   );
 }
 export function workspaceShell(routes, title, description, body) {
-  const p = state.workspace.profile || {},
-    unread = (state.workspace.notifications || []).filter(
-      (n) => !n.isRead,
-    ).length;
+  const p = state.workspace.profile || {};
   const next = nextWorkflowStep(state.workspace);
   const nav = (keys) =>
     nodeList(
@@ -75,8 +73,8 @@ export function workspaceShell(routes, title, description, body) {
           >
             {icon(routes[key][2])}
             <span className="nav-text">{routes[key][0]}</span>
-            {key === "notifications" && unread ? (
-              <span className="notification-number">{unread}</span>
+            {key === "notifications" ? (
+              <NotificationUnreadCount />
             ) : (
               ""
             )}
@@ -248,16 +246,7 @@ export function workspaceShell(routes, title, description, body) {
             </div>
             <div className="topbar-right">
               <WorkspaceMotionControl />
-              <button
-                type="button"
-                className="bell"
-                data-action="nav"
-                data-id="notifications"
-                aria-label={`Thông báo${unread ? `, ${unread} chưa đọc` : ""}`}
-              >
-                {icon("bell")}
-                {unread ? <span className="dot" /> : ""}
-              </button>
+              <NotificationBell />
               <button
                 type="button"
                 className="avatar-button"

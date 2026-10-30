@@ -7,7 +7,8 @@ using SPWPOS.Infrastructure.Persistence;
 namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEngine engine, TimeProvider clock,
-    ITaskInterpreter interpreter, IAiUsageService aiUsage, IEmailService? email = null) : IWorkspaceService, IPlanningAgentService
+    ITaskInterpreter interpreter, IAiUsageService aiUsage, IEmailService? email = null,
+    Microsoft.Extensions.Options.IOptions<EmailSettings>? emailOptions = null) : IWorkspaceService, IPlanningAgentService
 {
     private DateTimeOffset Now => clock.GetUtcNow();
     private static void Require([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string code, string message, int status = 400)
@@ -25,9 +26,23 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     {
         var email = await db.Users.AsNoTracking().Where(x => x.Id == uid).Select(x => x.NormalizedEmail).SingleOrDefaultAsync(ct);
         Require(email is not null, "UNAUTHORIZED", "Tài khoản không khả dụng.", 401);
-        await using var tx = await AccountTransaction.BeginAsync(db, email!, ct);
+        // Workspace writes use an optimistic account revision. Authentication and
+        // refresh-token rotation retain their separate account serialization.
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
         Require(await db.Users.AnyAsync(x => x.Id == uid && x.IsActive && x.EmailConfirmed, ct), "FORBIDDEN", "Tài khoản không khả dụng.", 403);
         var preference = await Preference(uid, ct);
+        // Claim the version before writing dependent rows. A stale writer fails
+        // here, so unique execution/repair rows are never written twice. The
+        // ordinary database transaction rolls this claim back if validation fails.
+        preference.MutationVersion = Guid.NewGuid();
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateException error) when (error.InnerException is Microsoft.Data.SqlClient.SqlException { Number: 2601 or 2627 } &&
+            error.Entries.Any(x => x.Entity is WorkPreference && x.State == EntityState.Added))
+        {
+            // Two first-time writers may both see no preference row. The unique
+            // UserId constraint then plays the same role as an existing version.
+            throw new DbUpdateConcurrencyException("Workspace preferences were initialized concurrently. Reload and retry.", error);
+        }
         var result = await action();
         db.ChangeTracker.DetectChanges();
         revision = revision && db.ChangeTracker.Entries().Any(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted);
@@ -37,7 +52,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         var timeChanged = db.ChangeTracker.Entries().Any(e =>
             e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted &&
             (e.Entity is WeeklyAvailability or AvailabilityException or FixedEvent ||
-             e.Entity is WorkPreference && e.Properties.Any(p => p.IsModified && p.Metadata.Name != nameof(WorkPreference.Revision))));
+             e.Entity is WorkPreference && e.Properties.Any(p => p.IsModified && p.Metadata.Name is not nameof(WorkPreference.Revision) and not nameof(WorkPreference.MutationVersion))));
         foreach (var entry in db.ChangeTracker.Entries<WorkSession>().Where(x => x.State is EntityState.Added or EntityState.Modified))
         { if (entry.State == EntityState.Added) entry.Entity.CreatedAt = Now; entry.Entity.UpdatedAt = Now; }
         await db.SaveChangesAsync(ct);
@@ -75,8 +90,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     {
         var user = await db.Users.AsNoTracking().SingleAsync(x => x.Id == userId, ct); var state = await State(userId, ct); var bias = engine.Biases(state);
         var categories = await Mine<TaskCategory>(userId).OrderBy(x => x.Name).Select(x => new CategoryView(x.Id, x.Name, x.Color)).ToArrayAsync(ct);
-        var notifications = await Mine<InAppNotification>(userId).Where(x => x.IsVisible).OrderByDescending(x => x.CreatedAt).Take(100)
-            .Select(x => new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null)).ToArrayAsync(ct);
+        var notifications = await GetNotificationsAsync(userId, ct);
         var preference = state.Preference;
         var sessionsByTask = state.Sessions.ToLookup(x => x.TaskId);
         var dependenciesByTask = state.Dependencies.ToLookup(x => x.TaskId);
@@ -96,7 +110,8 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
             state.Sessions.Where(s => tasksById.ContainsKey(s.TaskId)).Select(s => new SessionView(s.Id, s.TaskId, tasksById[s.TaskId].Name,
                 s.Start, s.End, s.Status.ToString(), s.IsLocked, (int)((s.ActualSeconds + (s.SegmentStartedAt is { } at ? Math.Max(0, (Now - at).TotalSeconds) : 0)) / 60),
                 s.ActualSeconds + (long)(s.SegmentStartedAt is { } since ? Math.Max(0, (Now - since).TotalSeconds) : 0),
-                s.SegmentStartedAt, s.ReasonCode)).ToArray(), notifications, new(ns.InAppEnabled, ns.DeadlineLeadHours, ns.SessionReminderLeadMinutes, ns.WorkloadWarningLevel, ns.EmailEnabled), ["history-v2", "recovery"]);
+                s.SegmentStartedAt, s.ReasonCode)).ToArray(), notifications, new(ns.InAppEnabled, ns.DeadlineLeadHours, ns.SessionReminderLeadMinutes, ns.WorkloadWarningLevel, ns.EmailEnabled),
+            ["history-v2", "recovery", "ambient-tracking", "gamification", "calendar-export", "notification-refresh"], await GetGamificationAsync(userId, ct));
     }
     public Task UpdateProfileAsync(Guid userId, ProfileInput input, CancellationToken ct) => Mutate(userId, async () =>
     {

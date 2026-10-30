@@ -1,0 +1,80 @@
+.calendar-time-past {
+  --calendar-time-bg: #f1f5f9;
+  --calendar-time-hover: #e8eef5;
+  --calendar-time-border: #cbd5e1;
+  --calendar-time-accent: #64748b;
+  --calendar-time-text: #475569;
+  --calendar-time-tag: #e0e7ef;
+}
+.calendar-time-current {
+  --calendar-time-bg: #e9fbf0;
+  --calendar-time-hover: #dcf7e7;
+  --calendar-time-border: #86d7aa;
+  --calendar-time-accent: #168451;
+  --calendar-time-text: #075d41;
+  --calendar-time-tag: #c5efd7;
+}
+.calendar-time-future {
+  --calendar-time-bg: #eaf3ff;
+  --calendar-time-hover: #deecff;
+  --calendar-time-border: #aecdf4;
+  --calendar-time-accent: #2878d8;
+  --calendar-time-text: #124c96;
+  --calendar-time-tag: #d4e6ff;
+}
+.calendar-workspace .calendar-timed-card {
+  background: var(--calendar-time-bg);
+  border: 1px solid var(--calendar-time-border);
+  border-left: 4px solid var(--calendar-time-accent);
+  color: var(--calendar-time-text);
+  opacity: 1;
+  box-shadow: inset 0 1px 0 #ffffffb3;
+}
+.calendar-workspace button.calendar-timed-card:hover {
+  background: var(--calendar-time-hover);
+  border-color: var(--calendar-time-accent);
+}
+.calendar-workspace .calendar-timed-card:focus-visible {
+  outline: 2px solid var(--calendar-time-accent);
+  outline-offset: 2px;
+}
+.calendar-workspace .calendar-timed-card :is(h3, .session-time, .block-meta) {
+  color: var(--calendar-time-text);
+}
+.calendar-workspace .calendar-timed-card .session-top {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.calendar-workspace .calendar-block.calendar-timed-card strong {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.calendar-workspace .calendar-timed-card .block-time {
+  font-size: 11px;
+}
+.calendar-workspace .calendar-time-tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  flex-shrink: 0;
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--calendar-time-tag);
+  color: var(--calendar-time-text);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.calendar-time-tag::before,
+.calendar-time-legend i {
+  background: var(--calendar-time-accent);
+  border-radius: 50%;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+}
+.calendar-time-tag::before {
+  content: "";
+}

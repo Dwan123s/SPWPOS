@@ -1,0 +1,201 @@
+
+ RUN  v5.0.3 C:/Users/Lenovo/Downloads/SWP/SWP/frontend
+
+stderr | tests/workflows.test.jsx > blocks invalid passwords in the register form before calling the API
+Invalid DOM property `autocapitalize`. Did you mean `autoCapitalize`?
+Invalid DOM property `spellcheck`. Did you mean `spellCheck`?
+
+stderr | tests/workflows.test.jsx > blocks reuse in the account password form before calling the API
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > blocks reuse in the account password form before calling the API
+Each child in a list should have a unique "key" prop.
+
+Check the render method of `section`. See https://react.dev/link/warning-keys for more information.
+
+stderr | tests/workflows.test.jsx > sets a first password for a Google account from Security and returns to login
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > navigates all workspace screens and renders the admin data
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > marks a notification read while preserving its filters and updating the shell unread count
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > retains an unread notification when marking it read fails
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > opens the notification settings tab directly from the inbox
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > confirms deletion from a task row and allows cancelling without a request
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > confirms deletion from a task row and allows cancelling without a request
+Each child in a list should have a unique "key" prop.
+
+Check the render method of `tasksPage`. See https://react.dev/link/warning-keys for more information.
+
+stderr | tests/workflows.test.jsx > deletes a task and its children after explaining the cancelled sessions
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > blocks deletion when a child has a Running session
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > blocks deletion when a child has a Paused session
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > keeps the task when the server rejects deletion
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > creates a task and retains filters while updating the React result list
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > submits the version captured when opening the task editor
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > keeps an unsaved stale task edit and requires an explicit reload before saving again
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > schedules a selected task and previews capacity warnings without applying them
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > schedules a selected task and previews capacity warnings without applying them
+Each child in a list should have a unique "key" prop.
+
+Check the top-level render call using <tbody>. See https://react.dev/link/warning-keys for more information.
+Each child in a list should have a unique "key" prop.
+
+Check the top-level render call using <ul>. See https://react.dev/link/warning-keys for more information.
+
+stderr | tests/workflows.test.jsx > requires confirmation before applying urgent displacement for a existing task
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > requires confirmation before applying urgent displacement for a new task
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > previews deadline protection and waits for confirmation before applying a new task plan
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > keeps the created task when automatic scheduling fails
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > adds and removes availability rows without losing unsaved time values
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > removes an avatar while preserving unsaved profile fields before save
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > saves a fixed work shift with the WORK category from the calendar form
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > guides an empty daily schedule to input before offering planning
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > returns to today's work after explicitly saving a proposed schedule
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > shows apply only for real proposals and keeps simulations read-only
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > reviews a captured task with safe text notes before saving
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > opens and closes the mobile drawer with inert content and restored focus
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > guides users to hours before generating a plan without changing saved tasks
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > saves hours and previews the schedule before any explicit apply
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > stays on hours when saving fails instead of proceeding to plan generation
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+stderr | tests/workflows.test.jsx > finishing a session asks for progress and completes the whole task only on explicit click
+flushSync was called from inside a lifecycle method. React cannot flush when React is already rendering. Consider moving this call to a scheduler task or micro task.
+
+ ✓ tests/workflows.test.jsx (42 tests) 20477ms
+   ✓ accepts a username in the login field and keeps email recovery separate 1370ms
+   ✓ submits login with same-origin cookies and toggles password without clearing it 1075ms
+   ✓ shows failed login directly on the password field, repeats feedback, and clears it on edit 479ms
+   ✓ blocks reuse in the account password form before calling the API 530ms
+   ✓ completes forgot password, OTP and reset transitions with the returned token 1289ms
+   ✓ keeps the animated auth page and pause setting through registration and verification 2378ms
+   ✓ sets a first password for a Google account from Security and returns to login 1016ms
+   ✓ navigates all workspace screens and renders the admin data 763ms
+   ✓ marks a notification read while preserving its filters and updating the shell unread count 624ms
+   ✓ creates a task and retains filters while updating the React result list 1083ms
+   ✓ submits the version captured when opening the task editor 575ms
+   ✓ keeps an unsaved stale task edit and requires an explicit reload before saving again 955ms
+   ✓ requires confirmation before applying urgent displacement for a existing task 309ms
+   ✓ requires confirmation before applying urgent displacement for a new task 655ms
+   ✓ keeps the created task when automatic scheduling fails 855ms
+   ✓ adds and removes availability rows without losing unsaved time values 326ms
+   ✓ removes an avatar while preserving unsaved profile fields before save 421ms
+   ✓ returns to today's work after explicitly saving a proposed schedule 325ms
+   ✓ reviews a captured task with safe text notes before saving 781ms
+   ✓ finishing a session asks for progress and completes the whole task only on explicit click 391ms
+ ✓ tests/notes.test.jsx (29 tests) 33102ms
+   ✓ cancels note deletion without changing the saved note or editor 2624ms
+   ✓ deletes the reviewed note with its latest version and clears the editor 1816ms
+   ✓ deletes a library note without losing the unsaved current note 570ms
+   ✓ preserves saved and unsaved content when note deletion fails 1522ms
+   ✓ saves a note, reviews Gemini tasks, and previews the schedule without applying it 1471ms
+   ✓ saves a note, reviews VertexAI tasks, and previews the schedule without applying it 1423ms
+   ✓ keeps imported tasks after a planning failure and retries only the plan 1096ms
+   ✓ offers availability setup and explains why edited notes need fresh analysis 1350ms
+   ✓ automatically schedules a saved note and reports the applied calendar 803ms
+   ✓ shows a confirmation proposal for urgent displacement instead of claiming the note schedule was saved 823ms
+   ✓ allows saving but disables AI actions when Gemini is not configured 833ms
+   ✓ identifies Gemini capabilities and the actual analysis provider 971ms
+   ✓ preserves saved note on AI failure and retries without creating tasks from rules 836ms
+   ✓ saves hours inline and continues the proposal while preserving reviewed tasks 1850ms
+   ✓ does not create work when saving hours fails and allows retry 1585ms
+   ✓ rejects empty days and backwards time without saving hours or tasks 1566ms
+   ✓ continues automatic scheduling after inline availability setup 1150ms
+   ✓ explains a missing task selection beside the proposal button 1173ms
+   ✓ keeps the note intact while changing writing size, paper and focus mode 761ms
+   ✓ saves a title from the first line when the user only writes note content 786ms
+   ✓ preserves task edits and selections when returning to the note and back to review 1509ms
+   ✓ shows an actionable quota message and retries the saved note without duplicates 728ms
+   ✓ filters real note states and searches Vietnamese titles without accents 483ms
+   ✓ asks before discarding unsaved note content when opening another note 662ms
+   ✓ keeps edited AI tasks when selecting the same note and confirms switching away from review 1508ms
+   ✓ inserts a checklist at the editor selection from the top toolbar without sending the note 347ms
+   ✓ remembers the appearance of a new note after saving, switching notes and reopening the page 1148ms
+   ✓ changes custom colors and resets appearance without invalidating AI analysis or task edits 1632ms
+ ✓ tests/notes-autosave.test.jsx (8 tests) 9510ms
+   ✓ autosaves a new draft and subsequent edits to the same note, surviving reload without calling AI 2515ms
+   ✓ keeps text entered during a slow create and serializes the next save with the returned version 2178ms
+   ✓ flushes a pending autosave and latest text before analyzing 1176ms
+   ✓ preserves the typed draft on a version conflict and supports an explicit save retry 1156ms
+   ✓ autosaves additions to a previously processed note and offers analysis of new work 1130ms
+   ✓ ticks the linked task without losing unsaved text and autosaves that text with the unchanged note version 1116ms
+ ✓ tests/note-activities.test.jsx (9 tests) 3345ms
+   ✓ explains the actual deadline and late finish, disables saving, and opens the affected task when returning to edit 512ms
+   ✓ replaces unsupported categories in older analysis with Other and sends the value actually shown in review 314ms
+   ✓ offers one-off requested hours after an availability warning without applying until confirmed 517ms
+   ✓ keeps the task editor and focus open when the second duration digit completes validation 423ms
+   ✓ keeps all four activities, requests the missing report duration, and saves only after confirming the preview 341ms
+   ✓ a failed confirmation preserves edited activities and allows a fresh preview 492ms
+   ✓ events can be reviewed without availability or creating an incomplete task 301ms
+ ✓ tests/note-impact.test.jsx (5 tests) 3685ms
+   ✓ automatically checks all selected drafts together and shows actionable overload without saving 498ms
+   ✓ hides stale conclusions immediately and ignores an older response after drafts change 965ms
+   ✓ preserves the opened mobile calendar and chosen day after a task edit 1197ms
+   ✓ reports unavailable checks and permits retry instead of claiming a safe schedule 992ms
+ ✓ tests/note-checklist.test.jsx (9 tests) 360ms
+ ✓ tests/note-plan-preview.test.jsx (2 tests) 320ms
+ ✓ tests/note-appearance.test.js (3 tests) 6ms
+
+ Test Files  8 passed (8)
+      Tests  107 passed (107)
+   Start at  14:13:47
+   Duration  51.03s (tests 72%, environment 18%, setup 4%, import 3%, transform 3%)
+
+    Isolate  8 workers spawned · ~2.49s startup each (spawn + environment, per file)
+             at least ~7.47s faster with isolate: false — reuses workers across files instead of one per file
+
+JSON report written to C:/Users/Lenovo/Downloads/SWP/SWP/artifacts/note-audit-2026-10-25/frontend.json

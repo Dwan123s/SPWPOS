@@ -37,7 +37,18 @@ public sealed class WorkspaceConcurrencyTests
         await Send(client, HttpMethod.Post, $"/api/plans/{proposal.GetProperty("id").GetGuid()}/apply");
         var route = $"/api/sessions/{proposal.GetProperty("sessions")[0].GetProperty("id").GetGuid()}/start";
         var responses = await Task.WhenAll(client.PostAsync(route, null, Ct), client.PostAsync(route, null, Ct));
-        try { Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode)); }
+        try {
+            Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.OK);
+            foreach (var response in responses) {
+                Assert.True(response.StatusCode is HttpStatusCode.OK or HttpStatusCode.Conflict);
+                if (response.StatusCode == HttpStatusCode.Conflict) {
+                    var error = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Ct);
+                    Assert.Equal("CONCURRENCY_CONFLICT", error.GetProperty("error").GetProperty("code").GetString());
+                }
+            }
+            // A new request after refresh acknowledges the already-running session.
+            using var replay = await client.PostAsync(route, null, Ct); Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        }
         finally { foreach (var response in responses) response.Dispose(); }
         await using var scope = factory.Services.CreateAsyncScope();
         Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().WorkSessions.CountAsync(x => x.Status == WorkSessionStatus.Running, Ct));

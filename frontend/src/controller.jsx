@@ -34,6 +34,8 @@ import {
   minuteValue,
 } from "./ui.jsx";
 import { api, submit } from "./api.js";
+import { resetNotificationFeed, syncNotifications } from "./notification-feed.js";
+import { startNotificationPolling } from "./notification-polling.js";
 import { GettingStarted } from "./getting-started.jsx";
 import { completeGuideStep } from "./onboarding.js";
 import { validateNewPassword } from "./password-policy.js";
@@ -123,6 +125,7 @@ function navigation(key) {
 function expiry() {
   if (!state.workspace) return;
   state.workspace = null;
+  resetNotificationFeed();
   state.insights = null;
   state.user = null;
   state.roles = [];
@@ -136,6 +139,8 @@ async function load(renderPage = true) {
   loading = true;
   try {
     state.workspace = await api("/api/workspace");
+    syncNotifications(state.workspace);
+    document.documentElement.dataset.noraSkin = state.workspace.gamification?.selectedSkin || "classic";
     state.loadedAt = Date.now();
     const input = {
       start: new Date().toISOString(),
@@ -149,6 +154,7 @@ async function load(renderPage = true) {
     state.conflicts = conflicts.status === "fulfilled" ? conflicts.value : null;
     state.analysisError =
       insights.status === "rejected" || conflicts.status === "rejected";
+    window.dispatchEvent(new Event("workspace-updated"));
     if (renderPage) render();
   } finally {
     loading = false;
@@ -156,6 +162,7 @@ async function load(renderPage = true) {
 }
 async function loggedIn() {
   const data = await api("/api/browser-session/me");
+  if (new URLSearchParams(location.search).has("googleCalendar")) state.settingsTab = "connections";
   state.user = data.user;
   state.roles = data.roles || [];
   await load();
@@ -198,10 +205,12 @@ function render() {
   syncDecorations();
 }
 async function loadAdmin(search = "") {
-  const [users, status, jobs] = await Promise.all([
+  const [users, status, jobs, metrics, health] = await Promise.all([
     api(`/api/admin/users?search=${encodeURIComponent(search)}`),
     api("/api/admin/status"),
     api("/api/admin/jobs"),
+    api("/api/admin/metrics"),
+    api("/api/admin/health"),
   ]);
   state.adminUsers = users;
   if ($("#admin-jobs"))
@@ -235,7 +244,8 @@ async function loadAdmin(search = "") {
       </table>,
     );
   if ($("#admin-users")) setSlot("admin-users", adminUsers(users));
-  if ($("#system-status")) setSlot("system-status", adminStatus(status));
+  if ($("#system-status"))
+    setSlot("system-status", adminStatus({ ...status, ...metrics, health }));
 }
 async function scheduleTask(id, triggerEvent = "MANUAL") {
   if (
@@ -827,15 +837,33 @@ async function action(name, id, element) {
               name="reason"
               rows="3"
               className="filter"
-              style={{ width: "100%", padding: "0.6rem", borderRadius: "8px", resize: "vertical", marginTop: "0.25rem" }}
+              style={{
+                width: "100%",
+                padding: "0.6rem",
+                borderRadius: "8px",
+                resize: "vertical",
+                marginTop: "0.25rem",
+              }}
               placeholder="Nhập lý do khóa tài khoản (lý do này sẽ hiển thị cho người dùng khi họ đăng nhập)..."
               maxLength="500"
               required
               autoFocus
             />
           </div>
-          <div className="actions" style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
-            <button type="button" className="btn ghost" data-action="close-modal">
+          <div
+            className="actions"
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              justifyContent: "flex-end",
+              marginTop: "1rem",
+            }}
+          >
+            <button
+              type="button"
+              className="btn ghost"
+              data-action="close-modal"
+            >
               Hủy
             </button>
             <button type="submit" className="btn danger">
@@ -851,7 +879,9 @@ async function action(name, id, element) {
         "Mở khóa tài khoản?",
         "Cho phép tài khoản hoạt động lại bình thường.",
         async () => {
-          await api(`/api/admin/users/${id}/unlock`, "POST", { reason: "Mở khóa bởi quản trị viên" });
+          await api(`/api/admin/users/${id}/unlock`, "POST", {
+            reason: "Mở khóa bởi quản trị viên",
+          });
           closeModal();
           await loadAdmin();
           toast("Đã mở khóa tài khoản thành công.");
@@ -1221,6 +1251,8 @@ export function onChange(event) {
     filterTasks();
 }
 export function startController() {
+  resetNotificationFeed();
+  const stopNotificationPolling = startNotificationPolling(() => state.workspace);
   let disposed = false,
     connecting = false;
   const entryLogin = () => {
@@ -1287,6 +1319,7 @@ export function startController() {
   void connect();
   return () => {
     disposed = true;
+    stopNotificationPolling();
     clearInterval(poll);
     window.removeEventListener("hashchange", hash);
     window.removeEventListener("session-expired", expiry);

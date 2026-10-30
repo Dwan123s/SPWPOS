@@ -64,7 +64,9 @@ public sealed partial class WorkspaceService
         db.TaskDependencies.RemoveRange(await Mine<TaskDependency>(uid).Where(x => ids.Contains(x.TaskId) || ids.Contains(x.PredecessorId)).ToArrayAsync(ct));
         task.IsDeleted = true;
     }, ct);
-    public Task SetStatusAsync(Guid uid, Guid id, StatusInput input, CancellationToken ct) => Mutate(uid, async () =>
+    public Task SetStatusAsync(Guid uid, Guid id, StatusInput input, CancellationToken ct) =>
+        Mutate(uid, () => SetTaskStatusCore(uid, id, input, ct), ct);
+    private async Task SetTaskStatusCore(Guid uid, Guid id, StatusInput input, CancellationToken ct)
     {
         Require(Enum.TryParse<WorkTaskStatus>(input.Status, true, out var status) && Enum.IsDefined(status), "INVALID_STATUS", "Trạng thái không hợp lệ.");
         var task = await Find<WorkTask>(uid, id, ct); Require(!task.IsDeleted, "NOT_FOUND", "Công việc đã xóa.", 404);
@@ -81,7 +83,7 @@ public sealed partial class WorkspaceService
         task.Status = status; task.Progress = status == WorkTaskStatus.Completed ? 100 : input.Progress; task.UpdatedAt = Now; task.CompletedAt = status == WorkTaskStatus.Completed ? Now : null;
         if (status is WorkTaskStatus.Completed or WorkTaskStatus.Cancelled)
             foreach (var session in await Mine<WorkSession>(uid).Where(x => x.TaskId == id && x.Status == WorkSessionStatus.Scheduled).ToArrayAsync(ct)) session.Status = WorkSessionStatus.Cancelled;
-    }, ct);
+    }
     public Task<Guid> SaveCategoryAsync(Guid uid, Guid? id, CategoryInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
         var name = input.Name.Trim(); Require(name.Length > 0, "VALIDATION_ERROR", "Tên nhóm không được để trống.");

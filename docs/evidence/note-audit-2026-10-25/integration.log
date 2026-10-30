@@ -1,0 +1,14 @@
+  SPWPOS.Domain -> C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.Domain.dll
+  SPWPOS.Application -> C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.Application.dll
+  SPWPOS.Infrastructure -> C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.Infrastructure.dll
+  SPWPOS.Api -> C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.Api.dll
+  SPWPOS.TestSupport -> C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.TestSupport.dll
+  SPWPOS.IntegrationTests -> C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll
+Test run for C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\build-integration\SPWPOS.IntegrationTests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+Results File: C:\Users\Lenovo\Downloads\SWP\SWP\artifacts\note-audit-2026-10-25\integration\note-integration.trx
+
+Passed!  - Failed:     0, Passed:    16, Skipped:     0, Total:    16, Duration: 11 s - SPWPOS.IntegrationTests.dll (net8.0)

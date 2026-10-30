@@ -14,6 +14,18 @@
     gap: 16px;
     min-width: 0;
   }
+  .note-review-help,
+  .note-preview-date-help,
+  .note-warning-next-step {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
+    margin: 10px 0 14px;
+  }
+  .warning .note-warning-next-step {
+    color: inherit;
+    margin-bottom: 0;
+  }
   .note-activity {
     border: 1px solid var(--line);
     border-radius: 14px;

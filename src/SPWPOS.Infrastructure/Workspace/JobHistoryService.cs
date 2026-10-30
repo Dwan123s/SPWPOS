@@ -26,7 +26,7 @@ public sealed partial class WorkspaceService
         }
     }
     public Task<JobRunView[]> GetJobRunsAsync(CancellationToken ct) => db.SystemJobRuns.AsNoTracking().OrderByDescending(x => x.StartedAt).Take(100)
-        .Select(x => new JobRunView(x.Id, x.UserId, x.JobType, x.Status, x.ErrorMessage, x.StartedAt, x.FinishedAt)).ToArrayAsync(ct);
+        .Select(x => new JobRunView(x.Id, null, x.JobType, x.Status, x.ErrorMessage, x.StartedAt, x.FinishedAt)).ToArrayAsync(ct);
     public Task<AccountStatusLogView[]> GetAccountStatusLogsAsync(Guid uid, CancellationToken ct) => Mine<AccountStatusLog>(uid).AsNoTracking().OrderByDescending(x => x.CreatedAt).Take(100)
         .Select(x => new AccountStatusLogView(x.Id, x.UserId, x.AdminId, x.Action, x.Reason, x.CreatedAt)).ToArrayAsync(ct);
 }

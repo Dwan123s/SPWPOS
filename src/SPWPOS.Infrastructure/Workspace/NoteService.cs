@@ -83,10 +83,18 @@ public sealed partial class WorkspaceService
             return result;
         }, ct);
         var allowedTypes = await db.TaskTypes.Where(x => x.IsActive).Select(x => x.Code).ToArrayAsync(ct);
+        string NoteTaskType(string type)
+        {
+            var normalized = NormalizeTaskType(type);
+            if (allowedTypes.Contains(normalized)) return normalized;
+            Require(allowedTypes.Contains("OTHER"), "INVALID_TASK_TYPE", "Loại công việc AI nhận diện chưa được hỗ trợ và loại Khác đang tắt. Kiểm tra danh mục công việc rồi phân tích lại.", 409);
+            return "OTHER";
+        }
         analysis = OnlyNewActivities(processing, analysis);
         analysis = analysis with { Tasks = analysis.Tasks.Select(x => x with
-            { TaskType = allowedTypes.Contains(NormalizeTaskType(x.TaskType)) ? NormalizeTaskType(x.TaskType) : "OTHER",
-              CreationSource = "NATURAL_LANGUAGE", CategoryId = null, ParentId = null }).ToArray() };
+            { TaskType = NoteTaskType(x.TaskType),
+              CreationSource = "NATURAL_LANGUAGE", CategoryId = null, ParentId = null }).ToArray(),
+            Activities = analysis.Activities?.Select(x => x.Kind == "TASK" ? x with { Type = NoteTaskType(x.Type) } : x).ToArray() };
         return await Mutate(uid, async () =>
         {
             var note = await Find<PlanningNote>(uid, id, ct); CheckNoteVersion(note, input.Version);

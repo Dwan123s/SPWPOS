@@ -1,0 +1,82 @@
+import { useSyncExternalStore } from "react";
+import { icon, state } from "./ui.jsx";
+import {
+  dismissNotificationPopup,
+  notificationSnapshot,
+  subscribeNotifications,
+} from "./notification-feed.js";
+import "./styles/notification-popups.css";
+
+export function useNotificationFeed() {
+  return useSyncExternalStore(
+    subscribeNotifications,
+    notificationSnapshot,
+    notificationSnapshot,
+  );
+}
+function useUnreadCount() {
+  const feed = useNotificationFeed();
+  const rows =
+    feed.userId && feed.userId === state.workspace?.profile?.id
+      ? feed.items
+      : state.workspace?.notifications || [];
+  return rows.filter((item) => !item.isRead).length;
+}
+export function NotificationBell() {
+  const count = useUnreadCount();
+  return (
+    <button
+      type="button"
+      className="bell"
+      data-action="nav"
+      data-id="notifications"
+      aria-label={`Thông báo${count ? `, ${count} chưa đọc` : ""}`}
+    >
+      {icon("bell")}
+      {count > 0 && <span className="dot" />}
+    </button>
+  );
+}
+export function NotificationUnreadCount() {
+  const count = useUnreadCount();
+  return count > 0 ? (
+    <span className="notification-number">{count}</span>
+  ) : null;
+}
+export function NotificationPopups() {
+  const feed = useNotificationFeed();
+  if (!feed.userId || !feed.popups.length) return null;
+  return (
+    <section
+      className="reminder-popups"
+      aria-label="Nhắc nhở mới"
+      aria-live="polite"
+    >
+      {feed.popups.map((item) => (
+        <article className="reminder-popup" key={item.id}>
+          <span className="reminder-popup-icon" aria-hidden="true">
+            {icon("bell")}
+          </span>
+          <div className="reminder-popup-content">
+            <strong>{item.title}</strong>
+            <p>{item.message}</p>
+            <a
+              href="#notifications"
+              onClick={() => dismissNotificationPopup(item.id)}
+            >
+              Xem thông báo {icon("arrow")}
+            </a>
+          </div>
+          <button
+            type="button"
+            className="reminder-popup-close"
+            aria-label={`Đóng nhắc nhở: ${item.title}`}
+            onClick={() => dismissNotificationPopup(item.id)}
+          >
+            {icon("close")}
+          </button>
+        </article>
+      ))}
+    </section>
+  );
+}

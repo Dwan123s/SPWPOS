@@ -1311,6 +1311,10 @@ it("finishing a session asks for progress and completes the whole task only on e
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   const user = userEvent.setup();
+  // The focus panel follows calendar time automatically. Explicit execution
+  // adjustments remain available inside the session's details.
+  const schedule = within(screen.getByRole("region", { name: "Lịch hôm nay", exact: true }));
+  await user.click(schedule.getByText(currentWorkspace.sessions[1].taskName).closest("button"));
   await user.click(
     screen.getByRole("button", { name: "Xong phiên", exact: true }),
   );

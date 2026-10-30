@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { MascotEyes } from "./mascot-eyes.jsx";
 import { icon } from "./ui.jsx";
+import "./styles/workspace-upgrade.css";
 
 const image = "/assets/start/planora-owl-v1.png";
 const preferenceKey = "planora.nora.motion-paused";
@@ -14,7 +15,10 @@ function readPaused() {
 
 export function NoraAvatar() {
   return (
-    <span className="nora-avatar" aria-hidden="true">
+    <span
+      className="nora-avatar"
+      aria-hidden="true"
+    >
       <img src={image} alt="" width="64" height="64" decoding="async" />
     </span>
   );

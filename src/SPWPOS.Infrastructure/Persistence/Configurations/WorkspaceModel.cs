@@ -54,8 +54,12 @@ public static class WorkspaceModel
         var exception = Owned<AvailabilityException>(b); exception.HasIndex(x => new { x.UserId, x.Date }); exception.Property(x => x.Note).HasMaxLength(300);
         var fixedEvent = Owned<FixedEvent>(b); fixedEvent.Property(x => x.Name).HasMaxLength(200); fixedEvent.HasIndex(x => new { x.UserId, x.Start });
         var preference = Owned<WorkPreference>(b); preference.HasIndex(x => x.UserId).IsUnique(); preference.Property(x => x.TimeZoneId).HasMaxLength(100);
+        preference.Property(x => x.Revision).IsConcurrencyToken();
+        preference.Property(x => x.MutationVersion).IsConcurrencyToken();
         var proposal = Owned<PlanProposal>(b); proposal.Property(x => x.PayloadJson).IsRequired(); proposal.HasIndex(x => x.ExpiresAt);
         var session = Owned<WorkSession>(b); session.Property(x => x.ReasonCode).HasMaxLength(80);
+        session.HasIndex(x => new { x.UserId, x.RepairSourceSessionId }).IsUnique().HasFilter("[RepairSourceSessionId] IS NOT NULL");
+        session.HasOne<WorkSession>().WithMany().HasForeignKey(x => new { x.UserId, x.RepairSourceSessionId }).HasPrincipalKey(x => new { x.UserId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         session.HasIndex(x => new { x.UserId, x.Start }); session.HasIndex(x => x.UserId).IsUnique().HasFilter("[Status] IN (1, 2)");
         session.HasOne<WorkTask>().WithMany().HasForeignKey(x => new { x.UserId, x.TaskId }).HasPrincipalKey(x => new { x.UserId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         var notification = Owned<InAppNotification>(b); notification.Property(x => x.Kind).HasMaxLength(60); notification.Property(x => x.Title).HasMaxLength(200);

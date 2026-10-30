@@ -1,0 +1,171 @@
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
+import {
+  NotificationBell,
+  NotificationPopups,
+  NotificationUnreadCount,
+} from "../src/notification-popups.jsx";
+import {
+  dismissNotificationPopup,
+  notificationSnapshot,
+  previewNotificationPopup,
+  resetNotificationFeed,
+  syncNotifications,
+} from "../src/notification-feed.js";
+import { startNotificationPolling } from "../src/notification-polling.js";
+import { state } from "../src/ui.jsx";
+const reminder = (id, isRead = false) => ({
+  id,
+  kind: "SESSION_REMINDER",
+  title: `Nhắc ${id}`,
+  message: "Sắp bắt đầu phiên học",
+  createdAt: "2026-10-30T07:00:00Z",
+  isRead,
+});
+function setup(items = []) {
+  state.workspace = {
+    profile: { id: "member" },
+    notifications: items,
+    notificationSettings: { inAppEnabled: true },
+    features: ["notification-refresh"],
+  };
+  act(() => syncNotifications(state.workspace));
+}
+beforeEach(() => {
+  localStorage.clear();
+  resetNotificationFeed();
+  state.workspace = null;
+});
+afterEach(() => {
+  cleanup();
+  resetNotificationFeed();
+  vi.useRealTimers();
+});
+
+it("shows existing unread once and updates the bell and popup on new arrivals", () => {
+  setup([reminder("old")]);
+  render(
+    <>
+      <NotificationBell />
+      <NotificationUnreadCount />
+      <NotificationPopups />
+    </>,
+  );
+  expect(screen.getByText("Bạn có 1 thông báo chưa đọc")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Thông báo, 1 chưa đọc" }),
+  ).toBeTruthy();
+  act(() =>
+    syncNotifications({
+      ...state.workspace,
+      notifications: [reminder("new"), reminder("old")],
+    }),
+  );
+  expect(screen.getByText("Nhắc new")).toBeTruthy();
+  expect(screen.getByText("Bạn có 2 thông báo chưa đọc")).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Thông báo, 2 chưa đọc" }),
+  ).toBeTruthy();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Đóng nhắc nhở: Nhắc new" }),
+  );
+  act(() =>
+    syncNotifications({
+      ...state.workspace,
+      notifications: [reminder("new"), reminder("old")],
+    }),
+  );
+  expect(screen.queryByText("Nhắc new")).toBeNull();
+  expect(
+    notificationSnapshot().items.filter((item) => !item.isRead),
+  ).toHaveLength(2);
+});
+it("does not repeat dismissed popups after a reload, and respects account isolation", () => {
+  setup([reminder("one")]);
+  act(() => dismissNotificationPopup("summary:member"));
+  resetNotificationFeed();
+  setup([reminder("one")]);
+  expect(notificationSnapshot().popups).toHaveLength(0);
+  act(() =>
+    syncNotifications({
+      profile: { id: "other" },
+      notifications: [],
+      notificationSettings: {},
+    }),
+  );
+  expect(notificationSnapshot().items).toHaveLength(0);
+  expect(notificationSnapshot().popups).toHaveLength(0);
+});
+it("removes read reminders, honors opt-out, and previews without fake inbox records", () => {
+  setup();
+  render(<NotificationPopups />);
+  act(() =>
+    syncNotifications({ ...state.workspace, notifications: [reminder("new")] }),
+  );
+  expect(screen.getByText("Nhắc new")).toBeTruthy();
+  act(() =>
+    syncNotifications({
+      ...state.workspace,
+      notifications: [reminder("new", true)],
+    }),
+  );
+  expect(screen.queryByText("Nhắc new")).toBeNull();
+  act(() =>
+    syncNotifications({
+      ...state.workspace,
+      notificationSettings: { inAppEnabled: false },
+      notifications: [reminder("off")],
+    }),
+  );
+  expect(screen.queryByLabelText("Nhắc nhở mới")).toBeNull();
+  setup();
+  act(() => previewNotificationPopup());
+  expect(screen.getByText("Thông báo thử")).toBeTruthy();
+  expect(notificationSnapshot().items).toHaveLength(0);
+});
+it("polls while editing a note, throttles scans, and stops cleanly", async () => {
+  vi.useFakeTimers();
+  setup();
+  state.route = "notes";
+  const request = vi.fn(async () => [reminder("due")]);
+  let stop;
+  await act(async () => {
+    stop = startNotificationPolling(() => state.workspace, request);
+  });
+  expect(request).toHaveBeenCalledWith("/api/notifications/refresh", "POST");
+  expect(notificationSnapshot().items[0].id).toBe("due");
+  await act(async () => vi.advanceTimersByTimeAsync(20000));
+  expect(request).toHaveBeenLastCalledWith("/api/notifications");
+  await act(async () => vi.advanceTimersByTimeAsync(40000));
+  expect(
+    request.mock.calls.filter(([path]) => path.endsWith("/refresh")),
+  ).toHaveLength(2);
+  stop();
+  const calls = request.mock.calls.length;
+  await act(async () => vi.advanceTimersByTimeAsync(60000));
+  expect(request).toHaveBeenCalledTimes(calls);
+});
+it("ignores responses that arrive after logout", async () => {
+  setup();
+  let resolve;
+  const request = vi.fn(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  const stop = startNotificationPolling(() => state.workspace, request);
+  state.workspace = null;
+  resetNotificationFeed();
+  await act(async () => {
+    resolve([reminder("private")]);
+  });
+  expect(notificationSnapshot().items).toHaveLength(0);
+  stop();
+});

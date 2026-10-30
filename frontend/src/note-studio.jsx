@@ -14,7 +14,6 @@ const types = {
   WRITING: "Viết nội dung",
   STUDY: "Học tập",
   MEETING_PREP: "Chuẩn bị họp",
-  DESIGN: "Thiết kế",
   ADMIN: "Hành chính",
 };
 
@@ -42,6 +41,7 @@ export function NoteStudio({
   updateDraft,
   proposalIssue,
   workspace,
+  checklist,
   stage,
   setStage,
   feedback,
@@ -93,7 +93,7 @@ export function NoteStudio({
   };
   return (
     <div
-      className={`notes-workspace note-studio ${reviewing ? "is-review" : "is-writing"}${focusMode && !reviewing ? " is-focus" : ""}${appearance.ruled ? " is-ruled" : ""}`}
+      className={`notes-workspace note-studio ${reviewing ? "is-review" : "is-writing"}${note.createdTaskIds?.length ? " has-checklist" : ""}${focusMode && !reviewing ? " is-focus" : ""}${appearance.ruled ? " is-ruled" : ""}`}
       style={noteAppearanceStyle(appearance)}
     >
       <NoteLibrary
@@ -241,6 +241,7 @@ export function NoteStudio({
                   }
                 />
               </label>
+              {!reviewing && checklist}
               <div className="note-editor-footer">
                 <div className="note-editor-caption">
                   <p className="note-privacy">
@@ -336,6 +337,7 @@ export function NoteStudio({
         </section>
         {feedback}
         {availability}
+        {reviewing && checklist}
         {note.analysis && (
           <section
             className="note-review"
@@ -358,7 +360,13 @@ export function NoteStudio({
                 </h2>
                 <p>
                   {note.analysis.activities ? (
-                    "Kiểm tra đủ hoạt động, bổ sung thông tin còn thiếu và xác nhận lịch."
+                    note.analysis.activities.some(
+                      (activity) => activity.kind === "TASK",
+                    ) ? (
+                      "Chọn việc muốn tạo và kiểm tra lịch. Các việc mới sẽ có ô tick hoàn thành trong Note sau khi bạn xác nhận lưu."
+                    ) : (
+                      "Kiểm tra ngày giờ trước khi xác nhận. Các sự kiện sẽ xuất hiện trên Lịch sau khi bạn lưu."
+                    )
                   ) : (
                     <>
                       Phân tích bằng {note.analysis.source} ·{" "}

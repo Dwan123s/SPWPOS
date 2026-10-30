@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SPWPOS.Domain.Entities;
 namespace SPWPOS.Infrastructure.Persistence;
 
-public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
@@ -55,11 +55,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         RefreshTaskVersions();
+        CaptureCalendarChanges();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         RefreshTaskVersions();
+        CaptureCalendarChanges();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
     protected override void OnModelCreating(ModelBuilder builder)
@@ -68,5 +70,6 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
         WorkspaceModel.Configure(builder);
         WorkloadHistoryModel.Configure(builder);
+        CalendarModel.Configure(builder);
     }
 }

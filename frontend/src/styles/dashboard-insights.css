@@ -1,0 +1,44 @@
+.horizon-chart .horizon-total {
+  display: block;
+  margin-bottom: 5px;
+  text-align: center;
+  font-size: 11px;
+  color: #24577f;
+  font-weight: 650;
+}
+.horizon-chart .horizon-planned {
+  width: 40%;
+  left: 7%;
+}
+.horizon-chart .horizon-capacity {
+  width: 40%;
+  left: 53%;
+}
+.horizon-chart.is-calendar-only .horizon-planned {
+  width: 64%;
+  left: 18%;
+}
+.horizon-missing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #526b82;
+}
+.horizon-missing .btn {
+  padding: 5px 8px;
+  min-height: 28px;
+}
+.intelligence-card .gauge-caption {
+  flex-wrap: wrap;
+  gap: 6px;
+  line-height: 1.6;
+}
+.intelligence-card.horizon-card > p {
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 6px;
+}

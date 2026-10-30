@@ -9,4 +9,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
     public bool IsActive { get; set; } = true;
+    public long ExperiencePoints { get; set; }
+    public int UserLevel { get; set; } = 1;
+    public string NoraSkin { get; set; } = "classic";
 }

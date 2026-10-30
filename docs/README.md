@@ -26,6 +26,9 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 ## Guides / Hướng dẫn
 
+- [Workspace phases 1–4 / Kiến trúc, EMA, XP và ghi nhận bù](features/WORKSPACE_UPGRADE_PHASES_1_TO_4.md)
+- [Independent builds, same origin / Build riêng, chung địa chỉ](development/INDEPENDENT_BUILD_SAME_ORIGIN.md)
+- [Upgrade verification 28/10/2026 / Kết quả kiểm chứng](development/WORKSPACE_UPGRADE_VERIFICATION_2026-10-28.md)
 - [User guide / Hướng dẫn người dùng](guides/USER_GUIDE.md)
 - [System setup and operation / Cấu hình và vận hành](guides/SYSTEM_GUIDE.md)
 - [Workspace interface / Giao diện không gian làm việc](guides/WORKSPACE_UI_GUIDE.md)
@@ -40,6 +43,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 - [Gmail SMTP](integrations/GMAIL_SMTP.md)
 - [Firebase Google login / Đăng nhập Google](integrations/FIREBASE_GOOGLE_LOGIN.md)
+- [Google Calendar: đồng bộ hai chiều và hướng dẫn cấu hình](integrations/GOOGLE_CALENDAR_SETUP.md)
 - [Google Cloud AI](integrations/GOOGLE_CLOUD_AI.md)
 - [PayOS decisions / Quyết định tích hợp PayOS](integrations/PAYOS_INTEGRATION_DECISIONS.md)
 
@@ -67,6 +71,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 ## Plans and reviews / Kế hoạch và đánh giá
 
+- [Note flow audit, 25 October / Kiểm thử và đánh giá luồng Note](reviews/NOTE_FLOW_AUDIT_2026-10-25.md) · [Luồng chi tiết](features/NOTE_FLOW_2026-10-25.md) · [208 bản ghi kiểm thử](evidence/note-audit-2026-10-25/cases.csv)
 - [Upgrade plan](plans/PLANORA_UPGRADE_PLAN.md) · [AI agent implementation plan](plans/AI_AGENT_IMPLEMENTATION_PLAN.md)
 - [Remediation plan](plans/PLANORA_REMEDIATION_PLAN_2026-10-15.md) · [Fix progress](plans/PLANORA_FIX_PROGRESS.md)
 - [Remediation prompt](prompts/PLANORA_FULL_REMEDIATION_PROMPT.md)

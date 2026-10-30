@@ -41,13 +41,26 @@ public sealed partial class WorkspaceService
     {
         var settings = await db.NotificationSettings.SingleOrDefaultAsync(x => x.UserId == uid, ct) ?? new();
         var state = await State(uid, ct); bool missed = false;
-        foreach (var session in state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && x.End < Now))
-        { session.Status = WorkSessionStatus.Missed; missed = true; }
+        foreach (var session in state.Sessions.Where(x => x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.NeedsReview && x.End < Now &&
+            state.Tasks.Any(t => t.Id == x.TaskId && t.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled)))
+        {
+            if (session.Status == WorkSessionStatus.Scheduled) { session.Status = WorkSessionStatus.NeedsReview; missed = true; }
+            await AddNotification(uid, "SESSION_REVIEW", "Bạn đã hoàn thành phiên này chưa?",
+                (state.Tasks.FirstOrDefault(x => x.Id == session.TaskId)?.Name ?? "Phiên làm việc") + " đã qua. Mở Hôm nay để ghi nhận kết quả, không cần bật timer.",
+                $"review:{session.Id}:{session.End.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
+        }
         if (missed) (await Preference(uid, ct)).Revision = Guid.NewGuid();
         foreach (var task in state.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled && x.Deadline < Now.AddHours(settings.DeadlineLeadHours)))
             await AddNotification(uid, "DEADLINE", "Công việc sắp đến hạn", task.Name + " · Hạn: " + TimeZoneInfo.ConvertTime(task.Deadline, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd/MM/yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"deadline:{task.Id}:{task.Deadline.UtcTicks}", task.Id, ct);
         foreach (var session in state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && x.Start >= Now && x.Start <= Now.AddMinutes(settings.SessionReminderLeadMinutes)))
             await AddNotification(uid, "SESSION_REMINDER", "Sắp đến phiên làm việc", (state.Tasks.FirstOrDefault(x => x.Id == session.TaskId)?.Name ?? "Phiên làm việc") + " · Bắt đầu: " + TimeZoneInfo.ConvertTime(session.Start, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd/MM/yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"session:{session.Id}:{session.Start.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
+        // Timetables imported from images are FixedEvents, not WorkSessions.
+        // Allow a short catch-up window when a browser/worker wakes at start time.
+        foreach (var entry in state.Events.Where(x => x.End > Now && x.Start >= Now.AddMinutes(-2) &&
+            x.Start <= Now.AddMinutes(settings.SessionReminderLeadMinutes)))
+            await AddNotification(uid, "EVENT_REMINDER", entry.Start <= Now ? "Lịch hẹn đang bắt đầu" : "Sắp đến lịch hẹn",
+                entry.Name + " · Bắt đầu: " + TimeZoneInfo.ConvertTime(entry.Start, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd/MM/yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").",
+                $"event:{entry.Id}:{entry.Start.UtcTicks}", null, ct);
         var analysis = engine.Analyze(state, new(Now, 7), Now);
         static int Level(string value) => value.ToUpperInvariant() switch { "MODERATE" => 1, "HIGH" => 2, "OVERLOAD" => 3, _ => 0 };
         if (Level(analysis.RiskLevel) >= Level(settings.WorkloadWarningLevel))
@@ -59,14 +72,16 @@ public sealed partial class WorkspaceService
         if (missed) { await db.SaveChangesAsync(ct); await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, state.Preference.PlanningHorizonDays), ct); }
         return true;
     }, ct, false);
+    public Task<NotificationView[]> GetNotificationsAsync(Guid uid, CancellationToken ct) => Mine<InAppNotification>(uid).AsNoTracking()
+        .Where(x => x.IsVisible).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(100)
+        .Select(x => new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null)).ToArrayAsync(ct);
     public Task MarkNotificationAsync(Guid uid, Guid id, CancellationToken ct) => Mutate(uid, async () => (await Find<InAppNotification>(uid, id, ct)).ReadAt = Now, ct, false);
     public Task<AdminUserView[]> SearchUsersAsync(string? search, CancellationToken ct)
     {
         var term = (search ?? "").Trim(); Require(term.Length <= 100, "VALIDATION_ERROR", "Từ khóa quá dài.");
         return db.Users.AsNoTracking().Where(x => term == "" || x.Email!.Contains(term) || x.FirstName.Contains(term) || x.LastName.Contains(term) || x.UserName!.Contains(term))
             .OrderBy(x => x.Email).Take(100).Select(x => new AdminUserView(x.Id, x.Email!, x.FirstName, x.LastName, x.IsActive, x.EmailConfirmed, x.LastLoginAt,
-                x.UserName, x.CreatedAt, db.WorkTasks.Count(t => t.UserId == x.Id && !t.IsDeleted),
-                db.WorkTasks.Count(t => t.UserId == x.Id && !t.IsDeleted && t.Status == WorkTaskStatus.Completed),
+                x.UserName, x.CreatedAt, 0, 0,
                 db.RefreshTokens.Count(t => t.UserId == x.Id && t.RevokedAt == null && t.ExpiresAt > Now))).ToArrayAsync(ct);
     }
     public Task SetUserActiveAsync(Guid adminId, Guid targetId, bool active, CancellationToken ct, string? reason = null) => Mutate(adminId, async () =>

@@ -80,6 +80,7 @@ public sealed partial class WorkspaceService
             db.ExecutionSegments.Add(new() { UserId = uid, ExecutionId = execution.Id, Start = Now });
         }
         if (execution is not null && action is "complete" or "skip") execution.EndedAt = Now;
+        if (action == "complete") await AwardSessionExperienceAsync(uid, session, task, Now, ct);
         session.UpdatedAt = Now;
         task.UpdatedAt = Now;
     }, ct);

@@ -2,6 +2,7 @@ import { SessionTimer } from "./react-ui.jsx";
 import { Select, nodeList } from "./react-ui.jsx";
 import { availabilityEditor } from "./interactive.jsx";
 import { StartSessionButton } from "./session-start.jsx";
+import { CalendarTimeTag } from "./calendar-time.jsx";
 import {
   state,
   button,
@@ -19,16 +20,17 @@ import {
 } from "./ui.jsx";
 export const sessionById = (id) =>
   state.workspace.sessions.find((s) => s.id === id);
-export function sessionCard(s) {
+export function sessionCard(s, calendarTime) {
   const upcoming = s.status === "Scheduled",
     active = ["Running", "Paused"].includes(s.status);
   const expired = active && new Date(s.end).getTime() <= Date.now();
   return (
     <div
-      className={`session-card ${s.status === "Completed" ? "completed" : ""}`}
+      className={`session-card ${s.status === "Completed" ? "completed" : ""} ${calendarTime ? `calendar-timed-card calendar-time-${calendarTime}` : ""}`}
     >
       <div className="session-top">
         <h3>{s.taskName}</h3>
+        {calendarTime && <CalendarTimeTag phase={calendarTime} />}
         {badge(
           statusLabels[s.status],
           active ? "purple" : s.status === "Completed" ? "green" : "",

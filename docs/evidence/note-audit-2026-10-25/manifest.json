@@ -1,0 +1,304 @@
+{
+  "auditDate": "2026-10-25",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "exportedAtUtc": "2026-10-25T07:32:30.1996078+00:00",
+  "head": "949febe89c657711d6268753d8ba375766066739",
+  "auditedWorkingTree": "Includes uncommitted changes; use hashes rather than HEAD alone.",
+  "baseline": {
+    "unit": 65,
+    "skipped": 0,
+    "integration": 16,
+    "frontend": 107,
+    "total": 188,
+    "failed": 0
+  },
+  "diagnostic": {
+    "backend": 11,
+    "total": 15,
+    "positiveChecks": 2,
+    "frontend": 4,
+    "reproducedGapsOrRisks": 13
+  },
+  "liveAi": {
+    "databaseWrites": false,
+    "provider": "VertexAI",
+    "fictionalInputsOnly": true,
+    "passed": 5,
+    "cases": 5
+  },
+  "records": 208,
+  "sourceFiles": [
+    {
+      "path": "Directory.Build.props",
+      "sha256": "05542edaaf086afd85559a29794b80db501484e4b6ac1a3680ac10636caac9f1"
+    },
+    {
+      "path": "frontend/package-lock.json",
+      "sha256": "c314ec65e4786da04fa208e876f5b144d8844d2171e482a7bf0546662f6b9d96"
+    },
+    {
+      "path": "frontend/package.json",
+      "sha256": "f21b19a99fa85044a9ca2bb63d5ad91aff1ffee75dd7228af1cfbff6350547b8"
+    },
+    {
+      "path": "frontend/src/controller.jsx",
+      "sha256": "eb44f043140445394084f09db4aa7d15b49e26eddf92d709ba2b35a51912bfb6"
+    },
+    {
+      "path": "frontend/src/note-activities.jsx",
+      "sha256": "a2869fbeebfbeafd9d962ac9fa5fc3dfb247d822a329808d9f5fc2203852dd9a"
+    },
+    {
+      "path": "frontend/src/note-appearance.js",
+      "sha256": "5deac3255171db2ccab71e0b767be2156d3f0d5aa6e36db255415ba9b2ed3da5"
+    },
+    {
+      "path": "frontend/src/note-checklist.jsx",
+      "sha256": "d515eedc2f19154029ba1c5106d2ca8645a00abc0a0f93cba2b7191919ad259d"
+    },
+    {
+      "path": "frontend/src/note-impact.jsx",
+      "sha256": "6184361b37384afc94888022b1fc763d094b0e7585692c582d9a184adb97a526"
+    },
+    {
+      "path": "frontend/src/note-library.jsx",
+      "sha256": "9f367dc52b574d7cc2c3955f5858f7efba6e5547660ab144655a6acb9622c512"
+    },
+    {
+      "path": "frontend/src/note-plan-preview.jsx",
+      "sha256": "c03815620e9b1974851fa3910326fef66642fdcaa891b42ce083228fae112c7e"
+    },
+    {
+      "path": "frontend/src/note-studio.jsx",
+      "sha256": "b3c5362400b8195dd837122a2b195a542580b7f9fd5472cf1c5a6c8d99be9dcb"
+    },
+    {
+      "path": "frontend/src/note-writing-tools.jsx",
+      "sha256": "ff004e0e0773ef42709b822c77dfe7cd3b6949434ac9e063c4fb0cfb062260e9"
+    },
+    {
+      "path": "frontend/src/notes.jsx",
+      "sha256": "b9a81eec6758ff195a54bb0de87b4cc261142b366481078b361074701968ddc8"
+    },
+    {
+      "path": "frontend/src/styles/note-activities.css",
+      "sha256": "3c04180c362c428a31ac213f264d55ca6fb6e4d5f3498658d81b919a92e66122"
+    },
+    {
+      "path": "frontend/src/styles/note-checklist.css",
+      "sha256": "e0f8790273fc545cbde1857f33247cf485944e6386137e5becfc1b1691ed6714"
+    },
+    {
+      "path": "frontend/src/styles/note-notebook.css",
+      "sha256": "b0938697bcacf02b28266702d21f4c9e9e2645157398e64785891fa350963014"
+    },
+    {
+      "path": "frontend/src/styles/note-studio.css",
+      "sha256": "c9a1e550d51052248f8f18ca8e95ae2b8e96790ca45793d12caea59dec7a929c"
+    },
+    {
+      "path": "frontend/src/styles/notes-entry.css",
+      "sha256": "6b2fc7c5755c29f2f06ff5ddc2690a643be9fcd7d0f4163f1e86207e75ee2436"
+    },
+    {
+      "path": "frontend/src/styles/notes.css",
+      "sha256": "a509846ae8a411275b2b919f19e08e17fcf13375af14aa92648e01ad54ad3176"
+    },
+    {
+      "path": "frontend/tests/note-activities.test.jsx",
+      "sha256": "b0e48aadcfda53a49fc17aa64a6695e88dba36d6e22f738e0a41b5f413087c1f"
+    },
+    {
+      "path": "frontend/tests/note-appearance.test.js",
+      "sha256": "0d44c548c1764553ee1d292e423d3e38e961411518ea98136f8002381001d3c0"
+    },
+    {
+      "path": "frontend/tests/note-checklist.test.jsx",
+      "sha256": "91369676ca84e7673902d5c03f1622bd338bebd770a05411b47fb88f8128eaeb"
+    },
+    {
+      "path": "frontend/tests/note-impact.test.jsx",
+      "sha256": "60f025df6d08af539f98e380afaff15469bea1632584928827c5b9bd251e93aa"
+    },
+    {
+      "path": "frontend/tests/note-plan-preview.test.jsx",
+      "sha256": "3c84c44d78ffdf43b9f9940680f0e439af9624affd3cedb0c8c9393be7f2a326"
+    },
+    {
+      "path": "frontend/tests/notes-autosave.test.jsx",
+      "sha256": "2698f4127b9b2dbc49b62943266a46570d8d4826a8a575558f388bb77f2148ac"
+    },
+    {
+      "path": "frontend/tests/notes.test.jsx",
+      "sha256": "844cafc357a78517dc13c2a98670f2a7e0d329a53b9afcbedf1067a95fe7b9a5"
+    },
+    {
+      "path": "frontend/vite.config.js",
+      "sha256": "c4624f12953bb7448ee58df12b9322530749c040840a5e0114a351ef808e9ff8"
+    },
+    {
+      "path": "global.json",
+      "sha256": "1a5d9f32cbc04872ee822bf0887debf77915c0b6b176343d05cf39a6827eafee"
+    },
+    {
+      "path": "src/SPWPOS.Api/Controllers/NotesController.cs",
+      "sha256": "95db51dce2a9dbddaa73bbf54d7e8f2287f6b62a33650db60b18f351ecfa3380"
+    },
+    {
+      "path": "src/SPWPOS.Application/Workspace/Contracts.cs",
+      "sha256": "035daa78e2c14245d32a639ededc0ed02431009d392307544c135bf1a0c2a738"
+    },
+    {
+      "path": "src/SPWPOS.Application/Workspace/NoteContracts.cs",
+      "sha256": "6969dc84790226a281c5a95e0549b78d6bfa5f6a410d7a5195f486f0c8dcc4e1"
+    },
+    {
+      "path": "src/SPWPOS.Application/Workspace/PlanningEngine.cs",
+      "sha256": "e3106d09174de7a791f904d4af8051f380cc277a75865adc228135dbc492a552"
+    },
+    {
+      "path": "src/SPWPOS.Domain/Entities/PlanningNote.cs",
+      "sha256": "316d7ca51ca502fc7849b2acf170776c152a810a9630ff9c67214875f3a60bcb"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Persistence/Migrations/20261008132609_AddPlanningNotes.cs",
+      "sha256": "4c529ef01c35328d0f267b6d92f6521048f877024aaa8c89006cd3a65b4c13f8"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Persistence/Migrations/20261008132609_AddPlanningNotes.Designer.cs",
+      "sha256": "61f9f925ebe99e6e4a06567fd52cdc23c181ad21682d9ea9c7aba245849e5fa6"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Persistence/Migrations/20261024142339_AddNoteProcessingState.cs",
+      "sha256": "65f3c742f86ea67489d0f7ca1022cdaaaa4b00e75fa18dd6f6fdc70616b470c0"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Persistence/Migrations/20261024142339_AddNoteProcessingState.Designer.cs",
+      "sha256": "d74dd5672b4fb01acf4a2f0d937ffc5c6ef32171c2d9cba6eccb3395bfd20b57"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Workspace/NoteActivitiesService.cs",
+      "sha256": "d0eb52e2248591a7c455965bf2c0f88be87ee661aa7a86ad2fe428a70c47dcda"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Workspace/NoteActivityInterpreter.cs",
+      "sha256": "ef598221d0d671dfcd887c3fb303b0a30c14a362782f28623d84ae1a097c01dc"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Workspace/NoteChecklistService.cs",
+      "sha256": "bdaa44cc4e577e36d52ec5362ba133d6822b022e6a94874a076923da4a015869"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Workspace/NoteProcessing.cs",
+      "sha256": "01f2304e5dcbfc89e7dabd5f1420e80be66436fdfeb13aae3408f8aa0380ce90"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Workspace/NoteService.cs",
+      "sha256": "b70340bcf34afe2fe50ffdeba993c7be3a8e6178cbf18380fd3dca3a2077e246"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Workspace/TaskInterpreter.cs",
+      "sha256": "04be277bd2066c4dca7413285aa0710cd1bb75c85ba7cc43b64967a67f01c482"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Workspace/TaskService.cs",
+      "sha256": "dc5a2d1e11f6be844beb914ac7a4e06184c3b67713ffc686ab5feb47c1c657a2"
+    },
+    {
+      "path": "src/SPWPOS.Infrastructure/Workspace/WorkspaceService.cs",
+      "sha256": "18165e5e7f1bcf1299c3bf126d6d80005c9c681ee550c98775ba754ed05479d7"
+    },
+    {
+      "path": "tests/SPWPOS.IntegrationTests/NoteImpactTests.cs",
+      "sha256": "862bac6ee4811605be43385f3c0c4b019e3d21d8f797c5f80ef6ab505ad14c52"
+    },
+    {
+      "path": "tests/SPWPOS.IntegrationTests/NotesApiTests.cs",
+      "sha256": "90d1c9f0feb442bdb8192ff22ced056cfeccccb54e829fb6451af6f38222c551"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/AgentAiTestDouble.cs",
+      "sha256": "f5d9e4a7acd18705655ee537cfcb2add082828a78ca78ac2723895d4af9f75c8"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/ApiFactory.cs",
+      "sha256": "f162d18ad37d5c161f05cb23d2aea5d40e5e8b528d0e7958030e113789f4bd58"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/ConversationFixture.cs",
+      "sha256": "7c0aa5e3e889deaa4f962697760776cfeaf37172b5137f45186e75ac9d9446e8"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/ConversationPack.cs",
+      "sha256": "a13cbd62fa341ba04aeaf7b3eb2e8630563d0b902c2f79397de3f2d9e9de7504"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/ConversationRunner.cs",
+      "sha256": "ac93b7a8e737c12fa12e1d9f23987c514ba770c77a09c3b4ad23e671ecf95dc8"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/Environment.cs",
+      "sha256": "a0040957d1cf864fa9af994c4c71d8b664a8f48b0d185eaad6f8c2882ce2da31"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/Export.cs",
+      "sha256": "80dab328f760a00a89f63b0d388aaa755232a9ba2698ed11fb1dba0928dc2c71"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/Models.cs",
+      "sha256": "8944af2f87233b2e382b0ee42fdd271c241218c49b100bea9d65f227c1ad2e19"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/Oracle.cs",
+      "sha256": "428d37c57d9dcc8c18fd3c88fcd178c590ea4f18755fc349e07e5a1b279c7733"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/Runner.cs",
+      "sha256": "a00649d057a63d569ddcb347edd0e6849a690e5a37fe7037c1534e3806a7ae89"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoraSandbox/ScriptedResponses.cs",
+      "sha256": "19ab34cb577b2bb70bf125637b2267fa8d1028b2f73a944fe1b471602e633e61"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/NoteAiTestDouble.cs",
+      "sha256": "d7355f4e9e45eda5c36d33ebbba507f10d7dd476b584e4b9242b4252953bfc7a"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/packages.lock.json",
+      "sha256": "8d84edaeb707d4b021dea1c44aaa4619a8d1b04be56970d5f89f6b2f8a09faa0"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/ServiceHarness.cs",
+      "sha256": "4ac9bf670e6884b3f30fb89a4c09e1ef3ab6d965d6311c8d0abc02c91b63ae96"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/SPWPOS.TestSupport.csproj",
+      "sha256": "5e3d30becbb3cbfba09090c698b4ad8f114dd9020c2da91390d2127af1268baf"
+    },
+    {
+      "path": "tests/SPWPOS.TestSupport/TestInfrastructure.cs",
+      "sha256": "b88fddd252875a86941ba33fdda363fee5f990a15e874fa7e447926970306331"
+    },
+    {
+      "path": "tests/SPWPOS.UnitTests/NoteActivitiesTests.cs",
+      "sha256": "d5e1de6d7a2119239a08212d4e3c412f69d67ed6162afc1c4d82c7fb858a9bb9"
+    },
+    {
+      "path": "tests/SPWPOS.UnitTests/NoteActivityInterpreterTests.cs",
+      "sha256": "debcd4e90cf84c4720eb67ffae30ebf7c1208e140afbf56038a200a4775f8f51"
+    },
+    {
+      "path": "tests/SPWPOS.UnitTests/NoteChecklistTests.cs",
+      "sha256": "d0ae191c697d45300b9dbd2d277a4d14854a2ba3b757ed35f87630c2d02f16b1"
+    },
+    {
+      "path": "tests/SPWPOS.UnitTests/NoteInterpreterTests.cs",
+      "sha256": "84a2e9cae5d344dbe75c67adcd8e9e404a5d3bbd6c276e10930ed0b9e862f0fc"
+    },
+    {
+      "path": "tests/SPWPOS.UnitTests/NoteWorkflowTests.cs",
+      "sha256": "8a4c418739bd465e1ea60d33fd17f879da4e834025e1d32a67c17d8f1cd920d0"
+    }
+  ]
+}

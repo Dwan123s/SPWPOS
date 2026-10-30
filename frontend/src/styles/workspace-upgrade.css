@@ -1,0 +1,66 @@
+.catch-up-card {
+  margin-bottom: 18px;
+  border: 1px solid #c9ddf7;
+}
+.catch-up-card h2,
+.nora-inventory h2 {
+  font-size: 18px;
+  margin: 0 0 10px;
+}
+.catch-up-actions,
+.catch-up-partial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+.catch-up-partial label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.catch-up-card small {
+  color: #526b88;
+}
+.nora-inventory {
+  margin: 18px 0;
+}
+.nora-inventory > progress {
+  width: 100%;
+  accent-color: #0869dc;
+}
+.nora-skin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.nora-skin-grid article {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #d4e0ef;
+  border-radius: 12px;
+}
+.inventory-owl img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+.skin-forest img,
+html[data-nora-skin="forest"] .nora-avatar img,
+html[data-nora-skin="forest"] .nora-mascot-figure > img {
+  filter: hue-rotate(295deg) saturate(0.85);
+}
+.skin-sunset img,
+html[data-nora-skin="sunset"] .nora-avatar img,
+html[data-nora-skin="sunset"] .nora-mascot-figure > img {
+  filter: hue-rotate(160deg) saturate(1.2);
+}
+.skin-cosmic img,
+html[data-nora-skin="cosmic"] .nora-avatar img,
+html[data-nora-skin="cosmic"] .nora-mascot-figure > img {
+  filter: hue-rotate(60deg) saturate(1.3);
+}
