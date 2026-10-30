@@ -66,7 +66,23 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-dotnet@v5
+      - name: Check runner SDK against global.json
+        id: runner-dotnet
+        shell: bash
+        run: |
+          # The SDK resolver checks the repository's requested version and
+          # roll-forward policy before reporting a version. Hosted runners
+          # normally already include a compatible SDK and its runtimes.
+          PLANORA_RUNNER_DOTNET_VERSION="$(dotnet --version 2>/dev/null || true)"
+          if [[ "$PLANORA_RUNNER_DOTNET_VERSION" == 8.* ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Using preinstalled .NET SDK $PLANORA_RUNNER_DOTNET_VERSION"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install missing .NET SDK
+        if: steps.runner-dotnet.outputs.available != 'true'
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "8.0.x"
           cache: true
