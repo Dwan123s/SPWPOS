@@ -6,6 +6,7 @@ $taskApiDirectory = Join-Path $taskApiRoot 'src\SPWPOS.Api'
 $taskApiExe = Join-Path $taskApiDirectory 'bin\Release\net8.0\SPWPOS.Api.exe'
 if (-not (Test-Path -LiteralPath $taskApiExe -PathType Leaf)) { throw 'Build the Release API first.' }
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
+$env:DOTNET_ENVIRONMENT = 'Development'
 Push-Location -LiteralPath $taskApiDirectory
 try {
     & $SpwposDotnet (Join-Path $taskApiDirectory 'bin\Release\net8.0\SPWPOS.Api.dll') --check-schema
@@ -21,7 +22,8 @@ foreach ($taskApiProcess in $taskApiOwnedProcesses) {
 $taskApiLogs = Join-Path $taskApiRoot 'artifacts'
 [IO.Directory]::CreateDirectory($taskApiLogs) | Out-Null
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
-$taskApiNewProcess = Start-Process -FilePath $taskApiExe -ArgumentList '--urls', 'https://localhost:7043' `
+$taskApiArguments = @('--urls', 'https://localhost:7043', '--contentRoot', ('"' + $taskApiDirectory + '"'))
+$taskApiNewProcess = Start-Process -FilePath $taskApiExe -ArgumentList $taskApiArguments `
     -WorkingDirectory $taskApiDirectory -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput (Join-Path $taskApiLogs 'live-ai-api.stdout.log') `
     -RedirectStandardError (Join-Path $taskApiLogs 'live-ai-api.stderr.log')
@@ -32,10 +34,21 @@ for ($taskApiAttempt = 0; $taskApiAttempt -lt 30; $taskApiAttempt++) {
     $taskApiSocket = New-Object Net.Sockets.TcpClient
     try {
         if ($taskApiSocket.ConnectAsync('localhost', 7043).Wait(300) -and $taskApiSocket.Connected) {
-            $taskApiReady = $true; break
+            $taskApiListeners = @(Get-NetTCPConnection -State Listen -LocalPort 7043 -ErrorAction SilentlyContinue)
+            if ($taskApiListeners | Where-Object { $_.OwningProcess -eq $taskApiNewProcess.Id }) {
+                $taskApiReady = $true; break
+            }
         }
     } catch { } finally { $taskApiSocket.Dispose() }
     Start-Sleep -Milliseconds 200
 }
 if (-not $taskApiReady) { throw 'PLANORA API did not listen on port 7043.' }
 Write-Host "PLANORA API started (PID $($taskApiNewProcess.Id)) at https://localhost:7043."
+$taskApiAiStatus = $null
+for ($taskAiStatusAttempt = 0; $taskAiStatusAttempt -lt 10; $taskAiStatusAttempt++) {
+    $taskApiAiStatus = Get-Content -LiteralPath (Join-Path $taskApiLogs 'live-ai-api.stdout.log') -ErrorAction SilentlyContinue |
+        Where-Object { $_ -match '^PLANORA AI: (ready|not configured); provider=[A-Za-z]*; model=[A-Za-z0-9._/-]+\.$' } | Select-Object -Last 1
+    if ($taskApiAiStatus) { break }
+    Start-Sleep -Milliseconds 200
+}
+if ($taskApiAiStatus) { Write-Host $taskApiAiStatus }

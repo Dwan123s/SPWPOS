@@ -4,7 +4,7 @@
     [ValidatePattern('^(global|[a-z]+(-[a-z]+)+[0-9])$')]
     [string]$Location = 'global',
     [ValidatePattern('^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$')]
-    [string]$Model = 'gemini-3.5-flash-lite',
+    [string]$Model = 'gemini-3.8-flash',
     [switch]$UseWindow,
     [switch]$UseAdc,
     [switch]$ExpressMode,

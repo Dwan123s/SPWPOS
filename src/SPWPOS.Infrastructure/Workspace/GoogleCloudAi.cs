@@ -76,10 +76,16 @@ public sealed partial class TaskInterpreter
     private HttpContent GoogleContent(string instructions, string prompt, JsonElement schema, int maxTokens, bool includeStore = false, object[]? contentParts = null)
     {
         // Vertex v1 uses responseJsonSchema. Developer API uses responseFormat.
-        object generation = Provider == "VertexAI"
-            ? new { candidateCount = 1, maxOutputTokens = maxTokens, responseMimeType = "application/json", responseJsonSchema = schema }
-            : new { candidateCount = 1, maxOutputTokens = maxTokens,
-                responseFormat = new { text = new { mimeType = "APPLICATION_JSON", schema } } };
+        var generation = new Dictionary<string, object> { ["candidateCount"] = 1, ["maxOutputTokens"] = maxTokens };
+        if (Provider == "VertexAI")
+        {
+            generation["responseMimeType"] = "application/json";
+            generation["responseJsonSchema"] = schema;
+        }
+        else generation["responseFormat"] = new { text = new { mimeType = "APPLICATION_JSON", schema } };
+        // Scheduling decisions are deterministic in PlanningEngine. Bound the
+        // interpreter's reasoning overhead; 3.8 supports LOW, not MINIMAL.
+        if (IsGemini38Flash) generation["thinkingConfig"] = new { thinkingLevel = "LOW" };
         var body = new Dictionary<string, object> {
             ["systemInstruction"] = new { parts = new[] { new { text = instructions } } },
             ["contents"] = new[] { new { role = "user", parts = contentParts ?? [new { text = prompt }] } },
@@ -88,6 +94,8 @@ public sealed partial class TaskInterpreter
         if (includeStore && Provider == "Gemini") body["store"] = false;
         return JsonContent.Create(body);
     }
+
+    private bool IsGemini38Flash => (config["AiSettings:Model"] ?? "").Trim() is "gemini-3.8-flash" or "models/gemini-3.8-flash";
 
     private async Task<AuthException> GoogleFailureDetailsAsync(HttpResponseMessage response, AuthException failure, CancellationToken ct)
     {

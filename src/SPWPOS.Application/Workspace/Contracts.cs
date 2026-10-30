@@ -52,15 +52,21 @@ public sealed record DurationInput([Range(0, 10080)] int ActualMinutes);
 public sealed record PlanInput(DateTimeOffset Start, [Range(1, 30)] int HorizonDays = 7,
     [MaxLength(500)] Guid[]? AffectedTaskIds = null, bool IsReschedule = false,
     [RegularExpression("^(MANUAL|NEW_TASK|TASK_CHANGED|EARLY_COMPLETION|SESSION_MISSED|DEADLINE_CHANGED|AVAILABILITY_CHANGED)$")] string TriggerEvent = "MANUAL",
-    bool UseCapacityFactor = true, bool UseEstimateBias = true);
+    bool UseCapacityFactor = true, bool UseEstimateBias = true)
+{
+    // Server-resolved calendar boundaries; never accepted from a public JSON request.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DateTimeOffset? WindowEnd { get; init; }
+}
 public sealed record PlanWarning(Guid TaskId, string TaskName, string Code, string Message, int UnscheduledMinutes);
 public sealed record ProposedSession(Guid Id, Guid TaskId, DateTimeOffset Start, DateTimeOffset End, string ReasonCode, bool Preserved);
 public sealed record PlanView(Guid Id, Guid Revision, DateTimeOffset Start, DateTimeOffset End,
     ProposedSession[] Sessions, PlanWarning[] Warnings, string[] Explanations, bool IsApplied,
     string Status = "PROPOSED", string Kind = "INITIAL", Guid? PreviousPlanId = null, DateTimeOffset? AppliedAt = null,
-    bool UseEstimateBias = true, NotePlanContext? NoteContext = null, bool HasUrgentReplan = false, bool HasDeadlineProtection = false)
+    bool UseEstimateBias = true, NotePlanContext? NoteContext = null, bool HasUrgentReplan = false, bool HasDeadlineProtection = false,
+    bool IsOptimization = false)
 {
-    public bool RequiresConfirmation => HasUrgentReplan || HasDeadlineProtection;
+    public bool RequiresConfirmation => HasUrgentReplan || HasDeadlineProtection || IsOptimization;
 }
 public sealed record ScenarioInput(PlanInput Plan, TaskInput NewTask, [MaxLength(11)] TaskInput[]? AdditionalTasks = null);
 public sealed record BiasView(string TaskType, int Samples, double Ratio, bool Personalized);

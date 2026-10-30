@@ -33,6 +33,31 @@ public sealed class AgentInterpreterTests
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
             ["AiSettings:Enabled"] = "true", ["AiSettings:Provider"] = "Gemini", ["AiSettings:Model"] = "gemini-3.5-flash-lite", ["AiSettings:GeminiApiKey"] = "test-key"
         }).Build(), NullLogger<TaskInterpreter>.Instance);
+
+    [Theory]
+    [InlineData("Gemini", "gemini-3.8-flash", true)]
+    [InlineData("VertexAI", "gemini-3.8-flash", true)]
+    [InlineData("Gemini", "models/gemini-3.8-flash", true)]
+    [InlineData("Gemini", "gemini-3.5-flash-lite", false)]
+    public async Task Flash_38_uses_supported_low_thinking_with_the_provider_structured_output_format(string providerName, string model, bool thinking)
+    {
+        using var provider = new Provider(); using var client = new HttpClient(provider);
+        var interpreter = new TaskInterpreter(client, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+            ["AiSettings:Enabled"] = "true", ["AiSettings:Provider"] = providerName, ["AiSettings:Model"] = model,
+            ["AiSettings:GeminiApiKey"] = "test-key", ["AiSettings:VertexApiKey"] = "test-key",
+            ["AiSettings:VertexAuthentication"] = "ApiKey", ["AiSettings:VertexExpressMode"] = "true",
+            ["AiSettings:VertexLocation"] = "global", ["AiSettings:VertexProjectId"] = "planora-test-123"
+        }).Build(), NullLogger<TaskInterpreter>.Instance);
+        var result = await interpreter.InterpretAsync("Thêm cuộc họp", "{}", [], "Asia/Ho_Chi_Minh",
+            DateTimeOffset.Parse("2026-10-14T06:00:00Z"), TestContext.Current.CancellationToken);
+        Assert.Single(result.Events);
+        using var body = JsonDocument.Parse(provider.Body);
+        var generation = body.RootElement.GetProperty("generationConfig");
+        Assert.Equal(thinking, generation.TryGetProperty("thinkingConfig", out var effort));
+        if (thinking) Assert.Equal("LOW", effort.GetProperty("thinkingLevel").GetString());
+        Assert.True(generation.TryGetProperty(providerName == "VertexAI" ? "responseJsonSchema" : "responseFormat", out _));
+        Assert.Contains("gemini-3.", provider.Url!.AbsolutePath);
+    }
     [Theory] [InlineData(false)] [InlineData(true)]
     public async Task Vision_sends_image_bytes_in_the_same_planning_request_without_an_OCR_roundtrip(bool streaming)
     {

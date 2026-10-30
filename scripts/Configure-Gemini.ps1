@@ -1,6 +1,6 @@
 param(
     [ValidatePattern('^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$')]
-    [string]$Model = 'gemini-3.5-flash-lite'
+    [string]$Model = 'gemini-3.8-flash'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Initialize-Dotnet.ps1')

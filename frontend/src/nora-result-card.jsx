@@ -24,6 +24,8 @@ export function NoraResultCard({
     preview = turn.status === "PREVIEW",
     undone = turn.status === "UNDONE";
   const confirmMove = preview && turn.plan?.hasUrgentReplan;
+  const optimization = turn.plan?.isOptimization;
+  const compareTimes = confirmMove || optimization;
   const reply = compactScheduleText(turn.reply || "");
   const explanation =
     /^(?:(?:tôi|mình)\s+)?(?:đã|vừa)\s+(?:lên lịch|xếp|thêm|lưu|cập nhật)/i.test(
@@ -39,7 +41,7 @@ export function NoraResultCard({
       <div className="nora-result-title">
         {icon(saved ? "check" : undone ? "undo" : "calendar")}
         <h3>
-          {saved
+          {optimization && preview ? "Phương án tối ưu lịch" : saved
             ? "Lịch đã lưu"
             : preview
               ? "Xem trước thay đổi"
@@ -63,6 +65,11 @@ export function NoraResultCard({
           Đề xuất dời lịch để ưu tiên việc khẩn. Chỉ lưu sau khi bạn xác nhận; hạn chót giữ nguyên.
         </p>
       )}
+      {optimization && preview && (
+        <p className="nora-result-hint" role="status">
+          Xem giờ cũ và giờ đề xuất trước khi xác nhận. Lịch hiện tại chưa thay đổi.
+        </p>
+      )}
       {explanation && (
         <div className="nora-result-reason">
           <NoraReply text={explanation} />
@@ -75,11 +82,11 @@ export function NoraResultCard({
             <li key={index}>
               <div>
                 <strong>{change.name}</strong>
-                {confirmMove && ["SESSION", "EVENT"].includes(change.kind) && change.before && (
+                {compareTimes && ["SESSION", "EVENT"].includes(change.kind) && change.before && (
                   <p>Giờ cũ: {compactScheduleText(change.before)}</p>
                 )}
                 <span>
-                  {confirmMove && ["SESSION", "EVENT"].includes(change.kind) && change.before && (
+                  {compareTimes && ["SESSION", "EVENT"].includes(change.kind) && change.before && (
                     <>Giờ mới: </>
                   )}
                   {compactScheduleText(
@@ -89,7 +96,7 @@ export function NoraResultCard({
                 {change.reason && (
                   <p className="nora-result-hint">Lý do và điều kiện: {change.reason}</p>
                 )}
-                {change.before && !(confirmMove && ["SESSION", "EVENT"].includes(change.kind)) && (
+                {change.before && !(compareTimes && ["SESSION", "EVENT"].includes(change.kind)) && (
                     <details>
                       <summary>Trước khi thay đổi</summary>
                       <p>{compactScheduleText(change.before)}</p>
@@ -166,7 +173,7 @@ export function NoraResultCard({
             disabled={busy}
             onClick={() => onAction(turn, "apply")}
           >
-            {confirmMove ? "Xác nhận dời lịch" : turn.plan?.hasDeadlineProtection ? "Xác nhận kế hoạch" : "Lưu thay đổi"}
+            {confirmMove ? "Xác nhận dời lịch" : optimization || turn.plan?.hasDeadlineProtection ? "Xác nhận kế hoạch" : "Lưu thay đổi"}
           </button>
         )}
         <button

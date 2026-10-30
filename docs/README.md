@@ -26,6 +26,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 ## Guides / Hướng dẫn
 
+- [Kịch bản demo PLANORA / Demo script](guides/DEMO_SCRIPT.md)
 - [Workspace phases 1–4 / Kiến trúc, EMA, XP và ghi nhận bù](features/WORKSPACE_UPGRADE_PHASES_1_TO_4.md)
 - [Independent builds, same origin / Build riêng, chung địa chỉ](development/INDEPENDENT_BUILD_SAME_ORIGIN.md)
 - [Upgrade verification 28/10/2026 / Kết quả kiểm chứng](development/WORKSPACE_UPGRADE_VERIFICATION_2026-10-28.md)

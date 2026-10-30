@@ -128,6 +128,7 @@ public sealed partial class WorkspaceService
                     ? agent.InterpretImageAsync(input.Text, recoveredContext, history, state.Preference.TimeZoneId, Now, visionImage, null, ct)
                     : agent.InterpretAsync(input.Text, recoveredContext, history, state.Preference.TimeZoneId, Now, ct), ct);
             }
+            intent = RecognizeAgentOptimization(intent, input.Text, state.Preference);
             intent = RecognizeScheduleReview(intent, input.Text);
             string? scheduleReviewReply = null;
             if (intent.ScheduleReviewQuery is not null)
@@ -157,6 +158,11 @@ public sealed partial class WorkspaceService
                 intent = GroundAgentDates(intent, input.Text, current.Preference, Now);
                 ValidateIntent(intent);
                 if (intent.FreeTimeQuery is not null) current = await AgentCalendarStateAsync(uid, current, ct);
+                if (intent.OptimizationQuery is { } optimizationScope)
+                {
+                    var calendar = await CalendarStateAsync(uid, current, optimizationScope.Start, optimizationScope.End, ct);
+                    current = current with { Sessions = calendar.Sessions.Concat(current.Sessions).DistinctBy(x => x.Id).ToArray() };
+                }
                 turn.ExpectedRevision = revision; turn.CommandJson = JsonSerializer.Serialize(intent, AgentJson); turn.ExpiresAt = Now.AddMinutes(30);
                 if (intent.Question.Length > 0)
                 {
@@ -170,10 +176,13 @@ public sealed partial class WorkspaceService
                     historyRows.TakeWhile(row => row.Status is "NEEDS_INPUT" or "FAILED" or "BLOCKED").Any(row => IsTimetableRequest(row.Text));
                 var (changes, candidate, affected, summary, timetableNotices) = await BuildAgentChangesAsync(uid, intent, current, input.Text, ct, eventRequest, timetableContext);
                 var hasChanges = changes.Weekly is not null || changes.Exceptions.Length > 0 || changes.Events.Length > 0 || changes.Tasks.Length > 0;
-                var planInput = new PlanInput(Now.AddMinutes(5), intent.HorizonDays, affected, true, "AVAILABILITY_CHANGED", UseCapacityFactor: input.UseCapacityFactor, UseEstimateBias: input.UseEstimateBias);
+                var planInput = new PlanInput(intent.OptimizationQuery is { } scope && scope.Start > Now.AddMinutes(5) ? scope.Start : Now.AddMinutes(5),
+                    intent.HorizonDays, affected, true, "AVAILABILITY_CHANGED", UseCapacityFactor: input.UseCapacityFactor, UseEstimateBias: input.UseEstimateBias)
+                    { WindowEnd = intent.OptimizationQuery?.End };
                 PlanView? plan = changes.UrgentEventIds is { Length: > 0 } urgentEventIds
                     ? engine.GenerateForUrgentEvents(candidate, planInput, Now, urgentEventIds)
                     : affected.Length > 0 ? engine.Generate(candidate, planInput, Now) : null;
+                if (plan is not null && intent.OptimizationQuery is not null) plan = plan with { IsOptimization = true };
                 if (plan?.HasDeadlineProtection == true)
                     plan = RespectSchedulingExclusions(plan, candidate, affected, input);
                 if (plan is not null)
@@ -202,8 +211,13 @@ public sealed partial class WorkspaceService
                             string.Join("; ", group.Select(x => LocalWindow(x.Start, x.End, current.Preference))),
                             string.Join("; ", plan.Sessions.Where(x => !x.Preserved && x.TaskId == group.Key).Select(x => LocalWindow(x.Start, x.End, current.Preference))), group.Key,
                             Reason: changes.UrgentEventIds is { Length: > 0 } && candidate.Tasks.Single(x => x.Id == group.Key).Priority == 4
-                                ? "Lịch khẩn mới được ưu tiên trước lịch khẩn cũ. Dời phiên khẩn cũ, giữ đủ thời lượng và deadline." : ""));
+                                ? "Lịch khẩn mới được ưu tiên trước lịch khẩn cũ. Dời phiên khẩn cũ, giữ đủ thời lượng và deadline." :
+                                intent.OptimizationQuery is not null ? "Xếp lại trong phạm vi bạn chọn, theo hạn chót, mức ưu tiên và giờ làm việc đã cài đặt." : ""));
                     summary = summary.Concat(movements.Where(x => x.Before != x.After)).ToArray();
+                    if (intent.OptimizationQuery is not null)
+                        summary = summary.Concat(plan.Sessions.Where(x => !x.Preserved && !summary.Any(change => change.TaskId == x.TaskId))
+                            .GroupBy(x => x.TaskId).Select(group => new AgentChangeView("SESSION", candidate.Tasks.Single(x => x.Id == group.Key).Name,
+                                "", string.Join("; ", group.Select(x => LocalWindow(x.Start, x.End, current.Preference))), group.Key))).ToArray();
                 }
                 turn.ChangesJson = JsonSerializer.Serialize(changes, AgentJson);
                 if (blocked && intent.Tasks is [var retryTask] && changes.Tasks is [var retry] && retry.WorkWindowStart is not null)
@@ -214,6 +228,7 @@ public sealed partial class WorkspaceService
                 var replyMessage = blocked
                     ? $"Chưa thể lưu toàn bộ yêu cầu vì lịch chưa khả thi{blockedDetail}. Lịch chưa thay đổi. " +
                         (BlockedWorkWindowSuggestions(candidate, plan!, input.UseEstimateBias) is { Length: > 0 } alternatives ? alternatives : "Bạn muốn điều chỉnh điều kiện nào?")
+                    : intent.OptimizationQuery is not null ? OptimizationReply(plan, summary, current.Preference, hasChanges)
                     : hasChanges && plan?.HasUrgentReplan == true
                         ? UrgentReplanReply(changes, candidate, summary)
                     : hasChanges && plan?.HasDeadlineProtection == true
@@ -278,6 +293,11 @@ public sealed partial class WorkspaceService
         Require(intent.ScheduleReviewQuery is null || intent.FreeTimeQuery is null && intent.Question.Length == 0 && !HasAgentActions(intent) &&
             intent.ScheduleReviewQuery.End > intent.ScheduleReviewQuery.Start && intent.ScheduleReviewQuery.End - intent.ScheduleReviewQuery.Start <= TimeSpan.FromDays(31),
             "AGENT_INVALID_INTENT", "Yêu cầu tư vấn lịch phải có phạm vi hợp lệ và không kèm thay đổi lịch.", 503);
+        Require(intent.OptimizationQuery is null || intent.Reschedule && intent.Question.Length == 0 && intent.FreeTimeQuery is null &&
+            intent.ScheduleReviewQuery is null && !intent.ReplaceWeeklyAvailability && intent.WeeklySlots.Length == 0 && intent.Exceptions.Length == 0 &&
+            intent.Events.Length == 0 && intent.Tasks.Length == 0 && intent.OptimizationQuery.End > intent.OptimizationQuery.Start &&
+            intent.OptimizationQuery.End - intent.OptimizationQuery.Start <= TimeSpan.FromDays(31),
+            "AGENT_INVALID_INTENT", "Yêu cầu tối ưu cần phạm vi hợp lệ và chỉ xếp lại công việc đã có.", 503);
         if (shapeOnly) return;
         var kind = intent.Question.Length > 0 ? "CLARIFICATION" : HasAgentActions(intent) ? "MUTATION" : "ANSWER";
         Require(intent.ResultKind is null || intent.ResultKind == kind, "AGENT_INVALID_INTENT", "Trạng thái câu trả lời không khớp với yêu cầu thay đổi; lịch chưa thay đổi.", 503);
@@ -427,12 +447,14 @@ public sealed partial class WorkspaceService
             var task = candidate.Tasks.Single(x => x.Id == session.TaskId);
             Require(!task.IsHardDeadline || session.End <= task.Deadline, "LOCKED_SESSION_CONFLICT", "Deadline mới xung đột với phiên đã khóa hoặc đang thực hiện.", 409);
         }
-        foreach (var id in TimeConflictTaskIds(candidate)) affected.Add(id);
+        if (intent.OptimizationQuery is null) foreach (var id in TimeConflictTaskIds(candidate)) affected.Add(id);
         Require(!candidate.Sessions.Any(x => x.Status == WorkSessionStatus.Scheduled && x.Start >= Now && x.Start < Now.AddMinutes(5) &&
             !engine.FreeSlots(candidate, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End)),
             "LOCKED_SESSION_CONFLICT", "Thay đổi trùng với phiên sắp bắt đầu trong 5 phút tới. Hãy xử lý phiên đó trước.", 409);
-        if (intent.Reschedule && affected.Count == 0) foreach (var task in candidate.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled)) affected.Add(task.Id);
-        Require(!candidate.Sessions.Any(x => affected.Contains(x.TaskId) && x.Status == WorkSessionStatus.Scheduled && x.Start >= Now.AddMinutes(5).AddDays(intent.HorizonDays) &&
+        if (intent.Reschedule && affected.Count == 0)
+            foreach (var id in intent.OptimizationQuery is { } scope ? OptimizationTaskIds(candidate, scope) :
+                candidate.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled).Select(x => x.Id)) affected.Add(id);
+        Require(intent.OptimizationQuery is not null || !candidate.Sessions.Any(x => affected.Contains(x.TaskId) && x.Status == WorkSessionStatus.Scheduled && x.Start >= Now.AddMinutes(5).AddDays(intent.HorizonDays) &&
             !engine.FreeSlots(candidate, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End)), "AGENT_HORIZON_CONFLICT", "Có phiên bị ảnh hưởng ngoài phạm vi đang lập lịch. Hãy mở rộng phạm vi hoặc chỉnh riêng phiên đó.", 409);
         return (new(weekly, exceptions.ToArray(), events.ToArray(), taskChanges.ToArray(), removedExceptions.Select(x => x.Id).ToArray(), urgentEventIds, clippedClasses.ToArray()), candidate, affected.ToArray(), summary.ToArray(), TimetableCutoffNotices(skippedClasses, clippedClasses.Count));
     }
@@ -536,7 +558,8 @@ public sealed partial class WorkspaceService
         state.Preference.Revision = Guid.NewGuid(); turn.AppliedRevision = state.Preference.Revision; turn.UpdatedAt = Now;
         await db.SaveChangesAsync(ct); await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, state.Preference.PlanningHorizonDays), ct);
         return SaveTurn(turn, view with { Status = "APPLIED",
-            Reply = plan?.HasUrgentReplan == true
+            Reply = plan?.IsOptimization == true ? "Đã lưu phương án tối ưu bạn vừa xác nhận. Bạn có thể xem lịch mới bên dưới hoặc hoàn tác nếu muốn quay lại lịch cũ."
+                : plan?.HasUrgentReplan == true
                 ? "Đã lưu phương án bạn xác nhận:\n" + string.Join("\n", view.Changes.Where(change => change.Kind is "EVENT" or "SESSION").Select(change =>
                     $"- {change.Name}: {change.After}." + (change.Before.Length > 0 ? $" Giờ cũ: {change.Before}." : "")))
                 : view.Reply == AgentActionReply(view.Changes, false) || string.IsNullOrWhiteSpace(view.Reply)

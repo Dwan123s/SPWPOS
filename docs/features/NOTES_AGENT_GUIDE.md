@@ -56,7 +56,7 @@ Phân tích note cần cấu hình AI. Lấy Gemini API key trong [Google AI Stu
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Configure-Gemini.ps1
 ```
 
-Script hỏi key bằng ô nhập ẩn và lưu qua stdin vào User Secrets; key không nằm trong lịch sử lệnh, tham số tiến trình hay Git. Mặc định dùng `gemini-3.5-flash-lite`; có thể đổi bằng `-Model "YOUR_GEMINI_MODEL"`.
+Script hỏi key bằng ô nhập ẩn và lưu qua stdin vào User Secrets; key không nằm trong lịch sử lệnh, tham số tiến trình hay Git. Mặc định dùng `gemini-3.8-flash`; có thể đổi bằng `-Model "YOUR_GEMINI_MODEL"`.
 
 Nếu muốn cấu hình từng giá trị bằng tay:
 
@@ -65,11 +65,11 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 . .\scripts\Initialize-Dotnet.ps1
 & $SpwposDotnet user-secrets set "AiSettings:Enabled" "true" --project src/SPWPOS.Api
 & $SpwposDotnet user-secrets set "AiSettings:Provider" "Gemini" --project src/SPWPOS.Api
-& $SpwposDotnet user-secrets set "AiSettings:Model" "gemini-3.5-flash-lite" --project src/SPWPOS.Api
+& $SpwposDotnet user-secrets set "AiSettings:Model" "gemini-3.8-flash" --project src/SPWPOS.Api
 & $SpwposDotnet user-secrets set "AiSettings:GeminiApiKey" "YOUR_GEMINI_API_KEY" --project src/SPWPOS.Api
 ```
 
-Chọn model mà tài khoản API của bạn có quyền sử dụng và hỗ trợ Structured Outputs. [Gemini 3.5 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite) hỗ trợ trích xuất dữ liệu có cấu trúc. Khởi động lại API, mở **Ghi chú & AI** và kiểm tra nhãn **Gemini sẵn sàng**. Nhãn này xác nhận có cấu hình, không kiểm tra quota hay khả năng kết nối provider. Khi người dùng bấm phân tích hoặc tự xếp lịch, server gửi nội dung note, thời điểm hiện tại và múi giờ đến Gemini; không gửi hồ sơ, email hay dữ liệu đăng nhập.
+Chọn model mà tài khoản API của bạn có quyền sử dụng và hỗ trợ Structured Outputs. [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) hỗ trợ trích xuất dữ liệu có cấu trúc. Khởi động lại API, mở **Ghi chú & AI** và kiểm tra nhãn **Gemini sẵn sàng**. Nhãn này xác nhận có cấu hình, không kiểm tra quota hay khả năng kết nối provider. Khi người dùng bấm phân tích hoặc tự xếp lịch, server gửi nội dung note, thời điểm hiện tại và múi giờ đến Gemini; không gửi hồ sơ, email hay dữ liệu đăng nhập.
 
 Adapter gọi `generateContent` với schema JSON và key trong header `x-goog-api-key`, sau đó kiểm tra giá trị trả về trên server. Phản hồi bị cắt (`MAX_TOKENS`), bị chặn, lỗi quota hoặc dữ liệu không hợp lệ không được nhập thành công việc AI; giao diện báo lỗi và cho phép thử lại, không chuyển sang bộ phân tích quy tắc. Xem [Gemini generateContent](https://ai.google.dev/api/generate-content) và [Structured Outputs](https://ai.google.dev/gemini-api/docs/generate-content/structured-output). Kiểm thử provider dùng phản hồi giả, không dùng note thật hoặc phát sinh phí API.
 

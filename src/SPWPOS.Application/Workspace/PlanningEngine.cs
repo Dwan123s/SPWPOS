@@ -119,7 +119,7 @@ public sealed partial class PlanningEngine
     private PlanView GenerateGreedy(PlanningState state, PlanInput input, DateTimeOffset now, UrgentReplanPolicy? urgency,
         bool urgentFirst, HashSet<Guid>? promoted = null)
     {
-        var start = input.Start < now ? now : input.Start; var end = start.AddDays(input.HorizonDays);
+        var start = input.Start < now ? now : input.Start; var end = input.WindowEnd ?? start.AddDays(input.HorizonDays);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         var factor = input.UseCapacityFactor ? Capacity(state, now).Factor : 1;
         var affected = input.AffectedTaskIds is null ? null : AffectedClosure(state, input.AffectedTaskIds);
@@ -231,7 +231,7 @@ public sealed partial class PlanningEngine
     }
     public IntelligenceView Analyze(PlanningState state, PlanInput input, DateTimeOffset now)
     {
-        var start = input.Start < now ? now : input.Start; var end = start.AddDays(input.HorizonDays);
+        var start = input.Start < now ? now : input.Start; var end = input.WindowEnd ?? start.AddDays(input.HorizonDays);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         var capacity = Capacity(state, now); var free = FreeSlots(state, start, end);
         var freeMinutes = (int)free.Sum(x => (x.End - x.Start).TotalMinutes);

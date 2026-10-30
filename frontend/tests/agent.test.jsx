@@ -182,35 +182,131 @@ async function ready() {
 }
 
 it("renders detailed schedule advice as readable paragraphs and sections without apply actions", async () => {
-  result.status = "ANSWERED"; result.canUndo = false; result.changes = []; result.plan = null;
-  result.reply = "Lịch của bạn có nhiều khoảng nghỉ ngắn. Mình gợi ý giữ khoảng dài nhất cho báo cáo gần hạn.\n\n**Thời gian còn lại và điểm cần chú ý**\n- Còn 110 phút trống, gồm bốn khoảng ngắn và một khoảng dài.\n\n**Gợi ý có thể cân nhắc**\n- Báo cáo: 17:50–18:50, đủ thời lượng và đã kiểm tra ràng buộc.\n\nLịch hiện tại chưa thay đổi.";
+  result.status = "ANSWERED";
+  result.canUndo = false;
+  result.changes = [];
+  result.plan = null;
+  result.reply =
+    "Lịch của bạn có nhiều khoảng nghỉ ngắn. Mình gợi ý giữ khoảng dài nhất cho báo cáo gần hạn.\n\n**Thời gian còn lại và điểm cần chú ý**\n- Còn 110 phút trống, gồm bốn khoảng ngắn và một khoảng dài.\n\n**Gợi ý có thể cân nhắc**\n- Báo cáo: 17:50–18:50, đủ thời lượng và đã kiểm tra ràng buộc.\n\nLịch hiện tại chưa thay đổi.";
   render(<AgentPage />);
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
   await screen.findByText(/Lịch của bạn có nhiều khoảng nghỉ ngắn/);
-  expect(screen.getByText("Thời gian còn lại và điểm cần chú ý").tagName).toBe("STRONG");
+  expect(screen.getByText("Thời gian còn lại và điểm cần chú ý").tagName).toBe(
+    "STRONG",
+  );
   expect(screen.getByText(/Báo cáo: 17:50–18:50/).closest("li")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: /Lưu thay đổi|Xác nhận dời lịch/ })).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: /Lưu thay đổi|Xác nhận dời lịch/ }),
+  ).toBeNull();
   expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
 });
+
+it("shows optimization comparisons inside NORA and applies only after confirmation", async () => {
+  result.status = "PREVIEW";
+  result.canUndo = false;
+  result.plan.isOptimization = true;
+  result.plan.requiresConfirmation = true;
+  result.reply =
+    "Mình đã chuẩn bị phương án. Bạn xem giờ cũ và giờ đề xuất nhé.";
+  result.changes = [
+    {
+      kind: "SESSION",
+      name: "Báo cáo SWP",
+      taskId: "task",
+      before: "22/10/2026 09:00 → 22/10/2026 10:00",
+      after: "22/10/2026 19:00 → 22/10/2026 20:00",
+    },
+  ];
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  await screen.findByRole("heading", { name: "Phương án tối ưu lịch" });
+  const card = screen.getByRole("region", { name: "Kết quả yêu cầu" });
+  expect(
+    within(card)
+      .getByText(/Giờ cũ:/)
+      .closest("details"),
+  ).toBeNull();
+  expect(within(card).getByText(/Giờ mới:/)).toBeTruthy();
+  expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận kế hoạch" }));
+  await screen.findAllByText("Đã lưu lịch");
+  expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
+});
+
+it("offers an optimization prompt without immediately sending it", async () => {
+  render(<AgentPage />);
+  await waitFor(() =>
+    expect(screen.queryByText("Đang tải trợ lý…")).toBeNull(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: /Tối ưu lịch/ }));
+  expect(screen.getByLabelText("Yêu cầu của bạn").value).toContain(
+    "Tối ưu lịch tuần này",
+  );
+  expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
+});
+
+it.each(["button", "focus"])(
+  "recovers AI availability after a backend restart via %s without losing the draft or reloading history",
+  async (trigger) => {
+    available = false;
+    render(<AgentPage />);
+    await screen.findByText(/Trợ lý AI chưa được cấu hình/);
+    const field = screen.getByLabelText("Yêu cầu của bạn");
+    fireEvent.change(field, { target: { value: "Bản nháp cần giữ nguyên" } });
+    expect(screen.getByRole("button", { name: "Gửi yêu cầu" }).disabled).toBe(
+      true,
+    );
+    available = true;
+    if (trigger === "button")
+      fireEvent.click(screen.getByRole("button", { name: "Kiểm tra lại AI" }));
+    else fireEvent.focus(window);
+    await waitFor(() =>
+      expect(screen.queryByText(/Trợ lý AI chưa được cấu hình/)).toBeNull(),
+    );
+    expect(field.value).toBe("Bản nháp cần giữ nguyên");
+    expect(screen.getByRole("button", { name: "Gửi yêu cầu" }).disabled).toBe(
+      false,
+    );
+    expect(
+      calls.filter(
+        (call) => call.url === "/api/agent/turns" && call.method === "GET",
+      ),
+    ).toHaveLength(1);
+    expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
+  },
+);
 
 it("keeps an urgent displacement pending with automatic save enabled until the user confirms", async () => {
   result.status = "PREVIEW";
   result.canUndo = false;
   result.plan.hasUrgentReplan = true;
-  result.changes.push({ kind: "SESSION", name: "Bài tập cũ", taskId: "old",
+  result.changes.push({
+    kind: "SESSION",
+    name: "Bài tập cũ",
+    taskId: "old",
     before: "22/10/2026 19:00 → 22/10/2026 20:00",
-    after: "23/10/2026 19:00 → 23/10/2026 20:00" });
+    after: "23/10/2026 19:00 → 23/10/2026 20:00",
+  });
   const changed = vi.fn();
   render(<AgentPage onWorkspaceChanged={changed} />);
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  const confirm = await screen.findByRole("button", { name: "Xác nhận dời lịch" });
-  expect(calls.find((call) => call.url === "/api/agent/turns/stream").body.autoApply).toBe(true);
+  const confirm = await screen.findByRole("button", {
+    name: "Xác nhận dời lịch",
+  });
+  expect(
+    calls.find((call) => call.url === "/api/agent/turns/stream").body.autoApply,
+  ).toBe(true);
   expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
   expect(changed).not.toHaveBeenCalled();
   const card = screen.getByRole("region", { name: "Kết quả yêu cầu" });
-  expect(within(card).getByText(/Giờ cũ:/).closest("details")).toBeNull();
+  expect(
+    within(card)
+      .getByText(/Giờ cũ:/)
+      .closest("details"),
+  ).toBeNull();
   expect(within(card).getByText(/Giờ mới:/)).toBeTruthy();
   fireEvent.click(confirm);
   await screen.findAllByText("Đã lưu lịch");
@@ -226,7 +322,9 @@ it("shows deadline protection as a plan that needs confirmation even when automa
   render(<AgentPage onWorkspaceChanged={changed} />);
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  const confirm = await screen.findByRole("button", { name: "Xác nhận kế hoạch" });
+  const confirm = await screen.findByRole("button", {
+    name: "Xác nhận kế hoạch",
+  });
   expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
   expect(changed).not.toHaveBeenCalled();
   fireEvent.click(confirm);
@@ -240,15 +338,31 @@ it("shows the old and proposed shopping hours beside an urgent meeting before co
   result.plan.hasUrgentReplan = true;
   result.plan.sessions = [];
   result.changes = [
-    { kind: "EVENT", name: "Cuộc họp khẩn", before: "", after: "22/10/2026 15:00 → 22/10/2026 17:00" },
-    { kind: "EVENT", name: "Đi mua sắm", before: "22/10/2026 15:00 → 22/10/2026 16:00", after: "22/10/2026 17:00 → 22/10/2026 18:00" },
+    {
+      kind: "EVENT",
+      name: "Cuộc họp khẩn",
+      before: "",
+      after: "22/10/2026 15:00 → 22/10/2026 17:00",
+    },
+    {
+      kind: "EVENT",
+      name: "Đi mua sắm",
+      before: "22/10/2026 15:00 → 22/10/2026 16:00",
+      after: "22/10/2026 17:00 → 22/10/2026 18:00",
+    },
   ];
   render(<AgentPage />);
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  const confirm = await screen.findByRole("button", { name: "Xác nhận dời lịch" });
+  const confirm = await screen.findByRole("button", {
+    name: "Xác nhận dời lịch",
+  });
   const shopping = screen.getByText("Đi mua sắm").closest("li");
-  expect(within(shopping).getByText(/Giờ cũ:/).closest("details")).toBeNull();
+  expect(
+    within(shopping)
+      .getByText(/Giờ cũ:/)
+      .closest("details"),
+  ).toBeNull();
   expect(within(shopping).getByText(/Giờ mới:/)).toBeTruthy();
   expect(shopping.textContent).toContain("15:00");
   expect(shopping.textContent).toContain("18:00");
@@ -261,25 +375,42 @@ it("shows the old and proposed shopping hours beside an urgent meeting before co
 it("names the proposed work shift move and explains that changing a shift needs permission", async () => {
   result.status = "PREVIEW";
   result.canUndo = false;
-  result.reply = "Giữ Họp khẩn 16:00–18:00; đề xuất dời Đi làm để tránh trùng giờ.";
+  result.reply =
+    "Giữ Họp khẩn 16:00–18:00; đề xuất dời Đi làm để tránh trùng giờ.";
   result.plan.hasUrgentReplan = true;
   result.plan.sessions = [];
   result.changes = [
-    { kind: "EVENT", name: "Họp khẩn", before: "", after: "24/10/2026 16:00 → 24/10/2026 18:00" },
-    { kind: "EVENT", name: "Đi làm", before: "24/10/2026 15:00 → 24/10/2026 18:00", after: "24/10/2026 18:00 → 24/10/2026 21:00",
-      reason: "Đây là ca làm. Chỉ xác nhận phương án nếu bạn được phép đổi ca." },
+    {
+      kind: "EVENT",
+      name: "Họp khẩn",
+      before: "",
+      after: "24/10/2026 16:00 → 24/10/2026 18:00",
+    },
+    {
+      kind: "EVENT",
+      name: "Đi làm",
+      before: "24/10/2026 15:00 → 24/10/2026 18:00",
+      after: "24/10/2026 18:00 → 24/10/2026 21:00",
+      reason: "Đây là ca làm. Chỉ xác nhận phương án nếu bạn được phép đổi ca.",
+    },
   ];
   render(<AgentPage />);
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  const confirm = await screen.findByRole("button", { name: "Xác nhận dời lịch" });
+  const confirm = await screen.findByRole("button", {
+    name: "Xác nhận dời lịch",
+  });
   const move = screen.getByText("Đi làm").closest("li");
   expect(within(move).getByText(/Giờ cũ:/).textContent).toContain("15:00");
   expect(within(move).getByText(/Giờ mới:/).textContent).toContain("21:00");
-  expect(within(move).getByText(/Lý do và điều kiện:/).textContent).toContain("được phép đổi ca");
+  expect(within(move).getByText(/Lý do và điều kiện:/).textContent).toContain(
+    "được phép đổi ca",
+  );
   expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
   fireEvent.click(confirm);
-  await waitFor(() => expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1));
+  await waitFor(() =>
+    expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1),
+  );
 });
 
 it("offers clickable time alternatives on an existing rejected turn and sends the chosen date in the same conversation", async () => {
@@ -324,21 +455,48 @@ it("offers clickable time alternatives on an existing rejected turn and sends th
 
 it("submits a custom time prompt in the same conversation without directly saving an event", async () => {
   const original = "Ngày mai tôi đi học từ 20h đến 21h";
-  turns = [{ ...result, status: "FAILED", changes: [], plan: null, canUndo: false,
-    text: original, errorCode: "BUSY_TIME_CONFLICT",
-    reply: "Sự kiện nằm trong giờ bận. Đề xuất giữ nguyên thời lượng: 26/10/2026 19:00–20:00. Bạn chọn một khung giờ để thử lại." }];
+  turns = [
+    {
+      ...result,
+      status: "FAILED",
+      changes: [],
+      plan: null,
+      canUndo: false,
+      text: original,
+      errorCode: "BUSY_TIME_CONFLICT",
+      reply:
+        "Sự kiện nằm trong giờ bận. Đề xuất giữ nguyên thời lượng: 26/10/2026 19:00–20:00. Bạn chọn một khung giờ để thử lại.",
+    },
+  ];
   render(<AgentPage />);
   await ready();
-  const form = (await screen.findByRole("group", { name: "Hoặc nhập thời gian khác" })).closest("form");
-  fireEvent.change(within(form).getByRole("textbox", { name: "Thời gian khác" }), { target: { value: "Mai 22h, giữ nguyên thời lượng giúp tôi" } });
-  expect(calls.some((call) => call.url === "/api/agent/turns/stream")).toBe(false);
+  const form = (
+    await screen.findByRole("group", { name: "Hoặc nhập thời gian khác" })
+  ).closest("form");
+  fireEvent.change(
+    within(form).getByRole("textbox", { name: "Thời gian khác" }),
+    { target: { value: "Mai 22h, giữ nguyên thời lượng giúp tôi" } },
+  );
+  expect(calls.some((call) => call.url === "/api/agent/turns/stream")).toBe(
+    false,
+  );
   fireEvent.submit(form);
-  await waitFor(() => expect(calls.some((call) => call.url === "/api/agent/turns/stream")).toBe(true));
+  await waitFor(() =>
+    expect(calls.some((call) => call.url === "/api/agent/turns/stream")).toBe(
+      true,
+    ),
+  );
   const request = calls.find((call) => call.url === "/api/agent/turns/stream");
   expect(request.body.conversationId).toBe("conversation");
-  expect(request.body.text).toContain("Mai 22h, giữ nguyên thời lượng giúp tôi");
+  expect(request.body.text).toContain(
+    "Mai 22h, giữ nguyên thời lượng giúp tôi",
+  );
   expect(request.body.text).toContain(original);
-  expect(calls.some((call) => call.url === "/api/time/events" && call.method === "POST")).toBe(false);
+  expect(
+    calls.some(
+      (call) => call.url === "/api/time/events" && call.method === "POST",
+    ),
+  ).toBe(false);
 });
 
 it.each([

@@ -1,0 +1,208 @@
+/* Keep dense weeks inside the calendar instead of stretching the page. */
+.calendar-workspace :is(.calendar-scroll, .agenda-week) {
+  max-height: clamp(320px, calc(100dvh - 300px), 680px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #9ebbd6 #edf5fc;
+  scrollbar-gutter: stable;
+}
+.calendar-workspace :is(.calendar-scroll, .agenda-week):focus-visible {
+  outline: 2px solid #2878d8;
+  outline-offset: -2px;
+}
+.calendar-workspace .calendar-scroll {
+  scroll-padding-top: 76px;
+}
+.calendar-workspace .week-grid {
+  min-height: 320px;
+  align-items: stretch;
+}
+.calendar-planning-layout .calendar-workspace .week-day {
+  min-height: 0;
+}
+.calendar-workspace .week-day-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "weekday date" "count date";
+  align-items: center;
+  gap: 3px 8px;
+  padding: 11px 12px;
+  text-align: left;
+  background: #f4f9ff;
+  box-shadow: 0 2px 5px #284e7410;
+}
+.calendar-workspace .week-day-header > span {
+  grid-area: weekday;
+}
+.calendar-workspace .week-day-header > strong {
+  grid-area: date;
+  justify-self: end;
+  font-size: 22px;
+}
+.calendar-workspace .week-day-header > small {
+  grid-area: count;
+}
+.calendar-workspace .week-day.today .week-day-header {
+  background: #e4f0ff;
+}
+.calendar-workspace .week-day.today .week-day-header strong {
+  margin: 0;
+}
+.calendar-workspace .day-blocks {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 9px 7px;
+}
+.calendar-workspace .calendar-block {
+  min-height: 0;
+  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  padding: 9px 8px;
+}
+.calendar-workspace .calendar-block.calendar-timed-card strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+.calendar-workspace .calendar-block .block-time {
+  font-size: 10px;
+}
+.calendar-workspace .calendar-block .calendar-time-tag {
+  padding: 2px 6px;
+  font-size: 9px;
+}
+.calendar-workspace .calendar-block .block-meta {
+  margin-top: 1px;
+  font-size: 9px;
+}
+.calendar-workspace .agenda-week {
+  padding: 0 16px;
+  scroll-padding-top: 12px;
+}
+.calendar-workspace .agenda-day {
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  padding: 14px 0;
+}
+.calendar-workspace .agenda-day-label {
+  position: sticky;
+  top: 12px;
+  padding: 8px 4px;
+  text-align: center;
+  background: #f0f6fd;
+  border-radius: 10px;
+}
+.calendar-workspace .agenda-day-label strong {
+  font-size: 24px;
+}
+.calendar-workspace .agenda-day-entries {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.calendar-workspace .calendar-agenda-entry {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  grid-template-areas: "time title phase" "time meta phase";
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+}
+.calendar-workspace .calendar-agenda-entry .block-time {
+  grid-area: time;
+  justify-content: flex-start;
+  font-size: 11px;
+}
+.calendar-workspace .calendar-agenda-entry > strong {
+  grid-area: title;
+}
+.calendar-workspace .calendar-agenda-entry .block-meta {
+  grid-area: meta;
+}
+.calendar-workspace .calendar-agenda-entry .calendar-time-tag {
+  grid-area: phase;
+  align-self: center;
+  justify-self: end;
+}
+.calendar-workspace .calendar-hint {
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 10px 16px;
+}
+@media (max-width: 1100px) {
+  .calendar-workspace :is(.calendar-scroll, .agenda-week) {
+    max-height: clamp(320px, 65dvh, 600px);
+  }
+}
+@media (max-width: 800px) {
+  .calendar-workspace :is(.calendar-scroll, .agenda-week) {
+    max-height: clamp(280px, calc(100dvh - 380px), 520px);
+  }
+  .calendar-workspace .calendar-toolbar {
+    padding: 12px;
+    gap: 10px;
+  }
+  .calendar-workspace .calendar-period {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .calendar-workspace .calendar-period h2 {
+    min-width: 0;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .calendar-workspace .calendar-toolbar > .actions {
+    gap: 8px;
+  }
+  .calendar-workspace .calendar-toolbar .view-switch {
+    flex: 1 0 100%;
+  }
+  .calendar-workspace .calendar-toolbar > .actions > .btn {
+    flex: 1;
+  }
+  .calendar-workspace .agenda-week {
+    padding: 0 10px;
+  }
+  .calendar-workspace .agenda-day {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 9px;
+  }
+  .calendar-workspace .agenda-day-label {
+    padding: 6px 2px;
+  }
+  .calendar-workspace .agenda-day-label strong {
+    font-size: 21px;
+  }
+  .calendar-workspace .agenda-day-label span {
+    font-size: 9px;
+  }
+  .calendar-workspace .calendar-agenda-entry {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "time phase" "title title" "meta meta";
+    gap: 6px;
+    padding: 10px;
+  }
+}
+@media print {
+  .calendar-workspace :is(.calendar-scroll, .agenda-week) {
+    max-height: none;
+    overflow: visible;
+  }
+  .calendar-workspace :is(.week-day-header, .agenda-day-label) {
+    position: static;
+  }
+}

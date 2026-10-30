@@ -133,6 +133,20 @@ builder.Services.AddSwaggerGen(o =>
     o.TagActionsBy(api => api.ActionDescriptor.EndpointMetadata.OfType<Microsoft.AspNetCore.Http.TagsAttribute>().FirstOrDefault()?.Tags.ToList() ?? ["Authentication"]);
 });
 var app = builder.Build();
+string AiConfigurationStatus()
+{
+    using var scope = app.Services.CreateScope();
+    var capabilities = scope.ServiceProvider.GetRequiredService<IPlanningAgentService>().GetAgentCapabilities();
+    var model = builder.Configuration["AiSettings:Model"] ?? "unset";
+    if (!System.Text.RegularExpressions.Regex.IsMatch(model, @"^(?:models/)?[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))) model = "invalid";
+    return $"PLANORA AI: {(capabilities.AiAvailable ? "ready" : "not configured")}; provider={capabilities.Provider}; model={model}.";
+}
+if (args.Contains("--check-ai-config", StringComparer.Ordinal))
+{
+    Console.WriteLine(AiConfigurationStatus());
+    return;
+}
 var firebaseSettings = builder.Configuration.GetSection("Firebase").Get<FirebaseSettings>() ?? new();
 if (args.Contains("--check-schema", StringComparer.Ordinal))
 {
@@ -286,5 +300,6 @@ app.UseRateLimiter();
 app.UseAuthorization();
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.MapControllers();
+if (app.Environment.IsDevelopment()) Console.WriteLine(AiConfigurationStatus());
 app.Run();
 public partial class Program;

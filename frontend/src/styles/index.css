@@ -20,6 +20,7 @@
 @import "./delete-actions.css" layer(components);
 @import "./notifications.css" layer(components);
 @import "./workspace-polish.css" layer(components);
+@import "./calendar-workspace.css" layer(components);
 
 @theme {
   --color-planora-50: #effbff;

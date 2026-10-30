@@ -16,7 +16,7 @@ public sealed partial class PlanningEngine
         if (input.AffectedTaskIds is null || input.AffectedTaskIds.Length == 0)
             return GenerateUrgent(state, input, now, baseline);
         var start = input.Start > now ? input.Start : now;
-        var end = start.AddDays(input.HorizonDays);
+        var end = input.WindowEnd ?? start.AddDays(input.HorizonDays);
         var selected = AffectedClosure(state, input.AffectedTaskIds);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         // A scoped request must still account for urgent and imminent work that
