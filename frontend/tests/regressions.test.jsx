@@ -70,7 +70,7 @@ describe("React view regressions", () => {
     const calendar = document.createElement("div");
     calendar.innerHTML = html;
     expect(
-      calendar.querySelectorAll('[data-action="edit-event"][data-id="event"]'),
+      calendar.querySelectorAll('[data-action="event-detail"][data-id="event"]'),
     ).toHaveLength(1);
     expect(html).toContain("22:00 — 24:00");
   });
@@ -94,7 +94,7 @@ describe("React view regressions", () => {
       const root = document.createElement("div");
       root.innerHTML = renderToStaticMarkup(calendarPage());
       const event = root.querySelector(
-        '[data-action="edit-event"][data-id="meeting"]',
+        '[data-action="event-detail"][data-id="meeting"]',
       );
       const day = event.closest(view === "week" ? ".week-day" : ".agenda-day");
       expect(day.querySelector("strong").textContent).toBe("19");
