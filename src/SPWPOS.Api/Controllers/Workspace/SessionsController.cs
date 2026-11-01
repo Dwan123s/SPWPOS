@@ -12,6 +12,7 @@ public sealed class SessionsController(IWorkspaceService service) : WorkspaceCon
     [HttpPost("{id:guid}/catch-up")] public async Task<IActionResult> CatchUp(Guid id, CatchUpInput input, CancellationToken ct) => Data(await service.CatchUpAsync(UserId, id, input, ct));
     [HttpGet("{id:guid}/execution")] public async Task<IActionResult> History(Guid id, CancellationToken ct) => Data(await service.GetExecutionAsync(UserId, id, ct));
     [HttpPut("{id:guid}")] public async Task<IActionResult> Move(Guid id, SessionEdit input, CancellationToken ct) { await service.EditSessionAsync(UserId, id, input, ct); return Done(); }
+    [HttpDelete("{id:guid}")] public async Task<IActionResult> Delete(Guid id, CancellationToken ct) { await service.DeleteSessionAsync(UserId, id, ct); return Done(); }
     [HttpPost("{id:guid}/lock")] public async Task<IActionResult> Lock(Guid id, CancellationToken ct) { await service.LockSessionAsync(UserId, id, true, ct); return Done(); }
     [HttpPost("{id:guid}/unlock")] public async Task<IActionResult> Unlock(Guid id, CancellationToken ct) { await service.LockSessionAsync(UserId, id, false, ct); return Done(); }
     [HttpPost("{id:guid}/split")] public async Task<IActionResult> Split(Guid id, SplitInput input, CancellationToken ct) { await service.SplitSessionAsync(UserId, id, input, ct); return Done(); }

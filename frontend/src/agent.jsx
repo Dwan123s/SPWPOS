@@ -5,6 +5,7 @@ import "./styles/nora-refinement.css";
 import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import { NoraResultCard } from "./nora-result-card.jsx";
 import { NoraSchedulePanel } from "./nora-schedule-panel.jsx";
+import { askNora, takeAgentDraft, secretaryMode } from "./agent-handoff.js";
 import { NoraEventEditor } from "./nora-event-editor.jsx";
 import {
   NoraScheduleAlternatives,
@@ -25,6 +26,8 @@ import {
 } from "./conversations.jsx";
 import { sendAgentStream } from "./agent-stream.js";
 import { agentFailure } from "./agent-failure.js";
+import { agentBlockedHint, isAgentProcessingStop } from "./agent-stop.js";
+import { AvailabilityPolicyCard } from "./availability-policy.jsx";
 import { NoraProgress } from "./nora-progress.jsx";
 import {
   NoraCopyButton,
@@ -136,13 +139,16 @@ function Turn({
           </strong>
           <span className={`agent-status is-${turn.status.toLowerCase()}`}>
             {icon(statusIcons[turn.status] || "chat")}
-            {statuses[turn.status] || turn.status}
+            {isAgentProcessingStop(turn)
+              ? "Tạm dừng xử lý"
+              : statuses[turn.status] || turn.status}
           </span>
         </div>
         {turn.run?.mode === "Agent" && (
           <details className="nora-completed-process">
             <summary>
-              {icon("check")}NORA Agent · {turn.run.toolCalls} lần dùng công cụ
+              {icon(turn.status === "BLOCKED" ? "clock" : "check")}NORA Agent ·{" "}
+              {turn.run.toolCalls} lần dùng công cụ
             </summary>
             <ol aria-label="Các hành động đã thực hiện">
               {(turn.run.steps || []).map((step) => (
@@ -170,7 +176,13 @@ function Turn({
           </details>
         )}
         {!hasResult && (
-          <NoraReply text={compactScheduleText(alternatives.reply)} />
+          <NoraReply
+            text={
+              isAgentProcessingStop(turn)
+                ? agentBlockedHint(turn)
+                : compactScheduleText(alternatives.reply)
+            }
+          />
         )}
         {!hasResult && (
           <NoraScheduleAlternatives
@@ -278,9 +290,7 @@ function Turn({
           <div className="agent-blocked-tip">
             {icon("spark")}{" "}
             <span>
-              <strong>Gợi ý từ NORA:</strong> Bạn có thể mở thêm giờ rảnh ở mục{" "}
-              <strong>Giờ rảnh</strong>, nới lỏng deadline hoặc chia nhỏ thời
-              lượng công việc rồi gửi lại yêu cầu.
+              <strong>Gợi ý từ NORA:</strong> {agentBlockedHint(turn)}
             </span>
           </div>
         )}
@@ -318,7 +328,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const aiCheckInFlight = useRef(false);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [conversationId, setConversationId] = useState(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(takeAgentDraft);
   const [autoApply, setAutoApply] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -341,6 +351,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const [dayDate, setDayDate] = useState(() => resultDate(null));
   const [calendarRevision, setCalendarRevision] = useState(0);
   const [editingEvent, setEditingEvent] = useState(null);
+  const editEvent = (event) =>
+    secretaryMode()
+      ? askNora(
+          `Tôi muốn điều chỉnh lịch cố định “${event.name}” (mã ${event.id}). Hỏi tôi thay đổi cần thực hiện rồi kiểm tra ảnh hưởng tới lịch.`,
+        )
+      : setEditingEvent(event);
   const [notice, setNotice] = useState("");
   useEffect(() => {
     if (!notice) return;
@@ -356,6 +372,15 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const scrollToBottomTimer = useRef(null);
   const retry = useRef(null);
   const requestField = useRef(null);
+  useEffect(() => {
+    const receive = () => {
+      const draft = takeAgentDraft();
+      if (draft) setText(draft);
+      requestField.current?.focus();
+    };
+    window.addEventListener("nora-draft", receive);
+    return () => window.removeEventListener("nora-draft", receive);
+  }, []);
   const drawerTrigger = useRef(null);
   const historyPanel = useRef(null);
   const composerDock = useRef(null);
@@ -514,7 +539,9 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     streamAbort.current = controller;
     streamState.current = {
       requestId: crypto.randomUUID(),
-      text: draftText || "Xếp lịch theo thời khóa biểu trong ảnh.",
+      text:
+        draftText ||
+        "Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.",
       image: withImage
         ? { name: image.attachment.file.name, url: image.attachment.preview }
         : null,
@@ -544,7 +571,8 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       controller.signal.throwIfAborted();
       if (!mounted.current) return;
       const messageText =
-        draftText || "Xếp lịch theo thời khóa biểu trong ảnh.";
+        draftText ||
+        "Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.";
       if (messageText.length > 2000)
         throw new Error(
           "Yêu cầu kèm thời khóa biểu vượt 2000 ký tự. Bạn rút gọn lời nhắn hoặc chia thời khóa biểu thành từng phần nhé.",
@@ -704,6 +732,8 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const current = turns.filter(
     (turn) => turn.conversationId === conversationId,
   );
+  const timetableTurn = current.filter((turn) => turn.status === "APPLIED" && turn.suggestRoutine)
+    .reduce((latest, turn) => !latest || new Date(turn.createdAt) >= new Date(latest.createdAt) ? turn : latest, null);
   useEffect(() => {
     const panel = historyPanel.current;
     if (!panel || typeof ResizeObserver !== "function") return;
@@ -991,6 +1021,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   }, [latestPlan?.id, conversationId]);
 
   const examples = [
+    {
+      title: "Bắt đầu từ thời gian biểu",
+      subtitle: "Gửi lịch cố định trước, NORA phân tích sau",
+      icon: "image",
+      text: "Tôi muốn gửi thời gian biểu cố định để bạn phân tích lịch bận trước, rồi cùng tôi xác nhận các giờ có thể làm việc. Không tự tạo giờ rảnh.",
+    },
     {
       title: "Xếp một cuộc họp",
       subtitle: "14:00–16:00 ngày mai",
@@ -1321,7 +1357,9 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                 <span>điều quan trọng.</span>
               </h2>
               <p>
-                Mình giúp bạn lên lịch, giữ nhịp và tiến gần hơn đến mục tiêu.
+                Gửi thời gian biểu cố định của bạn trước. Mình phân tích giờ
+                bận, cùng bạn xác nhận giờ rảnh, rồi sắp xếp bài tập và việc gấp
+                như một thư ký cá nhân.
               </p>
               <div className="agent-examples">
                 {examples.map((example) => (
@@ -1358,7 +1396,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                   onAction={act}
                   onReply={(replyText) => send(null, replyText)}
                   onEdit={editRequest}
-                  onEditEvent={setEditingEvent}
+                  onEditEvent={editEvent}
                   onViewPlan={(turn, trigger) => {
                     drawerTrigger.current = trigger;
                     setPlanTurnId(turn.id);
@@ -1370,6 +1408,29 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                 />
               ))
           )}
+          {secretaryMode() &&
+            !busy &&
+            !pending &&
+            state.workspace?.events?.length > 0 &&
+            (!state.workspace.availabilityPolicy?.hasDailyRoutine ||
+              current.some(
+                (t) =>
+                  t.status === "APPLIED" &&
+                  t.suggestRoutine &&
+                  new Date(t.createdAt).getTime() >
+                    new Date(
+                      state.workspace.availabilityPolicy?.confirmedAt || 0,
+                    ).getTime(),
+              )) && (
+              <div className="nora-routine-suggestion">
+                <AvailabilityPolicyCard
+                  key={timetableTurn?.id || "initial-routine"}
+                  timetableTurnId={timetableTurn?.id}
+                  autoPreview
+                  onWorkspaceChanged={onWorkspaceChanged}
+                />
+              </div>
+            )}
           {pending && (
             <NoraProgress pending={pending} busy={busy} onEdit={editRequest} />
           )}
@@ -1703,8 +1764,10 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                       {capabilities.provider === "VertexAI"
                         ? "Google Cloud"
                         : capabilities.provider}{" "}
-                      và xếp lịch theo chế độ tự động lưu ở trên. Thiếu ngày
-                      hoặc giờ theo tiết, NORA sẽ hỏi thêm.
+                      và tự tính giờ rảnh từng ngày theo chế độ lưu ở trên. NORA
+                      giữ lịch cố định và hỏi giờ sinh hoạt còn thiếu, rồi cấu
+                      hình giờ rảnh theo thông tin bạn cung cấp. Thiếu ngày hoặc
+                      giờ theo tiết, NORA sẽ hỏi thêm.
                     </p>
                   )}
                   {capabilities?.voiceAvailable ? (
@@ -1770,7 +1833,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             onDateChange={setDayDate}
             refreshKey={`${calendarRevision}:${conversationId}:${state.workspace?.preference?.revision || ""}`}
             busy={busy}
-            onEditEvent={setEditingEvent}
+            onEditEvent={editEvent}
             onSuggest={(prompt) => {
               setPlanOpen(wide);
               editRequest(prompt);
@@ -1785,7 +1848,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           onResizing={panelLayout.setResizing}
         />
       )}
-      {editingEvent && (
+      {editingEvent && !secretaryMode() && (
         <NoraEventEditor
           event={editingEvent}
           onCancel={() => setEditingEvent(null)}

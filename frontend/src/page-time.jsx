@@ -2,6 +2,8 @@ import { SessionTimer } from "./react-ui.jsx";
 import { Select, nodeList } from "./react-ui.jsx";
 import { availabilityEditor } from "./interactive.jsx";
 import { StartSessionButton } from "./session-start.jsx";
+import { secretaryMode } from "./agent-handoff.js";
+import { SecretaryTime } from "./secretary-overview.jsx";
 import {
   state,
   button,
@@ -17,7 +19,8 @@ import {
   minutes,
   timeValue,
 } from "./ui.jsx";
-export function timePage() {
+export function timePage({ onWorkspaceChanged } = {}) {
+  if (secretaryMode()) return <SecretaryTime onWorkspaceChanged={onWorkspaceChanged} />;
   const w = state.workspace,
     p = w.preference;
   return (

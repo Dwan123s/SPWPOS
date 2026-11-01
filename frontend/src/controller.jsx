@@ -34,10 +34,15 @@ import {
   minuteValue,
 } from "./ui.jsx";
 import { api, submit } from "./api.js";
-import { resetNotificationFeed, syncNotifications } from "./notification-feed.js";
+import { captureTeamInvite, pendingTeamInvite } from "./team-invite-link.js";
+import {
+  resetNotificationFeed,
+  syncNotifications,
+} from "./notification-feed.js";
 import { startNotificationPolling } from "./notification-polling.js";
 import { GettingStarted } from "./getting-started.jsx";
 import { completeGuideStep } from "./onboarding.js";
+import { askNora, secretaryMode } from "./agent-handoff.js";
 import { validateNewPassword } from "./password-policy.js";
 import {
   authSetup,
@@ -58,12 +63,14 @@ import {
 import {
   sessionById,
   sessionDetail,
+  eventDetail,
   eventModal,
   exceptionModal,
   planModal,
 } from "./calendar.jsx";
 import { categoryModal, adminUsers, adminStatus } from "./page-actions.jsx";
 const routes = {
+  teams: ["Nhóm đồ án", "Cùng nhận việc, giữ lịch cá nhân riêng tư.", "users"],
   agent: [
     "NORA · Trợ lý AI",
     "Cùng NORA dành thời gian cho những điều quan trọng.",
@@ -140,7 +147,8 @@ async function load(renderPage = true) {
   try {
     state.workspace = await api("/api/workspace");
     syncNotifications(state.workspace);
-    document.documentElement.dataset.noraSkin = state.workspace.gamification?.selectedSkin || "classic";
+    document.documentElement.dataset.noraSkin =
+      state.workspace.gamification?.selectedSkin || "classic";
     state.loadedAt = Date.now();
     const input = {
       start: new Date().toISOString(),
@@ -162,9 +170,11 @@ async function load(renderPage = true) {
 }
 async function loggedIn() {
   const data = await api("/api/browser-session/me");
-  if (new URLSearchParams(location.search).has("googleCalendar")) state.settingsTab = "connections";
+  if (new URLSearchParams(location.search).has("googleCalendar"))
+    state.settingsTab = "connections";
   state.user = data.user;
   state.roles = data.roles || [];
+  if (pendingTeamInvite()) history.replaceState(null, "", "#teams");
   await load();
 }
 function render() {
@@ -276,6 +286,15 @@ async function scheduleTask(id, triggerEvent = "MANUAL") {
   completeGuideStep(2);
 }
 function planOptions(affected = []) {
+  if (secretaryMode()) {
+    const names = affected.map((id) => taskById(id)?.name).filter(Boolean);
+    askNora(
+      names.length
+        ? `Hãy sắp xếp công việc ${names.map((name) => `“${name}”`).join(", ")} vào giờ rảnh đã xác nhận, giữ thời gian biểu cố định và deadline.`
+        : "Hãy kiểm tra các công việc đã lưu và sắp xếp vào giờ rảnh đã xác nhận, ưu tiên việc gấp và giữ thời gian biểu cố định.",
+    );
+    return;
+  }
   const go = (route) => {
     closeModal();
     navigation(route);
@@ -315,10 +334,10 @@ function planOptions(affected = []) {
     !state.workspace.exceptions.some((item) => item.isAvailable)
   ) {
     modal(
-      "Chọn giờ rảnh trước khi tạo lịch",
-      "Hệ thống cần biết ngày và giờ bạn có thể làm việc. Các công việc hiện tại đã được giữ nguyên.",
-      <button type="button" className="btn primary" onClick={() => go("time")}>
-        Chọn giờ rảnh
+      "Xác nhận giờ làm việc với NORA",
+      "Gửi thời gian biểu cố định và cho NORA biết giờ sinh hoạt, ngủ/nghỉ hoặc giờ có thể làm việc. NORA sẽ cấu hình quanh lịch của bạn.",
+      <button type="button" className="btn primary" onClick={() => go("agent")}>
+        Mở NORA
       </button>,
     );
     return;
@@ -583,16 +602,39 @@ async function action(name, id, element) {
     case "edit-event":
       eventModal(state.workspace.events.find((e) => e.id === id));
       break;
-    case "delete-event":
+    case "event-detail":
+      eventDetail(id);
+      break;
+    case "delete-event": {
+      const entry = state.workspace.events.find((e) => e.id === id);
+      if (!entry) break;
       confirmAction(
         "Xóa sự kiện?",
-        "Khoảng này sẽ trở lại khả dụng khi lập lịch.",
+        `Xóa “${entry.name}” ngày ${dateFmt(entry.start)} lúc ${timeFmt(entry.start)}? Chỉ xóa lần xuất hiện này và dừng các nhắc nhở của lịch này.`,
         async () => {
           await api(`/api/time/events/${id}`, "DELETE");
-          await refreshAfter();
+          await refreshAfter("Đã xóa sự kiện khỏi lịch.");
         },
+        "Xóa sự kiện",
       );
       break;
+    }
+    case "delete-session": {
+      const session = sessionById(id);
+      if (!session) break;
+      confirmAction(
+        "Xóa phiên khỏi lịch?",
+        `Xóa phiên “${session.taskName}” ngày ${dateFmt(session.start)} lúc ${timeFmt(session.start)}? Công việc và deadline vẫn được giữ để xếp lại sau.`,
+        async () => {
+          await api(`/api/sessions/${id}`, "DELETE");
+          await refreshAfter(
+            "Đã xóa phiên khỏi lịch. Công việc và deadline vẫn được giữ.",
+          );
+        },
+        "Xóa phiên",
+      );
+      break;
+    }
     case "new-exception":
       exceptionModal();
       break;
@@ -1251,8 +1293,11 @@ export function onChange(event) {
     filterTasks();
 }
 export function startController() {
+  captureTeamInvite();
   resetNotificationFeed();
-  const stopNotificationPolling = startNotificationPolling(() => state.workspace);
+  const stopNotificationPolling = startNotificationPolling(
+    () => state.workspace,
+  );
   let disposed = false,
     connecting = false;
   const entryLogin = () => {
@@ -1268,6 +1313,7 @@ export function startController() {
       )
     )
       renderAuth(route);
+    else if (pendingTeamInvite()) renderAuth("login");
     else setScreen(<GettingStarted onLogin={entryLogin} />, "getting-started");
   };
   const connect = async () => {
@@ -1289,6 +1335,7 @@ export function startController() {
     }
   };
   const hash = () => {
+    captureTeamInvite();
     if (state.workspace) render();
     else publicPage();
   };

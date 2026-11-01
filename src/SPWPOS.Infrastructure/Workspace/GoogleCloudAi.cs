@@ -91,7 +91,7 @@ public sealed partial class TaskInterpreter
         // the server. Avoid unbounded deliberation over feasibility in the model.
         // Scheduling decisions are deterministic in PlanningEngine. Bound the
         // interpreter's reasoning overhead; 3.8 supports LOW, not MINIMAL.
-        if (UsesGemini38) generation["thinkingConfig"] = new { thinkingLevel = "LOW" };
+        if (GoogleThinkingLevel is { } thinking) generation["thinkingConfig"] = new { thinkingLevel = thinking };
         var body = new Dictionary<string, object> {
             ["systemInstruction"] = new { parts = new[] { new { text = instructions } } },
             ["contents"] = new[] { new { role = "user", parts = contentParts ?? [new { text = prompt }] } },
@@ -102,6 +102,12 @@ public sealed partial class TaskInterpreter
     }
 
     private bool UsesGemini38 => IsGoogle && (config["AiSettings:Model"] is "gemini-3.8-flash" or "models/gemini-3.8-flash");
+    private string? GoogleThinkingLevel => !IsGoogle ? null : (config["AiSettings:Model"] ?? "").Replace("models/", "", StringComparison.Ordinal) switch
+    {
+        var model when model.StartsWith("gemini-3.", StringComparison.Ordinal) && model.Contains("flash-lite", StringComparison.Ordinal) => "MINIMAL",
+        var model when model.StartsWith("gemini-3", StringComparison.Ordinal) => "LOW",
+        _ => null,
+    };
 
     private async Task<AuthException> GoogleFailureDetailsAsync(HttpResponseMessage response, AuthException failure, CancellationToken ct)
     {

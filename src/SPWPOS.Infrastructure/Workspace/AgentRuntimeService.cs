@@ -29,8 +29,12 @@ public sealed partial class WorkspaceService
             var rows = await Mine<AgentRun>(uid).Where(x => x.ConversationId == input.ConversationId).ToArrayAsync(ct);
             Require(!rows.Any(x => x.Status == "RUNNING" && x.LeaseUntil > Now), "AGENT_BUSY", "NORA đang xử lý một yêu cầu trong hội thoại này.", 409);
             var previous = rows.OrderByDescending(x => x.UpdatedAt).FirstOrDefault();
+            var previousTurn = previous is null ? null : await Mine<AgentTurn>(uid).AsNoTracking().SingleOrDefaultAsync(x => x.Id == previous.TurnId, ct);
+            var recoverableStop = previousTurn?.Status == "BLOCKED" && TurnView(previousTurn).ErrorCode is
+                "AGENT_BUDGET_EXCEEDED" or "TOOL_BUDGET_EXCEEDED" or "AGENT_TIME_LIMIT";
             var same = rows.SingleOrDefault(x => x.TurnId == turnId);
-            var resume = same ?? (history.LastOrDefault()?.Status == "NEEDS_INPUT" && previous?.Status == "WAITING_FOR_INPUT" &&
+            var resume = same ?? ((history.LastOrDefault()?.Status == "NEEDS_INPUT" && previous?.Status == "WAITING_FOR_INPUT" || recoverableStop) &&
+                previous!.Continuations < 3 &&
                 previous.UpdatedAt > Now.AddMinutes(-30) ? previous : null);
             foreach (var abandoned in rows.Where(x => x.Status == "RUNNING")) { abandoned.Status = "INTERRUPTED"; abandoned.Version = Guid.NewGuid(); }
             if (resume is null)
@@ -62,6 +66,8 @@ public sealed partial class WorkspaceService
         var readObserved = false;
         var calendarObserved = false;
         var modelTurns = run.ModelTurns; var toolCalls = run.ToolCalls; var simulations = run.Simulations;
+        var simulationLimit = simulations + limits.MaxSimulations;
+        string? lastToolFailure = null;
         var priorSteps = await Mine<AgentToolCall>(uid).AsNoTracking().Where(x => x.RunId == runId).OrderBy(x => x.Sequence)
             .Select(x => new NoraToolTrace(x.Sequence, x.Tool, "", x.Status, x.DurationMilliseconds)).ToArrayAsync(ct);
         var catalog = NoraToolRegistry.Create(types);
@@ -127,15 +133,24 @@ public sealed partial class WorkspaceService
                         state.Preference.MinimumSessionMinutes, state.Preference.MaximumSessionMinutes, state.Preference.BreakMinutes,
                         state.Preference.PreferredPeriod, state.Preference.PreferredStartMinute, state.Preference.PreferredEndMinute },
                         weeklyAvailability = state.Availability.Select(x => new { x.DayOfWeek, x.StartMinute, x.EndMinute }),
+                        availabilityPolicy = state.Policy is { } policy ? PolicyDto(policy) : null,
+                        dailyRoutine = CurrentRoutineDays(state),
                         datedOverrides = state.Exceptions.Where(x => x.Date >= LocalDate(Now, state.Preference) && x.Date <= LocalDate(Now.AddDays(31), state.Preference))
                             .Take(200).Select(x => new { x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note }),
                         overridesTruncated = state.Exceptions.Count(x => x.Date >= LocalDate(Now, state.Preference) && x.Date <= LocalDate(Now.AddDays(31), state.Preference)) > 200 });
                 case "get_calendar":
                 case "find_free_slots":
+                case "answer_calendar":
+                case "answer_free_time":
                 case "analyze_workload":
                 {
                     var range = RuntimeRange(args, state.Preference);
                     var calendar = await Calendar(range, token); readObserved = true; calendarObserved = true;
+                    if (call.Name is "answer_calendar" or "answer_free_time")
+                    {
+                        verifiedReply = call.Name == "answer_calendar" ? VerifiedScheduleOverviewReply(range, calendar) : VerifiedFreeTimeReply(range, calendar);
+                        return new("TERMINAL", new NoraTerminal("ANSWER", verifiedReply));
+                    }
                     if (call.Name == "get_calendar")
                     {
                         verifiedReply = VerifiedScheduleOverviewReply(range, calendar);
@@ -164,10 +179,22 @@ public sealed partial class WorkspaceService
                         effectiveTasks = lastDraft.Tasks.Select(x => new { x.TaskId, x.Name, x.Deadline, x.EstimatedMinutes,
                             x.Priority, x.Splittable, x.WorkWindowStart, x.WorkWindowEnd }) });
                 }
+                case "propose_changes":
                 case "simulate_plan":
                 {
-                    Require(drafts.TryGetValue(args.GetProperty("draftId").GetString()!, out var draft), "DRAFT_NOT_FOUND", "Bản nháp không thuộc lượt xử lý này.");
-                    Require(simulations < limits.MaxSimulations, "SIMULATION_LIMIT", "Đã đạt giới hạn thử lịch. Hãy chọn phương án đã kiểm tra hoặc hỏi người dùng.");
+                    AgentIntent draft;
+                    if (call.Name == "propose_changes")
+                    {
+                        draft = NormalizeRuntimeDraft(args.GetProperty("intent"), source, state, pending, types);
+                        lastDraft = draft;
+                        Require(draft.Question.Length == 0, "CLARIFICATION_REQUIRED", draft.Question);
+                    }
+                    else
+                    {
+                        Require(drafts.TryGetValue(args.GetProperty("draftId").GetString()!, out var prepared), "DRAFT_NOT_FOUND", "Bản nháp không thuộc lượt xử lý này.");
+                        draft = prepared;
+                    }
+                    Require(simulations < simulationLimit, "SIMULATION_LIMIT", "Đã đạt giới hạn thử lịch của lượt này. Hãy chọn phương án đã kiểm tra hoặc hỏi người dùng.");
                     simulations++;
                     // Load the complete affected calendar before planning; the ordinary
                     // history cap must never hide reservations from a simulation.
@@ -175,6 +202,8 @@ public sealed partial class WorkspaceService
                     var candidate = await SimulateRuntimeAsync(uid, draft, Copy(state), input, source,
                         image is not null || IsTimetableRequest(source), args.GetProperty("strategy").GetString()!, token);
                     candidates[candidate.Id] = candidate;
+                    if (call.Name == "propose_changes" && candidate.Feasible)
+                        return new("TERMINAL", new NoraTerminal("PROPOSAL", AgentExplanation(draft.Reply), CandidateId: candidate.Id));
                     return new("OK", RuntimeCandidateFacts(candidate, state));
                 }
                 case "evaluate_candidate":
@@ -208,8 +237,11 @@ public sealed partial class WorkspaceService
         var initialData = new { currentTime = localNow,
             clock = new { currentLocal = localNow, today, tomorrow = today.AddDays(1), currentWeekStart = monday, nextWeekStart = monday.AddDays(7) },
             timeZone = state.Preference.TimeZoneId, activeTaskTypes = types, request = source, latestMessage = input.Text, history, pendingRequest = pending,
-            remainingModelTurns = limits.MaxModelTurns - modelTurns, remainingToolCalls = limits.MaxToolCalls - toolCalls,
-            remainingSimulations = limits.MaxSimulations - simulations,
+            timetableAutomation = new { hasFixedSchedule = state.Events.Length > 0,
+                hasConfirmedWorkHours = state.Policy != null || state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable),
+                policy = "Use the supplied fixed timetable as the foundation. Import complete fixed commitments with propose_changes; the server computes meals/sleep/rest and free-time suggestions for that timetable week, without extra model calls. Never invent actual work hours, tasks or deadlines. Schedule urgent work in verified gaps while preserving fixed commitments." },
+            remainingModelTurns = limits.MaxModelTurns, remainingToolCalls = limits.MaxToolCalls,
+            remainingSimulations = limits.MaxSimulations,
             policy = "Read data using tools. All actions are drafts until a server-validated proposal is applied. Fixed/locked/running commitments are protected." };
         var parts = new List<object> { new { text = JsonSerializer.Serialize(initialData, AgentJson) } };
         if (image?.Data is { Length: > 0 }) parts.Add(new { inlineData = new { mimeType = image.MimeType, data = image.Data } });
@@ -228,6 +260,7 @@ public sealed partial class WorkspaceService
                 }, Execute, async (step, hash, observation, token) =>
                 {
                     toolCalls = step.Sequence;
+                    if (observation.Status == "ERROR") lastToolFailure = observation.Message;
                     await Checkpoint("RUNNING", token, step, hash, observation.ErrorCode ?? "");
                     agentFileLog?.ToolCompleted(runId, turnId, step, hash, observation);
                     if (publish is not null) await publish(new("tool", $"TOOL_{step.Sequence}",
@@ -247,9 +280,14 @@ public sealed partial class WorkspaceService
                 return new(candidate.Intent with { Reply = terminal.Reply }, candidate, null, view);
             }
             if (terminal.Kind == "QUESTION")
-                return new(EmptyRuntimeIntent(terminal.Reply) with { Question = terminal.Question, Options = terminal.Options, Pending = pending }, null, null, view);
+                return new(NormalizeAgentIntent(EmptyRuntimeIntent(terminal.Reply) with {
+                    Question = terminal.Question, Options = terminal.Options }, input.Text, state, pending), null, null, view);
             if (terminal.Kind == "ANSWER") return new(EmptyRuntimeIntent(terminal.Reply), null, terminal.Reply, view);
-            return new(EmptyRuntimeIntent("Mình chưa tìm được phương án hoàn chỉnh trong giới hạn xử lý. Lịch chưa thay đổi. Bạn có thể thu hẹp khoảng ngày hoặc bổ sung điều kiện rồi thử lại."), null, null, view, terminal.Reply);
+            var stoppedReply = terminal.Reply is "AGENT_BUDGET_EXCEEDED" or "TOOL_BUDGET_EXCEEDED" or "AGENT_TIME_LIMIT"
+                ? "NORA đã chạm giới hạn xử lý của lượt này trước khi hoàn tất. Lịch chưa thay đổi. Bạn có thể nhắn “Tiếp tục xử lý” trong hội thoại này; mình sẽ dùng lại thông tin bạn đã gửi."
+                : lastToolFailure is { Length: > 0 } ? $"Chưa hoàn tất yêu cầu: {lastToolFailure} Lịch chưa thay đổi. Bạn có thể bổ sung ngay trong hội thoại này."
+                : "NORA chưa hoàn tất được yêu cầu. Lịch chưa thay đổi. Bạn có thể nhắn tiếp trong hội thoại này để mình kiểm tra lại.";
+            return new(EmptyRuntimeIntent(stoppedReply) with { Pending = pending ?? new(source, null, null, null, null, null) }, null, null, view, terminal.Reply);
         }
         catch (Exception failure)
         {

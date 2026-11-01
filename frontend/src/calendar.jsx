@@ -2,7 +2,8 @@ import { SessionTimer } from "./react-ui.jsx";
 import { Select, nodeList } from "./react-ui.jsx";
 import { availabilityEditor } from "./interactive.jsx";
 import { StartSessionButton } from "./session-start.jsx";
-import { CalendarTimeTag } from "./calendar-time.jsx";
+import { CalendarClock, CalendarTimeTag, calendarPhase } from "./calendar-time.jsx";
+import { askNora, secretaryMode } from "./agent-handoff.js";
 import {
   state,
   button,
@@ -20,6 +21,8 @@ import {
 } from "./ui.jsx";
 export const sessionById = (id) =>
   state.workspace.sessions.find((s) => s.id === id);
+export const canDeleteSession = (session) => session?.status === "Scheduled" &&
+  !session.actualSeconds && !session.actualMinutes && !session.segmentStartedAt;
 export function sessionCard(s, calendarTime) {
   const upcoming = s.status === "Scheduled",
     active = ["Running", "Paused"].includes(s.status);
@@ -113,7 +116,7 @@ export function sessionDetail(id) {
           <dd>{minutes(s.actualMinutes)}</dd>
         </div>
       </dl>
-      {s.status === "Scheduled" ? (
+      {s.status === "Scheduled" && !secretaryMode() ? (
         <>
           <form data-form="session-edit" data-id={id}>
             <div className="form-grid">
@@ -173,7 +176,7 @@ export function sessionDetail(id) {
       ) : (
         ""
       )}
-      {s.status === "Completed" ? (
+      {s.status === "Completed" && !secretaryMode() ? (
         <form data-form="actual-duration" data-id={id}>
           {field(
             "Sửa thời gian thực tế (phút)",
@@ -194,10 +197,44 @@ export function sessionDetail(id) {
       )}
       {button("Lịch sử timer", "execution-history", "ghost", s.id)}
       {button("Xem công việc", "task-detail", "ghost", s.taskId)}
+      {canDeleteSession(s) && <div className="form-actions spaced">
+        {s.isLocked && secretaryMode() && button("Mở khóa phiên", "session-unlock", "secondary", s.id, "lock")}
+        <button type="button" className="btn danger" data-action="delete-session" data-id={s.id}
+          disabled={s.isLocked} title={s.isLocked ? "Mở khóa phiên trước khi xóa" : "Xóa phiên này, giữ công việc và deadline"}>
+          Xóa phiên khỏi lịch
+        </button>
+      </div>}
     </>,
   );
 }
+export function eventDetail(id) {
+  const event = state.workspace.events.find((entry) => entry.id === id);
+  if (!event) return;
+  const types = { CLASS: "Lớp học", WORK: "Công việc", MEETING: "Cuộc họp", APPOINTMENT: "Cuộc hẹn", OTHER: "Lịch cố định" };
+  modal(event.name, "Chi tiết lịch cố định · Thao tác chỉ áp dụng cho lần xuất hiện này.", <>
+    <CalendarClock boundaries={[Date.parse(event.start), Date.parse(event.end)]}>
+      {(now) => <CalendarTimeTag phase={calendarPhase(event.start, event.end, now)} />}
+    </CalendarClock>
+    <dl className="detail-list">
+      <div><dt>Loại lịch</dt><dd>{types[event.eventType] || "Lịch cố định"}</dd></div>
+      <div><dt>Bắt đầu</dt><dd>{dateFmt(event.start, { year: "numeric" })} · {timeFmt(event.start)}</dd></div>
+      <div><dt>Kết thúc</dt><dd>{dateFmt(event.end, { year: "numeric" })} · {timeFmt(event.end)}</dd></div>
+      <div><dt>Thời lượng</dt><dd>{minutes(Math.round((Date.parse(event.end) - Date.parse(event.start)) / 60000))}</dd></div>
+    </dl>
+    {event.description && <p className="info" style={{ whiteSpace: "pre-wrap" }}>{event.description}</p>}
+    <div className="form-actions">
+      {button("Xóa lịch", "delete-event", "danger", event.id, "trash")}
+      {button(secretaryMode() ? "Điều chỉnh với NORA" : "Chỉnh sửa lịch", "edit-event", "secondary", event.id, "edit")}
+      {button("Đóng", "close-modal", "ghost")}
+    </div>
+  </>);
+}
 export function eventModal(event = {}) {
+  if (secretaryMode()) {
+    askNora(event.id ? `Tôi muốn điều chỉnh lịch cố định “${event.name}” (mã ${event.id}). Hỏi tôi thay đổi cần thực hiện.`
+      : "Tôi có một lịch bận mới. Hỏi tôi nội dung và thời gian, rồi cập nhật quanh thời gian biểu cố định.");
+    return;
+  }
   const start = event.start || new Date(Date.now() + 3600000).toISOString(),
     end = event.end || new Date(Date.now() + 7200000).toISOString();
   modal(
@@ -281,6 +318,11 @@ export function eventModal(event = {}) {
   );
 }
 export function exceptionModal(e = {}) {
+  if (secretaryMode()) {
+    askNora(e.id ? `Tôi muốn điều chỉnh khoảng ${e.isAvailable ? "rảnh" : "bận"} ngày ${e.date} (mã ${e.id}). Hỏi tôi thay đổi cần thực hiện.`
+      : "Tôi muốn cập nhật giờ bận hoặc giờ có thể làm việc. Hỏi tôi thông tin còn thiếu rồi cấu hình quanh thời gian biểu.");
+    return;
+  }
   modal(
     e.id ? "Sửa ngoại lệ" : "Thêm ngoại lệ thời gian",
     "Điều chỉnh một ngày riêng, bổ sung thời gian rảnh hoặc đánh dấu bận.",

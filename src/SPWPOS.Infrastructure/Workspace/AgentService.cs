@@ -9,7 +9,7 @@ public sealed partial class WorkspaceService
 {
     private static readonly JsonSerializerOptions AgentJson = new(JsonSerializerDefaults.Web);
     private sealed record AgentChangeSet(WeeklyAvailability[]? Weekly, AvailabilityException[] Exceptions, FixedEvent[] Events, WorkTask[] Tasks, Guid[]? RemovedExceptionIds = null,
-        Guid[]? UrgentEventIds = null, Guid[]? ClippedTimetableEventIds = null);
+        Guid[]? UrgentEventIds = null, Guid[]? ClippedTimetableEventIds = null, bool AnalyzeTimetable = false);
     private sealed record AgentUndo(WeeklyAvailability[]? Weekly, Guid[] ExceptionIds, Guid[] EventIds,
         AvailabilityException[] OriginalExceptions, FixedEvent[] OriginalEvents,
         WorkTask[] OriginalTasks, Guid[] NewTaskIds, WorkSession[] OriginalSessions, Guid[] NewSessionIds, Guid? PlanId);
@@ -105,7 +105,7 @@ public sealed partial class WorkspaceService
                 return publish?.Invoke(new("delta", Delta: delta), token) ?? Task.CompletedTask;
             }
             Require(interpreter is IPlanningAgentInterpreter && GetAgentCapabilities().AiAvailable,
-                "AGENT_AI_NOT_CONFIGURED", "Trợ lý AI chưa được cấu hình trên server. Bạn vẫn có thể nhập công việc và thời gian bằng form.", 503);
+                "AGENT_AI_NOT_CONFIGURED", "NORA chưa kết nối được với dịch vụ AI. Lịch đã lưu được giữ nguyên; hãy kiểm tra kết nối và thử lại.", 503);
             var state = await State(uid, ct); var revision = state.Preference.Revision;
             var historyRows = await Mine<AgentTurn>(uid).AsNoTracking().Where(x => x.ConversationId == input.ConversationId && x.Id != turnId &&
                 x.Status != "PROCESSING" && x.Status != "DELETED").OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(8).ToArrayAsync(ct);
@@ -115,8 +115,14 @@ public sealed partial class WorkspaceService
             var latest = historyRows.FirstOrDefault();
             var visionImage = input.Image ?? historyRows.TakeWhile(row => row.Status is "NEEDS_INPUT" or "BLOCKED" or "FAILED")
                 .Select(StoredAgentImage).FirstOrDefault(image => image?.Data is { Length: > 0 });
+            // A brief calendar lookup between clarification replies does not
+            // discard an uploaded timetable from this conversation.
+            if (visionImage is null && TimetableFollowup(input.Text))
+                visionImage = historyRows.Where(row => row.Status is "NEEDS_INPUT" or "BLOCKED" or "FAILED")
+                    .Select(StoredAgentImage).FirstOrDefault(image => image?.Data is { Length: > 0 });
             var pending = latest?.Status is "NEEDS_INPUT" or "BLOCKED" && latest.CommandJson.Length > 0
                 ? JsonSerializer.Deserialize<AgentIntent>(latest.CommandJson, AgentJson)?.Pending : null;
+            pending = ConfirmDurationProposal(pending, input.Text);
             var activeTaskTypes = await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).Select(x => x.Code).OrderBy(x => x).ToArrayAsync(ct);
             var nativeAgent = noraOptions?.Value.Mode == "Agent" && interpreter is INoraAgentModel { AgentAvailable: true };
             var (context, contextNotices) = nativeAgent ? ("", Array.Empty<string>())
@@ -207,6 +213,7 @@ public sealed partial class WorkspaceService
                     string.Join("\n", historyRows.TakeWhile(row => row.Status == "NEEDS_INPUT").Reverse().Select(row => row.Text).Append(input.Text));
                 var timetableContext = visionImage is not null || IsTimetableRequest(input.Text) ||
                     historyRows.TakeWhile(row => row.Status is "NEEDS_INPUT" or "FAILED" or "BLOCKED").Any(row => IsTimetableRequest(row.Text));
+                if (timetableContext) current = await AgentCalendarStateAsync(uid, current, ct);
                 var selected = runtime?.Candidate;
                 var (changes, candidate, affected, summary, timetableNotices) = selected is null
                     ? await BuildAgentChangesAsync(uid, intent, current, input.Text, ct, eventRequest, timetableContext)
@@ -275,6 +282,9 @@ public sealed partial class WorkspaceService
                     : affected.Length > 0 || intent.Events.Length > 0 || intent.Tasks.Length > 0 || intent.Exceptions.Length > 0 || intent.ReplaceWeeklyAvailability
                         ? "Lịch hiện tại đã đúng với yêu cầu; không có thay đổi cần lưu."
                         : scheduleReviewReply ?? ScopedReadOnlyReply(intent, input.Text, current, history, contextNotices);
+                if (!blocked && changes.AnalyzeTimetable)
+                    replyMessage = TimetableAnalysis(candidate, changes.Events, plan,
+                        applied: false);
                 return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text,
                     replyMessage,
                     blocked ? "BLOCKED" : hasChanges ? "PREVIEW" : "ANSWERED", "", hasChanges || blocked ? plan : null, summary, warnings.Concat(contextNotices).Concat(categoryNotices).Concat(hasChanges || blocked ? timetableNotices : []).ToArray(), turn.CreatedAt,
@@ -501,7 +511,10 @@ public sealed partial class WorkspaceService
                 candidate.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled).Select(x => x.Id)) affected.Add(id);
         Require(intent.OptimizationQuery is not null || !candidate.Sessions.Any(x => affected.Contains(x.TaskId) && x.Status == WorkSessionStatus.Scheduled && x.Start >= Now.AddMinutes(5).AddDays(intent.HorizonDays) &&
             !engine.FreeSlots(candidate, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End)), "AGENT_HORIZON_CONFLICT", "Có phiên bị ảnh hưởng ngoài phạm vi đang lập lịch. Hãy mở rộng phạm vi hoặc chỉnh riêng phiên đó.", 409);
-        return (new(weekly, exceptions.ToArray(), events.ToArray(), taskChanges.ToArray(), removedExceptions.Select(x => x.Id).ToArray(), urgentEventIds, clippedClasses.ToArray()), candidate, affected.ToArray(), summary.ToArray(), TimetableCutoffNotices(skippedClasses, clippedClasses.Count));
+        return (new(weekly, exceptions.ToArray(), events.ToArray(), taskChanges.ToArray(), removedExceptions.Select(x => x.Id).ToArray(), urgentEventIds, clippedClasses.ToArray(),
+            timetableContext && events.Count > 0 || (weekly is not null || exceptions.Count > 0) &&
+                candidate.Events.Any(x => x.End > Now && x.Start <= Now.AddDays(30) && x.EventType == "CLASS")),
+            candidate, affected.ToArray(), summary.ToArray(), TimetableCutoffNotices(skippedClasses, clippedClasses.Count));
     }
 
     private static string LocalTime(DateTimeOffset time, WorkPreference preference) => TimeZoneInfo.ConvertTime(time, PlanningEngine.Zone(preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm");
@@ -530,6 +543,8 @@ public sealed partial class WorkspaceService
         var state = await State(uid, ct);
         Require(state.Preference.Revision == turn.ExpectedRevision, "AGENT_STALE", "Dữ liệu đã thay đổi. Gửi lại yêu cầu để kiểm tra lịch mới.", 409);
         var changes = JsonSerializer.Deserialize<AgentChangeSet>(turn.ChangesJson, AgentJson)!; var view = TurnView(turn);
+        var timetableAnalysis = changes.AnalyzeTimetable;
+        if (timetableAnalysis) state = await AgentCalendarStateAsync(uid, state, ct);
         foreach (var task in changes.Tasks)
         {
             Require(await db.TaskTypes.AnyAsync(x => x.Code == task.TaskType && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không còn hoạt động; hãy tạo lại bản xem trước.", 409);
@@ -608,8 +623,11 @@ public sealed partial class WorkspaceService
             if (run is not null) { run.Status = "APPLIED"; run.UpdatedAt = Now; run.Version = Guid.NewGuid(); }
             view = view with { Run = appliedRun with { Status = "APPLIED" } };
         }
-        return SaveTurn(turn, view with { Status = "APPLIED",
-            Reply = plan?.IsOptimization == true ? "Đã lưu phương án tối ưu bạn vừa xác nhận. Bạn có thể xem lịch mới bên dưới hoặc hoàn tác nếu muốn quay lại lịch cũ."
+        return SaveTurn(turn, view with { Status = "APPLIED", SuggestRoutine = timetableAnalysis,
+            Reply = timetableAnalysis
+                ? TimetableAnalysis(candidate, changes.Events, plan,
+                    applied: true)
+                : plan?.IsOptimization == true ? "Đã lưu phương án tối ưu bạn vừa xác nhận. Bạn có thể xem lịch mới bên dưới hoặc hoàn tác nếu muốn quay lại lịch cũ."
                 : plan?.HasUrgentReplan == true
                 ? "Đã lưu phương án bạn xác nhận:\n" + string.Join("\n", view.Changes.Where(change => change.Kind is "EVENT" or "SESSION").Select(change =>
                     $"- {change.Name}: {change.After}." + (change.Before.Length > 0 ? $" Giờ cũ: {change.Before}." : "")))

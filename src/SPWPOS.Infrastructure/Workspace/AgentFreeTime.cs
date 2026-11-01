@@ -50,10 +50,10 @@ public sealed partial class WorkspaceService
         var range = partOfOverview ? "Trong khoảng này" : CalendarQueryLabel(query, state.Preference);
         if (slots.Length == 0)
         {
-            var hasAvailability = state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable && x.Date >= firstDate && x.Date <= lastDate);
+            var hasAvailability = state.Policy != null || state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable && x.Date >= firstDate && x.Date <= lastDate);
             return hasAvailability
                 ? $"{range}, mình không tìm thấy khoảng rảnh nào trong giờ bạn đã đặt. Bạn có thể cho mình một ngày khác để tìm tiếp nhé."
-                : $"{range}, bạn chưa đặt giờ rảnh nên mình chưa biết lúc nào bạn có thể dành thời gian cho công việc. Bạn thêm giờ rảnh trong phần cài đặt rồi mình xem giúp nhé.";
+                : $"{range}, mình chưa có giờ làm việc được bạn xác nhận. Bạn cho mình biết ngày và khung giờ có thể làm việc, cùng giờ sinh hoạt/ngủ/nghỉ cần chừa; mình sẽ cấu hình quanh thời gian biểu cố định của bạn.";
         }
 
         string Window(TimeSlot slot)

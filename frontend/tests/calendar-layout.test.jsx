@@ -46,13 +46,30 @@ it.each(["week", "agenda"])(
       const title = within(viewport).getByText(event.name);
       const entry = title.closest(".calendar-timed-card");
       const detail = entry;
-      expect(detail.dataset.action).toBe("edit-event");
+      expect(detail.dataset.action).toBe("event-detail");
       expect(detail.dataset.id).toBe(event.id);
       expect(title.title).toBe(event.name);
     });
     expect(screen.getByText(/Cuộn trong khung lịch để xem thêm/)).toBeTruthy();
   },
 );
+
+it("opens details from calendar cards and keeps deletion controls inside the popup", () => {
+  state.calendarView = "week";
+  state.workspace.sessions = [
+    { id: "scheduled", taskName: "Chưa làm", status: "Scheduled", start: "2026-10-21T08:00:00Z", end: "2026-10-21T09:00:00Z", actualSeconds: 0 },
+    { id: "locked", taskName: "Đã khóa", status: "Scheduled", isLocked: true, start: "2026-10-21T09:00:00Z", end: "2026-10-21T10:00:00Z", actualSeconds: 0 },
+    { id: "running", taskName: "Đang làm", status: "Running", start: "2026-10-21T10:00:00Z", end: "2026-10-21T11:00:00Z" },
+    { id: "completed", taskName: "Đã làm", status: "Completed", start: "2026-10-21T11:00:00Z", end: "2026-10-21T12:00:00Z" },
+  ];
+  render(calendarPage());
+  expect(screen.queryByRole("button", { name: /Xóa/ })).toBeNull();
+  state.workspace.sessions.forEach((session) => {
+    const card = screen.getByText(session.taskName).closest("button");
+    expect(card.dataset.action).toBe("session-detail");
+    expect(card.dataset.id).toBe(session.id);
+  });
+});
 
 it.each(["week", "agenda"])(
   "keeps fixed events in their day and normal document flow in %s view",

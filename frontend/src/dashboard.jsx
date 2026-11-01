@@ -561,7 +561,7 @@ export function todayPage({ onWorkspaceChanged } = {}) {
   const insights = state.insights;
   const next = nextWorkflowStep(state.workspace);
   const readyToPlan = workflowSteps(state.workspace)
-    .slice(0, 2)
+    .slice(0, 3)
     .every((step) => step.done);
   return (
     <>

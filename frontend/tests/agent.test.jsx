@@ -172,6 +172,18 @@ beforeEach(() => {
     }),
   );
 });
+
+it("shows a processing stop without blaming availability or asking users to change deadlines", async () => {
+  turns = [{ ...result, status: "BLOCKED", changes: [], plan: null, errorCode: "AGENT_BUDGET_EXCEEDED",
+    reply: "Mình chưa tìm được phương án. Bạn có thể thu hẹp khoảng ngày hoặc bổ sung điều kiện rồi thử lại.",
+    run: { mode: "Agent", toolCalls: 8, steps: [] } }];
+  render(<AgentPage />);
+  await screen.findByText("Tạm dừng xử lý");
+  expect(screen.queryByText(/thu hẹp khoảng ngày/)).toBeNull();
+  expect(screen.queryByText(/mở thêm giờ rảnh/)).toBeNull();
+  expect(screen.queryByText(/nới lỏng deadline/)).toBeNull();
+  expect(screen.getAllByText(/Tiếp tục xử lý/).length).toBeGreaterThan(0);
+});
 async function ready() {
   await waitFor(() =>
     expect(screen.queryByText("Đang tải trợ lý…")).toBeNull(),

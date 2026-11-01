@@ -3,7 +3,8 @@ namespace SPWPOS.Application.Workspace;
 
 public sealed record TimeSlot(DateTimeOffset Start, DateTimeOffset End);
 public sealed record PlanningState(WorkTask[] Tasks, TaskDependency[] Dependencies, WeeklyAvailability[] Availability,
-    AvailabilityException[] Exceptions, FixedEvent[] Events, WorkSession[] Sessions, WorkPreference Preference, EstimationObservation[]? Observations = null);
+    AvailabilityException[] Exceptions, FixedEvent[] Events, WorkSession[] Sessions, WorkPreference Preference, EstimationObservation[]? Observations = null,
+    AvailabilityPolicy? Policy = null);
 
 // Pure deterministic planner: no EF, HTTP, secrets, AI, or wall-clock dependencies.
 public sealed partial class PlanningEngine
@@ -58,23 +59,45 @@ public sealed partial class PlanningEngine
         var zone = Zone(state.Preference.TimeZoneId); var first = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(start, zone).DateTime);
         var last = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(end, zone).DateTime);
         var result = new List<TimeSlot>();
-        var blocks = state.Events.Select(x => new TimeSlot(x.Start, x.End)).Concat(additionalBlocks ?? []).ToArray();
+        var eventBlocks = Merge(state.Events.Select(x => new TimeSlot(x.Start, x.End))).ToArray();
+        var blocks = eventBlocks.Select(x => state.Policy is { } p && p.AppliesOn(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(x.Start, zone).DateTime))
+            ? new TimeSlot(x.Start.AddMinutes(-p.CommuteMinutes), x.End.AddMinutes(p.CommuteMinutes)) : x)
+            .Concat(additionalBlocks ?? []).ToArray();
         for (var day = first; day <= last; day = day.AddDays(1))
         {
+            var daily = state.Policy?.ForDate(day);
+            var activePolicy = state.Policy?.AppliesOn(day) == true ? state.Policy : null;
             var dated = state.Exceptions.Where(x => x.Date == day && x.IsAvailable).ToArray();
             var replaceDate = dated.Any(x => x.OverridesWeeklyAvailability);
-            var windows = (replaceDate ? [] : state.Availability.Where(x => x.DayOfWeek == (int)day.DayOfWeek))
+            var weekly = state.Availability.Where(x => x.DayOfWeek == (int)day.DayOfWeek).ToArray();
+            var windows = (replaceDate ? [] : weekly)
                 .Select(x => new TimeSlot(At(day, x.StartMinute, zone), At(day, x.EndMinute, zone)))
                 .Concat(dated.Where(x => !replaceDate || x.OverridesWeeklyAvailability).Select(x => new TimeSlot(At(day, x.StartMinute, zone), At(day, x.EndMinute, zone))));
+            if (!replaceDate && state.Availability.Length == 0 && activePolicy is { } policy)
+                windows = windows.Append(new(At(day, daily?.AwakeStart ?? policy.AwakeStart, zone), At(day, daily?.AwakeEnd ?? policy.AwakeEnd, zone)));
             var unavailable = state.Exceptions.Where(x => x.Date == day && !x.IsAvailable).Select(x => new TimeSlot(At(day, x.StartMinute, zone), At(day, x.EndMinute, zone)));
+            if (activePolicy is { } routine)
+                unavailable = unavailable.Concat(new[] { new TimeSlot(At(day, daily?.LunchStart ?? routine.LunchStart, zone), At(day, daily?.LunchEnd ?? routine.LunchEnd, zone)),
+                    new TimeSlot(At(day, daily?.DinnerStart ?? routine.DinnerStart, zone), At(day, daily?.DinnerEnd ?? routine.DinnerEnd, zone)) });
+            if (daily is { RestEnd: > 0 } && daily.RestEnd > daily.RestStart)
+                unavailable = unavailable.Append(new(At(day, daily.RestStart, zone), At(day, daily.RestEnd, zone)));
+            if (daily is { BreakfastEnd: > 0 } && daily.BreakfastEnd > daily.BreakfastStart)
+                unavailable = unavailable.Append(new(At(day, daily.BreakfastStart, zone), At(day, daily.BreakfastEnd, zone)));
             foreach (var window in Merge(windows))
             {
                 var clipped = new TimeSlot(window.Start < start ? start : window.Start, window.End > end ? end : window.End);
+                if (activePolicy is { } awake)
+                {
+                    var from = At(day, daily?.AwakeStart ?? awake.AwakeStart, zone); var to = At(day, daily?.AwakeEnd ?? awake.AwakeEnd, zone);
+                    clipped = new(clipped.Start < from ? from : clipped.Start, clipped.End > to ? to : clipped.End);
+                }
                 if (clipped.End > clipped.Start) result.AddRange(Subtract(clipped, blocks.Concat(unavailable)));
             }
         }
         return result.OrderBy(x => x.Start).ToArray();
     }
+    public TimeSlot[] FocusSlots(PlanningState state, DateTimeOffset start, DateTimeOffset end, IEnumerable<TimeSlot>? blocks = null) =>
+        FreeSlots(state, start, end, blocks).Where(x => state.Policy is null || !state.Policy.AppliesOn(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(x.Start, Zone(state.Preference.TimeZoneId)).DateTime)) || (x.End - x.Start).TotalMinutes >= state.Policy.FocusMinutes).ToArray();
     public static IEnumerable<TimeSlot> Merge(IEnumerable<TimeSlot> slots)
     {
         TimeSlot? current = null;
@@ -129,7 +152,7 @@ public sealed partial class PlanningEngine
         var schedule = preserve.Where(x => x.End > start && x.Start < end).Select(x => new ProposedSession(x.Id, x.TaskId, x.Start, x.End, "PRESERVED_SESSION", true)).ToList();
         TimeSlot Block(DateTimeOffset from, DateTimeOffset to) => new(from.AddMinutes(-state.Preference.BreakMinutes), to.AddMinutes(state.Preference.BreakMinutes));
         var completedBlocks = state.Sessions.Where(x => x.Status == WorkSessionStatus.Completed).Select(x => Block(x.Start, x.End)).ToArray();
-        var free = FreeSlots(state, start, end, preserve.Select(x => Block(x.Start, x.End)).Concat(completedBlocks));
+        var free = FocusSlots(state, start, end, preserve.Select(x => Block(x.Start, x.End)).Concat(completedBlocks));
         var zone = Zone(state.Preference.TimeZoneId);
         DateOnly Day(DateTimeOffset date) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(date, zone).DateTime);
         var budgets = CapacityDays(state, start, end, now, input.UseCapacityFactor, preserve)
@@ -225,7 +248,7 @@ public sealed partial class PlanningEngine
             schedule.AddRange(tentative); budgets = trialBudgets;
             done = CompletionTimes(state, preservedSessions.Concat(schedule.Where(x => !x.Preserved)), bias, start);
             var allBlocks = preserve.Select(x => Block(x.Start, x.End)).Concat(schedule.Where(x => !x.Preserved).Select(x => Block(x.Start, x.End)));
-            free = FreeSlots(state, start, end, allBlocks.Concat(completedBlocks));
+            free = FocusSlots(state, start, end, allBlocks.Concat(completedBlocks));
         }
         return new(Guid.Empty, state.Preference.Revision, start, end, schedule.OrderBy(x => x.Start).ToArray(), warnings.ToArray(),
             ["Ưu tiên công việc khẩn, sau đó theo deadline và thứ tự phụ thuộc.", $"Khả năng sử dụng thời gian: {factor:P0}; " + (input.UseEstimateBias ? $"dữ liệu ước lượng chỉ cá nhân hóa từ {MinimumBiasSamples} mẫu." : "dùng thời lượng công việc đã xác định trong yêu cầu."), "Giữ phiên đã khóa/đang thực hiện; không vượt deadline cứng. Phiên sau deadline mềm luôn có cảnh báo."], false, UseEstimateBias: input.UseEstimateBias);

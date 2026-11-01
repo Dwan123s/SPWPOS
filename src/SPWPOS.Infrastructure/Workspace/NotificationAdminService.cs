@@ -19,12 +19,13 @@ public sealed class NotificationJobStatus
 }
 public sealed partial class WorkspaceService
 {
-    private async Task AddNotification(Guid uid, string kind, string title, string message, string key, Guid? taskId, CancellationToken ct, Guid? sessionId = null, Guid? planId = null)
+    private async Task AddNotification(Guid uid, string kind, string title, string message, string key, Guid? taskId, CancellationToken ct, Guid? sessionId = null, Guid? planId = null, Guid? fixedEventId = null)
     {
         var settings = await db.NotificationSettings.SingleOrDefaultAsync(x => x.UserId == uid, ct);
         var visible = settings?.InAppEnabled != false;
         var emailPending = settings?.EmailEnabled == true && kind is "DEADLINE" or "SESSION_REMINDER";
-        if (!visible && !emailPending) return;
+        var telegram = await db.TelegramConnections.SingleOrDefaultAsync(x => x.UserId == uid && x.Enabled && x.ChatId != null, ct);
+        if (!visible && !emailPending && telegram is null) return;
         var existing = db.InAppNotifications.Local.FirstOrDefault(x => x.UserId == uid && x.DedupeKey == key)
             ?? await Mine<InAppNotification>(uid).SingleOrDefaultAsync(x => x.DedupeKey == key, ct);
         if (existing is not null)
@@ -32,10 +33,13 @@ public sealed partial class WorkspaceService
             // Opting into email must also cover reminders that are already due in the inbox.
             if (emailPending && existing.EmailSentAt is null && existing.EmailAttempts == 0 && !existing.EmailPending)
             { existing.EmailPending = true; existing.NextEmailAttemptAt = Now; existing.Title = title; existing.Message = message; }
+            if (telegram is not null && existing.CreatedAt >= telegram.ConnectedAt && existing.TelegramSentAt is null && existing.TelegramAttempts == 0 && !existing.TelegramPending)
+            { existing.TelegramPending = true; existing.TelegramBindingId = telegram.BindingId; existing.NextTelegramAttemptAt = Now; existing.FixedEventId = fixedEventId; }
             return;
         }
         db.InAppNotifications.Add(new() { UserId = uid, Kind = kind, Title = title, Message = message, DedupeKey = key, TaskId = taskId, SessionId = sessionId, PlanId = planId, ScheduledFor = Now, CreatedAt = Now,
-            IsVisible = visible, EmailPending = emailPending, NextEmailAttemptAt = emailPending ? Now : null });
+            IsVisible = visible, EmailPending = emailPending, NextEmailAttemptAt = emailPending ? Now : null,
+            TelegramPending = telegram is not null, TelegramBindingId = telegram?.BindingId, NextTelegramAttemptAt = telegram is not null ? Now : null, FixedEventId = fixedEventId });
     }
     public Task EnsureNotificationsAsync(Guid uid, CancellationToken ct) => Mutate(uid, async () =>
     {
@@ -52,15 +56,16 @@ public sealed partial class WorkspaceService
         if (missed) (await Preference(uid, ct)).Revision = Guid.NewGuid();
         foreach (var task in state.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled && x.Deadline < Now.AddHours(settings.DeadlineLeadHours)))
             await AddNotification(uid, "DEADLINE", "Công việc sắp đến hạn", task.Name + " · Hạn: " + TimeZoneInfo.ConvertTime(task.Deadline, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"deadline:{task.Id}:{task.Deadline.UtcTicks}", task.Id, ct);
-        foreach (var session in state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && x.Start >= Now && x.Start <= Now.AddMinutes(settings.SessionReminderLeadMinutes)))
+        foreach (var session in state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && x.Start > Now && x.Start <= Now.AddMinutes(settings.SessionReminderLeadMinutes)))
             await AddNotification(uid, "SESSION_REMINDER", "Sắp đến phiên làm việc", (state.Tasks.FirstOrDefault(x => x.Id == session.TaskId)?.Name ?? "Phiên làm việc") + " · Bắt đầu: " + TimeZoneInfo.ConvertTime(session.Start, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"session:{session.Id}:{session.Start.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
         // Timetables imported from images are FixedEvents, not WorkSessions.
-        // Allow a short catch-up window when a browser/worker wakes at start time.
-        foreach (var entry in state.Events.Where(x => x.End > Now && x.Start >= Now.AddMinutes(-2) &&
+        // Before-start and at-start notifications have separate dedupe keys.
+        foreach (var entry in state.Events.Where(x => x.End > Now && x.Start > Now &&
             x.Start <= Now.AddMinutes(settings.SessionReminderLeadMinutes)))
-            await AddNotification(uid, "EVENT_REMINDER", entry.Start <= Now ? "Lịch hẹn đang bắt đầu" : "Sắp đến lịch hẹn",
+            await AddNotification(uid, "EVENT_REMINDER", "Sắp đến lịch hẹn",
                 entry.Name + " · Bắt đầu: " + TimeZoneInfo.ConvertTime(entry.Start, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").",
-                $"event:{entry.Id}:{entry.Start.UtcTicks}", null, ct);
+                $"event:{entry.Id}:{entry.Start.UtcTicks}", null, ct, fixedEventId: entry.Id);
+        await AddStartedNotifications(uid, Now, ct);
         var analysis = engine.Analyze(state, new(Now, 7), Now);
         static int Level(string value) => value.ToUpperInvariant() switch { "MODERATE" => 1, "HIGH" => 2, "OVERLOAD" => 3, _ => 0 };
         if (Level(analysis.RiskLevel) >= Level(settings.WorkloadWarningLevel))
@@ -72,6 +77,32 @@ public sealed partial class WorkspaceService
         if (missed) { await db.SaveChangesAsync(ct); await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, state.Preference.PlanningHorizonDays), ct); }
         return true;
     }, ct, false);
+    public Task EnsureStartedNotificationsAsync(Guid uid, CancellationToken ct) => Mutate(uid, async () =>
+    {
+        await AddStartedNotifications(uid, Now, ct);
+        return true;
+    }, ct, false);
+    private async Task AddStartedNotifications(Guid uid, DateTimeOffset now, CancellationToken ct)
+    {
+        var cutoff = now.AddMinutes(-2);
+        var events = await Mine<FixedEvent>(uid).Where(x => x.Start <= now && x.Start >= cutoff && x.End > now).ToArrayAsync(ct);
+        var sessions = await Mine<WorkSession>(uid).Where(x => (x.Status == WorkSessionStatus.Scheduled || x.Status == WorkSessionStatus.Running) &&
+            x.Start <= now && x.Start >= cutoff && x.End > now && db.WorkTasks.Any(t => t.UserId == uid && t.Id == x.TaskId &&
+                !t.IsDeleted && t.Status != WorkTaskStatus.Completed && t.Status != WorkTaskStatus.Cancelled)).ToArrayAsync(ct);
+        if (events.Length == 0 && sessions.Length == 0) return;
+        var zone = PlanningEngine.Zone((await Preference(uid, ct)).TimeZoneId);
+        string Window(DateTimeOffset start, DateTimeOffset end) => TimeZoneInfo.ConvertTime(start, zone).ToString("dd/MM/yyyy HH:mm") +
+            " – " + TimeZoneInfo.ConvertTime(end, zone).ToString("dd/MM/yyyy HH:mm");
+        foreach (var entry in events)
+            await AddNotification(uid, "EVENT_STARTED", "Lịch hẹn đang diễn ra", entry.Name + " · Đang diễn ra: " + Window(entry.Start, entry.End) + ".",
+                $"event-started:{entry.Id}:{entry.Start.UtcTicks}", null, ct, fixedEventId: entry.Id);
+        foreach (var session in sessions)
+        {
+            var name = await Mine<WorkTask>(uid).Where(x => x.Id == session.TaskId).Select(x => x.Name).SingleAsync(ct);
+            await AddNotification(uid, "SESSION_STARTED", "Phiên làm việc đang diễn ra", name + " · Đã đến giờ trong lịch: " + Window(session.Start, session.End) + ".",
+                $"session-started:{session.Id}:{session.Start.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
+        }
+    }
     public Task<NotificationView[]> GetNotificationsAsync(Guid uid, CancellationToken ct) => Mine<InAppNotification>(uid).AsNoTracking()
         .Where(x => x.IsVisible).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(100)
         .Select(x => new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null)).ToArrayAsync(ct);
@@ -143,28 +174,52 @@ public sealed partial class WorkspaceService
             await db.SystemJobRuns.LongCountAsync(x => x.JobType == "NOTIFICATION_SCAN" && x.Status == "FAILED", ct));
     }
 }
-public sealed class WorkspaceNotificationWorker(IServiceScopeFactory scopes, NotificationJobStatus status, ILogger<WorkspaceNotificationWorker> logger) : BackgroundService
+public sealed class WorkspaceNotificationWorker(IServiceScopeFactory scopes, NotificationJobStatus status, ILogger<WorkspaceNotificationWorker> logger, TimeProvider clock) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(60));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        var tick = 0;
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             try
             {
                 var failuresBefore = status.Failures;
+                var fullScan = ++tick % 6 == 0;
                 Guid[] users;
-                using (var scope = scopes.CreateScope()) users = await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Users
-                    .Where(x => x.IsActive && x.EmailConfirmed).Select(x => x.Id).ToArrayAsync(stoppingToken);
+                using (var scope = scopes.CreateScope())
+                {
+                    var scanDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var accounts = scanDb.Users.Where(x => x.IsActive && x.EmailConfirmed);
+                    if (!fullScan)
+                    {
+                        var now = clock.GetUtcNow(); var cutoff = now.AddMinutes(-2);
+                        var due = scanDb.FixedEvents.Where(x => x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId)
+                            .Union(scanDb.WorkSessions.Where(x => (x.Status == WorkSessionStatus.Scheduled || x.Status == WorkSessionStatus.Running) &&
+                                x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId));
+                        accounts = accounts.Where(x => due.Contains(x.Id));
+                    }
+                    users = await accounts.Select(x => x.Id).ToArrayAsync(stoppingToken);
+                }
                 foreach (var uid in users)
                 {
                     try
                     {
                         using var scope = scopes.CreateScope();
                         var workspace = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
-                        await workspace.EnsureNotificationsAsync(uid, stoppingToken);
-                        await workspace.ScanRecoveryAsync(uid, stoppingToken);
-                        await scope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Email.ReminderNotificationService>().SendPendingAsync(uid, stoppingToken);
+                        if (fullScan)
+                        {
+                            await workspace.EnsureNotificationsAsync(uid, stoppingToken);
+                            await workspace.ScanRecoveryAsync(uid, stoppingToken);
+                        }
+                        else await workspace.EnsureStartedNotificationsAsync(uid, stoppingToken);
+                        // A delivery channel failure must not prevent the other channel from sending.
+                        try {
+                            using var telegramScope = scopes.CreateScope();
+                            await telegramScope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Telegram.TelegramNotificationService>().SendPendingAsync(uid, stoppingToken);
+                        }
+                        catch (Exception e) when (e is not OperationCanceledException) { logger.LogWarning("Telegram delivery failed ({FailureType}).", e.GetType().Name); }
+                        if (fullScan) await scope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Email.ReminderNotificationService>().SendPendingAsync(uid, stoppingToken);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
                     catch (Exception e)
@@ -176,7 +231,7 @@ public sealed class WorkspaceNotificationWorker(IServiceScopeFactory scopes, Not
                         await failureDb.SaveChangesAsync(stoppingToken);
                     }
                 }
-                using (var resultScope = scopes.CreateScope())
+                if (fullScan) using (var resultScope = scopes.CreateScope())
                 {
                     var resultDb = resultScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                     var success = status.Failures == failuresBefore;
@@ -184,7 +239,7 @@ public sealed class WorkspaceNotificationWorker(IServiceScopeFactory scopes, Not
                     await resultDb.SaveChangesAsync(stoppingToken);
                     await resultScope.ServiceProvider.GetRequiredService<WorkspaceHistoryMaintenance>().PruneAsync(stoppingToken);
                 }
-                if (status.Failures == failuresBefore) status.LastSuccess = DateTimeOffset.UtcNow;
+                if (fullScan && status.Failures == failuresBefore) status.LastSuccess = DateTimeOffset.UtcNow;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception e) { status.Failed(); logger.LogWarning("Workspace notification scan failed with {FailureType}", e.GetType().Name); }

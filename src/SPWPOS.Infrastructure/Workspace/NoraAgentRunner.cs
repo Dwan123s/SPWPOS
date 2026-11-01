@@ -36,20 +36,27 @@ public sealed class NoraAgentRunner
         var cache = new Dictionary<string, NoraToolResult>(StringComparer.Ordinal);
         var callIds = new Dictionary<string, string>(StringComparer.Ordinal);
         var rounds = priorModelTurns; var calls = priorToolCalls; var consecutiveErrors = 0;
+        // Audit counters span the goal; resource limits apply to this user turn.
+        // A clarification answer must still have room to finish its proposal.
+        var modelLimit = priorModelTurns + limits.MaxModelTurns;
+        var toolLimit = priorToolCalls + limits.MaxToolCalls;
         NoraRunnerResult Stop(string code) => new(new("BLOCKED", code), trace.ToArray(), rounds, calls);
         try
         {
-            while (rounds < limits.MaxModelTurns && calls < limits.MaxToolCalls)
+            while (rounds < modelLimit && calls < toolLimit)
             {
                 token.ThrowIfCancellationRequested(); rounds++;
-                var reply = await model(new(instructions, contents.ToArray(), tools), token);
+                var budget = $"\nCURRENT TURN BUDGET: {modelLimit - rounds + 1} model responses including this one and {toolLimit - calls} tool calls remain. " +
+                    "A successful simulation already includes feasibility and warnings; do not re-evaluate the same candidate. " +
+                    "When the requested changes are complete and feasible, finish_proposal next. Ask only for essential missing facts; never invent feasibility to finish.";
+                var reply = await model(new(instructions + budget, contents.ToArray(), tools), token);
                 if (reply.Content.ValueKind != JsonValueKind.Object || reply.Calls.Length is 0 or > 6)
                     throw new AuthException("AGENT_INVALID_STEP", "AI chưa chọn được hành động hợp lệ. Lịch chưa thay đổi.", 503);
                 contents.Add(reply.Content);
                 var observations = new List<object>();
                 foreach (var call in reply.Calls)
                 {
-                    if (calls >= limits.MaxToolCalls) return Stop("TOOL_BUDGET_EXCEEDED");
+                    if (calls >= toolLimit) return Stop("TOOL_BUDGET_EXCEEDED");
                     token.ThrowIfCancellationRequested(); calls++;
                     var watch = Stopwatch.StartNew();
                     var definition = tools.SingleOrDefault(x => x.Name == call.Name);
@@ -59,7 +66,7 @@ public sealed class NoraAgentRunner
                         throw new AuthException("AGENT_CALL_REUSED", "AI dùng lại mã hành động cho nội dung khác. Lịch chưa thay đổi.", 503);
                     callIds[call.Id] = fingerprint;
                     if (definition is null) result = new("ERROR", ErrorCode: "UNKNOWN_TOOL", Message: "Chỉ dùng công cụ được cung cấp.");
-                    else if (call.Name.StartsWith("finish_", StringComparison.Ordinal) || call.Name == "ask_user")
+                    else if (call.Name.StartsWith("finish_", StringComparison.Ordinal) || call.Name is "ask_user" or "propose_changes" or "answer_calendar" or "answer_free_time")
                     {
                         result = reply.Calls.Length != 1
                             ? new("ERROR", ErrorCode: "MIXED_TERMINAL", Message: "Kết thúc hoặc hỏi người dùng phải là hành động riêng.")

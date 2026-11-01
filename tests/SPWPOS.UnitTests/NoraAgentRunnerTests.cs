@@ -58,11 +58,14 @@ public sealed class NoraAgentRunnerTests
         Assert.Equal("REPEATED_TOOL_ERRORS", result.Terminal.Reply); Assert.Equal(3, result.ToolCalls);
     }
 
-    [Fact] public async Task Continuations_do_not_reset_cumulative_model_budget()
+    [Fact] public async Task A_user_continuation_gets_a_bounded_turn_budget_and_keeps_cumulative_counters()
     {
-        var result = await Run((_, _) => throw new InvalidOperationException("Budget already exhausted"), (_, _) => throw new InvalidOperationException(),
-            priorModel: 8, priorTools: 2);
-        Assert.Equal("BLOCKED", result.Terminal.Kind); Assert.Equal(8, result.ModelTurns);
+        var n = 0;
+        var result = await Run((_, _) => Task.FromResult(Call(n++ == 0 ? "inspect_constraints" : "ask_user", n)),
+            (call, _) => Task.FromResult(call.Name == "ask_user" ? new NoraToolResult("TERMINAL", new NoraTerminal("QUESTION")) : new("OK")),
+            new() { MaxModelTurns = 2, MaxToolCalls = 2 }, priorModel: 8, priorTools: 12);
+        Assert.Equal("QUESTION", result.Terminal.Kind); Assert.Equal(10, result.ModelTurns); Assert.Equal(14, result.ToolCalls);
+        Assert.Equal(new[] { 13, 14 }, result.Trace.Select(x => x.Sequence));
     }
 
     [Fact] public async Task Provider_call_id_is_echoed_only_when_supplied_and_invalid_args_are_not_executed()

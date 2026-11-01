@@ -176,8 +176,10 @@ public sealed partial class WorkspaceService
         var window = taskWindowSource is not null ? RequestedWorkWindow(taskWindowSource, state.Preference, windowReference) :
             canInfer ? RequestedWorkWindow(request, state.Preference, pending?.WorkWindowStart) ??
                 (pending is null ? null : RequestedWorkWindow(pending.OriginalText, state.Preference, pending.WorkWindowStart)) : null;
-        AgentIntent Ask(string question, string[]? options = null) => intent with
+        AgentIntent Ask(string question, string[]? options = null)
         {
+            var proposed = ProposedDuration(intent.Reply + "\n" + question);
+            return intent with {
             Reply = ClarificationReply(intent.Reply), Question = question, Options = options ?? [],
             ResultKind = "CLARIFICATION",
             ReplaceWeeklyAvailability = false, WeeklySlots = [], Exceptions = [], Events = [], Tasks = [], ScheduleTaskIds = [], Reschedule = false,
@@ -187,8 +189,11 @@ public sealed partial class WorkspaceService
                 window?.Start ?? pending?.WorkWindowStart, window?.End ?? pending?.WorkWindowEnd,
                 first?.DurationEvidence is { } duration && SourceQuote(duration, source) ? QuotedMinutes(duration) : QuotedMinutes(request) ?? pending?.EstimatedMinutes,
                 first?.DeadlineEvidence is { } deadline && SourceQuote(deadline, source) ? first.Deadline : pending?.Deadline,
-                pending is null ? [] : (pending.Answers ?? []).Append(request).TakeLast(4).ToArray())
-        };
+                pending is null ? [] : (pending.Answers ?? []).Append(request).TakeLast(4).ToArray(),
+                proposed ?? pending?.ProposedMinutes, pending?.DurationProposalAccepted == true &&
+                    (proposed is null || proposed == pending.ProposedMinutes))
+            };
+        }
         // Recover one mixed response as clarification. The mutation guard below
         // remains mandatory, including when applying a persisted preview.
         if (!string.IsNullOrWhiteSpace(intent.Question)) return Ask(intent.Question, intent.Options);
@@ -230,7 +235,9 @@ public sealed partial class WorkspaceService
             // reserved for older persisted commands/adapters, not a model escape.
             if (item.DurationEvidence is not null && task.EstimatedMinutes is not null)
             {
-                var duration = GroundDurationQuote(item, source);
+                var duration = intent.Tasks.Length == 1 && item.TaskId is null && pending is { DurationProposalAccepted: true, ProposedMinutes: { } minutes } &&
+                    task.EstimatedMinutes == minutes && SourceQuote(item.Name, pending.OriginalText)
+                    ? $"{minutes} phút" : GroundDurationQuote(item, source);
                 if (duration is null) return Ask("Bạn muốn dành bao nhiêu phút cho công việc này? Mình chưa lưu thời lượng chưa được xác nhận.");
                 task = task with { DurationEvidence = duration };
             }

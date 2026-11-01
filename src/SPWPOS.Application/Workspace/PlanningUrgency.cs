@@ -64,7 +64,7 @@ public sealed partial class PlanningEngine
         {
             var task = tasks[group.Key];
             var near = task.Deadline - now <= NearDeadlineWindow;
-            var latest = near ? task.Deadline : group.Min(x => Shift(x.End, MaximumUrgentDisplacementDays));
+            var latest = near ? task.Deadline : group.Min(x => Shift(x.End, Math.Clamp(input.UrgentDisplacementDays, 2, 30)));
             if (latest > task.Deadline) latest = task.Deadline;
             var successors = state.Dependencies.Where(x => x.PredecessorId == task.Id).Select(x => x.TaskId).ToHashSet();
             foreach (var dependent in state.Sessions.Where(x => retained.Contains(x.Id) && successors.Contains(x.TaskId) && x.Start >= start))
@@ -85,7 +85,7 @@ public sealed partial class PlanningEngine
                 fallback.Warnings.Sum(x => x.UnscheduledMinutes) < plan.Warnings.Sum(x => x.UnscheduledMinutes)) plan = fallback;
         }
         return plan with { HasUrgentReplan = true, Explanations = plan.Explanations.Append(
-            "Việc khẩn được ưu tiên. Việc còn hạn trong 48 giờ dời sát lịch cũ và vẫn kịp hạn; việc còn hạn xa ưu tiên ngày kế tiếp, tối đa 2 ngày. Giữ các phiên không liên quan, phiên khóa và đang thực hiện; không đổi hạn chót.").ToArray() };
+            $"Việc khẩn được ưu tiên. Việc còn hạn trong 48 giờ dời sát lịch cũ và vẫn kịp hạn; việc còn hạn xa được dời tối đa {Math.Clamp(input.UrgentDisplacementDays, 2, 30)} ngày. Giữ các phiên không liên quan, phiên khóa và đang thực hiện; không đổi hạn chót.").ToArray() };
     }
 
     private static IEnumerable<TimeSlot> DisplacedWindows(IEnumerable<TimeSlot> windows, UrgentMove move,

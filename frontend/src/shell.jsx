@@ -155,7 +155,7 @@ export function workspaceShell(routes, title, description, body) {
           <nav className="nav" aria-label="Điều hướng chính">
             <section className="nav-group" aria-label="Không gian cá nhân">
               <div className="nav-label">Không gian cá nhân</div>
-              {nav(["today", "agent", "notes", "calendar", "tasks"])}
+              {nav(["today", "agent", "notes", "calendar", "tasks", "teams"])}
             </section>
             <section className="nav-group" aria-label="Theo dõi và thiết lập">
               <div className="nav-label">Theo dõi & thiết lập</div>

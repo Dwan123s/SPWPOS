@@ -91,6 +91,12 @@ it("groups dates in the account time zone and routes each reminder to its releva
     "task",
   );
 });
+it.each(["EVENT_STARTED", "SESSION_STARTED"])("routes %s to the calendar as a separate notice", (kind) => {
+  workspace.notifications = [{ id: "started", kind, title: "Lịch đang diễn ra", message: "Đã đến giờ.", createdAt: "2026-10-14T02:00:00Z", isRead: false }];
+  render(<NotificationCenter workspace={workspace} />);
+  expect(screen.getByRole("link", { name: "Xem lịch làm việc" }).getAttribute("href")).toBe("#calendar");
+  expect(screen.getByRole("article", { name: "Lịch đang diễn ra" })).toBeTruthy();
+});
 it("combines status, type and accent-insensitive search and can reset an empty result", async () => {
   render(<NotificationCenter workspace={workspace} />);
   const user = userEvent.setup();

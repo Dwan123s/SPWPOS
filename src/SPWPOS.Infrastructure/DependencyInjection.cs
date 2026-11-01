@@ -62,6 +62,19 @@ public static class DependencyInjection
         services.AddScoped<IEmailConnectionCheck>(provider => provider.GetRequiredService<EmailService>());
         services.AddScoped<PasswordNotificationService>();
         services.AddScoped<ReminderNotificationService>();
+        // Telegram is optional. Invalid integration settings must not stop login, calendars or other reminders.
+        services.AddOptions<SPWPOS.Infrastructure.Telegram.TelegramOptions>().Configure<IConfiguration>((o, c) =>
+        {
+            o.Enabled = bool.TryParse(c["Telegram:Enabled"], out var enabled) && enabled;
+            o.BotToken = (c["Telegram:BotToken"] ?? "").Trim();
+            o.PollSeconds = int.TryParse(c["Telegram:PollSeconds"] ?? "3", out var seconds) ? seconds : 0;
+        });
+        services.AddHttpClient<SPWPOS.Infrastructure.Telegram.ITelegramGateway, SPWPOS.Infrastructure.Telegram.TelegramGateway>(client =>
+            { client.Timeout = TimeSpan.FromSeconds(15); client.MaxResponseContentBufferSize = 1024 * 1024; })
+            .RemoveAllLoggers().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddScoped<SPWPOS.Infrastructure.Telegram.TelegramNotificationService>();
+        services.AddScoped<SPWPOS.Application.Workspace.ITelegramNotificationService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Telegram.TelegramNotificationService>());
+        services.AddHostedService<SPWPOS.Infrastructure.Telegram.TelegramUpdateWorker>();
         services.AddHostedService<PasswordNotificationWorker>();
         services.AddScoped<ISecurityAuditService, SecurityAuditService>();
         services.AddScoped<AccountRateLimiter>();
@@ -72,6 +85,7 @@ public static class DependencyInjection
             .Validate(x => (x.Mode is "Workflow" or "Agent") && x.MaxModelTurns is >= 2 and <= 16 && x.MaxToolCalls is >= 1 and <= 30 &&
                 x.MaxSimulations is >= 1 and <= 5 && x.TimeoutSeconds is >= 15 and <= 180, "Invalid NORA runtime limits.").ValidateOnStart();
         services.AddScoped<SPWPOS.Application.Workspace.IWorkspaceService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
+        services.AddScoped<SPWPOS.Application.Workspace.IPrivateTeamService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
         services.AddScoped<SPWPOS.Application.Workspace.IPlanningAgentService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
         services.AddSingleton<SPWPOS.Infrastructure.Workspace.NotificationJobStatus>();
         services.AddHostedService<SPWPOS.Infrastructure.Workspace.WorkspaceNotificationWorker>();

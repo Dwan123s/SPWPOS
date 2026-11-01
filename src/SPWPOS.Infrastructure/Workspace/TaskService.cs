@@ -66,10 +66,21 @@ public sealed partial class WorkspaceService
     }, ct);
     public Task SetStatusAsync(Guid uid, Guid id, StatusInput input, CancellationToken ct) =>
         Mutate(uid, () => SetTaskStatusCore(uid, id, input, ct), ct);
-    private async Task SetTaskStatusCore(Guid uid, Guid id, StatusInput input, CancellationToken ct)
+    private async Task SetTaskStatusCore(Guid uid, Guid id, StatusInput input, CancellationToken ct, TeamCompletionSubmitInput? submission = null)
     {
         Require(Enum.TryParse<WorkTaskStatus>(input.Status, true, out var status) && Enum.IsDefined(status), "INVALID_STATUS", "Trạng thái không hợp lệ.");
         var task = await Find<WorkTask>(uid, id, ct); Require(!task.IsDeleted, "NOT_FOUND", "Công việc đã xóa.", 404);
+        var assignment = await db.TeamTaskAssignments.SingleOrDefaultAsync(x => x.UserId == uid && x.WorkTaskId == id && x.Active, ct);
+        TeamTask? shared = null;
+        if (assignment is not null)
+        {
+            shared = await SharedTask(uid, assignment.TeamTaskId, ct);
+            Require(status != WorkTaskStatus.Cancelled, "TEAM_RETURN_REQUIRED", "Dùng Trả việc trong nhóm để ngừng nhận task này.", 409);
+            if (input.Progress == 100) status = WorkTaskStatus.Completed;
+            if (shared.Status is "PendingReview" or "Completed" && status == WorkTaskStatus.Completed) return;
+            Require(shared.AssigneeId == uid && shared.Status == "Assigned", "TEAM_REVIEW_PENDING", "Task đang chờ trưởng nhóm duyệt hoặc đã được duyệt hoàn thành.", 409);
+            Require(status != WorkTaskStatus.Completed || shared.PendingChangeJson == null, "TEAM_CHANGE_PENDING", "Xác nhận hoặc từ chối yêu cầu thay đổi trước khi báo hoàn thành.", 409);
+        }
         Require(!await Mine<WorkSession>(uid).AnyAsync(x => x.TaskId == id && (x.Status == WorkSessionStatus.Running || x.Status == WorkSessionStatus.Paused), ct),
             "SESSION_ACTIVE", "Kết thúc phiên đang thực hiện trước khi thay đổi trạng thái.", 409);
         if (status == WorkTaskStatus.Completed)
@@ -81,6 +92,12 @@ public sealed partial class WorkspaceService
                 "DEPENDENCY_INCOMPLETE", "Hoàn thành công việc tiền nhiệm trước.");
         }
         task.Status = status; task.Progress = status == WorkTaskStatus.Completed ? 100 : input.Progress; task.UpdatedAt = Now; task.CompletedAt = status == WorkTaskStatus.Completed ? Now : null;
+        if (shared is not null)
+        {
+            if (status == WorkTaskStatus.Completed) await SubmitTeamCompletion(uid, shared, ct, submission);
+            else { shared.Progress = task.Progress; shared.Version = Guid.NewGuid(); TeamLog(uid, shared.TeamId, shared.Id, "PROGRESS_CONFIRMED"); }
+            (await TeamMember(uid, shared.TeamId, ct)).MutationVersion = Guid.NewGuid();
+        }
         if (status is WorkTaskStatus.Completed or WorkTaskStatus.Cancelled)
             foreach (var session in await Mine<WorkSession>(uid).Where(x => x.TaskId == id && x.Status == WorkSessionStatus.Scheduled).ToArrayAsync(ct)) session.Status = WorkSessionStatus.Cancelled;
     }

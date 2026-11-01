@@ -10,7 +10,7 @@ public sealed class WorkspaceReminderTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     private static async Task Call(ServiceHarness h, Func<IWorkspaceService, Task> action)
     { await using var scope = h.Provider.CreateAsyncScope(); await action(scope.ServiceProvider.GetRequiredService<IWorkspaceService>()); }
-    [Theory] [InlineData(5, true)] [InlineData(-1, true)] [InlineData(60, false)] [InlineData(-30, false)]
+    [Theory] [InlineData(5, true)] [InlineData(-1, false)] [InlineData(60, false)] [InlineData(-30, false)]
     public async Task Fixed_events_get_due_reminders_once_and_respect_the_configured_window(int minutes, bool expected)
     {
         await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync(); var now = h.Clock.GetUtcNow();
@@ -23,6 +23,39 @@ public sealed class WorkspaceReminderTests
         var rows = await h.DbAsync(db => db.InAppNotifications.Where(x => x.Kind == "EVENT_REMINDER").ToArrayAsync(Ct));
         Assert.Equal(expected ? 1 : 0, rows.Length);
         if (expected) { Assert.Contains("PRN212", rows[0].Message); Assert.True(rows[0].IsVisible); Assert.False(rows[0].EmailPending); }
+    }
+    [Theory] [InlineData(1, 60, false)] [InlineData(0, 60, true)] [InlineData(-1, 60, true)] [InlineData(-2, 60, true)] [InlineData(-3, 60, false)] [InlineData(-1, -1, false)]
+    public async Task At_start_notice_is_not_early_repeated_or_sent_for_expired_events(int startMinutes, int endMinutes, bool expected)
+    {
+        await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync(); var now = h.Clock.GetUtcNow();
+        await h.DbAsync(async db => { db.FixedEvents.Add(new() { UserId = user.Id, Name = "Đi làm", Start = now.AddMinutes(startMinutes), End = now.AddMinutes(endMinutes) }); await db.SaveChangesAsync(Ct); });
+        await Call(h, s => s.EnsureStartedNotificationsAsync(user.Id, Ct));
+        await Call(h, s => s.EnsureNotificationsAsync(user.Id, Ct));
+        await Call(h, s => s.EnsureStartedNotificationsAsync(user.Id, Ct));
+        var rows = await h.DbAsync(db => db.InAppNotifications.Where(x => x.Kind == "EVENT_STARTED").ToArrayAsync(Ct));
+        Assert.Equal(expected ? 1 : 0, rows.Length);
+        if (expected) Assert.Contains("đang diễn ra", rows[0].Title);
+    }
+
+    [Fact]
+    public async Task Reading_advance_notice_keeps_a_second_at_start_notice_and_never_starts_the_timer()
+    {
+        await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync(); var now = h.Clock.GetUtcNow();
+        var task = new WorkTask { UserId = user.Id, Name = "Ôn tập", Deadline = now.AddDays(3) };
+        var session = new WorkSession { UserId = user.Id, TaskId = task.Id, Start = now.AddMinutes(5), End = now.AddMinutes(35) };
+        await h.DbAsync(async db => { db.WorkTasks.Add(task); db.WorkSessions.Add(session); db.FixedEvents.Add(new() { UserId = user.Id, Name = "Lớp học", Start = session.Start, End = session.End }); await db.SaveChangesAsync(Ct); });
+        await Call(h, s => s.EnsureNotificationsAsync(user.Id, Ct));
+        var advance = await h.DbAsync(db => db.InAppNotifications.Where(x => x.Kind == "EVENT_REMINDER" || x.Kind == "SESSION_REMINDER").ToArrayAsync(Ct));
+        Assert.Equal(2, advance.Length);
+        foreach (var n in advance) await Call(h, s => s.MarkNotificationAsync(user.Id, n.Id, Ct));
+        h.Clock.Advance(TimeSpan.FromMinutes(5));
+        await Call(h, s => s.EnsureStartedNotificationsAsync(user.Id, Ct));
+        await Call(h, s => s.EnsureNotificationsAsync(user.Id, Ct));
+        await Call(h, s => s.EnsureStartedNotificationsAsync(user.Id, Ct));
+        var rows = await h.DbAsync(db => db.InAppNotifications.Where(x => x.Kind == "EVENT_STARTED" || x.Kind == "SESSION_STARTED").ToArrayAsync(Ct));
+        Assert.Equal(2, rows.Length); Assert.All(rows, n => Assert.Null(n.ReadAt));
+        Assert.Equal(WorkSessionStatus.Scheduled, (await h.DbAsync(db => db.WorkSessions.SingleAsync(Ct))).Status);
+        Assert.Equal(WorkTaskStatus.Todo, (await h.DbAsync(db => db.WorkTasks.SingleAsync(Ct))).Status);
     }
     [Fact] public async Task Opt_out_suppresses_fixed_event_notifications()
     {

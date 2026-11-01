@@ -57,6 +57,8 @@ public sealed record PlanInput(DateTimeOffset Start, [Range(1, 30)] int HorizonD
     // Server-resolved calendar boundaries; never accepted from a public JSON request.
     [System.Text.Json.Serialization.JsonIgnore]
     public DateTimeOffset? WindowEnd { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int UrgentDisplacementDays { get; init; } = 2;
 }
 public sealed record PlanWarning(Guid TaskId, string TaskName, string Code, string Message, int UnscheduledMinutes);
 public sealed record ProposedSession(Guid Id, Guid TaskId, DateTimeOffset Start, DateTimeOffset End, string ReasonCode, bool Preserved);
@@ -82,7 +84,7 @@ public sealed record NotificationView(Guid Id, string Kind, string Title, string
 public sealed record WorkspaceView(ProfileView Profile, PreferenceView Preference, CategoryView[] Categories,
     TaskView[] Tasks, AvailabilityInput[] Availability, ExceptionView[] Exceptions, EventView[] Events,
     SessionView[] Sessions, NotificationView[] Notifications, NotificationSettingInput NotificationSettings, string[]? Features = null,
-    GamificationProfile? Gamification = null);
+    GamificationProfile? Gamification = null, PolicyView? AvailabilityPolicy = null);
 public sealed record NotificationSettingInput(bool InAppEnabled = true, [Range(1, 168)] int DeadlineLeadHours = 24,
     [Range(1, 120)] int SessionReminderLeadMinutes = 10, [RegularExpression("^(MODERATE|HIGH|OVERLOAD)$")] string WorkloadWarningLevel = "HIGH", bool EmailEnabled = false);
 public sealed record PlanItemView(Guid Id, Guid TaskId, Guid? PreviousSessionId, string Action, DateTimeOffset? Start, DateTimeOffset? End, int? PlannedMinutes, string[] ReasonCodes);
@@ -140,6 +142,7 @@ public interface IWorkspaceService
     Task DeleteExceptionAsync(Guid userId, Guid id, CancellationToken ct);
     Task<Guid> SaveEventAsync(Guid userId, Guid? id, EventInput input, CancellationToken ct);
     Task DeleteEventAsync(Guid userId, Guid id, CancellationToken ct);
+    Task DeleteSessionAsync(Guid userId, Guid id, CancellationToken ct);
     Task SetPreferenceAsync(Guid userId, PreferenceInput input, CancellationToken ct);
     Task<PlanView> GeneratePlanAsync(Guid userId, PlanInput input, CancellationToken ct);
     Task<PlanView> GetPlanAsync(Guid userId, Guid id, CancellationToken ct);
@@ -159,6 +162,7 @@ public interface IWorkspaceService
     Task<ExecutionView?> GetExecutionAsync(Guid userId, Guid sessionId, CancellationToken ct);
     Task<NotificationView[]> GetNotificationsAsync(Guid userId, CancellationToken ct);
     Task EnsureNotificationsAsync(Guid userId, CancellationToken ct);
+    Task EnsureStartedNotificationsAsync(Guid userId, CancellationToken ct);
     Task<TaskSuggestion> CaptureAsync(Guid userId, CaptureInput input, CancellationToken ct);
     Task<BreakdownView> BreakdownAsync(Guid userId, Guid taskId, bool useAi, CancellationToken ct);
     Task<AdminUserView[]> SearchUsersAsync(string? search, CancellationToken ct);

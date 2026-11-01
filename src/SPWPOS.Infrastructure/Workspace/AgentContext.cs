@@ -28,6 +28,9 @@ public sealed partial class WorkspaceService
             clock = new { currentLocal = Local(Now), today, tomorrow = today.AddDays(1), dayAfterTomorrow = today.AddDays(2),
                 currentWeekStart = weekStart, nextWeekStart = weekStart.AddDays(7) },
             capabilities = new { taskWorkWindows = true, preferenceChanges = false },
+            timetableAutomation = new { hasFixedSchedule = state.Events.Length > 0,
+                hasConfirmedWorkHours = state.Policy != null || state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable),
+                policy = "Start from the user's uploaded fixed timetable. Import only supplied commitments and return a verified seven-day analysis. Never create default hours or assume empty cells are work availability. Save a complete timetable even when work hours are missing; then ask conversationally for the user's actual work/sleep/rest windows. Configure only explicitly supplied hours. Urgent tasks use confirmed gaps while protecting fixed commitments." },
             verifiedFreeTime = new { rangeStart = Local(Now), rangeEnd = Local(Now.AddDays(30)),
                 timeZoneId = state.Preference.TimeZoneId, includesAllSavedCalendarItems = true,
                 intervals = AgentFreeTimeSlots(state, Now, Now.AddDays(30)).Select(x => new {
@@ -47,6 +50,8 @@ public sealed partial class WorkspaceService
                 history=new { maximumTurns=8, truncatedPossible=true } },
             tasks=tasks.Select(x=>new {x.Id,x.Name,Deadline=Local(x.Deadline),WorkWindowStart=LocalOrNull(x.WorkWindowStart),WorkWindowEnd=LocalOrNull(x.WorkWindowEnd),x.EstimatedMinutes,x.Progress,x.Splittable,x.MinimumSessionMinutes,x.Priority,x.TaskType,status=x.Status.ToString()}),
             availability=state.Availability.Select(x=>new AvailabilityInput(x.DayOfWeek,x.StartMinute,x.EndMinute)),
+            availabilityPolicy=state.Policy is { } policy ? PolicyDto(policy) : null,
+            dailyRoutine=CurrentRoutineDays(state),
             exceptions=state.Exceptions.Where(x=>x.Date>=LocalDate(Now,state.Preference) && x.Date<=LocalDate(Now.AddDays(30),state.Preference)).Select(x=>new {x.Id,x.Date,x.StartMinute,x.EndMinute,x.IsAvailable,x.Note,x.OverridesWeeklyAvailability}),
             events=events.Take(100).Select(x=>new{x.Id,x.Name,Start=Local(x.Start),End=Local(x.End),x.EventType,x.Description,IsUrgent=IsUrgentEvent(x)}),
             sessions=sessions.Take(100).Select(x=>new{x.TaskId,Start=Local(x.Start),End=Local(x.End),x.IsLocked,status=x.Status.ToString()}),

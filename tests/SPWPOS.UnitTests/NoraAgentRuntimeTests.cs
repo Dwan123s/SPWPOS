@@ -69,6 +69,82 @@ public sealed class NoraAgentRuntimeTests
         await work.SetAvailabilityAsync(uid, new(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 480, 1320)).ToArray()), Ct);
     }
 
+    [Fact] public async Task Timetable_agent_saves_fixed_hours_and_proposes_a_routine_for_review()
+    {
+        var node = System.Text.Json.Nodes.JsonNode.Parse(Draft)!;
+        node["tasks"] = new System.Text.Json.Nodes.JsonArray();
+        node["events"] = System.Text.Json.Nodes.JsonNode.Parse("""
+            [{"name":"Toán","start":"2026-11-01T08:00:00+07:00","end":"2026-11-01T10:00:00+07:00",
+            "description":"","eventType":"CLASS","repeatWeeks":1,"existingId":null}]
+            """);
+        var model = new Model { DraftText = node.ToJsonString() };
+        await using var h = await Harness(model); var user = await h.RegisterAsync();
+        var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id,
+            new(Guid.NewGuid(), Guid.NewGuid(), "Nhập thời gian biểu ngày mai: Toán 08:00–10:00, chỉ một lần."), Ct));
+        Assert.Equal("APPLIED", turn.Status); Assert.Equal("APPLIED", turn.Run!.Status);
+        Assert.DoesNotContain("mặc định", turn.Reply);
+        Assert.Contains("Giờ rảnh đề xuất:", turn.Reply); Assert.True(turn.SuggestRoutine);
+        Assert.Contains("bữa trưa/tối 30 phút", turn.Reply);
+        Assert.Equal(0, await h.DbAsync(db => db.AvailabilityPolicies.CountAsync(Ct)));
+        Assert.Equal(0, await h.DbAsync(db => db.WeeklyAvailability.CountAsync(Ct)));
+        await Agent(h, s => s.UndoAgentTurnAsync(user.Id, turn.Id, Ct));
+        Assert.Empty(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(Ct)));
+        Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
+    }
+
+    [Fact] public async Task Combined_proposal_needs_one_model_call_and_preserves_preview_and_validation()
+    {
+        var model = new Model { Decision = (_, n) => Task.FromResult(Call("propose_changes", new { intent = JsonDocument.Parse(Draft).RootElement, strategy = "keep_existing" }, n)) };
+        await using var h = await Harness(model); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), Goal, false), Ct));
+        Assert.Equal("PREVIEW", turn.Status); Assert.Equal(1, model.Calls); Assert.Equal(1, turn.Run!.ModelTurns);
+        Assert.Equal("propose_changes", Assert.Single(turn.Run.Steps).Tool);
+        Assert.Equal(90, (Assert.Single(turn.Plan!.Sessions).End - turn.Plan.Sessions[0].Start).TotalMinutes);
+        Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct))); Assert.Empty(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
+    }
+
+    [Fact] public async Task Combined_proposal_cannot_bypass_a_read_only_request_or_invent_available_hours()
+    {
+        var model = new Model { Decision = (_, n) => Task.FromResult(Call("propose_changes", new { intent = JsonDocument.Parse(Draft).RootElement, strategy = "keep_existing" }, n)) };
+        await using var h = await Harness(model); var user = await h.RegisterAsync();
+        var read = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), "Chỉ xem, không tạo công việc. " + Goal), Ct));
+        Assert.Equal("BLOCKED", read.Status);
+        var blocked = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), Goal), Ct));
+        Assert.Equal("BLOCKED", blocked.Status);
+        Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct))); Assert.Empty(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
+    }
+
+    [Theory] [InlineData("answer_calendar")] [InlineData("answer_free_time")]
+    public async Task Read_only_answer_uses_one_call_and_verified_server_facts(string tool)
+    {
+        var model = new Model { Decision = (_, n) => Task.FromResult(Call(tool, new { start = "2026-11-01T00:00:00Z", end = "2026-11-02T00:00:00Z" }, n)) };
+        await using var h = await Harness(model); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        await h.DbAsync(async db => { db.FixedEvents.Add(new() { UserId = user.Id, Name = "PRIVATE_CLASS", Start = DateTimeOffset.Parse("2026-11-01T08:00:00Z"), End = DateTimeOffset.Parse("2026-11-01T10:00:00Z") }); await db.SaveChangesAsync(Ct); });
+        var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), tool == "answer_calendar" ? "Xem lịch ngày mai" : "Tìm giờ rảnh ngày mai"), Ct));
+        Assert.Equal("ANSWERED", turn.Status); Assert.Equal(1, model.Calls); Assert.NotEmpty(turn.Reply);
+        Assert.Equal(tool, Assert.Single(turn.Run!.Steps).Tool); Assert.Empty(turn.Changes);
+        Assert.Empty(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
+    }
+
+    [Fact] public async Task Native_agent_estimate_stays_pending_until_the_user_accepts_it_in_chat()
+    {
+        var model = new Model { Decision = (_, n) => Task.FromResult(Call("ask_user", new {
+            reply = "Mình đề xuất ước lượng 90 phút cho Làm slide, dựa trên yêu cầu trình bày.",
+            question = "Bạn đồng ý với ước lượng này không?", options = new[] { "Đồng ý", "Đổi thời lượng" }
+        }, n)) };
+        await using var h = await Harness(model); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        var conversation = Guid.NewGuid();
+        var proposed = await Agent(h, s => s.SendAgentTurnAsync(user.Id,
+            new(conversation, Guid.NewGuid(), "Xếp Làm slide, hạn chót 12:00 ngày 01/11/2026. Tôi chưa biết cần bao lâu."), Ct));
+        Assert.Equal("NEEDS_INPUT", proposed.Status);
+        Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+        model.Decision = null;
+        var scheduled = await Agent(h, s => s.SendAgentTurnAsync(user.Id,
+            new(conversation, Guid.NewGuid(), "Đồng ý"), Ct));
+        Assert.Equal("APPLIED", scheduled.Status);
+        Assert.Equal(90, (await h.DbAsync(db => db.WorkTasks.SingleAsync(Ct))).EstimatedMinutes);
+    }
+
     [Fact] public async Task File_log_tracks_real_runtime_model_rounds_and_tool_results_without_prompt_text()
     {
         var root = Path.Combine(AppContext.BaseDirectory, "file-log-tests", Guid.NewGuid().ToString("N"));
@@ -141,7 +217,81 @@ public sealed class NoraAgentRuntimeTests
         var b = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "90 phút"), Ct));
         Assert.Equal(a.Run!.Id, b.Run!.Id); Assert.Equal(2, b.Run.ModelTurns); Assert.Equal(2, b.Run.ToolCalls);
         var c = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "Trước trưa mai"), Ct));
-        Assert.Equal("BLOCKED", c.Status); Assert.Equal(2, model.Calls); Assert.Equal(1, await h.DbAsync(db => db.AgentRuns.CountAsync(Ct)));
+        Assert.Equal("NEEDS_INPUT", c.Status); Assert.Equal(3, model.Calls); Assert.Equal(a.Run.Id, c.Run!.Id);
+        Assert.Equal(3, c.Run.ModelTurns); Assert.Equal(3, c.Run.ToolCalls);
+        Assert.Equal(1, await h.DbAsync(db => db.AgentRuns.CountAsync(Ct)));
+    }
+
+    [Fact] public async Task A_processing_budget_stop_can_resume_the_original_goal_without_losing_pending_context()
+    {
+        var model = new Model { Decision = (_, n) => Task.FromResult(Call("get_preferences", new { }, n)) };
+        await using var h = await Harness(model, 3); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        var conversation = Guid.NewGuid();
+        var stopped = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), Goal), Ct));
+        Assert.Equal("BLOCKED", stopped.Status); Assert.Equal("AGENT_BUDGET_EXCEEDED", stopped.ErrorCode);
+        Assert.DoesNotContain("thu hẹp", stopped.Reply);
+        model.Decision = null;
+        var completed = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "Tiếp tục xử lý"), Ct));
+        Assert.Equal("APPLIED", completed.Status); Assert.Equal(stopped.Run!.Id, completed.Run!.Id);
+        Assert.Equal(6, completed.Run.ModelTurns); Assert.Single(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+        var run = await h.DbAsync(db => db.AgentRuns.SingleAsync(Ct));
+        Assert.Contains(Goal, run.Goal); Assert.Contains("Tiếp tục xử lý", run.Goal);
+    }
+
+    [Fact] public async Task A_clarification_reply_gets_a_fresh_simulation_allowance_without_resetting_audit_counts()
+    {
+        var model = new Model(); await using var h = await Harness(model); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        h.Provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<NoraAgentOptions>>().Value.MaxSimulations = 1;
+        model.Decision = (request, n) => Task.FromResult(request.Contents.Length == 1
+            ? Call("prepare_changes", new { intent = JsonDocument.Parse(Draft).RootElement }, n)
+            : request.Contents[^1].GetProperty("parts")[0].GetProperty("functionResponse").GetProperty("name").GetString() == "prepare_changes"
+                ? Call("simulate_plan", new { draftId = request.Contents[^1].GetProperty("parts")[0].GetProperty("functionResponse").GetProperty("response").GetProperty("data").GetProperty("draftId").GetString(), strategy = "keep_existing" }, n)
+                : Call("ask_user", new { reply = "Đã kiểm tra phương án, cần xác nhận phạm vi.", question = "Bạn giữ nguyên lịch học phải không?", options = new[] { "Giữ nguyên" } }, n));
+        var conversation = Guid.NewGuid();
+        var first = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), Goal), Ct));
+        Assert.Equal("NEEDS_INPUT", first.Status);
+        model.Decision = null;
+        var second = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "Giữ nguyên lịch học"), Ct));
+        Assert.Equal("APPLIED", second.Status);
+        Assert.Equal(2, (await h.DbAsync(db => db.AgentRuns.SingleAsync(Ct))).Simulations);
+    }
+
+    [Fact] public async Task Timetable_week_confirmation_can_finish_after_cumulative_calls_exceed_eight()
+    {
+        var payload = System.Text.Json.Nodes.JsonNode.Parse(Draft)!;
+        payload["tasks"] = new System.Text.Json.Nodes.JsonArray(); payload["horizonDays"] = 7;
+        payload["events"] = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(
+            new[] { 2, 3, 4, 6 }.SelectMany(day => new[] { 0, 1 }.Select(slot => new {
+                name = $"Môn {day}-{slot}", start = $"2026-11-{day:00}T{(slot == 0 ? "07:00" : "09:30")}:00+07:00",
+                end = $"2026-11-{day:00}T{(slot == 0 ? "09:15" : "11:45")}:00+07:00",
+                description = "", eventType = "CLASS", repeatWeeks = 1, existingId = (string?)null })), Json));
+        var model = new Model { DraftText = payload.ToJsonString() };
+        await using var h = await Harness(model); var user = await h.RegisterAsync();
+        h.Clock.Advance(DateTimeOffset.Parse("2026-11-01T06:54:00Z") - h.Clock.GetUtcNow());
+        var conversation = Guid.NewGuid();
+        var initialRounds = 0;
+        model.Decision = (_, n) => Task.FromResult(++initialRounds < 4 ? Call("get_preferences", new { }, n) : Call("ask_user", new {
+            reply = "Lịch trong ảnh thuộc tuần trước.", question = "Bạn muốn áp dụng vào tuần nào?",
+            options = new[] { "Áp dụng cho tuần tới (02/11 - 08/11)" } }, n));
+        var question = await Agent(h, s => s.SendAgentTurnAsync(user.Id,
+            new(conversation, Guid.NewGuid(), "Nhập thời khóa biểu trong ảnh."), Ct));
+        Assert.Equal("NEEDS_INPUT", question.Status);
+        var followupRound = 0;
+        model.Decision = (request, n) => {
+            followupRound++;
+            return followupRound switch {
+                1 or 2 => Task.FromResult(Call("get_preferences", new { }, n)),
+                3 => Task.FromResult(Call("prepare_changes", new { intent = JsonDocument.Parse(model.DraftText).RootElement }, n)),
+                4 => Task.FromResult(Call("simulate_plan", new { draftId = request.Contents[^1].GetProperty("parts")[0].GetProperty("functionResponse").GetProperty("response").GetProperty("data").GetProperty("draftId").GetString(), strategy = "keep_existing" }, n)),
+                _ => Task.FromResult(Call("finish_proposal", new { candidateId = request.Contents[^1].GetProperty("parts")[0].GetProperty("functionResponse").GetProperty("response").GetProperty("data").GetProperty("candidateId").GetString(), reply = "Đã đối chiếu đầy đủ tám buổi học cho tuần bạn chọn." }, n))
+            };
+        };
+        var saved = await Agent(h, s => s.SendAgentTurnAsync(user.Id,
+            new(conversation, Guid.NewGuid(), "Áp dụng cho tuần tới (02/11 - 08/11)"), Ct));
+        Assert.Equal("APPLIED", saved.Status); Assert.Equal(question.Run!.Id, saved.Run!.Id);
+        Assert.Equal(9, saved.Run.ModelTurns);
+        Assert.Equal(8, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
+        Assert.Empty(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(Ct)));
     }
 
     [Fact] public async Task Read_only_request_cannot_be_converted_into_a_mutating_draft()

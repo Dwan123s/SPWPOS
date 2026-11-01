@@ -10,7 +10,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     ITaskInterpreter interpreter, IAiUsageService aiUsage, IEmailService? email = null,
     Microsoft.Extensions.Options.IOptions<EmailSettings>? emailOptions = null,
     Microsoft.Extensions.Options.IOptions<NoraAgentOptions>? noraOptions = null,
-    NoraAgentFileLog? agentFileLog = null) : IWorkspaceService, IPlanningAgentService
+    NoraAgentFileLog? agentFileLog = null) : IWorkspaceService, IPlanningAgentService, IPrivateTeamService
 {
     private DateTimeOffset Now => clock.GetUtcNow();
     private static void Require([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string code, string message, int status = 400)
@@ -24,13 +24,20 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         if (preference is not null) return preference;
         preference = new() { UserId = uid }; db.WorkPreferences.Add(preference); return preference;
     }
-    private async Task<T> Mutate<T>(Guid uid, Func<Task<T>> action, CancellationToken ct, bool revision = true)
+    private async Task<T> Mutate<T>(Guid uid, Func<Task<T>> action, CancellationToken ct, bool revision = true,
+        System.Data.IsolationLevel isolation = System.Data.IsolationLevel.ReadCommitted)
     {
         var email = await db.Users.AsNoTracking().Where(x => x.Id == uid).Select(x => x.NormalizedEmail).SingleOrDefaultAsync(ct);
         Require(email is not null, "UNAUTHORIZED", "Tài khoản không khả dụng.", 401);
         // Workspace writes use an optimistic account revision. Authentication and
         // refresh-token rotation retain their separate account serialization.
-        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+        await using var tx = await db.Database.BeginTransactionAsync(isolation, ct);
+        if (isolation == System.Data.IsolationLevel.Serializable && db.Database.IsSqlServer())
+        {
+            // Serialize the initial read/update as well: two shared reads held by
+            // SERIALIZABLE would otherwise deadlock when both claim this account.
+            await db.WorkPreferences.FromSqlInterpolated($"SELECT * FROM [WorkPreferences] WITH (UPDLOCK, HOLDLOCK) WHERE [UserId] = {uid}").ToArrayAsync(ct);
+        }
         Require(await db.Users.AnyAsync(x => x.Id == uid && x.IsActive && x.EmailConfirmed, ct), "FORBIDDEN", "Tài khoản không khả dụng.", 403);
         var preference = await Preference(uid, ct);
         // Claim the version before writing dependent rows. A stale writer fails
@@ -86,7 +93,8 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
             await Mine<WorkSession>(uid).Where(x => x.Status != WorkSessionStatus.Cancelled)
                 .OrderBy(x => x.Status == WorkSessionStatus.Running || x.Status == WorkSessionStatus.Paused ? 0 : x.Status == WorkSessionStatus.Scheduled ? 1 : 2)
                 .ThenByDescending(x => x.Start).Take(10000).ToArrayAsync(ct), preference,
-            await Mine<EstimationObservation>(uid).OrderByDescending(x => x.ObservedAt).Take(500).ToArrayAsync(ct));
+            await Mine<EstimationObservation>(uid).OrderByDescending(x => x.ObservedAt).Take(500).ToArrayAsync(ct),
+            await Mine<AvailabilityPolicy>(uid).SingleOrDefaultAsync(ct));
     }
     public async Task<WorkspaceView> GetAsync(Guid userId, CancellationToken ct)
     {
@@ -113,7 +121,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
                 s.Start, s.End, s.Status.ToString(), s.IsLocked, (int)((s.ActualSeconds + (s.SegmentStartedAt is { } at ? Math.Max(0, (Now - at).TotalSeconds) : 0)) / 60),
                 s.ActualSeconds + (long)(s.SegmentStartedAt is { } since ? Math.Max(0, (Now - since).TotalSeconds) : 0),
                 s.SegmentStartedAt, s.ReasonCode)).ToArray(), notifications, new(ns.InAppEnabled, ns.DeadlineLeadHours, ns.SessionReminderLeadMinutes, ns.WorkloadWarningLevel, ns.EmailEnabled),
-            ["history-v2", "recovery", "ambient-tracking", "gamification", "calendar-export", "notification-refresh"], await GetGamificationAsync(userId, ct));
+            ["history-v2", "recovery", "ambient-tracking", "gamification", "calendar-export", "notification-refresh", "secretary-v1", "private-teams-v1"], await GetGamificationAsync(userId, ct), state.Policy is { } policy ? PolicyDto(policy) : null);
     }
     public Task UpdateProfileAsync(Guid userId, ProfileInput input, CancellationToken ct) => Mutate(userId, async () =>
     {

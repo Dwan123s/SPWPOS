@@ -7,6 +7,12 @@ public sealed class InAppNotification : OwnedRecord
     public DateTimeOffset? EmailSentAt { get; set; }
     public int EmailAttempts { get; set; }
     public DateTimeOffset? NextEmailAttemptAt { get; set; }
+    public bool TelegramPending { get; set; }
+    public Guid? TelegramBindingId { get; set; }
+    public DateTimeOffset? TelegramSentAt { get; set; }
+    public int TelegramAttempts { get; set; }
+    public DateTimeOffset? NextTelegramAttemptAt { get; set; }
+    public Guid? FixedEventId { get; set; }
     public Guid? SessionId { get; set; }
     public Guid? PlanId { get; set; }
     public DateTimeOffset ScheduledFor { get; set; }

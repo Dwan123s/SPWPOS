@@ -33,6 +33,8 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
     public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<NotificationSetting> NotificationSettings => Set<NotificationSetting>();
+    public DbSet<TelegramConnection> TelegramConnections => Set<TelegramConnection>();
+    public DbSet<TelegramUpdateCursor> TelegramUpdateCursors => Set<TelegramUpdateCursor>();
     public DbSet<TaskTypeDefinition> TaskTypes => Set<TaskTypeDefinition>();
     public DbSet<AccountStatusLog> AccountStatusLogs => Set<AccountStatusLog>();
     public DbSet<PlanItem> PlanItems => Set<PlanItem>();
@@ -56,12 +58,14 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
     }
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        ProtectTeamTaskContracts();
         RefreshTaskVersions();
         CaptureCalendarChanges();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
+        ProtectTeamTaskContracts();
         RefreshTaskVersions();
         CaptureCalendarChanges();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
@@ -74,5 +78,7 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
         WorkloadHistoryModel.Configure(builder);
         CalendarModel.Configure(builder);
         AgentRuntimeModel.Configure(builder);
+        PrivateTeamModel.Configure(builder);
+        TelegramModel.Configure(builder);
     }
 }

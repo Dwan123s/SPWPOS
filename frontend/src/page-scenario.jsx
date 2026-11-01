@@ -1,4 +1,6 @@
 import { Select, Slot, nodeList } from "./react-ui.jsx";
+import { secretaryMode } from "./agent-handoff.js";
+import { SecretaryScenario } from "./secretary-overview.jsx";
 import {
   state,
   button,
@@ -18,6 +20,7 @@ import {
   loadLabel,
 } from "./ui.jsx";
 export function scenarioPage() {
+  if (secretaryMode()) return <SecretaryScenario />;
   const result = state.scenario;
   return (
     <div className="equal-columns">

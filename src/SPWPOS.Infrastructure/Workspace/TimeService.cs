@@ -109,7 +109,14 @@ public sealed partial class WorkspaceService
                     calendar, item.Start, item.End, occupied, FitsSeries);
         }
     }
-    public Task DeleteEventAsync(Guid uid, Guid id, CancellationToken ct) => Mutate(uid, async () => db.FixedEvents.Remove(await Find<FixedEvent>(uid, id, ct)), ct);
+    public Task DeleteEventAsync(Guid uid, Guid id, CancellationToken ct) => Mutate(uid, async () =>
+    {
+        db.FixedEvents.Remove(await Find<FixedEvent>(uid, id, ct));
+        var reminderKey = $"event:{id}:"; var startKey = $"event-started:{id}:";
+        foreach (var notification in await Mine<InAppNotification>(uid).Where(x => x.FixedEventId == id ||
+            x.DedupeKey.StartsWith(reminderKey) || x.DedupeKey.StartsWith(startKey)).ToArrayAsync(ct))
+        { notification.IsVisible = false; notification.EmailPending = false; notification.TelegramPending = false; }
+    }, ct);
     public Task SetPreferenceAsync(Guid uid, PreferenceInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
         Require(input.MinimumSessionMinutes >= 5 && input.MaximumSessionMinutes >= input.MinimumSessionMinutes && input.MaximumSessionMinutes <= 480 && input.BreakMinutes is >= 0 and <= 120,

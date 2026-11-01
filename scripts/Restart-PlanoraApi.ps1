@@ -1,15 +1,15 @@
-param()
+param([ValidateSet('Release','Debug','TimetableAutomation')][string]$Configuration = 'Release')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Initialize-Dotnet.ps1')
 $taskApiRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $taskApiDirectory = Join-Path $taskApiRoot 'src\SPWPOS.Api'
-$taskApiExe = Join-Path $taskApiDirectory 'bin\Release\net8.0\SPWPOS.Api.exe'
-if (-not (Test-Path -LiteralPath $taskApiExe -PathType Leaf)) { throw 'Build the Release API first.' }
+$taskApiExe = Join-Path $taskApiDirectory ("bin\$Configuration\net8.0\SPWPOS.Api.exe")
+if (-not (Test-Path -LiteralPath $taskApiExe -PathType Leaf)) { throw "Build the $Configuration API first." }
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
 $env:DOTNET_ENVIRONMENT = 'Development'
 Push-Location -LiteralPath $taskApiDirectory
 try {
-    & $SpwposDotnet (Join-Path $taskApiDirectory 'bin\Release\net8.0\SPWPOS.Api.dll') --check-schema
+    & $SpwposDotnet (Join-Path $taskApiDirectory ("bin\$Configuration\net8.0\SPWPOS.Api.dll")) --check-schema
     if ($LASTEXITCODE -ne 0) { throw 'Schema check did not pass. Review migrations before restart; the existing API was left running.' }
 } finally { Pop-Location }
 $taskApiOwnedProcesses = @(Get-CimInstance Win32_Process -Filter "Name = 'SPWPOS.Api.exe'" | Where-Object {

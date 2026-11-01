@@ -184,7 +184,7 @@ public sealed partial class WorkspaceService
             if (suggestions.Count == 3) break;
         }
         var capacity = query.End > remainingStart ? engine.CapacityDays(state, remainingStart, query.End, Now, false) : [];
-        var hasAvailability = state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable &&
+        var hasAvailability = state.Policy != null || state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable &&
             x.Date >= LocalDate(query.Start, state.Preference) && x.Date <= LocalDate(query.End.AddTicks(-1), state.Preference));
         var totalFree = (int)gaps.Sum(x => (x.End - x.Start).TotalMinutes);
         var details = new List<string> { $"**Lịch đã đối chiếu: {Stamp(query.Start)} → {Stamp(query.End)}**",

@@ -24,6 +24,7 @@ import {
 let calls,
   currentWorkspace,
   failTaskDelete,
+  failCalendarDelete,
   failTaskUpdate,
   failPlan,
   planWarnings,
@@ -34,6 +35,7 @@ beforeEach(() => {
   currentWorkspace = workspace();
   calls = [];
   failTaskDelete = false;
+  failCalendarDelete = false;
   failTaskUpdate = false;
   failPlan = false;
   planWarnings = [];
@@ -69,9 +71,16 @@ beforeEach(() => {
       if (url === "/api/browser-session/me")
         data = { user: profile, roles: ["Admin"] };
       if (url === "/api/workspace") data = currentWorkspace;
+      if (options.method === "DELETE" && (/^\/api\/sessions\/[^/]+$/.test(url) || /^\/api\/time\/events\/[^/]+$/.test(url))) {
+        if (failCalendarDelete) return { ok: false, status: 409, json: async () => ({ error: { code: "SESSION_NOT_DELETABLE", message: "Lịch đã thay đổi. Hãy tải lại trước khi xóa." } }) };
+        const id = url.split("/").at(-1);
+        if (url.startsWith("/api/sessions/")) currentWorkspace.sessions = currentWorkspace.sessions.filter((s) => s.id !== id);
+        else currentWorkspace.events = currentWorkspace.events.filter((e) => e.id !== id);
+      }
       if (url === "/api/notes") data = [];
       if (url === "/api/notes/agent")
         data = { aiAvailable: true, provider: "Gemini" };
+      if (url === "/api/agent/turns") data = [];
       if (url === "/api/time/availability" && options.method === "PUT")
         currentWorkspace.availability = body.slots;
       if (url === "/api/auth/login-methods")
@@ -1094,6 +1103,48 @@ it("adds and removes availability rows without losing unsaved time values", asyn
       .startMinute,
   ).toBe(570);
 });
+
+it.each(["week", "agenda"])("deletes a fixed calendar occurrence after confirmation in secretary mode (%s)", async (view) => {
+  const entry = currentWorkspace.events[0]; currentWorkspace.sessions = [];
+  currentWorkspace.features = ["secretary-v1"]; state.calendarView = view; state.calendarStart = entry.start.slice(0, 10);
+  mount(); await navigate("calendar", "Lịch làm việc"); const user = userEvent.setup();
+  expect(screen.queryByRole("button", { name: /Xóa lịch/ })).toBeNull();
+  await user.click((await screen.findByText(entry.name)).closest("button"));
+  let detail = within(screen.getByRole("dialog"));
+  expect(detail.getByRole("heading", { name: entry.name })).toBeTruthy();
+  expect(detail.getByText("Bắt đầu")).toBeTruthy();
+  expect(location.hash).toBe("#calendar");
+  await user.click(detail.getByRole("button", { name: "Xóa lịch", exact: true }));
+  let dialog = within(screen.getByRole("dialog")); expect(dialog.getByText(/Chỉ xóa lần xuất hiện này/)).toBeTruthy();
+  expect(calls.some((c) => c.options.method === "DELETE")).toBe(false);
+  await user.click(dialog.getByRole("button", { name: "Hủy", exact: true }));
+  await user.click(screen.getByText(entry.name).closest("button"));
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xóa lịch", exact: true }));
+  dialog = within(screen.getByRole("dialog")); await user.click(dialog.getByRole("button", { name: "Xóa sự kiện", exact: true }));
+  await waitFor(() => expect(screen.queryByText(entry.name)).toBeNull());
+  expect(location.hash).toBe("#calendar"); expect(calls.some((c) => c.url === `/api/time/events/${entry.id}` && c.options.method === "DELETE")).toBe(true);
+});
+
+it("deletes a scheduled calendar slot without deleting its task and keeps it when the server rejects deletion", async () => {
+  const session = currentWorkspace.sessions[1]; currentWorkspace.sessions = [session]; currentWorkspace.events = [];
+  currentWorkspace.features = ["secretary-v1"]; state.calendarView = "week"; state.calendarStart = session.start.slice(0, 10);
+  const taskCount = currentWorkspace.tasks.length;
+  mount(); await navigate("calendar", "Lịch làm việc"); const user = userEvent.setup();
+  const sessionCard = await screen.findByText(session.taskName, { selector: ".calendar-block strong" });
+  await user.click(sessionCard.closest("button"));
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xóa phiên khỏi lịch", exact: true }));
+  expect(within(screen.getByRole("dialog")).getByText(/Công việc và deadline vẫn được giữ/)).toBeTruthy();
+  failCalendarDelete = true;
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xóa phiên", exact: true }));
+  await screen.findByText("Lịch đã thay đổi. Hãy tải lại trước khi xóa.");
+  expect(currentWorkspace.sessions).toHaveLength(1);
+  failCalendarDelete = false;
+  await user.click(screen.getByText(session.taskName, { selector: ".calendar-block strong" }).closest("button"));
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xóa phiên khỏi lịch", exact: true }));
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xóa phiên", exact: true }));
+  await waitFor(() => expect(screen.queryByText(session.taskName, { selector: ".calendar-block strong" })).toBeNull());
+  expect(currentWorkspace.tasks).toHaveLength(taskCount);
+});
 it("removes an avatar while preserving unsaved profile fields before save", async () => {
   currentWorkspace.profile.avatarUrl = "data:image/png;base64,AAA";
   mount();
@@ -1142,6 +1193,56 @@ it("saves a fixed work shift with the WORK category from the calendar form", asy
   expect(calls.find((call) => call.url === "/api/time/events" && call.options.method === "POST")?.body.isUrgent).toBe(true);
 });
 
+it.each(["", "#today"])("opens Today at %s for a completely new workspace without creating data", async (hash) => {
+  currentWorkspace.tasks = [];
+  currentWorkspace.sessions = [];
+  currentWorkspace.events = [];
+  currentWorkspace.availability = [];
+  currentWorkspace.exceptions = [];
+  currentWorkspace.categories = [];
+  currentWorkspace.notifications = [];
+  currentWorkspace.features = ["secretary-v1"];
+  window.history.replaceState(null, "", `/${hash}`);
+  mount();
+  await screen.findByRole("heading", { level: 1, name: /^Một ngày có chủ đích/ });
+  await screen.findByRole("region", { name: "Lịch hôm nay", exact: true });
+  expect(location.hash).toBe(hash);
+  expect(state.route).toBe("today");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Gửi thời gian biểu cho NORA", exact: true }).length).toBeGreaterThan(0);
+  expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
+  expect(calls.some((call) => call.url === "/api/time/availability" && call.options.method === "PUT")).toBe(false);
+  expect(calls.filter((call) =>
+    ["POST", "PUT", "PATCH", "DELETE"].includes(call.options.method) &&
+    !["/api/intelligence", "/api/plans/conflicts"].includes(call.url),
+  )).toEqual([]);
+});
+
+it("keeps Notes accessible even before a new workspace uploads a timetable", async () => {
+  currentWorkspace.tasks = []; currentWorkspace.sessions = []; currentWorkspace.events = [];
+  currentWorkspace.availability = []; currentWorkspace.exceptions = [];
+  currentWorkspace.features = ["secretary-v1"];
+  mount();
+  await screen.findByRole("heading", { level: 1, name: /^Một ngày có chủ đích/ });
+  await navigate("notes", "Nhập việc");
+  await screen.findByLabelText("Nội dung ghi chú");
+  expect(location.hash).toBe("#notes");
+});
+
+it("returns from NORA to Today through navigation before uploading a timetable", async () => {
+  currentWorkspace.tasks = []; currentWorkspace.sessions = []; currentWorkspace.events = [];
+  currentWorkspace.availability = []; currentWorkspace.exceptions = [];
+  currentWorkspace.features = ["secretary-v1"];
+  window.history.replaceState(null, "", "/#agent");
+  mount();
+  await screen.findByRole("heading", { level: 1, name: "NORA · Trợ lý AI" });
+  await userEvent.setup().click(screen.getByRole("button", { name: "Hôm nay", exact: true }));
+  await screen.findByRole("heading", { level: 1, name: /^Một ngày có chủ đích/ });
+  await screen.findByRole("region", { name: "Lịch hôm nay", exact: true });
+  expect(location.hash).toBe("#today");
+  expect(state.route).toBe("today");
+});
+
 it("guides an empty daily schedule to input before offering planning", async () => {
   currentWorkspace.tasks = [];
   currentWorkspace.sessions = [];
@@ -1153,9 +1254,9 @@ it("guides an empty daily schedule to input before offering planning", async () 
   await userEvent
     .setup()
     .click(
-      schedule.getByRole("button", { name: "Nhập việc cần làm", exact: true }),
+      schedule.getByRole("button", { name: "Giao việc cho NORA", exact: true }),
     );
-  await screen.findByRole("heading", { level: 1, name: "Nhập việc" });
+  await screen.findByRole("heading", { level: 1, name: "NORA · Trợ lý AI" });
   expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
 });
 
@@ -1246,10 +1347,10 @@ it("guides users to hours before generating a plan without changing saved tasks"
     .click(
       within(document.querySelector(".page-header .actions")).getByRole(
         "button",
-        { name: "Chọn giờ rảnh", exact: true },
+        { name: "Xác nhận giờ rảnh với NORA", exact: true },
       ),
     );
-  await screen.findByRole("heading", { level: 1, name: "Giờ rảnh" });
+  await screen.findByRole("heading", { level: 1, name: "NORA · Trợ lý AI" });
   expect(calls.some((c) => c.url === "/api/plans")).toBe(false);
   expect(currentWorkspace.tasks).toHaveLength(6);
 });

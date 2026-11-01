@@ -12,7 +12,7 @@ using SPWPOS.Infrastructure.Workspace;
 
 namespace SPWPOS.UnitTests;
 
-public sealed class VertexAiInterpreterTests
+public sealed partial class VertexAiInterpreterTests
 {
     private const string Command = """
         {"reply":"Thêm cuộc họp","resultKind":"MUTATION","question":"","options":[],"replaceWeeklyAvailability":false,"weeklySlots":[],"exceptions":[],
@@ -81,6 +81,16 @@ public sealed class VertexAiInterpreterTests
         Assert.Equal("LOW", generation.GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString());
     }
 
+    [Fact]
+    public async Task Flash_lite_uses_minimal_thinking_for_short_structured_extraction()
+    {
+        using var provider = new Provider(); using var http = new HttpClient(provider);
+        await Interpret(Interpreter(http, model: "gemini-3.1-flash-lite"));
+        using var request = JsonDocument.Parse(provider.Body);
+        var generation = request.RootElement.GetProperty("generationConfig");
+        Assert.Equal("MINIMAL", generation.GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString());
+        Assert.True(generation.GetProperty("maxOutputTokens").GetInt32() >= 6000);
+    }
     [Fact]
     public async Task Cloud_agent_uses_the_documented_api_key_route_with_a_separate_header_key()
     {

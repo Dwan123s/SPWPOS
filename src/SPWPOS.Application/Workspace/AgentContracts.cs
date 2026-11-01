@@ -11,7 +11,8 @@ public sealed record AgentTaskCommand(Guid? TaskId, string Name, DateTimeOffset?
     string? DurationEvidence = null, string? DeadlineEvidence = null, string? WorkWindowEvidence = null,
     bool DeadlineFromWorkWindow = false);
 public sealed record AgentPendingRequest(string OriginalText, Guid? TaskId, DateTimeOffset? WorkWindowStart,
-    DateTimeOffset? WorkWindowEnd, int? EstimatedMinutes, DateTimeOffset? Deadline, string[]? Answers = null);
+    DateTimeOffset? WorkWindowEnd, int? EstimatedMinutes, DateTimeOffset? Deadline, string[]? Answers = null,
+    int? ProposedMinutes = null, bool DurationProposalAccepted = false);
 public sealed record AgentExceptionCommand(DateOnly Date, int StartMinute, int EndMinute,
     bool IsAvailable, string Note = "", Guid? ExistingId = null);
 public sealed record AgentEventCommand(string Name, DateTimeOffset Start, DateTimeOffset End,
@@ -27,7 +28,7 @@ public sealed record AgentChangeView(string Kind, string Name, string Before, st
 public sealed record AgentTurnView(Guid Id, Guid ConversationId, Guid RequestId, string Text,
     string Reply, string Status, string Question, PlanView? Plan, AgentChangeView[] Changes,
     string[] Warnings, DateTimeOffset CreatedAt, bool CanUndo = false, string[]? Options = null, string? ErrorCode = null,
-    string Outcome = "", AgentImage? Image = null, NoraRunView? Run = null);
+    string Outcome = "", AgentImage? Image = null, NoraRunView? Run = null, bool SuggestRoutine = false);
 public sealed record AgentStreamEvent(string Type, string? Stage = null, string? Message = null,
     string? Delta = null, AgentTurnView? Turn = null, string? Code = null);
 public sealed record ConversationView(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,

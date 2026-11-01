@@ -13,6 +13,41 @@ namespace SPWPOS.UnitTests;
 public sealed class NoraLiveAgentTests
 {
     public static bool Enabled => Environment.GetEnvironmentVariable("PLANORA_LIVE_AGENT_TESTS") == "1";
+    [Fact(SkipUnless = nameof(Enabled), Skip = "Opt-in real provider timetable follow-up check.")]
+    public async Task Native_timetable_week_confirmation_imports_all_classes_without_making_up_work_hours()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var root = Environment.GetEnvironmentVariable("PLANORA_REPOSITORY_ROOT") ?? Directory.GetCurrentDirectory();
+        var config = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, "src", "SPWPOS.Api", "appsettings.json"))
+            .AddUserSecrets("SPWPOS-Authentication-Development").Build();
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(50) };
+        var model = new TaskInterpreter(http, config, NullLogger<TaskInterpreter>.Instance);
+        Assert.True(model.AgentAvailable);
+        await using var h = await ServiceHarness.CreateAsync(s => { s.AddSingleton<ITaskInterpreter>(model);
+            s.Configure<NoraAgentOptions>(x => x.Mode = "Agent"); });
+        h.Clock.Advance(DateTimeOffset.Parse("2026-11-01T06:54:00Z") - h.Clock.GetUtcNow());
+        var user = await h.RegisterAsync();
+        await using var scope = h.Provider.CreateAsyncScope();
+        var agent = scope.ServiceProvider.GetRequiredService<IPlanningAgentService>();
+        var conversation = Guid.NewGuid();
+        var first = await agent.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(),
+            "Nhập thời khóa biểu cố định: thứ 2 Toán 07:00–09:15, Anh 09:30–11:45; thứ 3 Lý 07:00–09:15, Hóa 09:30–11:45; thứ 4 Anh 07:00–09:15, Toán 09:30–11:45; thứ 6 Hóa 07:00–09:15, Lý 09:30–11:45. Trước tiên hãy hỏi tôi tuần áp dụng, tôi chưa xác định ngày bắt đầu hoặc số tuần; chưa lưu khi thiếu thông tin này."), ct);
+        Assert.Equal("NEEDS_INPUT", first.Status);
+        Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(ct)));
+        var next = await agent.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(),
+            "Áp dụng cho tuần tới (02/11 - 08/11), chỉ 1 tuần. Lưu thời khóa biểu cố định trước, chưa tự tạo giờ có thể làm việc."), ct);
+        Assert.Equal("APPLIED", next.Status);
+        var classes = await h.DbAsync(db => db.FixedEvents.OrderBy(x => x.Start).ToArrayAsync(ct));
+        Assert.Equal(8, classes.Length); Assert.All(classes, x => Assert.Equal("CLASS", x.EventType));
+        var expected = new[] { 2, 3, 4, 6 }.SelectMany(day => new[] {
+            (DateTimeOffset.Parse($"2026-11-{day:00}T07:00:00+07:00"), DateTimeOffset.Parse($"2026-11-{day:00}T09:15:00+07:00")),
+            (DateTimeOffset.Parse($"2026-11-{day:00}T09:30:00+07:00"), DateTimeOffset.Parse($"2026-11-{day:00}T11:45:00+07:00")) });
+        Assert.Equal(expected, classes.Select(x => (x.Start, x.End)));
+        Assert.Empty(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(ct)));
+        Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(ct)));
+        Assert.Equal(first.Run!.Id, next.Run!.Id);
+        Console.WriteLine($"LIVE TIMETABLE: {next.Status}; 8 classes; no invented work hours; {next.Run.ModelTurns} cumulative model turns. Only fictional in-memory data used.");
+    }
     [Fact(SkipUnless = nameof(Enabled), Skip = "Opt-in real provider smoke test.")]
     public async Task Native_provider_completes_a_real_tool_loop_and_keeps_the_calendar_a_draft()
     {
@@ -39,8 +74,8 @@ public sealed class NoraLiveAgentTests
             $"Tạo công việc mới tên [PROBE] Làm slide, cần 90 phút liên tục vào ngày mai {day:dd/MM/yyyy}, hạn chót 12:00 trưa ngày {day:dd/MM/yyyy}. Giữ nguyên lịch học.", false),
             (item, _) => { events.Add(item); return Task.CompletedTask; }, ct);
         Assert.Equal("PREVIEW", result.Status); Assert.Equal("Agent", result.Run!.Mode);
-        Assert.Contains(result.Run.Steps, x => x.Tool == "simulate_plan");
-        Assert.Equal("finish_proposal", result.Run.Steps[^1].Tool);
+        Assert.Contains(result.Run.Steps, x => x.Tool is "simulate_plan" or "propose_changes");
+        Assert.Contains(result.Run.Steps[^1].Tool, new[] { "finish_proposal", "propose_changes" });
         var scheduled = Assert.Single(result.Plan!.Sessions, x => !x.Preserved);
         Assert.Equal(90, (scheduled.End - scheduled.Start).TotalMinutes);
         Assert.True(scheduled.Start >= start.AddHours(2)); Assert.True(scheduled.End <= start.AddHours(4));

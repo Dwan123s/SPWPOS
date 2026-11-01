@@ -255,7 +255,9 @@ app.Use(async (context, next) =>
         if (!context.Request.IsHttps)
         { await ApiProblems.WriteAsync(context, 400, "HTTPS_REQUIRED", "HTTPS is required.", context.RequestAborted); return; }
         var requestLimit = context.Request.Path.Value is "/api/agent/turns" or "/api/agent/turns/stream" ? 8 * 1024 * 1024
-            : context.Request.Path.Value == "/api/agent/images/timetable" ? TimetableImageLimits.MaxBytes : 3 * 1024 * 1024;
+            : context.Request.Path.Value == "/api/agent/images/timetable" ? TimetableImageLimits.MaxBytes
+            : context.Request.Path.StartsWithSegments("/api/teams") && context.Request.Path.Value!.EndsWith("/briefs", StringComparison.Ordinal) ? 12000000
+            : context.Request.Path.StartsWithSegments("/api/teams/tasks") && context.Request.Path.Value!.EndsWith("/completion/submit", StringComparison.Ordinal) ? 29000000 : 3 * 1024 * 1024;
         if (context.Request.ContentLength > requestLimit)
         { await ApiProblems.WriteAsync(context, 413, "REQUEST_TOO_LARGE", "Request body is too large.", context.RequestAborted); return; }
         var browserSession = context.Request.Path.StartsWithSegments("/api/browser-session");

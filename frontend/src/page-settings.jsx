@@ -1,4 +1,5 @@
 import { Select, Slot, nodeList } from "./react-ui.jsx";
+import { secretaryMode } from "./agent-handoff.js";
 import {
   state,
   button,
@@ -23,6 +24,7 @@ import { GoogleAccountCard } from "./google-signin.jsx";
 import { Loading } from "./loading.jsx";
 import { NoraInventory } from "./nora-inventory.jsx";
 import { GoogleCalendarCard } from "./google-calendar.jsx";
+import { TelegramCard } from "./telegram.jsx";
 export function settingsPage() {
   const p = state.workspace.profile || {},
     n = state.workspace.notificationSettings || {};
@@ -115,7 +117,7 @@ export function settingsPage() {
           {" Thông báo"}
         </button>
       </div>
-      {currentTab === "connections" ? <GoogleCalendarCard /> : null}
+      {currentTab === "connections" ? <div className="stack gap-24"><GoogleCalendarCard /><TelegramCard /></div> : null}
       {currentTab === "profile" ? (
         <section className="card settings-content-card">
           <div className="card-header">
@@ -199,7 +201,7 @@ export function settingsPage() {
                 hoạch.
               </p>
             </div>
-            {button(
+            {!secretaryMode() && button(
               "Thêm danh mục mới",
               "new-category",
               "primary small",
@@ -223,7 +225,7 @@ export function settingsPage() {
                       {" công việc"}
                     </small>
                   </div>
-                  <div className="category-card-actions">
+                  {!secretaryMode() && <div className="category-card-actions">
                     {button(
                       "",
                       "edit-category",
@@ -238,16 +240,16 @@ export function settingsPage() {
                       c.id,
                       "trash",
                     )}
-                  </div>
+                  </div>}
                 </div>
               )),
             ) ||
-              empty(
+              (secretaryMode() ? <p>NORA dùng loại công việc phù hợp từ nội dung bạn giao.</p> : empty(
                 "Chưa có danh mục công việc nào",
                 "Tạo danh mục đầu tiên để sắp xếp công việc tốt hơn.",
                 "new-category",
                 "Thêm danh mục",
-              )}
+              ))}
           </div>
         </section>
       ) : (
@@ -285,6 +287,7 @@ export function settingsPage() {
       )}
       {currentTab === "notifications" ? (
         <div className="stack gap-24">
+          <TelegramCard />
           <section className="card settings-content-card">
             <div className="card-header">
               <div>

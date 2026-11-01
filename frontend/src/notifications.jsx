@@ -9,15 +9,21 @@ const types = {
   event: { label: "Lịch hẹn", glyph: "calendar", tone: "blue" },
   warning: { label: "Cảnh báo lịch", glyph: "alertCircle", tone: "coral" },
   schedule: { label: "Thay đổi lịch", glyph: "refresh", tone: "teal" },
+  team: { label: "Công việc nhóm", glyph: "users", tone: "teal" },
   other: { label: "Cập nhật khác", glyph: "bell", tone: "blue" },
 };
 function notificationType(kind) {
   return (
     {
+      TEAM_COMPLETION_REQUEST: "team",
+      TEAM_TASK_COMPLETED: "team",
+      TEAM_COMPLETION_REJECTED: "team",
       DEADLINE: "deadline",
       SESSION_REMINDER: "session",
+      SESSION_STARTED: "session",
       SESSION_REVIEW: "session",
       EVENT_REMINDER: "event",
+      EVENT_STARTED: "event",
       WORKLOAD_WARNING: "warning",
       SCHEDULE_CHANGE: "schedule",
       SCHEDULE_CHANGED: "schedule",
@@ -36,8 +42,10 @@ export function NotificationCenter({ workspace }) {
   const [type, setType] = useState("all");
   const [query, setQuery] = useState("");
   const feed = useNotificationFeed();
-  const notifications = feed.userId && feed.userId === workspace.profile?.id
-    ? feed.items : workspace.notifications || [];
+  const notifications =
+    feed.userId && feed.userId === workspace.profile?.id
+      ? feed.items
+      : workspace.notifications || [];
   const tasks = workspace.tasks || [];
   const settings = workspace.notificationSettings || {};
   const unread = notifications.filter((item) => !item.isRead).length;
@@ -353,7 +361,14 @@ export function NotificationCenter({ workspace }) {
             >
               Điều chỉnh nhắc nhở {icon("arrow")}
             </button>
-            <button type="button" className="btn secondary small notice-popup-test" disabled={settings.inAppEnabled === false} onClick={previewNotificationPopup}>Thử popup</button>
+            <button
+              type="button"
+              className="btn secondary small notice-popup-test"
+              disabled={settings.inAppEnabled === false}
+              onClick={previewNotificationPopup}
+            >
+              Thử popup
+            </button>
           </section>
           <p className="notice-read-hint">
             {icon("check")} Đã đọc chỉ ghi nhận bạn đã xem thông báo. Tiến độ
@@ -368,17 +383,19 @@ function NotificationItem({ item, task }) {
   const type = notificationType(item.kind);
   const meta = types[type];
   const target =
-    item.kind === "SESSION_REVIEW"
-      ? { label: "Ghi nhận kết quả", route: "today" }
-      : type === "session" || type === "event" || type === "schedule"
-      ? { label: "Xem lịch làm việc", route: "calendar" }
-      : task
-        ? { label: "Xem công việc", taskId: task.id }
-        : type === "warning"
-          ? { label: "Xem tiến độ", route: "insights" }
-          : item.taskId
-            ? { label: "Mở danh sách công việc", route: "tasks" }
-            : null;
+    type === "team"
+      ? { label: "Mở công việc nhóm", route: "teams" }
+      : item.kind === "SESSION_REVIEW"
+        ? { label: "Ghi nhận kết quả", route: "today" }
+        : type === "session" || type === "event" || type === "schedule"
+          ? { label: "Xem lịch làm việc", route: "calendar" }
+          : task
+            ? { label: "Xem công việc", taskId: task.id }
+            : type === "warning"
+              ? { label: "Xem tiến độ", route: "insights" }
+              : item.taskId
+                ? { label: "Mở danh sách công việc", route: "tasks" }
+                : null;
   const validDate = Number.isFinite(Date.parse(item.createdAt));
   return (
     <li>

@@ -45,7 +45,7 @@ public sealed partial class AgentFreeTimeTests
         });
         var result = await Send(h, user.Id, "Xem lịch ngày mai");
         Assert.Contains("chưa có cuộc hẹn hay phiên làm việc nào được lưu", result.Reply);
-        Assert.Contains(configured ? "19:00–22:00 (180 phút)" : "bạn chưa đặt giờ rảnh", result.Reply);
+        Assert.Contains(configured ? "19:00–22:00 (180 phút)" : "chưa có giờ làm việc được bạn xác nhận", result.Reply);
         Assert.DoesNotContain("rảnh cả ngày", result.Reply); Assert.Equal(1, ai.Calls);
     }
 

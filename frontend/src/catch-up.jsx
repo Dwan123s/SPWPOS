@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api.js";
 import { state, dateFmt, timeFmt } from "./ui.jsx";
+import { secretaryMode } from "./agent-handoff.js";
 import "./styles/workspace-upgrade.css";
 
 export function CatchUpCard({ onWorkspaceChanged = async () => {} }) {
@@ -56,7 +57,7 @@ export function CatchUpCard({ onWorkspaceChanged = async () => {} }) {
             {timeFmt(session.start)}–{timeFmt(session.end)}) đã qua. Bạn có thể
             ghi nhận kết quả mà không cần bật timer.
           </p>
-          {partial && (
+          {partial && !secretaryMode() && (
             <div className="catch-up-partial">
               <label>
                 Tiến độ hiện tại của công việc: {progress}%
@@ -101,7 +102,7 @@ export function CatchUpCard({ onWorkspaceChanged = async () => {} }) {
             >
               Đã hoàn thành
             </button>
-            <button
+            {!secretaryMode() && <button
               type="button"
               className="btn secondary small"
               disabled={busy}
@@ -114,7 +115,7 @@ export function CatchUpCard({ onWorkspaceChanged = async () => {} }) {
               }}
             >
               Hoàn thành một phần
-            </button>
+            </button>}
             <button
               type="button"
               className="btn secondary small"

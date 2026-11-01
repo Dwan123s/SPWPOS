@@ -18,6 +18,7 @@ export function createPageResource(load, name) {
   return resource;
 }
 const pages = {
+  teams: createPageResource(() => import("./teams.jsx"), "TeamsPage"),
   today: createPageResource(() => import("./dashboard.jsx"), "todayPage"),
   tasks: createPageResource(() => import("./page-tasks.jsx"), "tasksPage"),
   calendar: createPageResource(() => import("./schedule.jsx"), "calendarPage"),

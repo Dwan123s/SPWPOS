@@ -51,7 +51,7 @@ public sealed partial class PlanningEngine
             var freeMinutes = Minutes(FreeSlots(state, rangeStart, rangeEnd));
             var remainingBudget = Math.Max(0, budget - consumed);
             var effective = Math.Min(freeMinutes, remainingBudget);
-            var schedulable = Math.Min(Minutes(FreeSlots(state, rangeStart, rangeEnd, blocks)), Math.Max(0, remainingBudget - reservedMinutes));
+            var schedulable = Math.Min(Minutes(FocusSlots(state, rangeStart, rangeEnd, blocks)), Math.Max(0, remainingBudget - reservedMinutes));
             result.Add(new(day, freeMinutes, budget, consumed, reservedMinutes, effective, schedulable));
         }
         return result.ToArray();

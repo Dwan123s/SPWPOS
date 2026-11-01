@@ -1,8 +1,22 @@
+export function needsTimetableSetup(workspace) {
+  return (
+    !!workspace &&
+    !(
+      workspace.events?.length ||
+      workspace.availability?.length ||
+      workspace.exceptions?.length ||
+      workspace.tasks?.length ||
+      workspace.sessions?.length
+    )
+  );
+}
+
 export function workflowSteps(workspace, now = Date.now()) {
   const hasTasks = (workspace?.tasks || []).some(
     (task) => !["Completed", "Cancelled"].includes(task.status),
   );
   const hasTime =
+    !!workspace?.availabilityPolicy?.confirmed ||
     !!workspace?.availability?.length ||
     !!workspace?.exceptions?.some((item) => item.isAvailable);
   const hasPlan = (workspace?.sessions || []).some(
@@ -12,30 +26,39 @@ export function workflowSteps(workspace, now = Date.now()) {
   );
   return [
     {
-      title: "Nhập việc",
+      title: "Gửi thời gian biểu",
       description:
-        "Viết việc cần làm để xem trước kết quả AI, hoặc thêm công việc thủ công.",
-      done: hasTasks,
-      route: "notes",
-      label: "Nhập việc cần làm",
-      symbol: "edit",
+        "Gửi lịch học, lịch làm hoặc lịch cố định để NORA phân tích các giờ bận trước.",
+      done: !!workspace?.events?.length || hasTime || hasPlan,
+      route: "agent",
+      label: "Gửi thời gian biểu cho NORA",
+      symbol: "calendar",
     },
     {
-      title: "Chọn giờ rảnh",
+      title: "Xác nhận giờ có thể làm việc",
       description:
-        "Đã có công việc. Chọn những khoảng bạn có thể làm trước khi tạo lịch.",
+        "Nói giờ sinh hoạt, ngủ/nghỉ và giờ có thể làm việc; NORA cấu hình quanh lịch cố định.",
       done: hasTime,
-      route: "time",
-      label: "Chọn giờ rảnh",
+      route: "agent",
+      label: "Xác nhận giờ rảnh với NORA",
       symbol: "clock",
     },
     {
-      title: "Xem lịch đề xuất",
+      title: "Giao việc cho NORA",
       description:
-        "Đã có việc và giờ rảnh. Xem lịch đề xuất rồi chọn lưu khi phù hợp.",
+        "Cho biết bài tập hoặc công việc, thời lượng, deadline và mức độ gấp để NORA tìm chỗ trong lịch.",
+      done: hasTasks,
+      route: "agent",
+      label: "Giao việc cho NORA",
+      symbol: "edit",
+    },
+    {
+      title: "Sắp xếp công việc",
+      description:
+        "NORA xếp việc vào giờ rảnh đã xác nhận, ưu tiên việc gấp và giữ lịch cố định.",
       done: hasPlan,
-      action: "generate-plan",
-      label: "Xem lịch đề xuất",
+      route: "agent",
+      label: "Nhờ NORA sắp xếp",
       symbol: "calendar",
     },
     {

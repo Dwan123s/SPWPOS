@@ -79,3 +79,28 @@ export async function submit(form, operation) {
     if (btn && btn.isConnected) btn.disabled = form.dataset.stale === "true";
   }
 }
+export async function downloadPrivateFile(path, filename, retry = true) {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    headers: { "X-SPWPOS": "1" },
+  });
+  if (response.status === 401 && retry) {
+    await refreshSession();
+    return downloadPrivateFile(path, filename, false);
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(
+      body.error?.message ||
+        "Không tải được file. Hãy đăng nhập lại hoặc thử lại.",
+    );
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

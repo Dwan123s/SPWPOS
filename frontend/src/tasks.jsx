@@ -19,6 +19,7 @@ import {
   dayKey,
 } from "./ui.jsx";
 import { api } from "./api.js";
+import { askNora, secretaryMode } from "./agent-handoff.js";
 export const taskById = (id) => state.workspace.tasks.find((t) => t.id === id);
 export function taskRows(tasks) {
   return <TaskList tasks={tasks} />;
@@ -353,6 +354,13 @@ export function taskForm(task = {}, parentId = null) {
   );
 }
 export function openTask(task = {}, parentId = null) {
+  if (secretaryMode()) {
+    askNora(task.id
+      ? `Tôi muốn cập nhật công việc “${task.name}” (mã ${task.id}). Hỏi tôi điều cần thay đổi rồi kiểm tra và cập nhật lịch.`
+      : parentId ? `Tôi muốn bổ sung việc liên quan đến “${taskById(parentId)?.name || parentId}”. Hỏi tôi nội dung rồi đề xuất cách sắp xếp.`
+      : "Tôi có công việc mới. Hỏi tôi nội dung và hạn chót; nếu thiếu thời lượng, đề xuất ước lượng để tôi xác nhận trong chat, rồi tự xếp lịch.");
+    return;
+  }
   setSlot("task-conflict", null);
   modal(
     task.id ? "Chỉnh sửa công việc" : "Thêm công việc",
@@ -458,7 +466,9 @@ export function openDetail(id, afterSession = false) {
       ) : (
         ""
       )}
-      <form data-form="task-progress" data-id={id}>
+      {secretaryMode() ? <div className="form-actions">
+        {!["Completed", "Cancelled"].includes(t.status) && button("Đã hoàn thành công việc", "task-finish", "primary small", id, "check")}
+      </div> : <form data-form="task-progress" data-id={id}>
         <div className="form-grid">
           {field(
             "Tiến độ (%)",
@@ -486,7 +496,7 @@ export function openDetail(id, afterSession = false) {
             Cập nhật tiến độ
           </button>
         </div>
-      </form>
+      </form>}
       <div className="spaced">
         <h3>Công việc con</h3>
         {children.length ? (
@@ -524,7 +534,7 @@ export function openDetail(id, afterSession = false) {
             </div>
           )),
         )}
-        <form data-form="dependency" data-id={id}>
+        {!secretaryMode() && <form data-form="dependency" data-id={id}>
           <div className="actions">
             <Select name="predecessor" className="filter">
               {nodeList(
@@ -538,7 +548,7 @@ export function openDetail(id, afterSession = false) {
             </button>
           </div>
           <div className="form-error" />
-        </form>
+        </form>}
       </div>
       <div className="form-actions">
         {button("Xóa công việc", "delete-task", "danger small", id, "trash")}
@@ -555,6 +565,7 @@ export function openDetail(id, afterSession = false) {
   );
 }
 export function captureModal() {
+  if (secretaryMode()) { askNora("Tôi muốn giao một việc cho bạn. Hỏi tôi nội dung rồi giúp tôi sắp xếp, không cần điền biểu mẫu."); return; }
   modal(
     "Ghi nhanh công việc",
     "Bạn kiểm tra gợi ý trước khi lưu.",
@@ -584,6 +595,7 @@ export function captureModal() {
   );
 }
 export async function breakdownModal(id) {
+  if (secretaryMode()) { askNora(`Hãy tư vấn cách chia nhỏ công việc “${taskById(id)?.name || id}” và đề xuất thời lượng để tôi xác nhận, chưa lưu thêm việc.`); return; }
   const t = taskById(id);
   const result = await api(`/api/tasks/${id}/breakdown`, "POST");
   state.breakdown = result;

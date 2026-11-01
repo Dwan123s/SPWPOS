@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api.js";
 import { icon } from "./ui.jsx";
+import { secretaryMode } from "./agent-handoff.js";
 const statusLabels = {
   PROPOSED: "Chờ bạn xem",
   BLOCKED: "Cần thêm thời gian",
@@ -114,7 +115,7 @@ export function RecoveryPanel({ onWorkspaceChanged }) {
       )}
       {data && (
         <>
-          <details className="recovery-settings">
+          {!secretaryMode() && <details className="recovery-settings">
             <summary>
               Cài đặt phục hồi{" "}
               <span>
@@ -210,7 +211,7 @@ export function RecoveryPanel({ onWorkspaceChanged }) {
                 Lưu cài đặt
               </button>
             </form>
-          </details>
+          </details>}
           {!data.items.length && (
             <div className="recovery-empty">
               <span className="recovery-empty-icon" aria-hidden="true">

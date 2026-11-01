@@ -35,6 +35,22 @@ Ba gợi ý mẫu chỉ điền và focus ô nhập; không gọi AI hoặc lưu
 
 ## Cách sử dụng
 
+### Nhập thời khóa biểu tự động — 01/11/2026
+
+Gửi ảnh thời khóa biểu trong NORA hoặc nhập thời gian biểu bằng lời. Khi ngày áp dụng, giờ học và số tuần lặp đã rõ, NORA nhập các buổi học, tự tính các khoảng rảnh và trả báo cáo 7 ngày tính từ buổi học đầu tiên còn hiệu lực. Báo cáo liệt kê lịch bận, từng khoảng rảnh kèm số phút, tổng phút theo ngày và khoảng trống dài nhất. Các phiên linh hoạt bị lịch học đè lên được kiểm tra/xếp lại trước khi lưu.
+
+Thời khóa biểu người dùng cung cấp là dữ liệu gốc. Hệ thống không tự tạo giờ làm việc, giờ ngủ/nghỉ hoặc coi ô trống là giờ rảnh. Khi chưa có giờ có thể làm việc, NORA vẫn nhập lịch cố định đầy đủ, phân tích các giờ bận và hỏi khung sinh hoạt còn thiếu bằng hội thoại. Người dùng trả lời bằng lời để NORA cấu hình giờ rảnh quanh lịch cố định; không cần điền từng khung trong form. Giờ rảnh đã xác nhận được giữ nguyên. Giới hạn phút mỗi ngày, độ dài phiên và thời gian nghỉ vẫn được áp dụng riêng khi xếp công việc.
+
+Chế độ tự lưu mặc định lưu toàn bộ phương án hợp lệ. **Hoàn tác** khôi phục cả lịch học và các phiên bị dời, theo điều kiện hoàn tác hiện hành. Tắt tự lưu hoặc yêu cầu chỉ xem trước thì chưa lưu gì. Nếu thiếu ngày/giờ học, ảnh không rõ hoặc có xung đột không thể giải quyết, hệ thống không lưu từng phần. Không tự đoán giờ theo tiết hoặc thời hạn học kỳ. Với công việc khẩn, NORA dùng thời lượng, deadline và các khoảng rảnh đã xác nhận để tìm chỗ; lịch cố định vẫn được bảo vệ.
+
+Luồng này có trong cả chế độ `Agent` và `Workflow`; không cần migration mới. Cần build frontend và khởi động lại API để dùng thay đổi.
+
+### Giao việc qua hội thoại
+
+Workspace mới công bố capability `secretary-v1`: các màn hình công việc, lịch cố định, giờ rảnh và mô phỏng chuyển thao tác nhập/sửa sang NORA. Trang giờ rảnh trở thành bản xem thời gian biểu và các giờ đã xác nhận. **Notes giữ nguyên giao diện và toàn bộ luồng hiện có**: soạn/lưu bản nháp, phân tích AI, chỉnh kết quả và xem trước/tự lưu lịch. Notes vẫn truy cập được khi workspace chưa có thời gian biểu. Các màn hình lập lịch khác không yêu cầu điền form task, số phút, mức ưu tiên, các khung rảnh, phiên/ngày lập kế hoạch hay sửa thời gian phiên. Theo dõi timer và đánh dấu hoàn thành vẫn dùng nút trực tiếp. Form tài khoản, bảo mật và kết nối không thuộc luồng lập lịch này.
+
+Khi người dùng chỉ cung cấp tên/mô tả công việc, AI có thể **đề xuất** một thời lượng ước lượng. Đề xuất được lưu trong ngữ cảnh làm rõ, chưa tạo task hoặc phiên làm việc. Chỉ sau câu trả lời chấp nhận rõ ràng (ví dụ “Đồng ý”) mới dùng đúng số phút đó cho đúng công việc của yêu cầu đang chờ. Từ chối, câu trả lời không liên quan, đổi tên công việc hoặc số phút khác không tự chấp nhận ước lượng. Deadline và giờ sinh hoạt vẫn cần dữ kiện từ người dùng; không được tự bịa.
+
 ### Quy tắc và guardrail — 19/10/2026
 
 - Danh sách loại công việc đang hoạt động được đọc từ database vào ngữ cảnh AI và enum của schema, thay cho danh sách viết cố định. Backend vẫn kiểm tra loại công việc khi tạo bản xem trước và kiểm tra lại khi áp dụng.
@@ -49,7 +65,7 @@ Kiểm thử hồi quy dùng phản hồi AI được kiểm soát và database 
 
 ### Các bước
 
-1. Vào **Giờ rảnh**, nhập các khoảng làm việc thực tế. Cấu hình múi giờ, phiên dài nhất và tổng phút mỗi ngày.
+1. Có thể gửi thời khóa biểu trực tiếp để hệ thống tự phân tích. Phần **Giờ rảnh** dùng khi muốn cá nhân hóa các khoảng làm việc, múi giờ, phiên dài nhất và tổng phút mỗi ngày.
 2. Vào **Trợ lý AI**, nhập yêu cầu có ngày giờ cụ thể, ví dụ:
 
    - “Ngày mai tôi có cuộc họp từ 14h đến 16h, xếp lại lịch giúp tôi.”

@@ -138,6 +138,18 @@ public sealed partial class WorkspaceService
         session.Start = input.Start; session.End = input.End; session.ReasonCode = "USER_ADJUSTMENT";
         await AddNotification(uid, "SCHEDULE_CHANGED", "Phiên đã được chỉnh sửa", "Đã cập nhật thời gian của một phiên làm việc.", "edit:" + Guid.NewGuid(), session.TaskId, ct);
     }, ct);
+    public Task DeleteSessionAsync(Guid uid, Guid id, CancellationToken ct) => Mutate(uid, async () =>
+    {
+        var session = await Find<WorkSession>(uid, id, ct);
+        if (session.Status == WorkSessionStatus.Cancelled) return;
+        Require(session.Status == WorkSessionStatus.Scheduled && session.ActualSeconds == 0 && session.SegmentStartedAt is null &&
+            !await Mine<SessionExecution>(uid).AnyAsync(x => x.SessionId == id, ct),
+            "SESSION_NOT_DELETABLE", "Chỉ xóa phiên chưa bắt đầu và chưa có lịch sử thực hiện.", 409);
+        Require(!session.IsLocked, "SESSION_LOCKED", "Mở khóa phiên trước khi xóa khỏi lịch.", 409);
+        session.Status = WorkSessionStatus.Cancelled;
+        foreach (var notification in await Mine<InAppNotification>(uid).Where(x => x.SessionId == id).ToArrayAsync(ct))
+        { notification.IsVisible = false; notification.EmailPending = false; notification.TelegramPending = false; }
+    }, ct);
     public Task LockSessionAsync(Guid uid, Guid id, bool locked, CancellationToken ct) => Mutate(uid, async () =>
     {
         var session = await Find<WorkSession>(uid, id, ct); Require(session.Status == WorkSessionStatus.Scheduled && session.Start >= Now, "SESSION_NOT_EDITABLE", "Chỉ khóa phiên trong tương lai.");

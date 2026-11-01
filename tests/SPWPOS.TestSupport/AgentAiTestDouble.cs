@@ -1,7 +1,7 @@
 using SPWPOS.Application.Workspace;
 namespace SPWPOS.TestSupport;
 
-public sealed class AgentAiTestDouble : ITaskInterpreter, IPlanningAgentInterpreter
+public sealed class AgentAiTestDouble : ITaskInterpreter, IPlanningAgentInterpreter, ITeamBriefInterpreter
 {
     public NoteAgentCapabilities Capabilities => new(true, Provider: "Gemini");
     public Func<DateTimeOffset, AgentIntent> Response { get; set; } = _ => Empty();
@@ -11,10 +11,20 @@ public sealed class AgentAiTestDouble : ITaskInterpreter, IPlanningAgentInterpre
     public string Context { get; private set; } = "";
     public AgentMessage[] History { get; private set; } = [];
     public AgentImage? LastImage { get; private set; }
+    public int ImageCalls { get; private set; }
+    public TeamBriefContext? BriefContext { get; private set; }
+    public Func<TeamBriefContext, TeamBriefAnalysis>? BriefResponse { get; set; }
+    public async Task<TeamBriefAnalysis> AnalyzeTeamBriefAsync(TeamBriefContext context, CancellationToken ct)
+    {
+        Calls++; BriefContext = context;
+        if (BeforeReply != null) await BeforeReply();
+        return BriefResponse?.Invoke(context) ?? new("Chưa đủ thông tin", "Cần deadline", "", [], []);
+    }
     public async Task<AgentIntent> InterpretImageAsync(string text, string contextJson, AgentMessage[] history,
         string timeZoneId, DateTimeOffset now, AgentImage image, Func<string, CancellationToken, Task>? onReplyDelta, CancellationToken ct)
     {
         LastImage = image;
+        ImageCalls++;
         var result = await InterpretAsync(text, contextJson, history, timeZoneId, now, ct);
         if (onReplyDelta is not null) await onReplyDelta(result.Reply, ct);
         return result;

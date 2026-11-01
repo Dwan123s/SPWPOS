@@ -1,0 +1,13 @@
+.telegram-card { display: grid; gap: 18px; }
+.telegram-heading { display: flex; gap: 14px; align-items: flex-start; }
+.telegram-heading h2 { margin: 0 0 6px; }
+.telegram-heading p { margin: 0; color: var(--muted, #65809f); line-height: 1.7; }
+.telegram-heading > div { flex: 1; min-width: 0; }
+.telegram-heading .badge { flex-shrink: 0; }
+.telegram-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: #e7f5ff; color: #168ac5; flex-shrink: 0; }
+.telegram-hint { margin: 0; line-height: 1.7; }
+.telegram-connect-steps { padding: 18px; border: 1px solid #bedff4; border-radius: 16px; background: #f3faff; }
+.telegram-connect-steps p { line-height: 1.7; }
+.telegram-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.telegram-card > small { color: var(--muted, #65809f); line-height: 1.6; }
+@media(max-width: 600px) { .telegram-heading { flex-wrap: wrap; } .telegram-heading .badge { margin-left: 58px; } .telegram-actions .btn { width: 100%; } }

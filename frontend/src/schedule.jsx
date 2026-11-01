@@ -66,11 +66,10 @@ export function calendarPage() {
     const from = dayKey(e.start) < date ? "00:00" : timeFmt(e.start),
       to = dayKey(e.end) > date ? "24:00" : timeFmt(e.end);
     return (
-      <button
-        key={`event-${e.id}-${date}`}
+      <button key={`event-${e.id}-${date}`}
         type="button"
         className={`calendar-block fixed-event calendar-timed-card calendar-time-${phase}${compact ? "" : " calendar-agenda-entry"}`}
-        data-action="edit-event"
+        data-action="event-detail"
         data-id={e.id}
       >
         <span className="block-time">
@@ -88,8 +87,7 @@ export function calendarPage() {
     );
   };
   const block = (s, now, agenda = false) => (
-    <button
-      key={`session-${s.id}`}
+    <button key={`session-${s.id}`}
       type="button"
       className={`calendar-block calendar-timed-card calendar-time-${calendarPhase(s.start, s.end, now)} ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}${agenda ? " calendar-agenda-entry" : ""}`}
       data-action="session-detail"
@@ -239,7 +237,7 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
             </div>
             {button("Sự kiện", "new-event", "small secondary", "", "plus")}
             {workflowSteps(state.workspace)
-              .slice(0, 2)
+              .slice(0, 3)
               .every((step) => step.done) &&
               button(
                 "Lập kế hoạch",
@@ -365,7 +363,7 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
         )}
         <p className="calendar-hint">
           {icon("clock")}
-          Cuộn trong khung lịch để xem thêm. Bấm một mục để xem chi tiết.
+          Cuộn trong khung lịch để xem thêm. Bấm một mục để xem chi tiết và các thao tác với lịch.
           {" Múi giờ "}
           {state.workspace.preference.timeZoneId}.
         </p>
