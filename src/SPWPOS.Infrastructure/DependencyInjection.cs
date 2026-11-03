@@ -17,6 +17,12 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddOptions<SPWPOS.Infrastructure.Commerce.PayOsOptions>().BindConfiguration("PayOs");
+        services.AddHttpClient<SPWPOS.Infrastructure.Commerce.IPayOsGateway, SPWPOS.Infrastructure.Commerce.PayOsGateway>(client =>
+            { client.Timeout = TimeSpan.FromSeconds(15); client.MaxResponseContentBufferSize = 131072; })
+            .RemoveAllLoggers().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddScoped<SPWPOS.Infrastructure.Commerce.SkinPaymentService>();
+        services.AddScoped<SPWPOS.Infrastructure.Commerce.CommerceAdminService>();
         services.AddDbContext<ApplicationDbContext>(o => o.UseSqlServer(configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.")));
         services.AddIdentityCore<ApplicationUser>(o =>
@@ -79,6 +85,9 @@ public static class DependencyInjection
         services.AddScoped<ISecurityAuditService, SecurityAuditService>();
         services.AddScoped<AccountRateLimiter>();
         services.AddSingleton<SPWPOS.Application.Workspace.PlanningEngine>();
+        services.AddMemoryCache();
+        services.AddOptions<SPWPOS.Application.Workspace.EisenhowerOptions>().BindConfiguration("Eisenhower");
+        services.AddScoped<SPWPOS.Application.Workspace.IEisenhowerService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
         services.AddScoped<SPWPOS.Infrastructure.Workspace.WorkspaceHistoryMaintenance>();
         services.AddScoped<SPWPOS.Infrastructure.Workspace.WorkspaceService>();
         services.AddOptions<SPWPOS.Application.Workspace.NoraAgentOptions>().BindConfiguration("NoraAgent")

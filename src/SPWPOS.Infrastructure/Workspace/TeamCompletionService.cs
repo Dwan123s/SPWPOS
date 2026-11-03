@@ -75,6 +75,11 @@ public sealed partial class WorkspaceService
         var leaderName = await TeamUserName(uid, ct);
         if (input.Approved)
         {
+            var preference = await Preference(member.UserId, ct);
+            preference.MutationVersion = Guid.NewGuid();
+            await db.SaveChangesAsync(ct);
+            var personal = await Find<WorkTask>(member.UserId, assignment.WorkTaskId, ct);
+            await AwardTaskExperienceAsync(member.UserId, personal, task.CompletionSubmittedAt ?? Now, ct);
             var message = $"{assigneeName} đã hoàn thành task “{task.Name}”. Đã được trưởng nhóm {leaderName} xác nhận.";
             db.TeamChatMessages.Add(new() { TeamId = task.TeamId, UserId = uid, RequestId = input.RequestId,
                 Text = message, IsSystem = true, CreatedAt = Now });

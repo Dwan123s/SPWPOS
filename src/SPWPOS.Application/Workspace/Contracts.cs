@@ -18,7 +18,8 @@ public sealed record TaskView(Guid Id, string Name, string Description, DateTime
     int AdjustedMinutes, int RemainingMinutes, int ActualMinutes, int PlannedMinutes, int Priority, string TaskType,
     bool Splittable, int MinimumSessionMinutes, Guid? CategoryId, Guid? ParentId, string Status, int Progress,
     DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, Guid[] Dependencies, bool IsHardDeadline = false, string CreationSource = "MANUAL",
-    DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default);
+    DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default,
+    ImportanceView? Importance = null);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
 public sealed record CategoryView(Guid Id, string Name, string Color);
@@ -66,7 +67,7 @@ public sealed record PlanView(Guid Id, Guid Revision, DateTimeOffset Start, Date
     ProposedSession[] Sessions, PlanWarning[] Warnings, string[] Explanations, bool IsApplied,
     string Status = "PROPOSED", string Kind = "INITIAL", Guid? PreviousPlanId = null, DateTimeOffset? AppliedAt = null,
     bool UseEstimateBias = true, NotePlanContext? NoteContext = null, bool HasUrgentReplan = false, bool HasDeadlineProtection = false,
-    bool IsOptimization = false)
+    bool IsOptimization = false, string? PriorityPolicy = null)
 {
     public bool RequiresConfirmation => HasUrgentReplan || HasDeadlineProtection || IsOptimization;
 }
@@ -108,6 +109,10 @@ public interface IWorkspaceService
     Task SelectSkinAsync(Guid userId, SkinInput input, CancellationToken ct);
     Task<SessionView[]> GetCatchUpAsync(Guid userId, CancellationToken ct);
     Task<CatchUpResult> CatchUpAsync(Guid userId, Guid sessionId, CatchUpInput input, CancellationToken ct);
+    Task<WorkTimeReview[]> GetWorkTimeReviewsAsync(Guid userId, CancellationToken ct);
+    Task<ExtraTimePreview> PreviewExtraTimeAsync(Guid userId, Guid sessionId, ExtraTimeInput input, CancellationToken ct);
+    Task<WorkTimeResult> ConfirmExtraTimeAsync(Guid userId, Guid proposalId, ExtraTimeConfirm input, CancellationToken ct);
+    Task<WorkTimeResult> FinishWorkTaskAsync(Guid userId, Guid sessionId, CancellationToken ct);
     Task<string> ExportCalendarAsync(Guid userId, CancellationToken ct);
     Task<AdminMetrics> GetAdminMetricsAsync(CancellationToken ct);
     Task<AdminHealth> GetAdminHealthAsync(CancellationToken ct);

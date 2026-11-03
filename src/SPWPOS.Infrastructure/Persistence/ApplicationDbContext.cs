@@ -14,6 +14,8 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
     public DbSet<SecurityRateLimit> SecurityRateLimits => Set<SecurityRateLimit>();
     public DbSet<PasswordChangeNotification> PasswordChangeNotifications => Set<PasswordChangeNotification>();
     public DbSet<WorkTask> WorkTasks => Set<WorkTask>();
+    public DbSet<SkinPurchase> SkinPurchases => Set<SkinPurchase>();
+    public DbSet<OwnedPetSkin> OwnedPetSkins => Set<OwnedPetSkin>();
     public DbSet<PlanningNote> PlanningNotes => Set<PlanningNote>();
     public DbSet<AgentTurn> AgentTurns => Set<AgentTurn>();
     public DbSet<AgentConversation> AgentConversations => Set<AgentConversation>();
@@ -79,6 +81,7 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
         CalendarModel.Configure(builder);
         AgentRuntimeModel.Configure(builder);
         PrivateTeamModel.Configure(builder);
+        EisenhowerModel.Configure(builder);
         TelegramModel.Configure(builder);
     }
 }

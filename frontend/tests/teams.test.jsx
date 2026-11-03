@@ -244,7 +244,7 @@ it("returning a task first shows the affected private sessions and requires anot
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByText("Cập nhật tiến độ / trả việc"));
+  fireEvent.click(await screen.findByRole("button", { name: "Chi tiết" }));
   fireEvent.click(
     await screen.findByRole("button", { name: "Trả việc về nhóm" }),
   );

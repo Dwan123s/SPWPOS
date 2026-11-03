@@ -74,7 +74,7 @@ public sealed class TelegramMessageFormatterTests
         var live = TelegramMessageFormatter.Format(new() { Kind = "EVENT_REMINDER", Title = "Lịch hẹn đang bắt đầu" }, details, "Asia/Ho_Chi_Minh", now);
         Assert.Contains("🟢 Đang diễn ra", live); Assert.DoesNotContain("Bắt đầu sau", live);
         var review = TelegramMessageFormatter.Format(new() { Kind = "SESSION_REVIEW", Title = "Bạn đã hoàn thành phiên này chưa?" }, details, "Asia/Ho_Chi_Minh", now);
-        Assert.Contains("Cập nhật kết quả phiên này trong PLANORA nhé.", review); Assert.DoesNotContain("Đang diễn ra", review);
+        Assert.Contains("Bạn đã làm xong chưa?", review); Assert.Contains("Cần thêm thời gian", review); Assert.DoesNotContain("Đang diễn ra", review);
     }
 
     private static void AssertSupportedMarkup(string message)

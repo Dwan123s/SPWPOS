@@ -41,7 +41,13 @@ public sealed partial class WorkspaceService
             task.Progress = input.Outcome == "PARTIAL" ? input.Progress!.Value : Math.Min(100, task.Progress + (int)Math.Ceiling(100 * (session.End - session.Start).TotalMinutes / task.EstimatedMinutes));
             task.Status = task.Progress == 100 ? WorkTaskStatus.Completed : WorkTaskStatus.InProgress;
             task.CompletedAt = task.Progress == 100 ? session.End : null; task.UpdatedAt = Now;
-            if (input.Outcome == "COMPLETED") await AwardSessionExperienceAsync(uid, session, task, session.End, ct);
+            if(task.Status==WorkTaskStatus.Completed)await ReleaseCompletedTaskSessions(uid,task.Id,ct);
+            if (input.Outcome == "COMPLETED")
+            {
+                await AwardSessionExperienceAsync(uid, session, task, session.End, ct);
+                if (!await db.TeamTaskAssignments.AnyAsync(x => x.UserId == uid && x.WorkTaskId == task.Id && x.Active, ct))
+                    await AwardTaskExperienceAsync(uid, task, session.End, ct);
+            }
         }
         await db.SaveChangesAsync(ct);
         if (input.Outcome == "COMPLETED") return new CatchUpResult(id, "Completed", null, "Mình đã ghi nhận kết quả. Bạn không cần bật timer để hoàn thành phiên.");

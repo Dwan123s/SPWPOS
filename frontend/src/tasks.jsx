@@ -1,3 +1,4 @@
+import { TaskEisenhowerDetail } from "./eisenhower.jsx";
 import { useState } from "react";
 import { Select, Slot, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
@@ -422,6 +423,7 @@ export function openDetail(id, afterSession = false) {
         {badge(`Ưu tiên ${t.priority}`)}
         {badge(t.isHardDeadline ? "Deadline cứng" : "Deadline mềm")}
       </div>
+      <TaskEisenhowerDetail task={t} onChanged={async () => { state.workspace = await api("/api/workspace"); openDetail(id); }} />
       <dl className="detail-list">
         {t.workWindowStart && t.workWindowEnd && (
           <div>

@@ -98,8 +98,9 @@ public sealed partial class WorkspaceService
             else { shared.Progress = task.Progress; shared.Version = Guid.NewGuid(); TeamLog(uid, shared.TeamId, shared.Id, "PROGRESS_CONFIRMED"); }
             (await TeamMember(uid, shared.TeamId, ct)).MutationVersion = Guid.NewGuid();
         }
+        else if (status == WorkTaskStatus.Completed) await AwardTaskExperienceAsync(uid, task, Now, ct);
         if (status is WorkTaskStatus.Completed or WorkTaskStatus.Cancelled)
-            foreach (var session in await Mine<WorkSession>(uid).Where(x => x.TaskId == id && x.Status == WorkSessionStatus.Scheduled).ToArrayAsync(ct)) session.Status = WorkSessionStatus.Cancelled;
+            await ReleaseCompletedTaskSessions(uid,id,ct);
     }
     public Task<Guid> SaveCategoryAsync(Guid uid, Guid? id, CategoryInput input, CancellationToken ct) => Mutate(uid, async () =>
     {

@@ -41,7 +41,7 @@ public sealed class WorkspaceUpgradeTests
             var session = await db.WorkSessions.SingleAsync(Ct); var execution = await db.SessionExecutions.SingleAsync(Ct);
             Assert.Equal(WorkSessionStatus.Completed, session.Status); Assert.Equal(3600, session.ActualSeconds); Assert.True(session.ExperienceAwarded);
             Assert.True(execution.IsUserAdjusted); Assert.Equal(0, execution.TimerSeconds); Assert.Empty(await db.ExecutionSegments.ToArrayAsync(Ct));
-            Assert.Equal(100, (await db.WorkTasks.SingleAsync(Ct)).Progress); Assert.Equal(14, (await db.Users.SingleAsync(Ct)).ExperiencePoints);
+            Assert.Equal(100, (await db.WorkTasks.SingleAsync(Ct)).Progress); Assert.Equal(39, (await db.Users.SingleAsync(Ct)).ExperiencePoints);
         });
     }
 
@@ -78,18 +78,20 @@ public sealed class WorkspaceUpgradeTests
         Assert.Null(result.ReplacementSessionId); Assert.Equal(1, await h.DbAsync(db => db.WorkSessions.CountAsync(Ct)));
     }
 
-    [Fact] public async Task Inventory_unlocks_with_xp_and_rejects_locked_skins()
+    [Fact] public async Task Inventory_keeps_only_default_nora_and_paid_fox_and_rejects_removed_skins()
     {
         await using var h = await ServiceHarness.CreateAsync(); var data = await Setup(h);
         await h.DbAsync(async db => { (await db.Users.SingleAsync(Ct)).ExperiencePoints = 98; await db.SaveChangesAsync(Ct); });
         var locked = await Assert.ThrowsAsync<AuthException>(() => Call(h, s => s.SelectSkinAsync(data.User, new("forest"), Ct)));
-        Assert.Equal("SKIN_LOCKED", locked.Code);
+        Assert.Equal("SKIN_NOT_FOUND", locked.Code);
         await Call(h, s => s.CatchUpAsync(data.User, data.Session.Id, new("COMPLETED"), Ct));
         var profile = await Call(h, s => s.GetGamificationAsync(data.User, Ct));
-        Assert.Equal(112, profile.ExperiencePoints); Assert.Equal(2, profile.UserLevel); Assert.Equal(200, profile.NextLevelXp);
-        Assert.True(profile.Inventory.Single(x => x.Code == "forest").Unlocked); Assert.False(profile.Inventory.Single(x => x.Code == "cosmic").Unlocked);
-        await Call(h, s => s.SelectSkinAsync(data.User, new("forest"), Ct));
-        Assert.Equal("forest", (await Call(h, s => s.GetGamificationAsync(data.User, Ct))).SelectedSkin);
+        Assert.Equal(137, profile.ExperiencePoints); Assert.Equal(2, profile.UserLevel); Assert.Equal(200, profile.NextLevelXp);
+        Assert.Equal(new[] { "classic", "fox" }, profile.Inventory.Select(x => x.Code));
+        Assert.False(profile.Inventory.Single(x => x.Code == "fox").Unlocked);
+        await h.DbAsync(async db => { (await db.Users.SingleAsync(Ct)).NoraSkin = "forest"; await db.SaveChangesAsync(Ct); });
+        Assert.Equal("classic", (await Call(h, s => s.GetGamificationAsync(data.User, Ct))).SelectedSkin);
+        await Call(h, s => s.SelectSkinAsync(data.User, new("classic"), Ct));
     }
 
     [Fact] public async Task Calendar_escapes_text_folds_utf8_and_isolates_ownership()

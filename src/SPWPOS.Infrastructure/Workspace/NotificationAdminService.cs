@@ -45,14 +45,8 @@ public sealed partial class WorkspaceService
     {
         var settings = await db.NotificationSettings.SingleOrDefaultAsync(x => x.UserId == uid, ct) ?? new();
         var state = await State(uid, ct); bool missed = false;
-        foreach (var session in state.Sessions.Where(x => x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.NeedsReview && x.End < Now &&
-            state.Tasks.Any(t => t.Id == x.TaskId && t.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled)))
-        {
-            if (session.Status == WorkSessionStatus.Scheduled) { session.Status = WorkSessionStatus.NeedsReview; missed = true; }
-            await AddNotification(uid, "SESSION_REVIEW", "Bạn đã hoàn thành phiên này chưa?",
-                (state.Tasks.FirstOrDefault(x => x.Id == session.TaskId)?.Name ?? "Phiên làm việc") + " đã qua. Mở Hôm nay để ghi nhận kết quả, không cần bật timer.",
-                $"review:{session.Id}:{session.End.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
-        }
+        missed=state.Sessions.Any(s=>s.End<=Now && s.Status==WorkSessionStatus.Scheduled);
+        await EnsureTimeReviewNotifications(uid,ct);
         if (missed) (await Preference(uid, ct)).Revision = Guid.NewGuid();
         foreach (var task in state.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled && x.Deadline < Now.AddHours(settings.DeadlineLeadHours)))
             await AddNotification(uid, "DEADLINE", "Công việc sắp đến hạn", task.Name + " · Hạn: " + TimeZoneInfo.ConvertTime(task.Deadline, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"deadline:{task.Id}:{task.Deadline.UtcTicks}", task.Id, ct);
@@ -66,6 +60,7 @@ public sealed partial class WorkspaceService
                 entry.Name + " · Bắt đầu: " + TimeZoneInfo.ConvertTime(entry.Start, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").",
                 $"event:{entry.Id}:{entry.Start.UtcTicks}", null, ct, fixedEventId: entry.Id);
         await AddStartedNotifications(uid, Now, ct);
+        await NotifyEisenhowerTransitions(uid, ct);
         var analysis = engine.Analyze(state, new(Now, 7), Now);
         static int Level(string value) => value.ToUpperInvariant() switch { "MODERATE" => 1, "HIGH" => 2, "OVERLOAD" => 3, _ => 0 };
         if (Level(analysis.RiskLevel) >= Level(settings.WorkloadWarningLevel))
@@ -80,6 +75,7 @@ public sealed partial class WorkspaceService
     public Task EnsureStartedNotificationsAsync(Guid uid, CancellationToken ct) => Mutate(uid, async () =>
     {
         await AddStartedNotifications(uid, Now, ct);
+        await EnsureTimeReviewNotifications(uid,ct);
         return true;
     }, ct, false);
     private async Task AddStartedNotifications(Guid uid, DateTimeOffset now, CancellationToken ct)
@@ -196,7 +192,9 @@ public sealed class WorkspaceNotificationWorker(IServiceScopeFactory scopes, Not
                         var now = clock.GetUtcNow(); var cutoff = now.AddMinutes(-2);
                         var due = scanDb.FixedEvents.Where(x => x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId)
                             .Union(scanDb.WorkSessions.Where(x => (x.Status == WorkSessionStatus.Scheduled || x.Status == WorkSessionStatus.Running) &&
-                                x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId));
+                                x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId))
+                            .Union(scanDb.WorkSessions.Where(x=>x.End<=now && x.End>=cutoff &&
+                                (x.Status==WorkSessionStatus.Scheduled || x.Status==WorkSessionStatus.Running || x.Status==WorkSessionStatus.Paused || x.Status==WorkSessionStatus.Completed)).Select(x=>x.UserId));
                         accounts = accounts.Where(x => due.Contains(x.Id));
                     }
                     users = await accounts.Select(x => x.Id).ToArrayAsync(stoppingToken);

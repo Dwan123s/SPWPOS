@@ -1249,6 +1249,36 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.ToTable("notification_settings", (string)null);
                 });
 
+            modelBuilder.Entity("SPWPOS.Domain.Entities.OwnedPetSkin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("AcquiredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PurchaseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SkinCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "PurchaseId");
+
+                    b.HasIndex("UserId", "SkinCode")
+                        .IsUnique();
+
+                    b.ToTable("OwnedPetSkins");
+                });
+
             modelBuilder.Entity("SPWPOS.Domain.Entities.PasswordChangeNotification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1529,6 +1559,37 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "UpdatedAt");
 
                     b.ToTable("PlanningNotes");
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.PriorityAlertState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ClearSince")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("Episode")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LastSignal")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "TaskId")
+                        .IsUnique();
+
+                    b.ToTable("PriorityAlertStates");
                 });
 
             modelBuilder.Entity("SPWPOS.Domain.Entities.PrivatePlanningProposal", b =>
@@ -1887,6 +1948,84 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "SessionId");
 
                     b.ToTable("session_executions", (string)null);
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.SkinPurchase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccountNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("AmountVnd")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CheckoutUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("OrderCode")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PaymentLinkId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ReceiptReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SkinCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderCode")
+                        .IsUnique();
+
+                    b.HasIndex("PaymentLinkId")
+                        .IsUnique()
+                        .HasFilter("[PaymentLinkId] IS NOT NULL");
+
+                    b.HasIndex("ReceiptReference")
+                        .IsUnique()
+                        .HasFilter("[ReceiptReference] IS NOT NULL");
+
+                    b.HasIndex("UserId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "SkinCode", "Status");
+
+                    b.ToTable("SkinPurchases");
                 });
 
             modelBuilder.Entity("SPWPOS.Domain.Entities.StoredPlanWarning", b =>
@@ -2346,9 +2485,22 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Active")
                         .HasColumnType("bit");
 
+                    b.Property<string>("ApprovalStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasDefaultValue("Approved");
+
+                    b.Property<Guid?>("JoinInviteId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("MutationVersion")
                         .IsConcurrencyToken()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("RequestedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -2368,6 +2520,8 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("TeamId", "ApprovalStatus");
 
                     b.HasIndex("TeamId", "UserId")
                         .IsUnique();
@@ -2435,8 +2589,38 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<Guid?>("DesignatedUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("EstimatedMinutes")
                         .HasColumnType("int");
+
+                    b.Property<double?>("ImportanceConfidence")
+                        .HasColumnType("float");
+
+                    b.Property<DateTimeOffset?>("ImportanceConfirmedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ImportanceLevel")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)")
+                        .HasDefaultValue("Unknown");
+
+                    b.Property<string>("ImportanceReason")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("ImportanceSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)")
+                        .HasDefaultValue("Unknown");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -2454,6 +2638,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("ProgressBeforeReview")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("SourceDocumentId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("Splittable")
                         .HasColumnType("bit");
@@ -2473,6 +2660,10 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AssigneeId");
+
+                    b.HasIndex("DesignatedUserId");
+
+                    b.HasIndex("SourceDocumentId");
 
                     b.HasIndex("TeamId");
 
@@ -2519,6 +2710,47 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("TeamTaskAssignments");
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.TeamTaskDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<int>("Size")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UploadedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("UploadedBy");
+
+                    b.ToTable("TeamTaskDocuments");
                 });
 
             modelBuilder.Entity("SPWPOS.Domain.Entities.TelegramConnection", b =>
@@ -2834,6 +3066,33 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<int>("EstimatedMinutes")
                         .HasColumnType("int");
 
+                    b.Property<double?>("ImportanceConfidence")
+                        .HasColumnType("float");
+
+                    b.Property<DateTimeOffset?>("ImportanceConfirmedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ImportanceLevel")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)")
+                        .HasDefaultValue("Unknown");
+
+                    b.Property<string>("ImportanceReason")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("ImportanceSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)")
+                        .HasDefaultValue("Unknown");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -2862,6 +3121,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<bool>("TaskExperienceAwarded")
+                        .HasColumnType("bit");
 
                     b.Property<string>("TaskType")
                         .IsRequired()
@@ -3177,6 +3439,22 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("SPWPOS.Domain.Entities.OwnedPetSkin", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SPWPOS.Domain.Entities.SkinPurchase", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "PurchaseId")
+                        .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SPWPOS.Domain.Entities.PasswordChangeNotification", b =>
                 {
                     b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
@@ -3265,6 +3543,15 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("SPWPOS.Domain.Entities.PlanningNote", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.PriorityAlertState", b =>
                 {
                     b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
                         .WithMany()
@@ -3371,6 +3658,15 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId", "SessionId")
                         .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.SkinPurchase", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -3561,6 +3857,16 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("AssigneeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("DesignatedUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SPWPOS.Domain.Entities.TeamTaskDocument", null)
+                        .WithMany()
+                        .HasForeignKey("SourceDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SPWPOS.Domain.Entities.TeamProject", null)
                         .WithMany()
                         .HasForeignKey("TeamId")
@@ -3585,6 +3891,21 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasOne("SPWPOS.Domain.Entities.WorkTask", null)
                         .WithMany()
                         .HasForeignKey("WorkTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.TeamTaskDocument", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.TeamProject", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

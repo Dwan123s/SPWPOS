@@ -14,6 +14,7 @@ public sealed partial class WorkspaceService
         var shared = await SharedTask(uid, taskId, ct); var member = await TeamMember(uid, shared.TeamId, ct);
         Require(change ? shared.AssigneeId == uid && shared.Status == "Assigned" && shared.PendingChangeJson != null : shared.AssigneeId == null && shared.Status == "Open",
             "TASK_UNAVAILABLE", "Công việc đã được nhận hoặc không có yêu cầu thay đổi.", 409);
+        Require(change || shared.DesignatedUserId == null || shared.DesignatedUserId == uid, "TASK_DESIGNATED", "Task này được chỉ định cho thành viên khác.", 403);
         var state = await State(uid, ct);
         Require(state.Events.Length > 0, "TIMETABLE_REQUIRED", "Gửi và xác nhận thời gian biểu trước khi nhận việc.", 409);
         var data = change ? JsonSerializer.Deserialize<SharedTaskView>(shared.PendingChangeJson!)! : SharedDto(shared);
@@ -21,11 +22,13 @@ public sealed partial class WorkspaceService
         var task = new WorkTask { UserId = uid, Name = data.Name, Description = data.Description, EstimatedMinutes = data.EstimatedMinutes, Deadline = data.Deadline,
             Priority = data.Priority, Splittable = data.Splittable, IsHardDeadline = true, CreationSource = "TEAM", CreatedAt = Now, UpdatedAt = Now,
             MinimumSessionMinutes = state.Preference.MinimumSessionMinutes };
+        task.InheritedImportance = shared.ImportanceLevel; task.InheritedImportanceReason = shared.ImportanceReason;
         if (change)
         {
             var assignment = await db.TeamTaskAssignments.SingleAsync(x => x.TeamTaskId == taskId && x.UserId == uid && x.Active, ct);
             var original = state.Tasks.Single(x => x.Id == assignment.WorkTaskId);
             task.Id = original.Id; task.Progress = original.Progress; task.Status = original.Status; task.CreatedAt = original.CreatedAt;
+            WriteImportance(task, new(original.ImportanceLevel, original.ImportanceSource, original.ImportanceReason, original.ImportanceConfidence), original.ImportanceConfirmedAt);
         }
         var candidate = state with { Tasks = state.Tasks.Where(x => x.Id != task.Id).Append(task).ToArray() };
         var start = Now.AddMinutes(5);
@@ -145,8 +148,11 @@ public sealed partial class WorkspaceService
         Require(row.Status == "Proposed" && row.ExpiresAt > Now && row.TeamTaskVersion == shared.Version && row.MembershipVersion == member.Version && row.Revision == state.Preference.Revision,
             "CLAIM_STALE", "Công việc, thành viên hoặc lịch đã thay đổi. Hãy xem phương án mới.", 409);
         Require(payload.IsChange ? shared.AssigneeId == uid && shared.PendingChangeJson != null : shared.AssigneeId == null && shared.Status == "Open", "TASK_UNAVAILABLE", "Task đã được nhận.", 409);
+        Require(payload.IsChange || shared.DesignatedUserId == null || shared.DesignatedUserId == uid, "TASK_DESIGNATED", "Task này được chỉ định cho thành viên khác.", 403);
         Require(input.Option >= 0 && input.Option < payload.Plans.Length, "INVALID_OPTION", "Phương án không hợp lệ.");
         var plan = payload.Plans[input.Option];
+        Require(plan.PriorityPolicy == null || plan.PriorityPolicy == (state.EisenhowerScheduling ? "eisenhower-v1" : "legacy"),
+            "CLAIM_STALE", "Chính sách ưu tiên đã thay đổi. Hãy xem phương án mới.", 409);
         var candidate = state with { Tasks = state.Tasks.Where(x => x.Id != payload.Task.Id).Append(payload.Task).ToArray() };
         Require(ClaimFeasible(candidate, payload.Task, plan), "CLAIM_INFEASIBLE", "Phương án không còn hợp lệ.", 409);
         // Acquire the shared task and membership versions BEFORE any calendar writes.

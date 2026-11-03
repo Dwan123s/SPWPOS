@@ -1,9 +1,19 @@
 namespace SPWPOS.Domain.Entities;
 
 public enum WorkTaskStatus { Todo, InProgress, Completed, Cancelled }
-public sealed class WorkTask : OwnedRecord
+public sealed class WorkTask : OwnedRecord, ITaskImportance
 {
+    public string ImportanceLevel { get; set; } = "Unknown";
+    public string ImportanceSource { get; set; } = "Unknown";
+    public string ImportanceReason { get; set; } = "";
+    public double? ImportanceConfidence { get; set; }
+    public DateTimeOffset? ImportanceConfirmedAt { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped] public string? InheritedImportance { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped] public string? InheritedImportanceReason { get; set; }
+    public string EffectiveImportance => ImportanceLevel == "Unknown" ? InheritedImportance ?? "Unknown" : ImportanceLevel;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped] public int? ConfirmedRemainingMinutes { get; set; }
     public Guid Version { get; set; } = Guid.NewGuid();
+    public bool TaskExperienceAwarded { get; set; }
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public Guid? CategoryId { get; set; }

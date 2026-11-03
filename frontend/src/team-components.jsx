@@ -1,54 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { icon, dateFmt, timeFmt } from "./ui.jsx";
 import { readTeamBriefFile, TEAM_BRIEF_ACCEPT } from "./team-brief-file.js";
-import { CompletionReport } from "./team-completion-files.jsx";
+import { TeamRecipientSelect } from "./team-recipient-select.jsx";
+import { ImportancePreview } from "./eisenhower.jsx";
+import {
+  TeamDraftOptions,
+  TeamDraftTaskEditor,
+  draftEditValues,
+} from "./team-draft-editor.jsx";
 
-export function TeamDialog({
-  title,
-  subtitle,
-  children,
-  onClose,
-  busy,
-  wide = false,
-}) {
-  const host = useRef(null);
-  useEffect(() => {
-    const el = host.current;
-    el.showModal();
-    return () => {
-      if (el.open) el.close();
-    };
-  }, []);
-  return (
-    <dialog
-      ref={host}
-      className={`team-dialog${wide ? " team-dialog-wide" : ""}`}
-      aria-label={title}
-      onCancel={(e) => {
-        e.preventDefault();
-        if (!busy) onClose();
-      }}
-    >
-      <header className="team-dialog-header">
-        <div>
-          <span className="team-eyebrow">PLANORA WORKSPACE</span>
-          <h2>{title}</h2>
-          {subtitle && <p>{subtitle}</p>}
-        </div>
-        <button
-          type="button"
-          className="team-icon-button"
-          aria-label="Đóng cửa sổ"
-          disabled={busy}
-          onClick={onClose}
-        >
-          {icon("close")}
-        </button>
-      </header>
-      {children}
-    </dialog>
-  );
-}
+import { TeamDialog } from "./team-dialog.jsx";
+export { TeamDialog } from "./team-dialog.jsx";
+
 export function GroupHub({
   teams,
   selected,
@@ -317,7 +280,7 @@ export function GroupHub({
                   ? "Bạn sẽ là trưởng nhóm và có thể mời thành viên, giao task, quản lý deadline."
                   : mode === "invite"
                     ? "Link mời có hạn dùng và có thể thu hồi. Chỉ trưởng nhóm được tạo link cho nhóm mình quản lý."
-                    : "Bạn sẽ thấy task và chat chung. Lịch riêng của các thành viên luôn được giữ riêng."}
+                    : "Yêu cầu của bạn cần được trưởng nhóm duyệt trước khi xem công việc và chat chung."}
               </p>
             </div>
             <div className="team-actions end">
@@ -336,7 +299,7 @@ export function GroupHub({
                     ? "Tạo nhóm"
                     : mode === "invite"
                       ? "Tạo link mời"
-                      : "Tham gia nhóm"}
+                      : "Gửi yêu cầu tham gia"}
               </button>
             </div>
           </form>
@@ -487,7 +450,7 @@ export function TeamMembers({ detail, uid, busy, onRemove }) {
                   disabled={busy}
                   onClick={() => onRemove(m)}
                 >
-                  {m.userId === uid ? "Rời nhóm" : "Gỡ"}
+                  {m.userId === uid ? "Rời nhóm" : "Loại khỏi nhóm"}
                 </button>
               )}
           </div>
@@ -499,333 +462,7 @@ export function TeamMembers({ detail, uid, busy, onRemove }) {
     </section>
   );
 }
-export function TaskBoard({
-  detail,
-  uid,
-  busy,
-  onClaim,
-  onProgress,
-  onReviewCompletion,
-  onReturn,
-  onChange,
-  onReject,
-  onCompose,
-}) {
-  const [filter, setFilter] = useState("all"),
-    [query, setQuery] = useState("");
-  const tasks = detail.tasks.filter(
-    (t) =>
-      (filter !== "mine" || t.assigneeId === uid) &&
-      (filter !== "available" || !t.assigneeId) &&
-      t.name.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")),
-  );
-  const columns = [
-    { key: "Open", label: "Chờ nhận", tone: "open", glyph: "clock" },
-    { key: "Assigned", label: "Đang thực hiện", tone: "active", glyph: "play" },
-    {
-      key: "PendingReview",
-      label: "Chờ duyệt",
-      tone: "review",
-      glyph: "clock",
-    },
-    { key: "Completed", label: "Hoàn thành", tone: "done", glyph: "check" },
-  ];
-  return (
-    <section className="team-board" aria-label="Công việc nhóm">
-      <div className="team-board-heading">
-        <div>
-          <span className="team-eyebrow">CÔNG VIỆC CHUNG</span>
-          <h3>Bảng công việc</h3>
-        </div>
-        <label className="team-search">
-          {icon("search")}
-          <input
-            aria-label="Tìm task trong nhóm"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm công việc…"
-          />
-        </label>
-      </div>
-      <div className="team-board-tabs" aria-label="Lọc công việc">
-        {[
-          { id: "all", name: "Tất cả" },
-          { id: "available", name: "Có thể nhận" },
-          { id: "mine", name: "Việc của tôi" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={filter === t.id ? "active" : ""}
-            aria-pressed={filter === t.id}
-            onClick={() => setFilter(t.id)}
-          >
-            {t.name}
-            {t.id === "mine" && (
-              <span>
-                {detail.tasks.filter((x) => x.assigneeId === uid).length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-      {!detail.tasks.length ? (
-        <div className="team-board-empty">
-          <span>{icon("tasks")}</span>
-          <h3>Công việc đầu tiên đang chờ bạn</h3>
-          <p>
-            {detail.team.role === "Leader"
-              ? "Mô tả việc cần làm và hạn chót. NORA sẽ soạn task để bạn xác nhận trước khi giao cho nhóm."
-              : "Trưởng nhóm sẽ giao công việc tại đây. Bạn có thể nhận task và để NORA sắp xếp theo lịch riêng."}
-          </p>
-          {detail.team.role === "Leader" && (
-            <button className="btn primary" disabled={busy} onClick={onCompose}>
-              {icon("spark")} Tạo task cùng NORA
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="team-board-columns">
-          {columns.map((column) => (
-            <section
-              className={`team-board-column ${column.tone}`}
-              key={column.key}
-            >
-              <div className="team-column-heading">
-                <span className="team-status-dot" />
-                <h4>{column.label}</h4>
-                <span>
-                  {tasks.filter((t) => t.status === column.key).length}
-                </span>
-              </div>
-              <div className="team-column-cards">
-                {tasks
-                  .filter((t) => t.status === column.key)
-                  .map((task) => {
-                    const mine = task.assigneeId === uid,
-                      assignee = detail.members.find(
-                        (m) => m.userId === task.assigneeId,
-                      );
-                    return (
-                      <article className="team-task-card" key={task.id}>
-                        <div className="team-task-topline">
-                          <span
-                            className={`team-priority priority-${task.priority}`}
-                          >
-                            {task.priority === 4
-                              ? "Khẩn cấp"
-                              : task.priority === 3
-                                ? "Ưu tiên cao"
-                                : task.priority === 1
-                                  ? "Linh hoạt"
-                                  : "Thông thường"}
-                          </span>
-                          {task.hasPendingChange && (
-                            <span className="team-change-badge">
-                              Có yêu cầu mới
-                            </span>
-                          )}
-                        </div>
-                        <h4>{task.name}</h4>
-                        <p className="team-task-description">
-                          {task.description}
-                        </p>
-                        {task.description && (
-                          <details className="team-task-brief-details">
-                            <summary>Xem đầy đủ yêu cầu & ghi chú</summary>
-                            <div>{task.description}</div>
-                          </details>
-                        )}
-                        <div className="team-task-facts">
-                          <span>
-                            {icon("calendar")}
-                            {dateFmt(task.deadline)} · {timeFmt(task.deadline)}
-                          </span>
-                          <span>
-                            {icon("clock")}
-                            {task.estimatedMinutes} phút
-                            {task.splittable
-                              ? " · Có thể chia phiên"
-                              : " · Làm liên tục"}
-                          </span>
-                        </div>
-                        {task.assigneeId && (
-                          <div className="team-task-progress">
-                            <div>
-                              <span>
-                                {mine
-                                  ? "Tiến độ của bạn"
-                                  : assignee?.name || "Thành viên"}
-                              </span>
-                              <strong>{task.progress}%</strong>
-                            </div>
-                            <div className="team-progress-track">
-                              <i style={{ width: `${task.progress}%` }} />
-                            </div>
-                          </div>
-                        )}
-                        {task.status === "PendingReview" && (
-                          <div className="team-review-state">
-                            <strong>
-                              {icon("clock")} Chờ trưởng nhóm xác nhận
-                            </strong>
-                            <p>
-                              {assignee?.name || "Thành viên"} đã báo hoàn thành
-                              {task.completionSubmittedAt
-                                ? ` lúc ${timeFmt(task.completionSubmittedAt)} · ${dateFmt(task.completionSubmittedAt)}`
-                                : ""}
-                              .
-                            </p>
-                            {detail.team.role === "Leader" && (
-                              <button
-                                className="btn primary"
-                                disabled={busy}
-                                onClick={() => onReviewCompletion(task)}
-                              >
-                                Kiểm tra & duyệt
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {task.status === "Assigned" &&
-                          task.completionApproved === false && (
-                            <div className="team-review-state changes-requested">
-                              <strong>Cần bổ sung trước khi hoàn thành</strong>
-                              <p>
-                                {task.completionReviewNote ||
-                                  "Trưởng nhóm yêu cầu kiểm tra lại công việc. Trao đổi trong chat và gửi duyệt lại khi xong."}
-                              </p>
-                            </div>
-                          )}
-                        {task.status === "Completed" &&
-                          task.completionApproved === true && (
-                            <p className="team-approved-caption">
-                              {icon("shield")} Đã được{" "}
-                              {detail.members.find(
-                                (m) => m.userId === task.completionReviewedBy,
-                              )?.name || "trưởng nhóm"}{" "}
-                              duyệt
-                            </p>
-                          )}
-                        <CompletionReport task={task} />
-                        <div className="team-task-actions">
-                          {!task.assigneeId && (
-                            <>
-                              <p>
-                                {icon("lock")} NORA xếp theo lịch riêng của bạn
-                              </p>
-                              <button
-                                className="btn primary"
-                                disabled={busy}
-                                onClick={() => onClaim(task)}
-                              >
-                                {icon("spark")} Nhận task · NORA xếp lịch
-                              </button>
-                            </>
-                          )}
-                          {mine && task.status === "Assigned" && (
-                            <>
-                              <button
-                                className="btn primary"
-                                disabled={busy}
-                                onClick={() => onProgress(task, 100)}
-                              >
-                                {icon("check")} Báo hoàn thành · Gửi duyệt
-                              </button>
-                              <details className="team-task-options">
-                                <summary>Cập nhật tiến độ / trả việc</summary>
-                                <div>
-                                  {[25, 50, 75]
-                                    .filter((p) => p > task.progress)
-                                    .map((p) => (
-                                      <button
-                                        className="btn secondary"
-                                        disabled={busy}
-                                        key={p}
-                                        onClick={() => onProgress(task, p)}
-                                      >
-                                        Xác nhận {p}%
-                                      </button>
-                                    ))}
-                                  <button
-                                    className="team-text-button"
-                                    disabled={busy}
-                                    onClick={() => onReturn(task)}
-                                  >
-                                    Trả việc về nhóm
-                                  </button>
-                                </div>
-                              </details>
-                            </>
-                          )}
-                          {task.assigneeId &&
-                            !mine &&
-                            task.status === "Assigned" && (
-                              <span className="team-assigned-caption">
-                                {icon("users")} {assignee?.name || "Thành viên"}{" "}
-                                đã nhận việc
-                              </span>
-                            )}
-                          {mine && task.hasPendingChange && (
-                            <div className="team-change-actions">
-                              <p>
-                                Trưởng nhóm đề xuất thay đổi yêu cầu. Lịch hiện
-                                tại vẫn giữ nguyên.
-                              </p>
-                              <button
-                                className="btn secondary"
-                                disabled={busy}
-                                onClick={() => onClaim(task, true)}
-                              >
-                                Xem lịch cho yêu cầu mới
-                              </button>
-                              <button
-                                className="team-text-button"
-                                disabled={busy}
-                                onClick={() => onReject(task)}
-                              >
-                                Giữ yêu cầu hiện tại
-                              </button>
-                            </div>
-                          )}
-                          {detail.team.role === "Leader" &&
-                            !["Completed", "PendingReview"].includes(
-                              task.status,
-                            ) && (
-                              <button
-                                className="team-text-button team-edit-task"
-                                disabled={busy}
-                                onClick={() => onChange(task)}
-                              >
-                                Đề xuất đổi yêu cầu {icon("arrow")}
-                              </button>
-                            )}
-                        </div>
-                      </article>
-                    );
-                  })}
-                {!tasks.some((t) => t.status === column.key) && (
-                  <div className="team-column-empty">
-                    {icon(column.glyph)}
-                    <p>
-                      {column.key === "Open"
-                        ? "Chưa có task chờ nhận"
-                        : column.key === "Assigned"
-                          ? "Task được nhận sẽ xuất hiện ở đây"
-                          : column.key === "PendingReview"
-                            ? "Task được báo hoàn thành sẽ chờ duyệt ở đây"
-                            : "Hoàn thành từng việc, tiến gần mục tiêu"}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
+export { TaskBoard } from "./team-task-board.jsx";
 export function TeamTaskComposer({
   text,
   setText,
@@ -836,16 +473,21 @@ export function TeamTaskComposer({
   error,
   onDraft,
   onConfirm,
+  onEditDraft,
   onClose,
   file,
   setFile,
   splitBrief,
   setSplitBrief,
   memberCount = 1,
+  members = [],
 }) {
   const upload = useRef(null);
   const [fileError, setFileError] = useState("");
   const [reading, setReading] = useState(false);
+  const [recipients, setRecipients] = useState({});
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  useEffect(() => setEditingTaskId(null), [draft?.proposalId, draft?.revision]);
   async function attachFile(selected) {
     if (!selected || busy || reading) return;
     setFileError("");
@@ -861,7 +503,9 @@ export function TeamTaskComposer({
       if (upload.current) upload.current.value = "";
     }
   }
-  const previewTasks = draft?.tasks || (draft?.task ? [draft.task] : []);
+  const previewTasks = draft?.pendingTasks?.length
+    ? draft.pendingTasks
+    : draft?.tasks || (draft?.task ? [draft.task] : []);
   return (
     <TeamDialog
       title={changeTask ? "Đề xuất thay đổi công việc" : "Tạo task cùng NORA"}
@@ -947,7 +591,7 @@ export function TeamTaskComposer({
                   </strong>
                   <p>
                     {file
-                      ? `${Math.max(1, Math.ceil(file.size / 1024))} KB · NORA sẽ đọc và chia việc theo nhóm`
+                      ? `${Math.max(1, Math.ceil(file.size / 1024))} KB · File gốc sẽ được đính kèm các task sau khi bạn xác nhận, để thành viên tải về.`
                       : "Kéo thả PDF, Word, TXT hoặc Markdown · tối đa 8 MB"}
                   </p>
                 </div>
@@ -985,7 +629,7 @@ export function TeamTaskComposer({
               required={!file}
               rows={4}
               maxLength={splitBrief ? 12000 : 2000}
-              disabled={busy || reading}
+              disabled={busy || reading || !!editingTaskId}
               value={text}
               onChange={(e) => {
                 setText(e.target.value);
@@ -1003,7 +647,9 @@ export function TeamTaskComposer({
           <div className="team-actions end">
             <button
               className="btn primary"
-              disabled={busy || reading || (!text.trim() && !file)}
+              disabled={
+                busy || reading || !!editingTaskId || (!text.trim() && !file)
+              }
             >
               {icon("spark")}
               {busy
@@ -1019,9 +665,18 @@ export function TeamTaskComposer({
         {draft && (
           <div className="team-draft-preview">
             <span className="team-eyebrow">BẢN NHÁP · CHƯA GIAO VIỆC</span>
-            <p>
-              {draft.summary || draft.reply} {draft.question}
-            </p>
+            <p>{draft.summary || draft.reply}</p>
+            {draft.question && (
+              <div className="team-brief-warnings" role="status">
+                <strong>Cần xác nhận để giao việc</strong>
+                <p>{draft.question}</p>
+                <p>
+                  Các gói việc bên dưới được giữ để bạn xem trước. Bạn có thể
+                  chỉnh trực tiếp hạn chót và nội dung, hoặc bổ sung thông tin
+                  để NORA phân tích lại.
+                </p>
+              </div>
+            )}
             {draft.splitReason && <p>{draft.splitReason}</p>}
             {draft.memberCount && (
               <span className="team-status-pill">
@@ -1036,6 +691,14 @@ export function TeamTaskComposer({
                 ))}
               </ul>
             )}
+            {draft.tasks && previewTasks.length > 0 && onEditDraft && (
+              <TeamDraftOptions
+                key={draft.proposalId}
+                tasks={previewTasks}
+                busy={busy || !!editingTaskId}
+                onSave={onEditDraft}
+              />
+            )}
             {previewTasks.map((task, index) => (
               <article className="team-brief-task" key={task.id}>
                 <h3>
@@ -1048,25 +711,82 @@ export function TeamTaskComposer({
                     phút
                   </span>
                   <span>
-                    {icon("calendar")}Hạn {dateFmt(task.deadline)}{" "}
-                    {timeFmt(task.deadline)}
+                    {icon("calendar")}
+                    {task.deadline && !task.deadlineNeedsConfirmation ? (
+                      <>
+                        Hạn {dateFmt(task.deadline)} {timeFmt(task.deadline)}
+                      </>
+                    ) : (
+                      "Hạn chót chờ xác nhận"
+                    )}
                   </span>
                 </div>
-                <p className="team-brief-task-notes">{task.description}</p>
+                {editingTaskId !== task.id && (
+                  <>
+                    <p className="team-brief-task-notes">{task.description}</p>
+                    <ImportancePreview value={task.importance} />
+                  </>
+                )}
+                {draft.tasks && onEditDraft && (
+                  <TeamDraftTaskEditor
+                    key={`${task.id}:${draft.revision || "initial"}`}
+                    task={task}
+                    busy={busy}
+                    disabled={!!editingTaskId && editingTaskId !== task.id}
+                    editing={editingTaskId === task.id}
+                    onEditingChange={(editing) =>
+                      setEditingTaskId(editing ? task.id : null)
+                    }
+                    onSave={(edit) =>
+                      onEditDraft(
+                        previewTasks.map((current) =>
+                          current.id === edit.id
+                            ? edit
+                            : draftEditValues(current),
+                        ),
+                      )
+                    }
+                  />
+                )}
+                {!changeTask && !draft.question && (
+                  <TeamRecipientSelect
+                    members={members}
+                    value={recipients[task.id] || ""}
+                    onChange={(value) =>
+                      setRecipients((previous) => ({
+                        ...previous,
+                        [task.id]: value,
+                      }))
+                    }
+                    busy={busy}
+                    label={
+                      draft.tasks
+                        ? `Người nhận task ${index + 1}: ${task.name}`
+                        : "Người nhận task"
+                    }
+                  />
+                )}
               </article>
             ))}
-            {previewTasks.length > 0 && !draft.question && (
+            {previewTasks.length > 0 && !draft.question && draft.proposalId && (
               <button
                 className="btn primary"
-                disabled={busy}
-                onClick={onConfirm}
+                disabled={busy || !!editingTaskId}
+                onClick={() => onConfirm(recipients)}
               >
                 {changeTask
                   ? "Xác nhận gửi yêu cầu mới"
                   : draft.tasks
                     ? `Xác nhận & giao ${previewTasks.length} task cho nhóm`
-                    : "Đồng ý thời lượng và tạo task chung"}
+                    : recipients[previewTasks[0]?.id]
+                      ? "Đồng ý thời lượng và giao task"
+                      : "Đồng ý thời lượng và tạo task chung"}
               </button>
+            )}
+            {!!editingTaskId && (
+              <p role="status" className="team-draft-source-hint">
+                Lưu hoặc hủy chỉnh sửa trước khi xác nhận giao việc.
+              </p>
             )}
           </div>
         )}
@@ -1079,7 +799,13 @@ export function TeamActivity({ detail }) {
     TEAM_CREATED: "đã tạo nhóm",
     MEMBER_JOINED: "đã tham gia nhóm",
     MEMBER_LEFT: "đã rời nhóm",
+    MEMBER_JOIN_REQUESTED: "đã gửi yêu cầu tham gia",
+    MEMBER_JOIN_APPROVED: "đã duyệt yêu cầu tham gia",
+    MEMBER_JOIN_REJECTED: "đã từ chối yêu cầu tham gia",
+    MEMBER_REMOVED: "đã loại một thành viên khỏi nhóm",
     TASK_CREATED: "đã tạo task",
+    TASK_IMPORTANCE_CHANGED: "đã cập nhật mức quan trọng",
+    TASK_RECIPIENT_CHANGED: "đã đổi người được chỉ định",
     TASK_CLAIMED: "đã nhận task",
     TASK_RETURNED: "đã trả task",
     TASK_COMPLETED: "đã hoàn thành task",

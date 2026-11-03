@@ -26,6 +26,113 @@
 .nora-inventory {
   margin: 18px 0;
 }
+.pet-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 18px;
+  border-radius: 20px;
+  background: linear-gradient(125deg, #edfaff, #fff7e6);
+}
+.pet-profile-hero > .pet-artwork {
+  width: 170px;
+  flex: 0 0 170px;
+}
+.pet-profile-hero > div {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.pet-profile-hero h2,
+.pet-profile-hero p {
+  margin: 0;
+}
+.pet-profile-hero progress {
+  width: 100%;
+  max-width: 400px;
+  accent-color: #219ec5;
+}
+.pet-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #47768e;
+  font-weight: 700;
+}
+.pet-rule-note,
+.pet-payment-notice {
+  color: #526b88;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.pet-evolution-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.pet-evolution-grid article {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 14px 8px;
+  border: 1px dashed #d1dae5;
+  border-radius: 16px;
+  color: #60778e;
+}
+.pet-evolution-grid .pet-artwork {
+  width: min(100%, 120px);
+  opacity: 0.6;
+}
+.pet-evolution-grid .is-unlocked {
+  border-style: solid;
+  border-color: #8bcbd8;
+  background: #f3fcff;
+}
+.pet-evolution-grid .is-unlocked .pet-artwork {
+  opacity: 1;
+}
+.pet-evolution-grid span:not(.pet-artwork),
+.pet-evolution-grid small {
+  font-size: 12px;
+}
+.pet-checkout {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #d4e0ef;
+}
+.pet-checkout-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pet-checkout p {
+  line-height: 1.7;
+}
+.nora-skin-grid .inventory-owl {
+  width: 100px;
+  height: 100px;
+}
+.nora-skin-grid .inventory-owl img {
+  width: 100%;
+  height: 100%;
+}
+@media (max-width: 600px) {
+  .pet-profile-hero {
+    gap: 12px;
+    padding: 12px;
+  }
+  .pet-profile-hero > .pet-artwork {
+    width: 100px;
+    flex-basis: 100px;
+  }
+  .pet-evolution-grid {
+    gap: 6px;
+  }
+  .pet-evolution-grid article {
+    padding: 10px 4px;
+  }
+}
 .nora-inventory > progress {
   width: 100%;
   accent-color: #0869dc;
@@ -48,19 +155,4 @@
   width: 72px;
   height: 72px;
   object-fit: contain;
-}
-.skin-forest img,
-html[data-nora-skin="forest"] .nora-avatar img,
-html[data-nora-skin="forest"] .nora-mascot-figure > img {
-  filter: hue-rotate(295deg) saturate(0.85);
-}
-.skin-sunset img,
-html[data-nora-skin="sunset"] .nora-avatar img,
-html[data-nora-skin="sunset"] .nora-mascot-figure > img {
-  filter: hue-rotate(160deg) saturate(1.2);
-}
-.skin-cosmic img,
-html[data-nora-skin="cosmic"] .nora-avatar img,
-html[data-nora-skin="cosmic"] .nora-mascot-figure > img {
-  filter: hue-rotate(60deg) saturate(1.3);
 }

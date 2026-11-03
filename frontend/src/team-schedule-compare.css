@@ -1,0 +1,350 @@
+.team-dialog.team-claim-dialog {
+  width: min(1180px, calc(100vw - 32px));
+}
+.team-claim-option.team-claim-option-readable {
+  padding: 22px;
+  gap: 20px;
+  border-color: #ccdcf1;
+  border-radius: 18px;
+}
+.team-claim-option-readable .team-option-heading h3 {
+  font-size: 19px;
+  line-height: 1.5;
+  color: #173352;
+}
+.team-claim-option-readable .team-option-heading .team-status-pill {
+  font-size: 11px;
+  padding: 7px 10px;
+  color: #216748;
+  background: #edf8f1;
+}
+.team-claim-option-readable .team-plan-reasons {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #526783;
+}
+.team-schedule-comparison {
+  min-width: 0;
+}
+.team-compare-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.team-compare-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.team-compare-stats > span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid #dde5f0;
+  border-radius: 9px;
+  background: #f4f7fb;
+  color: #425776;
+  font-size: 12px;
+}
+.team-compare-stats > .is-proposed {
+  color: #176342;
+  border-color: #bbe4cc;
+  background: #edf9f2;
+}
+.team-compare-stats strong {
+  font-size: 15px;
+}
+.team-compare-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid #c9d8ed;
+  border-radius: 9px;
+  background: #fff;
+  color: #244f83;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.team-compare-filter[aria-pressed="true"] {
+  border-color: #1768c4;
+  background: #eaf3ff;
+  color: #12529c;
+}
+.team-compare-filter:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.team-compare-filter .icon {
+  width: 15px;
+  height: 15px;
+}
+.team-compare-filter:focus-visible,
+.team-compare-scroll:focus-visible {
+  outline: 3px solid #4387dd;
+  outline-offset: 3px;
+}
+.team-compare-guide {
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #526783;
+}
+.team-compare-scroll {
+  max-height: min(64dvh, 650px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #cbdbee;
+  border-radius: 14px;
+  scrollbar-color: #9db4cf #f2f6fc;
+  scrollbar-width: thin;
+}
+.team-compare-columns {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid #cbdbee;
+  box-shadow: 0 3px 8px #17335209;
+}
+.team-compare-columns > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 76px;
+  padding: 15px 18px;
+  background: #edf2f8;
+}
+.team-compare-columns > div + div {
+  border-left: 1px solid #cbdbee;
+  background: #e8f2ff;
+}
+.team-compare-columns > div > .icon {
+  width: 22px;
+  height: 22px;
+  color: #536f90;
+  flex-shrink: 0;
+}
+.team-compare-columns > div + div > .icon {
+  color: #1768c4;
+}
+.team-compare-columns h4 {
+  margin: 0;
+  color: #173352;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.team-compare-columns p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #4a6382;
+}
+.team-compare-day > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #dce5f0;
+  background: #f0f5fc;
+}
+.team-compare-day + .team-compare-day {
+  border-top: 1px solid #cbdbee;
+}
+.team-compare-day > header strong {
+  font-size: 14px;
+  color: #233e61;
+  text-transform: capitalize;
+}
+.team-compare-day > header > span {
+  font-size: 11px;
+  color: #526783;
+}
+.team-compare-day-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.team-compare-day-columns > section {
+  min-width: 0;
+  padding: 14px;
+  background: #fafbfd;
+}
+.team-compare-day-columns > section + section {
+  border-left: 1px solid #dce5f0;
+  background: #f6faff;
+}
+.team-compare-day-columns h5 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.team-compare-sessions {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.team-compare-session {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #d5dfeb;
+  border-left: 4px solid #a7b8cd;
+  border-radius: 11px;
+  background: #fff;
+}
+.team-compare-session.is-proposed {
+  border-color: #b8e0c9;
+  border-left-color: #239260;
+  background: #f1fbf5;
+}
+.team-compare-session.is-moved {
+  border-color: #efd7b0;
+  border-left-color: #c08623;
+  background: #fffaf0;
+}
+.team-compare-session-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.team-compare-session-top .team-compare-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #173352;
+  font-size: 16px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.team-compare-time > .icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 2px;
+  color: #607998;
+}
+.team-compare-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border: 1px solid #d7e0eb;
+  border-radius: 7px;
+  background: #f1f5f9;
+  color: #4a607c;
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.team-compare-badge .icon {
+  width: 12px;
+  height: 12px;
+}
+.team-compare-badge.is-proposed {
+  background: #e1f5e9;
+  border-color: #b6ddc7;
+  color: #176342;
+}
+.team-compare-badge.is-moved {
+  background: #fff0d2;
+  border-color: #e8cf9c;
+  color: #825313;
+}
+.team-compare-session .team-compare-task {
+  margin: 0 0 8px;
+  color: #233e61;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.team-compare-duration,
+.team-compare-previous {
+  display: block;
+  color: #526783;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.team-compare-previous {
+  margin-top: 5px;
+  color: #825313;
+}
+.team-compare-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 18px 10px;
+  color: #62748c;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.team-compare-empty > .icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.team-compare-zone {
+  display: block;
+  margin-top: 9px;
+  font-size: 11px;
+  color: #526783;
+}
+@media (max-width: 680px) {
+  .team-dialog.team-claim-dialog {
+    width: calc(100vw - 16px);
+    padding: 15px;
+  }
+  .team-claim-option.team-claim-option-readable {
+    padding: 13px;
+  }
+  .team-claim-option-readable .team-option-heading h3 {
+    font-size: 17px;
+  }
+  .team-compare-columns {
+    display: none;
+  }
+  .team-compare-day-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-compare-day-columns > section + section {
+    border-left: 0;
+    border-top: 1px solid #dce5f0;
+  }
+  .team-compare-day-columns h5 {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    margin: 0 0 10px;
+    font-size: 14px;
+    color: #244f83;
+    white-space: normal;
+  }
+  .team-compare-scroll {
+    max-height: 65dvh;
+  }
+  .team-compare-filter {
+    width: 100%;
+  }
+  .team-compare-session {
+    padding: 12px;
+  }
+}

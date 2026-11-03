@@ -44,11 +44,11 @@ public sealed class WorkspaceUpgradeApiTests
         Assert.Equal(id, reviews[0].GetProperty("id").GetGuid());
         await Send(client, HttpMethod.Post, $"/api/sessions/{id}/catch-up", new CatchUpInput("COMPLETED"));
         var profile = (await Send(client, HttpMethod.Get, "/api/workspace/gamification/profile")).GetProperty("data");
-        Assert.Equal(14, profile.GetProperty("experiencePoints").GetInt64());
+        Assert.Equal(39, profile.GetProperty("experiencePoints").GetInt64());
         using var calendar = await client.GetAsync("/api/workspace/calendar/export.ics", Ct);
         Assert.Equal(HttpStatusCode.OK, calendar.StatusCode); Assert.Equal("text/calendar", calendar.Content.Headers.ContentType!.MediaType);
         Assert.Contains("Viết báo cáo riêng", (await calendar.Content.ReadAsStringAsync(Ct)).Replace("\r\n ", ""));
-        await Send(client, HttpMethod.Post, "/api/commerce/payments", new {}, HttpStatusCode.Gone);
+        await Send(client, HttpMethod.Post, "/api/commerce/payments", new SkinCheckoutInput("fox", Guid.NewGuid()), HttpStatusCode.ServiceUnavailable);
     }
 
     [Fact] public async Task Admin_only_metrics_are_aggregate_and_user_listing_omits_personal_work()

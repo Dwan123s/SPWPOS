@@ -20,7 +20,46 @@ import {
 } from "./ui.jsx";
 import { api } from "./api.js";
 import { taskRows, scopes } from "./tasks.jsx";
+import { useState } from "react";
+import { EisenhowerMatrix, eisenhowerEnabled } from "./eisenhower.jsx";
 export function tasksPage() {
+  return <TasksWorkspace />;
+}
+function TasksWorkspace() {
+  const [view, setView] = useState("list");
+  return (
+    <>
+      {eisenhowerEnabled() && (
+        <div
+          className="eis-view-switch"
+          role="group"
+          aria-label="Bố cục công việc"
+        >
+          <button
+            type="button"
+            aria-pressed={view === "list"}
+            onClick={() => setView("list")}
+          >
+            {icon("tasks")} Danh sách
+          </button>
+          <button
+            type="button"
+            aria-pressed={view === "matrix"}
+            onClick={() => setView("matrix")}
+          >
+            {icon("spark")} Eisenhower
+          </button>
+        </div>
+      )}
+      {view === "matrix" && eisenhowerEnabled() ? (
+        <EisenhowerMatrix />
+      ) : (
+        <TaskListPage />
+      )}
+    </>
+  );
+}
+function TaskListPage() {
   const scope = state.taskScope || "all";
   return (
     <>

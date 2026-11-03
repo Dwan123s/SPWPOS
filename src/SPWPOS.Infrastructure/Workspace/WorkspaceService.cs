@@ -10,7 +10,9 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     ITaskInterpreter interpreter, IAiUsageService aiUsage, IEmailService? email = null,
     Microsoft.Extensions.Options.IOptions<EmailSettings>? emailOptions = null,
     Microsoft.Extensions.Options.IOptions<NoraAgentOptions>? noraOptions = null,
-    NoraAgentFileLog? agentFileLog = null) : IWorkspaceService, IPlanningAgentService, IPrivateTeamService
+    NoraAgentFileLog? agentFileLog = null,
+    Microsoft.Extensions.Options.IOptions<EisenhowerOptions>? eisenhowerOptions = null,
+    Microsoft.Extensions.Caching.Memory.IMemoryCache? eisenhowerCache = null) : IWorkspaceService, IPlanningAgentService, IPrivateTeamService, IEisenhowerService
 {
     private DateTimeOffset Now => clock.GetUtcNow();
     private static void Require([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string code, string message, int status = 400)
@@ -88,13 +90,24 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         // an active container; both affect whether active work can be scheduled.
         var related = await taskQuery.Where(x => requiredIds.Contains(x.Id) || x.ParentId != null && activeIds.Contains(x.ParentId.Value)).ToArrayAsync(ct);
         tasks = tasks.Concat(related).DistinctBy(x => x.Id).ToArray();
-        return new(tasks, dependencies, await Mine<WeeklyAvailability>(uid).ToArrayAsync(ct),
-            await Mine<AvailabilityException>(uid).ToArrayAsync(ct), await Mine<FixedEvent>(uid).ToArrayAsync(ct),
-            await Mine<WorkSession>(uid).Where(x => x.Status != WorkSessionStatus.Cancelled)
+        var inheritance = await (from a in db.TeamTaskAssignments.AsNoTracking()
+            join t in db.TeamTasks.AsNoTracking() on a.TeamTaskId equals t.Id
+            join m in db.TeamMemberships.AsNoTracking() on t.TeamId equals m.TeamId
+            where a.UserId == uid && a.Active && m.UserId == uid && m.Active
+            select new { a.WorkTaskId, t.ImportanceLevel, t.ImportanceReason }).ToArrayAsync(ct);
+        foreach (var task in tasks) {
+            var shared = inheritance.FirstOrDefault(x => x.WorkTaskId == task.Id);
+            task.InheritedImportance = shared?.ImportanceLevel; task.InheritedImportanceReason = shared?.ImportanceReason;
+        }
+        var sessions = await Mine<WorkSession>(uid).Where(x => x.Status != WorkSessionStatus.Cancelled)
                 .OrderBy(x => x.Status == WorkSessionStatus.Running || x.Status == WorkSessionStatus.Paused ? 0 : x.Status == WorkSessionStatus.Scheduled ? 1 : 2)
-                .ThenByDescending(x => x.Start).Take(10000).ToArrayAsync(ct), preference,
+                .ThenByDescending(x => x.Start).Take(10000).ToArrayAsync(ct);
+        await ApplyRemainingTimeBudgets(uid,tasks,sessions,ct);
+        return new(tasks, dependencies, await Mine<WeeklyAvailability>(uid).ToArrayAsync(ct),
+            await Mine<AvailabilityException>(uid).ToArrayAsync(ct), await Mine<FixedEvent>(uid).ToArrayAsync(ct), sessions, preference,
             await Mine<EstimationObservation>(uid).OrderByDescending(x => x.ObservedAt).Take(500).ToArrayAsync(ct),
-            await Mine<AvailabilityPolicy>(uid).SingleOrDefaultAsync(ct));
+            await Mine<AvailabilityPolicy>(uid).SingleOrDefaultAsync(ct),
+            eisenhowerOptions?.Value is { Enabled: true, SchedulingEnabled: true });
     }
     public async Task<WorkspaceView> GetAsync(Guid userId, CancellationToken ct)
     {
@@ -113,7 +126,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
                 (int)(sessionsByTask[t.Id].Sum(s => s.ActualSeconds) / 60),
                 (int)sessionsByTask[t.Id].Where(s => s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).Sum(s => (s.End - s.Start).TotalMinutes),
                 t.Priority, t.TaskType, t.Splittable, t.MinimumSessionMinutes, t.CategoryId, t.ParentId, t.Status.ToString(), t.Progress, t.CreatedAt, t.CompletedAt,
-                dependenciesByTask[t.Id].Select(d => d.PredecessorId).ToArray(), t.IsHardDeadline, t.CreationSource, t.WorkWindowStart, t.WorkWindowEnd, t.Version)).ToArray(),
+                dependenciesByTask[t.Id].Select(d => d.PredecessorId).ToArray(), t.IsHardDeadline, t.CreationSource, t.WorkWindowStart, t.WorkWindowEnd, t.Version, ImportanceDto(t))).ToArray(),
             state.Availability.Select(x => new AvailabilityInput(x.DayOfWeek, x.StartMinute, x.EndMinute)).ToArray(),
             state.Exceptions.Select(x => new ExceptionView(x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note, x.OverridesWeeklyAvailability)).ToArray(),
             state.Events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),
@@ -121,7 +134,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
                 s.Start, s.End, s.Status.ToString(), s.IsLocked, (int)((s.ActualSeconds + (s.SegmentStartedAt is { } at ? Math.Max(0, (Now - at).TotalSeconds) : 0)) / 60),
                 s.ActualSeconds + (long)(s.SegmentStartedAt is { } since ? Math.Max(0, (Now - since).TotalSeconds) : 0),
                 s.SegmentStartedAt, s.ReasonCode)).ToArray(), notifications, new(ns.InAppEnabled, ns.DeadlineLeadHours, ns.SessionReminderLeadMinutes, ns.WorkloadWarningLevel, ns.EmailEnabled),
-            ["history-v2", "recovery", "ambient-tracking", "gamification", "calendar-export", "notification-refresh", "secretary-v1", "private-teams-v1"], await GetGamificationAsync(userId, ct), state.Policy is { } policy ? PolicyDto(policy) : null);
+            ["history-v2", "recovery", "ambient-tracking", "gamification", "calendar-export", "notification-refresh", "secretary-v1", "private-teams-v1", ..(eisenhowerOptions?.Value.Enabled == true ? new[] { "eisenhower-v1" } : [])], await GetGamificationAsync(userId, ct), state.Policy is { } policy ? PolicyDto(policy) : null);
     }
     public Task UpdateProfileAsync(Guid userId, ProfileInput input, CancellationToken ct) => Mutate(userId, async () =>
     {

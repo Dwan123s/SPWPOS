@@ -1,0 +1,16 @@
+.team-join-request {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid #dbe7ef;
+  overflow-wrap: anywhere;
+}
+.team-join-request:last-child {
+  border-bottom: 0;
+}
+.team-join-request small {
+  color: #526c85;
+}
+.team-join-request .team-actions {
+  flex-wrap: wrap;
+}

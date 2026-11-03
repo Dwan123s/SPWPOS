@@ -13,6 +13,7 @@ import { update } from "../src/store.js";
 import { state } from "../src/ui.jsx";
 import { renderAuth, authSetup } from "../src/auth.jsx";
 import { eventModal, planModal } from "../src/calendar.jsx";
+import { revenueReport, purchaseHistory } from "./commerce-fixtures.js";
 import {
   workspace,
   insights,
@@ -21,6 +22,7 @@ import {
   profile,
 } from "./fixtures.js";
 
+let sessionRoles;
 let calls,
   currentWorkspace,
   failTaskDelete,
@@ -31,6 +33,7 @@ let calls,
   urgentReplan,
   deadlineProtection;
 beforeEach(() => {
+  sessionRoles = ["Admin"];
   resetFixtures();
   currentWorkspace = workspace();
   calls = [];
@@ -69,7 +72,7 @@ beforeEach(() => {
       calls.push({ url, options, body });
       let data = {};
       if (url === "/api/browser-session/me")
-        data = { user: profile, roles: ["Admin"] };
+        data = { user: profile, roles: sessionRoles };
       if (url === "/api/workspace") data = currentWorkspace;
       if (options.method === "DELETE" && (/^\/api\/sessions\/[^/]+$/.test(url) || /^\/api\/time\/events\/[^/]+$/.test(url))) {
         if (failCalendarDelete) return { ok: false, status: 409, json: async () => ({ error: { code: "SESSION_NOT_DELETABLE", message: "Lịch đã thay đổi. Hãy tải lại trước khi xóa." } }) };
@@ -220,6 +223,8 @@ beforeEach(() => {
         data = { resetToken: "one-use-reset-token" };
       if (url.startsWith("/api/admin/users") || url === "/api/admin/jobs")
         data = [];
+      if (url.startsWith("/api/admin/commerce/revenue?")) data = revenueReport;
+      if (url.startsWith("/api/admin/commerce/purchases?")) data = purchaseHistory;
       if (url === "/api/admin/status")
         data = {
           databaseHealthy: true,
@@ -707,7 +712,9 @@ it("navigates all workspace screens and renders the admin data", async () => {
     scenario: "Thử nhận thêm việc",
     notifications: "Thông báo",
     settings: "Cài đặt",
-    admin: "Quản trị",
+    "admin-users": "Quản lý người dùng",
+    "admin-revenue": "Doanh thu & đơn hàng",
+    "admin-system": "Trạng thái hệ thống",
   }))
     await navigate(route, title);
   await screen.findByText("Hoạt động");
@@ -715,8 +722,42 @@ it("navigates all workspace screens and renders the admin data", async () => {
   await userEvent
     .setup()
     .click(screen.getByRole("link", { name: "Đến nội dung chính" }));
-  expect(location.hash).toBe("#admin");
+  expect(location.hash).toBe("#admin-system");
   expect(document.activeElement).toBe(document.getElementById("main-content"));
+});
+it("separates admin users, revenue and system pages and loads only their own data", async () => {
+  mount();
+  await navigate("admin-users", "Quản lý người dùng");
+  await screen.findByText("Không tìm thấy tài khoản phù hợp.");
+  expect(screen.queryByRole("region", { name: "Quản lý doanh thu và mua hàng" })).toBeNull();
+  expect(calls.some((c) => c.url.startsWith("/api/admin/commerce/") || c.url === "/api/admin/status")).toBe(false);
+  const usersIndex = calls.length;
+  await navigate("admin-revenue", "Doanh thu & đơn hàng");
+  await screen.findByText("Nguyễn Minh Anh");
+  expect(screen.queryByLabelText("Tìm người dùng")).toBeNull();
+  expect(document.querySelector("#system-status")).toBeNull();
+  expect(calls.slice(usersIndex).some((c) => c.url.startsWith("/api/admin/users") || c.url === "/api/admin/status")).toBe(false);
+  const revenueIndex = calls.length;
+  await navigate("admin-system", "Trạng thái hệ thống");
+  await screen.findByText("Hoạt động");
+  expect(screen.queryByLabelText("Tìm người dùng")).toBeNull();
+  expect(screen.queryByRole("region", { name: "Quản lý doanh thu và mua hàng" })).toBeNull();
+  expect(calls.slice(revenueIndex).some((c) => c.url.startsWith("/api/admin/users") || c.url.startsWith("/api/admin/commerce/"))).toBe(false);
+});
+it("keeps the legacy admin link opening user management", async () => {
+  window.history.replaceState(null, "", "/#admin");
+  mount();
+  await screen.findByRole("heading", { level: 1, name: "Quản lý người dùng" });
+  expect(location.hash).toBe("#admin-users");
+  await screen.findByText("Không tìm thấy tài khoản phù hợp.");
+});
+it.each(["admin-users", "admin-revenue", "admin-system"])("blocks non-admin direct navigation to %s and hides admin menu", async (route) => {
+  sessionRoles = [];
+  window.history.replaceState(null, "", `/#${route}`);
+  mount();
+  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  expect(screen.queryByLabelText("Quản trị viên", { selector: "section" })).toBeNull();
+  expect(calls.some((c) => c.url.startsWith("/api/admin/"))).toBe(false);
 });
 it("marks a notification read while preserving its filters and updating the shell unread count", async () => {
   mount();

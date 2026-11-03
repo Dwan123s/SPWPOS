@@ -155,10 +155,13 @@ public sealed partial class WorkspaceService
                     {
                         verifiedReply = VerifiedScheduleOverviewReply(range, calendar);
                         var events = calendar.Events.Where(x => x.Start < range.End && x.End > range.Start).ToArray();
+                        var taskLookup = state.Tasks.ToDictionary(x => x.Id);
                         return new("OK", new { range, totalEvents = events.Length, totalSessions = calendar.Sessions.Length,
                             truncated = events.Length > 100 || calendar.Sessions.Length > 100,
                             events = events.Take(100).Select(x => new { x.Id, x.Name, x.Start, x.End, x.EventType }),
-                            sessions = calendar.Sessions.Take(100).Select(x => new { x.Id, x.TaskId, x.Start, x.End, x.IsLocked, status = x.Status.ToString() }),
+                            sessions = calendar.Sessions.Take(100).Select(x => new { x.Id, x.TaskId, taskName = taskLookup.GetValueOrDefault(x.TaskId)?.Name,
+                                deadline = taskLookup.GetValueOrDefault(x.TaskId)?.Deadline, estimatedMinutes = taskLookup.GetValueOrDefault(x.TaskId)?.EstimatedMinutes,
+                                x.Start, x.End, x.IsLocked, status = x.Status.ToString() }),
                             busyOverrides = calendar.Exceptions.Where(x => !x.IsAvailable && x.Date >= LocalDate(range.Start, calendar.Preference) && x.Date <= LocalDate(range.End, calendar.Preference)).ToArray() });
                     }
                     if (call.Name == "find_free_slots")
@@ -225,6 +228,10 @@ public sealed partial class WorkspaceService
                     var question = Text(args, "question", 1000);
                     var options = args.GetProperty("options").EnumerateArray().Select(x => x.GetString()!).ToArray();
                     Require(question.Length > 0 && options.Length <= 6 && options.All(x => x.Length is > 0 and <= 120), "INVALID_QUESTION", "Hỏi một câu ngắn, tối đa 6 lựa chọn.");
+                    Require(!(HasSessionMoveRequest(source) && simulations == run.Simulations &&
+                        (ChatMatch(question, @"\b(?:chuyen|doi|doi gio|khung gio khac)\b[^.!?]{0,80}\b(?:kiem tra|cuoc hop|cuoc hen|lich kham)\b").Success ||
+                         ChatMatch(question, @"\b(?:kiem tra|cuoc hop|cuoc hen|lich kham)\b[^.!?]{0,80}\b(?:sang|khung gio nao|gio khac)\b").Success)),
+                        "WRONG_MOVE_TARGET", "Người dùng đã cho phép dời phiên làm việc để giữ giờ hẹn. Hãy đọc đúng phiên theo giờ/ngày và thử phương án đó trước; chỉ hỏi ngày/giờ kết thúc nếu còn thiếu, không đảo thành dời cuộc hẹn.");
                     return new("TERMINAL", new NoraTerminal("QUESTION", AgentExplanation(Text(args, "reply", 4000)), question, options));
                 }
                 default: return new("ERROR", ErrorCode: "UNKNOWN_TOOL");

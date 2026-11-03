@@ -4,6 +4,12 @@ import { state, dateFmt, timeFmt, icon } from "./ui.jsx";
 import { askNora } from "./agent-handoff.js";
 import { TeamChat } from "./team-chat.jsx";
 import {
+  MyJoinRequests,
+  TeamJoinRequests,
+  RemoveTeamMemberDialog,
+} from "./team-membership.jsx";
+import "./team-membership.css";
+import {
   CompletionFileUpload,
   CompletionReport,
 } from "./team-completion-files.jsx";
@@ -15,6 +21,7 @@ import {
 } from "./team-invite-link.js";
 import { AvailabilityPolicyCard } from "./availability-policy.jsx";
 import { SessionList } from "./team-session-list.jsx";
+import { TeamScheduleCompare } from "./team-schedule-compare.jsx";
 export { SessionList } from "./team-session-list.jsx";
 import {
   GroupHub,
@@ -26,6 +33,10 @@ import {
   TeamActivity,
 } from "./team-components.jsx";
 import "./team-workspace.css";
+import "./team-task-board.css";
+import "./team-task-detail.css";
+import "./team-recipient-select.css";
+import { takeEisenhowerTeamTask } from "./eisenhower.jsx";
 
 export function PrivateClaimPreview({
   claim,
@@ -113,7 +124,10 @@ export function PrivateClaimPreview({
         </section>
       )}
       {claim.options.map((o, i) => (
-        <section className="team-claim-option" key={o.index}>
+        <section
+          className="team-claim-option team-claim-option-readable"
+          key={o.index}
+        >
           <div className="team-option-heading">
             <div>
               <span className="team-eyebrow">
@@ -125,16 +139,7 @@ export function PrivateClaimPreview({
               {icon("check")} Đã kiểm tra lịch
             </span>
           </div>
-          <div className="team-schedule-compare">
-            <details>
-              <summary>Lịch trước khi nhận</summary>
-              <SessionList items={o.before} showStatus={false} />
-            </details>
-            <div>
-              <h4>Lịch sau khi nhận</h4>
-              <SessionList items={o.after} />
-            </div>
-          </div>
+          <TeamScheduleCompare before={o.before} after={o.after} />
           {!!o.explanations.length && (
             <details className="team-plan-reasons">
               <summary>Vì sao NORA chọn phương án này?</summary>
@@ -159,12 +164,14 @@ export function PrivateClaimPreview({
   );
 }
 export function TeamsPage({ onWorkspaceChanged }) {
+  const [eisenhowerTaskId, setEisenhowerTaskId] = useState(null);
   const [teams, setTeams] = useState([]),
     [detail, setDetail] = useState(null),
     [loadingTeams, setLoadingTeams] = useState(true);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [setupOpen, setSetupOpen] = useState(false);
+  const [taskDetailOpen, setTaskDetailOpen] = useState(false);
   const [invite, setInvite] = useState(null),
     [copied, setCopied] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false),
@@ -187,6 +194,9 @@ export function TeamsPage({ onWorkspaceChanged }) {
   const [joinLink, setJoinLink] = useState(() => captureTeamInvite());
   const [invitePreview, setInvitePreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [joinRequests, setJoinRequests] = useState([]);
+  const [joinMessage, setJoinMessage] = useState("");
+  const [removingMember, setRemovingMember] = useState(null);
   useEffect(() => {
     if (!joinLink?.code) return;
     let live = true;
@@ -214,6 +224,28 @@ export function TeamsPage({ onWorkspaceChanged }) {
   };
   const selectedTeamId = detail?.team.id;
   useEffect(() => {
+    let live = true;
+    const open = async () => {
+      const requested = takeEisenhowerTeamTask();
+      if (!requested) return;
+      try {
+        const next = await api(`/api/teams/${requested.teamId}`);
+        if (live) {
+          setDetail(next);
+          setEisenhowerTaskId(requested.taskId);
+        }
+      } catch (failure) {
+        if (live) setError(failure.message);
+      }
+    };
+    open();
+    window.addEventListener("eisenhower-open-team", open);
+    return () => {
+      live = false;
+      window.removeEventListener("eisenhower-open-team", open);
+    };
+  }, []);
+  useEffect(() => {
     if (!selectedTeamId) return;
     let live = true;
     const timer = setInterval(async () => {
@@ -221,8 +253,24 @@ export function TeamsPage({ onWorkspaceChanged }) {
       try {
         const next = await api(`/api/teams/${selectedTeamId}`);
         if (live) setDetail(next);
-      } catch {
-        /* Explicit actions show errors; polling keeps the last view. */
+      } catch (failure) {
+        if (live && failure.code === "TEAM_FORBIDDEN") {
+          setDetail(null);
+          setClaim(null);
+          setClaimOpen(false);
+          setComposerOpen(false);
+          setRemovingMember(null);
+          setCompletion(null);
+          setReturning(null);
+          setInvite(null);
+          setDraft(null);
+          setUndo(null);
+          setError("Bạn không còn là thành viên của nhóm này.");
+          try {
+            const list = await api("/api/teams");
+            if (live) setTeams(list);
+          } catch { /* Group data is already cleared even if the list refresh fails. */ }
+        }
       }
     }, 7000);
     return () => {
@@ -230,6 +278,30 @@ export function TeamsPage({ onWorkspaceChanged }) {
       clearInterval(timer);
     };
   }, [selectedTeamId, busy]);
+  useEffect(() => {
+    let live = true;
+    async function refreshRequests() {
+      if (document.hidden || busy) return;
+      try {
+        const [requests, list] = await Promise.all([
+          api("/api/teams/join-requests"),
+          api("/api/teams"),
+        ]);
+        if (live) {
+          setJoinRequests(Array.isArray(requests) ? requests : []);
+          setTeams(list);
+        }
+      } catch {
+        /* Explicit refresh and actions surface errors. */
+      }
+    }
+    refreshRequests();
+    const timer = setInterval(refreshRequests, 7000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [busy]);
   useEffect(() => {
     let live = true;
     api("/api/teams")
@@ -266,9 +338,20 @@ export function TeamsPage({ onWorkspaceChanged }) {
   async function reload(id = detail?.team.id) {
     const list = await api("/api/teams");
     setTeams(list);
+    const requests = await api("/api/teams/join-requests");
+    setJoinRequests(Array.isArray(requests) ? requests : []);
     if (id && list.some((t) => t.id === id))
       setDetail(await api(`/api/teams/${id}`));
     else setDetail(null);
+  }
+  async function requestJoin(code) {
+    const result = await post("join", { text: parseTeamInvite(code) });
+    setJoinMessage(
+      result.status === "Pending"
+        ? "Đã gửi yêu cầu. Bạn sẽ vào nhóm sau khi trưởng nhóm duyệt."
+        : "",
+    );
+    await reload(result.status === "Pending" ? undefined : result.id);
   }
   async function changed() {
     await reload();
@@ -308,12 +391,14 @@ export function TeamsPage({ onWorkspaceChanged }) {
     });
   }
   const modalOpen =
+    taskDetailOpen ||
     setupOpen ||
     claimOpen ||
     composerOpen ||
     !!invite ||
     !!returning ||
     !!completion ||
+    !!removingMember ||
     !!joinLink;
   const ready =
     !!state.workspace?.events?.length &&
@@ -345,8 +430,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
         }
         onJoin={(code) =>
           run(async () => {
-            const result = await post("join", { text: parseTeamInvite(code) });
-            await reload(result.id);
+            await requestJoin(code);
           })
         }
         onCreateLink={(id) =>
@@ -357,6 +441,12 @@ export function TeamsPage({ onWorkspaceChanged }) {
           })
         }
       />
+      {joinMessage && (
+        <p className="team-success" role="status">
+          {joinMessage}
+        </p>
+      )}
+      <MyJoinRequests requests={joinRequests} />
       {error && !modalOpen && (
         <p className="team-error" role="alert">
           {icon("alertCircle")}
@@ -400,6 +490,33 @@ export function TeamsPage({ onWorkspaceChanged }) {
               <TaskBoard
                 key={detail.team.id}
                 detail={detail}
+                openTaskId={eisenhowerTaskId}
+                onImportanceChanged={() => run(() => reload())}
+                error={error}
+                onDialogChange={setTaskDetailOpen}
+                onRecipientChange={(task, userId) =>
+                  run(async () => {
+                    await post(`tasks/${task.id}/recipient`, {
+                      version: task.version,
+                      userId,
+                    });
+                    await reload();
+                  })
+                }
+                onAttachSource={(task, file) =>
+                  run(async () => {
+                    await post(`tasks/${task.id}/source`, {
+                      version: task.version,
+                      requestId: file.requestId,
+                      file: {
+                        name: file.name,
+                        mimeType: file.mimeType,
+                        data: file.data,
+                      },
+                    });
+                    await reload();
+                  })
+                }
                 uid={uid}
                 busy={busy}
                 onCompose={() => openComposer()}
@@ -457,13 +574,21 @@ export function TeamsPage({ onWorkspaceChanged }) {
                 detail={detail}
                 uid={uid}
                 busy={busy}
-                onRemove={(member) =>
+                onRemove={(member) => {
+                  setError("");
+                  setRemovingMember(member);
+                }}
+              />
+              <TeamJoinRequests
+                detail={detail}
+                busy={busy}
+                onReview={(request, approved) =>
                   run(async () => {
                     await post(
-                      `${detail.team.id}/members/${member.userId}/remove`,
-                      { version: member.version },
+                      `${detail.team.id}/join-requests/${request.userId}/review`,
+                      { version: request.version, approved },
                     );
-                    await reload();
+                    await changed();
                   })
                 }
               />
@@ -675,8 +800,27 @@ export function TeamsPage({ onWorkspaceChanged }) {
           splitBrief={splitBrief}
           setSplitBrief={setSplitBrief}
           memberCount={detail.members.length}
+          members={detail.members}
           busy={busy}
           error={error}
+          onEditDraft={
+            draft?.tasks
+              ? (edits) =>
+                  run(async () =>
+                    setDraft(
+                      await post(
+                        `${detail.team.id}/briefs/${draft.proposalId}/edit`,
+                        {
+                          revision:
+                            draft.revision ||
+                            "00000000-0000-0000-0000-000000000000",
+                          tasks: edits,
+                        },
+                      ),
+                    ),
+                  )
+              : undefined
+          }
           onClose={() => setComposerOpen(false)}
           onDraft={() =>
             run(async () =>
@@ -703,10 +847,25 @@ export function TeamsPage({ onWorkspaceChanged }) {
               ),
             )
           }
-          onConfirm={() =>
+          onConfirm={(recipients = {}) =>
             run(async () => {
+              const selections = (draft.tasks || [draft.task])
+                .filter((task) => recipients[task.id])
+                .map((task) => ({
+                  taskId: task.id,
+                  userId: recipients[task.id],
+                }));
               await post(
                 `${detail.team.id}/${draft.tasks ? "briefs" : "drafts"}/${draft.proposalId}/confirm`,
+                draft.tasks &&
+                  draft.revision &&
+                  draft.revision !== "00000000-0000-0000-0000-000000000000"
+                  ? { recipients: selections, revision: draft.revision }
+                  : changeTask || !selections.length
+                    ? undefined
+                    : draft.tasks
+                      ? { recipients: selections }
+                      : { userId: selections[0].userId },
               );
               setComposerOpen(false);
               setDraft(null);
@@ -740,7 +899,9 @@ export function TeamsPage({ onWorkspaceChanged }) {
                 <p>
                   {invitePreview.alreadyMember
                     ? "Bạn đã là thành viên của nhóm này."
-                    : "Tham gia để xem công việc và chat chung. Lịch cá nhân của bạn vẫn được giữ riêng tư."}
+                    : invitePreview.requestStatus === "Pending"
+                      ? "Yêu cầu của bạn đang chờ trưởng nhóm duyệt."
+                      : "Gửi yêu cầu tham gia. Bạn chỉ được xem công việc và chat chung sau khi trưởng nhóm duyệt."}
                 </p>
               </>
             ) : null}
@@ -753,13 +914,14 @@ export function TeamsPage({ onWorkspaceChanged }) {
               {invitePreview && (
                 <button
                   className="btn primary"
-                  disabled={busy || previewLoading}
+                  disabled={
+                    busy ||
+                    previewLoading ||
+                    ["Pending", "Removed"].includes(invitePreview.requestStatus)
+                  }
                   onClick={() =>
                     run(async () => {
-                      const result = await post("join", {
-                        text: joinLink.code,
-                      });
-                      await reload(result.id);
+                      await requestJoin(joinLink.code);
                       closeJoinLink();
                     })
                   }
@@ -768,7 +930,11 @@ export function TeamsPage({ onWorkspaceChanged }) {
                     ? "Đang tham gia…"
                     : invitePreview.alreadyMember
                       ? "Mở nhóm"
-                      : "Xác nhận tham gia nhóm"}
+                      : invitePreview.requestStatus === "Pending"
+                        ? "Đang chờ duyệt"
+                        : invitePreview.requestStatus === "Removed"
+                          ? "Không thể tham gia lại"
+                          : "Gửi yêu cầu tham gia"}
                 </button>
               )}
               <button
@@ -781,6 +947,25 @@ export function TeamsPage({ onWorkspaceChanged }) {
             </div>
           </div>
         </TeamDialog>
+      )}
+      {removingMember && detail && (
+        <RemoveTeamMemberDialog
+          member={removingMember}
+          self={removingMember.userId === uid}
+          busy={busy}
+          error={error}
+          onClose={() => setRemovingMember(null)}
+          onConfirm={() =>
+            run(async () => {
+              await post(
+                `${detail.team.id}/members/${removingMember.userId}/remove`,
+                { version: removingMember.version },
+              );
+              setRemovingMember(null);
+              await changed();
+            })
+          }
+        />
       )}
       {invite && (
         <TeamDialog
@@ -865,6 +1050,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
       {claimOpen && (
         <TeamDialog
           title="NORA · Nhận task và xếp lịch riêng"
+          className="team-claim-dialog"
           subtitle={claimRequest?.task.name}
           busy={busy}
           wide

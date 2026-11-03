@@ -26,14 +26,15 @@ public sealed partial class WorkspaceService
             "STALE_SESSION", "Lịch đã thay đổi hoặc hiện không nằm trong giờ rảnh. Hãy xếp lại phần còn lại trước khi tiếp tục.", 409);
     }
 
-    private async Task StopSegment(WorkSession session, CancellationToken ct)
+    private async Task StopSegment(WorkSession session, CancellationToken ct, DateTimeOffset? cutoff = null)
     {
         if (session.SegmentStartedAt is not { } at) return;
-        session.ActualSeconds += (long)Math.Max(0, (Now - at).TotalSeconds);
+        var stoppedAt = cutoff ?? Now;
+        session.ActualSeconds += (long)Math.Max(0, (stoppedAt - at).TotalSeconds);
         session.SegmentStartedAt = null;
         var execution = await Mine<SessionExecution>(session.UserId).SingleAsync(x => x.SessionId == session.Id, ct);
         var segment = await Mine<ExecutionSegment>(session.UserId).SingleAsync(x => x.ExecutionId == execution.Id && x.End == null, ct);
-        segment.End = Now; execution.TimerSeconds += (long)Math.Max(0, (Now - at).TotalSeconds); execution.ActualSeconds = session.ActualSeconds;
+        segment.End = stoppedAt; execution.TimerSeconds += (long)Math.Max(0, (stoppedAt - at).TotalSeconds); execution.ActualSeconds = session.ActualSeconds;
     }
     public Task ExecuteSessionAsync(Guid uid, Guid id, string action, CancellationToken ct) => Mutate(uid, async () =>
     {

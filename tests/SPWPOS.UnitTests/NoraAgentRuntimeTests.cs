@@ -9,7 +9,7 @@ using SPWPOS.TestSupport;
 
 namespace SPWPOS.UnitTests;
 
-public sealed class NoraAgentRuntimeTests
+public sealed partial class NoraAgentRuntimeTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

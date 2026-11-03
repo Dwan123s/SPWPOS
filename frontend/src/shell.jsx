@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Slot, attrs, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
 import { CapacityRibbon } from "./capacity-ribbon.jsx";
+import { PetProgress } from "./pet-appearance.jsx";
 import { PageTransition } from "./page-transition.jsx";
 import {
   WorkspaceAtmosphere,
@@ -9,7 +10,11 @@ import {
 } from "./workspace-motion.jsx";
 import { $, state, icon, button, userAvatar, dateFmt, modal } from "./ui.jsx";
 import { nextWorkflowStep } from "./workflow.js";
-import { NotificationBell, NotificationUnreadCount } from "./notification-popups.jsx";
+import { adminRoutes, isAdminRoute } from "./admin-navigation.js";
+import {
+  NotificationBell,
+  NotificationUnreadCount,
+} from "./notification-popups.jsx";
 
 const menuKey = "planora.menu.compact";
 function readStorage(key) {
@@ -60,7 +65,7 @@ export function workspaceShell(routes, title, description, body) {
   const nav = (keys) =>
     nodeList(
       keys
-        .filter((key) => key !== "admin" || state.roles.includes("Admin"))
+        .filter((key) => !isAdminRoute(key) || state.roles.includes("Admin"))
         .map((key) => (
           <button
             type="button"
@@ -73,11 +78,7 @@ export function workspaceShell(routes, title, description, body) {
           >
             {icon(routes[key][2])}
             <span className="nav-text">{routes[key][0]}</span>
-            {key === "notifications" ? (
-              <NotificationUnreadCount />
-            ) : (
-              ""
-            )}
+            {key === "notifications" ? <NotificationUnreadCount /> : ""}
           </button>
         )),
     );
@@ -163,8 +164,14 @@ export function workspaceShell(routes, title, description, body) {
             </section>
             <section className="nav-group" aria-label="Quản lý">
               <div className="nav-label">Quản lý</div>
-              {nav(["notifications", "settings", "admin"])}
+              {nav(["notifications", "settings"])}
             </section>
+            {state.roles.includes("Admin") && (
+              <section className="nav-group" aria-label="Quản trị viên">
+                <div className="nav-label">Quản trị viên</div>
+                {nav(Object.keys(adminRoutes))}
+              </section>
+            )}
           </nav>
           <div className="sidebar-bottom">
             <div className="user-mini">
@@ -245,6 +252,7 @@ export function workspaceShell(routes, title, description, body) {
               </div>
             </div>
             <div className="topbar-right">
+              <PetProgress compact />
               <WorkspaceMotionControl />
               <NotificationBell />
               <button

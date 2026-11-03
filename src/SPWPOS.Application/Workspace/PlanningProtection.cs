@@ -4,7 +4,17 @@ namespace SPWPOS.Application.Workspace;
 public sealed partial class PlanningEngine
 {
     public PlanView Generate(PlanningState state, PlanInput input, DateTimeOffset now)
-        => GenerateProtected(state, input, now);
+    {
+        var policy = state.EisenhowerScheduling ? "eisenhower-v1" : "legacy";
+        var baseline = GenerateProtected(state with { EisenhowerScheduling = false }, input, now) with { PriorityPolicy = policy };
+        if (!state.EisenhowerScheduling || !state.Tasks.Any(t => t.EffectiveImportance == "Important")) return baseline;
+        var candidate = GenerateProtected(state, input, now) with { PriorityPolicy = policy };
+        if (candidate.Warnings.Any(w => w.UnscheduledMinutes > baseline.Warnings.Where(b => b.TaskId == w.TaskId).Sum(b => b.UnscheduledMinutes))) return baseline;
+        var oldLate = baseline.Sessions.GroupBy(s => s.TaskId).ToDictionary(g => g.Key, g => g.Max(s => s.End));
+        if (candidate.Sessions.Any(s => oldLate.TryGetValue(s.TaskId, out var previous) &&
+            state.Tasks.Any(t => t.Id == s.TaskId && s.End > t.Deadline && s.End > previous))) return baseline;
+        return candidate with { Explanations = candidate.Explanations.Append("Ưu tiên công việc quan trọng và các việc phụ thuộc, giữ tính khả thi và deadline của mọi công việc.").ToArray() };
+    }
 
     private PlanView GenerateProtected(PlanningState state, PlanInput input, DateTimeOffset now, UrgentReplanPolicy? baseline = null)
     {

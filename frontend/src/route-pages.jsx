@@ -39,7 +39,18 @@ const pages = {
     () => import("./page-settings.jsx"),
     "settingsPage",
   ),
-  admin: createPageResource(() => import("./page-admin.jsx"), "adminPage"),
+  "admin-users": createPageResource(
+    () => import("./page-admin.jsx"),
+    "adminPage",
+  ),
+  "admin-revenue": createPageResource(
+    () => import("./admin-commerce.jsx"),
+    "AdminCommerce",
+  ),
+  "admin-system": createPageResource(
+    () => import("./page-admin.jsx"),
+    "adminSystemPage",
+  ),
   notes: createPageResource(() => import("./notes.jsx"), "NotesPage"),
   agent: createPageResource(() => import("./agent.jsx"), "AgentPage"),
 };

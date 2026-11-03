@@ -25,11 +25,14 @@ public sealed partial class ApplicationDbContext
     public DbSet<TeamChatMessage> TeamChatMessages => Set<TeamChatMessage>();
     public DbSet<TeamCompletionSubmission> TeamCompletionSubmissions => Set<TeamCompletionSubmission>();
     public DbSet<TeamCompletionFile> TeamCompletionFiles => Set<TeamCompletionFile>();
+    public DbSet<TeamTaskDocument> TeamTaskDocuments => Set<TeamTaskDocument>();
 }
 internal static class PrivateTeamModel
 {
     public static void Configure(ModelBuilder b)
     {
+        b.Entity<TeamMembership>().Property(x => x.ApprovalStatus).HasMaxLength(16).HasDefaultValue("Approved");
+        b.Entity<TeamMembership>().HasIndex(x => new { x.TeamId, x.ApprovalStatus });
         b.Entity<AvailabilityPolicy>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.UserId).IsUnique(); e.Property(x => x.Version).IsConcurrencyToken(); e.Property(x => x.RoutineDaysJson).HasDefaultValue("[]"); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<PrivatePlanningProposal>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.UserId, x.ExpiresAt }); e.Property(x => x.Applied).IsConcurrencyToken(); e.Property(x => x.Kind).HasMaxLength(20); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamProject>(e => { e.HasKey(x => x.Id); e.Property(x => x.Name).HasMaxLength(120); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CreatorId).OnDelete(DeleteBehavior.Restrict); });
@@ -42,5 +45,8 @@ internal static class PrivateTeamModel
         b.Entity<TeamChatMessage>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TeamId, x.Id }); e.HasIndex(x => new { x.TeamId, x.UserId, x.RequestId, x.IsSystem }).IsUnique(); e.Property(x => x.Text).HasMaxLength(2000); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamCompletionSubmission>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.TeamTaskId); e.Property(x => x.Note).HasMaxLength(1000); e.HasOne<TeamTask>().WithMany().HasForeignKey(x => x.TeamTaskId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamCompletionFile>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.SubmissionId); e.Property(x => x.Name).HasMaxLength(180); e.Property(x => x.MimeType).HasMaxLength(100); e.HasOne<TeamCompletionSubmission>().WithMany().HasForeignKey(x => x.SubmissionId).OnDelete(DeleteBehavior.Restrict); });
+        b.Entity<TeamTaskDocument>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.TeamId); e.Property(x => x.Name).HasMaxLength(180); e.Property(x => x.MimeType).HasMaxLength(100); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict); });
+        b.Entity<TeamTask>().HasOne<TeamTaskDocument>().WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<TeamTask>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.DesignatedUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

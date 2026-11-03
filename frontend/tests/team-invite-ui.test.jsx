@@ -40,7 +40,8 @@ beforeEach(() => {
         expiresAt: invite.expiresAt,
         alreadyMember: false,
       };
-    if (path === "/api/teams/join") return { id: "team" };
+    if (path === "/api/teams/join") return { id: "team", status: "Pending" };
+    if (path === "/api/teams/join-requests") return [];
     return {};
   });
 });
@@ -72,7 +73,7 @@ it("leader can create and copy a join link from the group hub", async () => {
     await screen.findByRole("button", { name: "Đã sao chép link" }),
   ).toBeTruthy();
 });
-it("opening a link previews the group and joins only after explicit confirmation", async () => {
+it("opening a link previews the group and requests approval only after explicit confirmation", async () => {
   history.replaceState(null, "", `/app/#teams?join=${code}`);
   render(<TeamsPage />);
   const dialog = await screen.findByRole("dialog", {
@@ -83,7 +84,7 @@ it("opening a link previews the group and joins only after explicit confirmation
   ).toBeTruthy();
   expect(api.mock.calls.some(([, method]) => method === "POST")).toBe(false);
   fireEvent.click(
-    within(dialog).getByRole("button", { name: "Xác nhận tham gia nhóm" }),
+    within(dialog).getByRole("button", { name: "Gửi yêu cầu tham gia" }),
   );
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith("/api/teams/join", "POST", { text: code }),
@@ -94,6 +95,8 @@ it("opening a link previews the group and joins only after explicit confirmation
     ).toBeNull(),
   );
   expect(pendingTeamInvite()).toBeNull();
+  expect(api.mock.calls.some(([path]) => path === "/api/teams/team")).toBe(false);
+  expect(screen.getByText(/Đã gửi yêu cầu/)).toBeTruthy();
 });
 it("invalid or revoked invitations show a useful error and never auto join", async () => {
   history.replaceState(null, "", `/app/#teams?join=${code}`);
@@ -107,7 +110,7 @@ it("invalid or revoked invitations show a useful error and never auto join", asy
     "Link mời đã bị thu hồi. Hãy xin link mới.",
   );
   expect(
-    screen.queryByRole("button", { name: "Xác nhận tham gia nhóm" }),
+    screen.queryByRole("button", { name: "Gửi yêu cầu tham gia" }),
   ).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Đóng lời mời" }));
   expect(pendingTeamInvite()).toBeNull();
@@ -124,7 +127,7 @@ it("the normal join form also accepts the full link", async () => {
     { target: { value: teamInviteLink(code) } },
   );
   fireEvent.click(
-    within(dialog).getByRole("button", { name: "Tham gia nhóm", exact: true }),
+    within(dialog).getByRole("button", { name: "Gửi yêu cầu tham gia", exact: true }),
   );
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith("/api/teams/join", "POST", { text: code }),

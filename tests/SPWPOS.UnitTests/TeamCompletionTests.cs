@@ -41,6 +41,7 @@ public sealed partial class PrivateTeamPlanningTests
         await Use(h, s => s.UpdateTeamProgressAsync(Member, TaskId, new(assigned.Version, 100), Ct));
         var pending = await Current(h);
         Assert.Equal("PendingReview", pending.Status); Assert.NotNull(pending.CompletionSubmittedAt);
+        Assert.Equal(0, await h.DbAsync(db => db.Users.Where(x => x.Id == Member).Select(x => x.ExperiencePoints).SingleAsync(Ct)));
         Assert.Empty((await Use(h, s => s.GetTeamChatAsync(Member, Team, null, null, Ct))).Items);
         Assert.Equal(1, await h.DbAsync(db => db.InAppNotifications.CountAsync(x => x.Kind == "TEAM_COMPLETION_REQUEST" && x.UserId == Leader, Ct)));
         Assert.Equal(0, await h.DbAsync(db => db.InAppNotifications.CountAsync(x => x.Kind == "TEAM_TASK_COMPLETED", Ct)));
@@ -51,6 +52,7 @@ public sealed partial class PrivateTeamPlanningTests
         await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ReviewTeamCompletionAsync(Other, TaskId, review, Ct)));
         await Use(h, s => s.ReviewTeamCompletionAsync(Leader, TaskId, review, Ct));
         await Use(h, s => s.ReviewTeamCompletionAsync(Leader, TaskId, review, Ct));
+        Assert.Equal(25, await h.DbAsync(db => db.Users.Where(x => x.Id == Member).Select(x => x.ExperiencePoints).SingleAsync(Ct)));
         var complete = await Current(h); Assert.Equal("Completed", complete.Status); Assert.True(complete.CompletionApproved); Assert.Equal(Leader, complete.CompletionReviewedBy);
         var message = Assert.Single((await Use(h, s => s.GetTeamChatAsync(Member, Team, null, null, Ct))).Items, x => x.IsSystem);
         Assert.True(message.IsSystem); Assert.Equal("Hệ thống", message.Author); Assert.Contains("Thành Viên", message.Text); Assert.Contains(complete.Name, message.Text);
@@ -91,7 +93,7 @@ public sealed partial class PrivateTeamPlanningTests
             await Assert.ThrowsAsync<AuthException>(() => scope.ServiceProvider.GetRequiredService<IWorkspaceService>().SetStatusAsync(Member, personal.Id, new("InProgress", 50), Ct));
         await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ProposeTeamTaskChangeAsync(Leader, TaskId, new("Đổi yêu cầu"), Ct)));
         var member = (await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Members.Single(x => x.UserId == Member);
-        await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.RemoveTeamMemberAsync(Leader, Team, Member, member.Version, Ct)));
+        await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.RemoveTeamMemberAsync(Member, Team, Member, member.Version, Ct)));
         await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ReviewTeamCompletionAsync(Leader, TaskId, new(Guid.NewGuid(), pending.CompletionRequestId!.Value, true), Ct)));
         Assert.Equal("PendingReview", (await Current(h)).Status);
         Assert.Equal(0, await h.DbAsync(db => db.TeamChatMessages.CountAsync(Ct)));

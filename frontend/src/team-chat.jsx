@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { dateFmt, timeFmt, dayKey, icon, state } from "./ui.jsx";
+import { PetArtwork, usePetAppearance } from "./pet-appearance.jsx";
 import "./team-chat.css";
 
 function mergeMessages(previous, incoming) {
@@ -48,9 +49,11 @@ function chatDay(at) {
     : dateFmt(at, { year: "numeric" });
 }
 export function TeamChat({ teamId, name }) {
+  const myPet = usePetAppearance();
   const [messages, setMessages] = useState([]),
     [text, setText] = useState("");
   const [authors, setAuthors] = useState({});
+  const [expanded, setExpanded] = useState(false);
   const [sending, setSending] = useState(false),
     [loading, setLoading] = useState(true),
     [older, setOlder] = useState(false),
@@ -62,9 +65,35 @@ export function TeamChat({ teamId, name }) {
     oldest = useRef(null),
     follow = useRef(true),
     alive = useRef(false),
-    pending = useRef(null);
+    pending = useRef(null),
+    dialog = useRef(null),
+    sizeButton = useRef(null),
+    scrollPosition = useRef(null);
   const uid = state.workspace?.profile?.id;
   const profile = state.workspace?.profile;
+  function resizeChat() {
+    scrollPosition.current = list.current?.scrollTop ?? 0;
+    setExpanded((value) => !value);
+  }
+  useLayoutEffect(() => {
+    if (expanded) {
+      const window = dialog.current;
+      const previousOverflow = document.body.style.overflow;
+      window.showModal();
+      document.body.style.overflow = "hidden";
+      input.current?.focus({ preventScroll: true });
+      if (list.current) list.current.scrollTop = scrollPosition.current;
+      return () => {
+        window.close();
+        document.body.style.overflow = previousOverflow;
+      };
+    }
+    if (list.current && scrollPosition.current !== null)
+      list.current.scrollTop = scrollPosition.current;
+    // Restore focus after the expanded window is closed.
+    if (sizeButton.current && scrollPosition.current !== null)
+      sizeButton.current.focus({ preventScroll: true });
+  }, [expanded]);
   function rememberAuthors(page) {
     if (page.authors?.length)
       setAuthors((previous) => ({
@@ -128,7 +157,7 @@ export function TeamChat({ teamId, name }) {
       input.current.style.height = "auto";
       input.current.style.height = `${Math.min(input.current.scrollHeight || 40, 120)}px`;
     }
-  }, [text]);
+  }, [text, expanded]);
   async function send(e) {
     e.preventDefault();
     const value = text.trim();
@@ -181,8 +210,11 @@ export function TeamChat({ teamId, name }) {
       if (alive.current) setLoadingOlder(false);
     }
   }
-  return (
-    <section className="card team-chat" aria-label={`Chat chung ${name}`}>
+  const chat = (
+    <section
+      className={`card team-chat${expanded ? " team-chat-expanded" : ""}`}
+      aria-label={`Chat chung ${name}`}
+    >
       <header className="team-chat-header">
         <span className="team-chat-group-icon">{icon("chat")}</span>
         <div>
@@ -197,6 +229,30 @@ export function TeamChat({ teamId, name }) {
           {icon("lock")}
           <span>Riêng tư</span>
         </span>
+        <button
+          ref={sizeButton}
+          type="button"
+          className="team-chat-resize"
+          aria-label={expanded ? "Thu nhỏ khung chat" : "Phóng to khung chat"}
+          title={expanded ? "Thu nhỏ khung chat (Esc)" : "Phóng to khung chat"}
+          aria-expanded={expanded}
+          onClick={resizeChat}
+        >
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d={
+                expanded
+                  ? "M4 9h5V4 M20 9h-5V4 M4 15h5v5 M20 15h-5v5"
+                  : "M9 4H4v5 M15 4h5v5 M4 15v5h5 M20 15v5h-5"
+              }
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       </header>
       {older && (
         <button
@@ -242,6 +298,13 @@ export function TeamChat({ teamId, name }) {
         {messages.map((m, index) => {
           const mine = m.userId === uid;
           const account = mine ? profile : authors[m.userId];
+          const pet =
+            mine && state.workspace?.gamification
+              ? { selectedSkin: myPet.code, userLevel: myPet.level }
+              : authors[m.userId];
+          const petCode = pet?.selectedSkin === "fox" ? "fox" : "classic";
+          const petLevel = Math.max(1, Number(pet?.userLevel) || 1);
+          const petName = petCode === "fox" ? "MILO" : "NORA";
           const author =
             (mine ? account?.displayName : account?.name) ||
             m.author ||
@@ -277,9 +340,27 @@ export function TeamChat({ teamId, name }) {
                     userId={m.userId}
                   />
                   <div className="team-chat-message-content">
-                    <strong className="team-chat-author">
-                      {mine ? "Bạn" : author}
-                    </strong>
+                    <div className="team-chat-author-line">
+                      <strong className="team-chat-author">
+                        {mine ? "Bạn" : author}
+                      </strong>
+                      <span
+                        className="team-chat-pet"
+                        title={`${petName} của ${mine ? "bạn" : author} · Cấp ${petLevel}`}
+                      >
+                        <PetArtwork
+                          code={petCode}
+                          level={petLevel}
+                          alt={`${petName} của ${mine ? "bạn" : author} · Cấp ${petLevel}`}
+                        />
+                        <span
+                          className="team-chat-pet-level"
+                          aria-hidden="true"
+                        >
+                          Cấp {petLevel}
+                        </span>
+                      </span>
+                    </div>
                     <article
                       className={`team-chat-message${mine ? " mine" : ""}`}
                     >
@@ -320,7 +401,12 @@ export function TeamChat({ teamId, name }) {
             onChange={(e) => setText(e.target.value)}
             placeholder="Viết tin nhắn cho nhóm…"
             onKeyDown={(e) => {
-              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                e.nativeEvent.keyCode !== 229
+              ) {
                 e.preventDefault();
                 e.currentTarget.form.requestSubmit();
               }
@@ -329,7 +415,7 @@ export function TeamChat({ teamId, name }) {
           <button
             className="team-chat-send-button"
             aria-label={sending ? "Đang gửi…" : "Gửi tin nhắn"}
-            title="Gửi tin nhắn (Ctrl+Enter)"
+            title="Gửi tin nhắn (Enter)"
             disabled={sending || !text.trim()}
           >
             {icon(sending ? "clock" : "arrow")}
@@ -337,11 +423,27 @@ export function TeamChat({ teamId, name }) {
         </div>
         <div className="team-chat-composer-hint">
           <span>
-            <kbd>Ctrl</kbd> + <kbd>Enter</kbd> để gửi
+            <kbd>Enter</kbd> để gửi · <kbd>Shift</kbd> + <kbd>Enter</kbd> xuống
+            dòng
           </span>
           <span>{text.length}/2000</span>
         </div>
       </form>
     </section>
+  );
+  return expanded ? (
+    <dialog
+      ref={dialog}
+      className="team-chat-window"
+      aria-label={`Chat chung ${name} mở rộng`}
+      onCancel={(event) => {
+        event.preventDefault();
+        resizeChat();
+      }}
+    >
+      {chat}
+    </dialog>
+  ) : (
+    chat
   );
 }

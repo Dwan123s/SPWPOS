@@ -4,7 +4,7 @@ namespace SPWPOS.Application.Workspace;
 public sealed record TimeSlot(DateTimeOffset Start, DateTimeOffset End);
 public sealed record PlanningState(WorkTask[] Tasks, TaskDependency[] Dependencies, WeeklyAvailability[] Availability,
     AvailabilityException[] Exceptions, FixedEvent[] Events, WorkSession[] Sessions, WorkPreference Preference, EstimationObservation[]? Observations = null,
-    AvailabilityPolicy? Policy = null);
+    AvailabilityPolicy? Policy = null, bool EisenhowerScheduling = false);
 
 // Pure deterministic planner: no EF, HTTP, secrets, AI, or wall-clock dependencies.
 public sealed partial class PlanningEngine
@@ -42,7 +42,7 @@ public sealed partial class PlanningEngine
         return (int)Math.Ceiling(task.EstimatedMinutes * bias.Ratio);
     }
     public int Remaining(WorkTask task, BiasView[] biases) => task.IsDeleted || task.Status is WorkTaskStatus.Completed or WorkTaskStatus.Cancelled ? 0 :
-        (int)Math.Ceiling(Adjusted(task, biases) * (1 - task.Progress / 100d));
+        task.ConfirmedRemainingMinutes ?? (int)Math.Ceiling(Adjusted(task, biases) * (1 - task.Progress / 100d));
     public static TimeZoneInfo Zone(string id) => TimeZoneInfo.FindSystemTimeZoneById(id);
     public static bool InsideWorkWindow(WorkTask task, DateTimeOffset start, DateTimeOffset end) =>
         (task.WorkWindowStart is null || start >= task.WorkWindowStart) && (task.WorkWindowEnd is null || end <= task.WorkWindowEnd);
@@ -161,12 +161,15 @@ public sealed partial class PlanningEngine
         var preservedSessions = preserve.Select(x => new ProposedSession(x.Id, x.TaskId, x.Start, x.End, x.ReasonCode, true)).ToArray();
         var done = CompletionTimes(state, preservedSessions, bias, start);
         var warnings = new List<PlanWarning>();
+        var important = state.EisenhowerScheduling ? state.Tasks.Where(t => t.EffectiveImportance == "Important").Select(t => t.Id).ToHashSet() : [];
+        if (important.Count > 0) IncludePrerequisites(state, important);
         while (tasks.Count > 0)
         {
             var task = tasks.Values.Where(t => state.Dependencies.Where(d => d.TaskId == t.Id).All(d => done.ContainsKey(d.PredecessorId)))
                 .OrderByDescending(t => promoted?.Contains(t.Id) == true)
                 .ThenByDescending(t => urgentFirst && t.Priority == 4)
                 .ThenByDescending(t => urgentFirst && urgency?.RequestedUrgentTaskIds?.Contains(t.Id) == true)
+                .ThenByDescending(t => important.Contains(t.Id))
                 .ThenBy(t => t.Deadline).ThenByDescending(t => t.Priority).ThenBy(t => t.Id).FirstOrDefault();
             if (task is null)
             {

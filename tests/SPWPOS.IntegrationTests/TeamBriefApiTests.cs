@@ -43,6 +43,32 @@ public sealed class TeamBriefApiTests
         await using (var scope = factory.Services.CreateAsyncScope()) Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().TeamTasks.CountAsync(ct));
         var first = await client.PostAsJsonAsync($"/api/teams/{teamId}/briefs/{id}/confirm", new { }, ct); Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         var retry = await client.PostAsJsonAsync($"/api/teams/{teamId}/briefs/{id}/confirm", new { }, ct); Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
-        await using var verify = factory.Services.CreateAsyncScope(); Assert.Equal(1, await verify.ServiceProvider.GetRequiredService<ApplicationDbContext>().TeamTasks.CountAsync(ct));
+        await using var verify = factory.Services.CreateAsyncScope(); var db = verify.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Equal(1, await db.TeamTasks.CountAsync(ct)); Assert.Equal(1, await db.TeamTaskDocuments.CountAsync(ct));
+        var taskId = await db.TeamTasks.Select(x => x.Id).SingleAsync(ct);
+        var detail = await client.GetStringAsync($"/api/teams/{teamId}", ct); Assert.DoesNotContain(input.File!.Data, detail);
+        using var group = JsonDocument.Parse(detail);
+        var metadata = Assert.Single(group.RootElement.GetProperty("data").GetProperty("tasks").EnumerateArray()).GetProperty("sourceFiles");
+        Assert.Equal(id, Assert.Single(metadata.EnumerateArray()).GetProperty("id").GetGuid());
+        var file = await client.GetAsync($"/api/teams/tasks/{taskId}/source/files/{id}", ct);
+        Assert.Equal(HttpStatusCode.OK, file.StatusCode); Assert.Equal(bytes, await file.Content.ReadAsByteArrayAsync(ct));
+        Assert.Equal("attachment", file.Content.Headers.ContentDisposition!.DispositionType);
+        Assert.Equal("application/pdf", file.Content.Headers.ContentType!.MediaType);
+        Assert.Contains("sandbox", file.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.True(file.Headers.CacheControl!.NoStore); Assert.Equal("nosniff", file.Headers.GetValues("X-Content-Type-Options").Single());
+        var legacy = new SPWPOS.Domain.Entities.TeamTask { TeamId = teamId, Name = "Task chưa có tài liệu", Deadline = factory.Clock.GetUtcNow().AddDays(2), EstimatedMinutes = 60 };
+        db.TeamTasks.Add(legacy); await db.SaveChangesAsync(ct);
+        var attachment = new TeamSourceFileInput(legacy.Version, Guid.NewGuid(), input.File);
+        async Task<HttpResponseMessage> Attach()
+        {
+            using var body = new StringContent(JsonSerializer.Serialize(attachment, new JsonSerializerOptions(JsonSerializerDefaults.Web)), Encoding.UTF8, "application/json");
+            return await client.PostAsync($"/api/teams/tasks/{legacy.Id}/source", body, ct);
+        }
+        Assert.Equal(HttpStatusCode.OK, (await Attach()).StatusCode); Assert.Equal(HttpStatusCode.OK, (await Attach()).StatusCode);
+        Assert.Equal(2, await db.TeamTaskDocuments.CountAsync(ct));
+        var uploaded = await client.GetAsync($"/api/teams/tasks/{legacy.Id}/source/files/{attachment.RequestId}", ct);
+        Assert.Equal(bytes, await uploaded.Content.ReadAsByteArrayAsync(ct));
+        client.DefaultRequestHeaders.Authorization = null;
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/teams/tasks/{taskId}/source/files/{id}", ct)).StatusCode);
     }
 }

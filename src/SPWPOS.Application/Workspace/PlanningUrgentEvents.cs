@@ -29,8 +29,9 @@ public sealed partial class PlanningEngine
             return new UrgentMove(anchor, anchor > start ? anchor : start, latest, true);
         });
         var affected = input.AffectedTaskIds is null ? null : input.AffectedTaskIds.Concat(closure).Distinct().ToArray();
-        var plan = GenerateProtected(state, input with { AffectedTaskIds = affected }, now, new(retained, moves));
-        return plan with { HasUrgentReplan = true, Explanations = plan.Explanations.Append(
+        // Exact urgent appointment handling keeps the existing displacement contract.
+        var plan = GenerateProtected(state with { EisenhowerScheduling = false }, input with { AffectedTaskIds = affected }, now, new(retained, moves));
+        return plan with { PriorityPolicy = state.EisenhowerScheduling ? "eisenhower-v1" : "legacy", HasUrgentReplan = true, Explanations = plan.Explanations.Append(
             "Giữ đúng giờ lịch khẩn; dời các phiên chưa khóa bị trùng sang giờ phù hợp gần nhất sau lịch cũ, không đổi deadline hoặc khung giờ cho phép. Các lịch khác được giữ nguyên; cần xác nhận trước khi lưu.").ToArray() };
     }
 }

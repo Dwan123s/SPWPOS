@@ -17,12 +17,23 @@ public sealed partial class WorkspaceService
         var page = messages.Take(50); if (descending) page = page.Reverse(); var items = page.ToArray();
         // Send each account avatar once per page, rather than repeat image data on every message.
         var authorIds = items.Where(x => !x.IsSystem).Select(x => x.UserId).Distinct().ToArray();
-        var authors = await (from u in db.Users.AsNoTracking()
+        if (after is not null)
+        {
+            // Refresh visible authors' equipped pets even when no message was
+            // sent since the last cursor. Keep this bounded to recent history.
+            var recentAuthors = await db.TeamChatMessages.AsNoTracking().Where(x => x.TeamId == teamId && !x.IsSystem)
+                .OrderByDescending(x => x.Id).Take(50).Select(x => x.UserId).Distinct().ToArrayAsync(ct);
+            authorIds = authorIds.Concat(recentAuthors).Distinct().ToArray();
+        }
+        var accounts = await (from u in db.Users.AsNoTracking()
             join p in db.UserProfiles.AsNoTracking() on u.Id equals p.UserId into profiles
             from p in profiles.DefaultIfEmpty()
             where authorIds.Contains(u.Id)
-            select new TeamChatAuthorView(u.Id, p != null && p.DisplayName != "" ? p.DisplayName : u.FirstName + " " + u.LastName,
-                p != null ? p.AvatarUrl : "")).ToArrayAsync(ct);
+            select new { u.Id, Name = p != null && p.DisplayName != "" ? p.DisplayName : u.FirstName + " " + u.LastName,
+                AvatarUrl = p != null ? p.AvatarUrl : "", u.ExperiencePoints,
+                SelectedSkin = u.NoraSkin == "fox" && db.OwnedPetSkins.Any(s => s.UserId == u.Id && s.SkinCode == "fox") ? "fox" : "classic" }).ToArrayAsync(ct);
+        var authors = accounts.Select(u => new TeamChatAuthorView(u.Id, u.Name, u.AvatarUrl, u.SelectedSkin,
+            (int)Math.Min(int.MaxValue, Math.Max(1L, 1 + u.ExperiencePoints / 100)))).ToArray();
         return new(items.Select(x => new TeamChatMessageView(x.Id, x.UserId, x.IsSystem ? "Hệ thống" : x.Author, x.Text, x.CreatedAt, x.IsSystem)).ToArray(), items.Length > 0 ? items[^1].Id : after, messages.Length > 50, authors);
     }
     public Task<TeamChatMessageView> SendTeamChatAsync(Guid uid, Guid teamId, TeamChatInput input, CancellationToken ct) => Mutate(uid, async () =>

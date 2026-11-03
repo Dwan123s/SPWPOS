@@ -32,9 +32,9 @@ public sealed partial class WorkspaceService
         return query;
     }
 
-    private static bool RuntimeReplanAllowed(string source) => ChatMatch(source,
+    private static bool RuntimeReplanAllowed(string source) => (HasSessionMoveRequest(source) || ChatMatch(source,
         @"\b(?:toi uu|xep lai|sap xep lai|lap lai lich|doi (?:cac |nhung )?phien|doi lich|doi cac (?:viec|cong viec)|reschedule|replan)\b").Success &&
-        !ChatMatch(source, @"\b(?:khong|dung|chua) (?:duoc |tu dong )?(?:doi (?:cac )?phien|doi lich|xep lai|toi uu)\b").Success;
+        !ChatMatch(source, @"\b(?:khong|dung|chua) (?:duoc |tu dong )?(?:doi (?:cac )?phien|doi lich|xep lai|toi uu)\b").Success);
 
     private AgentIntent NormalizeRuntimeDraft(JsonElement payload, string source, PlanningState state, AgentPendingRequest? pending, string[] types)
     {
@@ -85,7 +85,9 @@ public sealed partial class WorkspaceService
         var (changes, candidate, affected, summary, notices) = await BuildAgentChangesAsync(uid, intent, state, source, ct, source, timetable);
         var start = intent.OptimizationQuery is { } scope && scope.Start > Now.AddMinutes(5) ? scope.Start : Now.AddMinutes(5);
         var end = intent.OptimizationQuery?.End;
-        if (strategy == "replan_flexible")
+        // A local collision repair already releases precisely authorized work in
+        // PrepareAgentEvents. It must not expand into moving every flexible task.
+        if (strategy == "replan_flexible" && (intent.Events.Length == 0 || intent.Reschedule))
         {
             // Scope is derived from the grounded request, never expanded by the
             // model. New-task windows bound which old sessions can be moved.
@@ -103,9 +105,10 @@ public sealed partial class WorkspaceService
         Require(end is null || end > start, "INVALID_RANGE", "Khoảng thực hiện đã qua hoặc không còn hợp lệ.");
         var planInput = new PlanInput(start, intent.HorizonDays, affected, true, "AVAILABILITY_CHANGED",
             input.UseCapacityFactor, input.UseEstimateBias) { WindowEnd = end };
+        var planningCandidate = ProtectUnselectedSessionReferences(source, candidate, intent.Events);
         PlanView? plan = changes.UrgentEventIds is { Length: > 0 } urgent
-            ? engine.GenerateForUrgentEvents(candidate, planInput, Now, urgent)
-            : affected.Length > 0 ? engine.Generate(candidate, planInput, Now) : null;
+            ? engine.GenerateForUrgentEvents(planningCandidate, planInput, Now, urgent)
+            : affected.Length > 0 ? engine.Generate(planningCandidate, planInput, Now) : null;
         if (plan is not null)
         {
             plan = plan with { IsOptimization = intent.OptimizationQuery is not null || strategy == "replan_flexible" };

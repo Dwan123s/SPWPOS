@@ -156,7 +156,8 @@ public sealed class TelegramNotificationService(ApplicationDbContext db, ITelegr
                 ? s.Status == WorkSessionStatus.Scheduled && s.Start > now && n.DedupeKey == $"session:{s.Id}:{s.Start.UtcTicks}"
                 : n.Kind == "SESSION_STARTED" ? (s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running) &&
                     s.Start <= now && s.Start >= now.AddMinutes(-2) && s.End > now && n.DedupeKey == $"session-started:{s.Id}:{s.Start.UtcTicks}"
-                : s.Status == WorkSessionStatus.NeedsReview && n.CreatedAt > now.AddDays(-1) && n.DedupeKey == $"review:{s.Id}:{s.End.UtcTicks}");
+                : (s.Status is WorkSessionStatus.NeedsReview or WorkSessionStatus.Paused or WorkSessionStatus.Completed) && s.End<=now &&
+                    n.CreatedAt > now.AddDays(-1) && n.DedupeKey == $"review:{s.Id}:{s.End.UtcTicks}");
             return current ? new(task.Name, s!.Start, s.End) : null;
         }
         return n.CreatedAt > now.AddDays(-1) ? new() : null;

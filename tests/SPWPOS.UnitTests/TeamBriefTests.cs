@@ -78,8 +78,9 @@ public sealed partial class PrivateTeamPlanningTests
             };
         } }; await using var h = await Setup(ai);
         if (kind == "wrongCount") await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.DraftTeamBriefAsync(Leader, Team, BriefInput, Ct)));
-        else { var draft = await Use(h, s => s.DraftTeamBriefAsync(Leader, Team, BriefInput, Ct)); Assert.Equal(Guid.Empty, draft.ProposalId); Assert.NotEmpty(draft.Question); Assert.Empty(draft.Tasks); }
-        Assert.Equal(0, await h.DbAsync(db => db.PrivatePlanningProposals.CountAsync(Ct))); Assert.Equal(1, await h.DbAsync(db => db.TeamTasks.CountAsync(Ct)));
+        else { var draft = await Use(h, s => s.DraftTeamBriefAsync(Leader, Team, BriefInput, Ct)); Assert.NotEqual(Guid.Empty, draft.ProposalId); Assert.NotEmpty(draft.Question); Assert.Empty(draft.Tasks); Assert.Equal(2, draft.PendingTasks!.Length);
+            await Assert.ThrowsAsync<AuthException>(()=>Use(h,s=>s.ConfirmTeamBriefAsync(Leader,Team,draft.ProposalId,Ct))); }
+        Assert.Equal(kind=="wrongCount" ? 0 : 1, await h.DbAsync(db => db.PrivatePlanningProposals.CountAsync(Ct))); Assert.Equal(1, await h.DbAsync(db => db.TeamTasks.CountAsync(Ct)));
     }
 
     [Fact] public async Task Word_tables_and_paragraphs_are_read_and_pdf_is_passed_directly_to_the_model()

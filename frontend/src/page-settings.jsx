@@ -76,6 +76,9 @@ export function settingsPage() {
         </div>
       </div>
       <div className="settings-tabs-bar">
+        <button type="button" className={`settings-tab-btn ${currentTab === "pets" ? "active" : ""}`} data-action="settings-tab" data-id="pets">
+          {icon("spark")} Pet & XP
+        </button>
         <button type="button" className={`settings-tab-btn ${currentTab === "connections" ? "active" : ""}`} data-action="settings-tab" data-id="connections">
           {icon("calendar")} Kết nối
         </button>
@@ -118,6 +121,7 @@ export function settingsPage() {
         </button>
       </div>
       {currentTab === "connections" ? <div className="stack gap-24"><GoogleCalendarCard /><TelegramCard /></div> : null}
+      {currentTab === "pets" ? <NoraInventory /> : null}
       {currentTab === "profile" ? (
         <section className="card settings-content-card">
           <div className="card-header">
@@ -260,7 +264,6 @@ export function settingsPage() {
           {" "}
           <section className="card settings-content-card">
             <GoogleAccountCard />
-            <NoraInventory />
             <AccountPassword email={p.email || ""} />
           </section>{" "}
           <section className="card danger-card">

@@ -54,6 +54,7 @@ public sealed partial class WorkspaceService
         var authorizedMoves = state.Tasks.Where(task => !preserved.Contains(task.Id) && (conflictingMoves || ChatMatch(request,
             @"\b(?:doi|doi lich|doi gio|di chuyen|xep lai|sap xep lai)\s+(?:(?:rieng|lich|phien|cho|cong viec)\s+)*" +
             Regex.Escape(MatchText(task.Name)) + @"\b").Success)).Select(task => task.Id).ToHashSet();
+        authorizedMoves.UnionWith(ClockReferencedSessionTasks(request, state, incoming.Select(e => new AgentEventCommand(e.Name, e.Start, e.End))));
         bool NeedsReplan(DateTimeOffset start, DateTimeOffset end) => Overlaps(start, end) || classes.Any(item => start < item.End && item.Start < end);
         var existing = state.Events.Where(item => !incoming.Any(change => change.Id == item.Id)).ToArray();
         var movable = existing.Where(item => item.Start >= Now.AddMinutes(5) && Overlaps(item.Start, item.End) && CanProposeEventMove(item, request)).ToArray();

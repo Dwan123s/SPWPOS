@@ -3,17 +3,27 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Initialize-Dotnet.ps1')
 $taskApiRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $taskApiDirectory = Join-Path $taskApiRoot 'src\SPWPOS.Api'
-$taskApiExe = Join-Path $taskApiDirectory ("bin\$Configuration\net8.0\SPWPOS.Api.exe")
-if (-not (Test-Path -LiteralPath $taskApiExe -PathType Leaf)) { throw "Build the $Configuration API first." }
+# Never launch from bin: a later build can replace not-yet-loaded assemblies
+# while the process keeps older ones in memory (MissingMethodException).
+# Rebuild the whole project graph into a fresh, immutable runtime directory.
+$taskApiRuntimeRoot = Join-Path $taskApiRoot 'artifacts\api-runtime'
+$taskApiRuntimeDirectory = Join-Path $taskApiRuntimeRoot ([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N'))
+[IO.Directory]::CreateDirectory($taskApiRuntimeDirectory) | Out-Null
+& $SpwposDotnet build (Join-Path $taskApiDirectory 'SPWPOS.Api.csproj') --configuration $Configuration --no-restore `
+    --output $taskApiRuntimeDirectory --target:Rebuild -m:1 -nr:false -p:UseSharedCompilation=false --verbosity minimal
+if ($LASTEXITCODE -ne 0) { throw 'API rebuild did not pass; the existing API was left running.' }
+$taskApiExe = Join-Path $taskApiRuntimeDirectory 'SPWPOS.Api.exe'
+if (-not (Test-Path -LiteralPath $taskApiExe -PathType Leaf)) { throw 'Rebuilt API executable is missing; the existing API was left running.' }
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
 $env:DOTNET_ENVIRONMENT = 'Development'
 Push-Location -LiteralPath $taskApiDirectory
 try {
-    & $SpwposDotnet (Join-Path $taskApiDirectory ("bin\$Configuration\net8.0\SPWPOS.Api.dll")) --check-schema
+    & $SpwposDotnet (Join-Path $taskApiRuntimeDirectory 'SPWPOS.Api.dll') --check-schema
     if ($LASTEXITCODE -ne 0) { throw 'Schema check did not pass. Review migrations before restart; the existing API was left running.' }
 } finally { Pop-Location }
 $taskApiOwnedProcesses = @(Get-CimInstance Win32_Process -Filter "Name = 'SPWPOS.Api.exe'" | Where-Object {
-    $_.ExecutablePath -and $_.ExecutablePath.StartsWith($taskApiDirectory + '\', [StringComparison]::OrdinalIgnoreCase)
+    $_.ExecutablePath -and ($_.ExecutablePath.StartsWith($taskApiDirectory + '\', [StringComparison]::OrdinalIgnoreCase) -or
+        $_.ExecutablePath.StartsWith($taskApiRuntimeRoot + '\', [StringComparison]::OrdinalIgnoreCase))
 })
 foreach ($taskApiProcess in $taskApiOwnedProcesses) {
     Stop-Process -Id $taskApiProcess.ProcessId -Force
@@ -44,6 +54,7 @@ for ($taskApiAttempt = 0; $taskApiAttempt -lt 30; $taskApiAttempt++) {
 }
 if (-not $taskApiReady) { throw 'PLANORA API did not listen on port 7043.' }
 Write-Host "PLANORA API started (PID $($taskApiNewProcess.Id)) at https://localhost:7043."
+Write-Host "Runtime: $taskApiRuntimeDirectory"
 $taskApiAiStatus = $null
 for ($taskAiStatusAttempt = 0; $taskAiStatusAttempt -lt 10; $taskAiStatusAttempt++) {
     $taskApiAiStatus = Get-Content -LiteralPath (Join-Path $taskApiLogs 'live-ai-api.stdout.log') -ErrorAction SilentlyContinue |

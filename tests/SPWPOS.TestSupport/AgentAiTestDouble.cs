@@ -1,7 +1,7 @@
 using SPWPOS.Application.Workspace;
 namespace SPWPOS.TestSupport;
 
-public sealed class AgentAiTestDouble : ITaskInterpreter, IPlanningAgentInterpreter, ITeamBriefInterpreter
+public sealed class AgentAiTestDouble : ITaskInterpreter, IPlanningAgentInterpreter, ITeamBriefInterpreter, IImportanceInterpreter
 {
     public NoteAgentCapabilities Capabilities => new(true, Provider: "Gemini");
     public Func<DateTimeOffset, AgentIntent> Response { get; set; } = _ => Empty();
@@ -14,6 +14,14 @@ public sealed class AgentAiTestDouble : ITaskInterpreter, IPlanningAgentInterpre
     public int ImageCalls { get; private set; }
     public TeamBriefContext? BriefContext { get; private set; }
     public Func<TeamBriefContext, TeamBriefAnalysis>? BriefResponse { get; set; }
+    public ImportanceContext? ImportanceContext { get; private set; }
+    public Func<ImportanceContext, ImportanceSuggestion>? ImportanceResponse { get; set; }
+    public async Task<ImportanceSuggestion> SuggestImportanceAsync(ImportanceContext context, CancellationToken ct)
+    {
+        Calls++; ImportanceContext = context;
+        if (BeforeReply != null) await BeforeReply();
+        return ImportanceResponse?.Invoke(context) ?? new("Unknown", "Cần làm rõ ảnh hưởng", .5, "");
+    }
     public async Task<TeamBriefAnalysis> AnalyzeTeamBriefAsync(TeamBriefContext context, CancellationToken ct)
     {
         Calls++; BriefContext = context;

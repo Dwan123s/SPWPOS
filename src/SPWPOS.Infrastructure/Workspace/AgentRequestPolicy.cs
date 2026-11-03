@@ -152,15 +152,30 @@ public sealed partial class WorkspaceService
         return explanation;
     }
 
-    private static AgentIntent ConstrainEventReplanning(AgentIntent intent, string request, PlanningState state)
+    private AgentIntent ConstrainEventReplanning(AgentIntent intent, string request, PlanningState state)
     {
-        if (intent.Events.Length == 0) return intent;
+        if (intent.Events.Length == 0) {
+            if (intent.Question.Length == 0 && (intent.Reschedule || intent.ScheduleTaskIds.Length > 0)) {
+                var clockTasks = ClockReferencedSessionTasks(request, state);
+                if (clockTasks.Count > 0) return intent with { Reschedule = false, ScheduleTaskIds = clockTasks.ToArray() };
+            }
+            return intent;
+        }
+        if (intent.Events.Length == 1 && SessionMovePurposeMinute(request) is { } purposeMinute) {
+            var local = TimeZoneInfo.ConvertTime(intent.Events[0].Start, PlanningEngine.Zone(state.Preference.TimeZoneId));
+            Require(local.Hour * 60 + local.Minute == purposeMinute, "WRONG_MOVE_TARGET",
+                "Bạn yêu cầu dời phiên làm việc và giữ giờ hẹn đã nói. Hãy giữ đúng giờ hẹn, chỉ thử dời phần việc được cho phép.");
+        }
         var text = MatchText(request);
         var replan = RequestMatches(text, @"\b(?:xep lai|sap xep lai|toi uu (?:lai )?|lap lai lich|reschedule|replan)\b").Count > 0;
         var global = replan && RequestMatches(text, @"\b(?:toan bo|tat ca|all|whole)\b").Count > 0;
         var preserved = ExplicitlyPreservedTasks(request, state);
         var named = state.Tasks.Where(t => !preserved.Contains(t.Id) && (text.Contains(MatchText(t.Name), StringComparison.Ordinal) ||
             request.Contains(t.Id.ToString(), StringComparison.OrdinalIgnoreCase))).Select(t => t.Id).ToHashSet();
+        var clockReferenced = ClockReferencedSessionTasks(request, state, intent.Events);
+        // A task mentioned in the PURPOSE or in “keep other work” is not a
+        // movement target. Exact clock selection narrows a model's broad IDs.
+        if (clockReferenced.Count > 0) named = clockReferenced;
         return intent with { Reschedule = intent.Reschedule && global,
             ScheduleTaskIds = global ? intent.ScheduleTaskIds : intent.ScheduleTaskIds.Where(named.Contains).ToArray() };
     }
@@ -171,7 +186,7 @@ public sealed partial class WorkspaceService
         !ForbidsSessionMoves(request);
 
     private static bool ForbidsSessionMoves(string request) => ChatMatch(request,
-        @"\b(?:khong|dung|cho)\s+(?:tu dong\s+)?(?:xep lai|sap xep lai|chuyen|di chuyen|doi)\b(?!\s+(?:(?:cac|nhung)\s+)?(?:cong viec|phien|lich)\s+khong lien quan\b)").Success;
+        @"\b(?:khong|dung|cho)\s+(?:tu dong\s+)?(?:xep lai|sap xep lai|chuyen|di chuyen|doi)\b(?!\s+(?:(?:gio|lich|bai|cuoc|buoi)\s+)*(?:kiem tra|hop|kham|hen|thi)\b)(?!\s+(?:(?:cac|nhung)\s+)?(?:cong viec|phien|lich)\s+khong lien quan\b)").Success;
 
     private static string? ClarificationRecoveryContext(AgentIntent intent, string request, string context, string[] activeTypes)
     {

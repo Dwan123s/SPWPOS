@@ -1,0 +1,208 @@
+.pet-artwork {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  aspect-ratio: 1;
+  isolation: isolate;
+}
+.pet-artwork > img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.pet-artwork.pet-stage-2 > img,
+.pet-artwork.pet-stage-3 > img {
+  transform: scale(0.85);
+}
+.pet-artwork.pet-stage-2 {
+  background: radial-gradient(ellipse at center, #daf8ff 12%, transparent 68%);
+}
+.pet-artwork.pet-stage-3 {
+  background: radial-gradient(ellipse at center, #fff0bd 12%, transparent 70%);
+}
+.pet-evolution-wings {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+.pet-evolution-crown {
+  position: absolute;
+  left: 32%;
+  top: -1%;
+  width: 36%;
+  height: 25%;
+  z-index: 2;
+}
+.nora-avatar .pet-artwork > img {
+  object-fit: contain;
+  transform: none;
+}
+.nora-avatar .pet-stage-2 > img,
+.nora-avatar .pet-stage-3 > img {
+  transform: scale(0.85);
+}
+.nora-mascot-figure > .pet-artwork {
+  display: block;
+}
+.pet-progress-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  margin: 0 0 16px;
+  border: 1px solid #d4e8f4;
+  border-radius: 18px;
+  background: linear-gradient(120deg, #f4fcff, #fffaf0);
+  color: #26415a;
+  text-decoration: none;
+}
+.pet-progress-card > .pet-artwork {
+  flex: 0 0 64px;
+}
+.pet-progress-card > span:nth-child(2) {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.pet-progress-card strong {
+  font-size: 13px;
+}
+.pet-progress-heading {
+  display: grid;
+  gap: 6px;
+}
+.pet-progress-card small {
+  font-size: 11px;
+  color: #587083;
+}
+.pet-progress-card progress {
+  width: 100%;
+  max-width: 300px;
+  height: 7px;
+  accent-color: #229fc5;
+}
+.pet-progress-card:focus-visible {
+  outline: 3px solid #5aaadd;
+  outline-offset: 3px;
+}
+.pet-xp-progress {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #dce9f3;
+  color: #219ec5;
+}
+.pet-xp-progress::-webkit-progress-bar {
+  background: #dce9f3;
+  border-radius: 999px;
+}
+.pet-xp-progress::-webkit-progress-value {
+  background: linear-gradient(90deg, #219ec5, #56c5da);
+  border-radius: 999px;
+}
+.pet-xp-progress::-moz-progress-bar {
+  background: linear-gradient(90deg, #219ec5, #56c5da);
+  border-radius: 999px;
+}
+.topbar .pet-progress-header {
+  flex: 0 0 auto;
+  width: clamp(176px, 18vw, 230px);
+  min-width: 0;
+  margin: 0;
+  padding: 4px 8px;
+  gap: 7px;
+  border-radius: 12px;
+}
+.pet-progress-header > .pet-artwork {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+}
+.pet-progress-header > span:nth-child(2) {
+  gap: 5px;
+}
+.pet-progress-header .pet-progress-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+}
+.pet-progress-header strong {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.pet-progress-header small {
+  font-size: 10px;
+  line-height: 1.4;
+}
+.pet-progress-header progress {
+  height: 5px;
+}
+.planning-console .topbar:has(.pet-progress-header) .topbar-right {
+  flex-shrink: 0;
+}
+@media (min-width: 801px) {
+  .planning-console .topbar:has(.pet-progress-header) .console-command-search {
+    width: clamp(130px, 21vw, 300px);
+    overflow: hidden;
+  }
+  .planning-console
+    .topbar:has(.pet-progress-header)
+    .console-command-search
+    > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 700px) {
+  .planning-console .topbar:has(.pet-progress-header) {
+    height: auto;
+    min-height: 56px;
+    padding-block: 6px;
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .planning-console .topbar:has(.pet-progress-header) .topbar-right {
+    margin-left: auto;
+  }
+  .topbar .pet-progress-header {
+    width: 150px;
+  }
+  .pet-progress-header > .pet-artwork {
+    flex-basis: 32px;
+    width: 32px;
+    height: 32px;
+  }
+  .pet-progress-header .pet-progress-heading {
+    display: grid;
+    gap: 0;
+  }
+  .pet-progress-header > span:nth-child(2) {
+    gap: 3px;
+  }
+}
+@media (max-width: 400px) {
+  .topbar .pet-progress-header {
+    width: 124px;
+    padding-inline: 6px;
+    gap: 5px;
+  }
+  .pet-progress-header > .pet-artwork {
+    flex-basis: 28px;
+    width: 28px;
+    height: 28px;
+  }
+}

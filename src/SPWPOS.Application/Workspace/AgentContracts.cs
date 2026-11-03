@@ -9,7 +9,7 @@ public sealed record AgentTaskCommand(Guid? TaskId, string Name, DateTimeOffset?
     int? EstimatedMinutes, int? Priority, string TaskType, bool? Splittable,
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null,
     string? DurationEvidence = null, string? DeadlineEvidence = null, string? WorkWindowEvidence = null,
-    bool DeadlineFromWorkWindow = false);
+    bool DeadlineFromWorkWindow = false, ImportanceSuggestion? Importance = null);
 public sealed record AgentPendingRequest(string OriginalText, Guid? TaskId, DateTimeOffset? WorkWindowStart,
     DateTimeOffset? WorkWindowEnd, int? EstimatedMinutes, DateTimeOffset? Deadline, string[]? Answers = null,
     int? ProposedMinutes = null, bool DurationProposalAccepted = false);

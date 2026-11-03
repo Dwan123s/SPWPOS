@@ -222,9 +222,10 @@ public sealed partial class WorkspaceService
                 var planInput = new PlanInput(intent.OptimizationQuery is { } scope && scope.Start > Now.AddMinutes(5) ? scope.Start : Now.AddMinutes(5),
                     intent.HorizonDays, affected, true, "AVAILABILITY_CHANGED", UseCapacityFactor: input.UseCapacityFactor, UseEstimateBias: input.UseEstimateBias)
                     { WindowEnd = intent.OptimizationQuery?.End };
+                var planningCandidate = selected is null ? ProtectUnselectedSessionReferences(eventRequest, candidate, intent.Events) : candidate;
                 PlanView? plan = selected is not null ? selected.Plan : changes.UrgentEventIds is { Length: > 0 } urgentEventIds
-                    ? engine.GenerateForUrgentEvents(candidate, planInput, Now, urgentEventIds)
-                    : affected.Length > 0 ? engine.Generate(candidate, planInput, Now) : null;
+                    ? engine.GenerateForUrgentEvents(planningCandidate, planInput, Now, urgentEventIds)
+                    : affected.Length > 0 ? engine.Generate(planningCandidate, planInput, Now) : null;
                 if (plan is not null && intent.OptimizationQuery is not null) plan = plan with { IsOptimization = true };
                 if (selected is null && plan is not null)
                     plan = RespectSchedulingExclusions(plan, candidate, affected, input);
@@ -471,7 +472,7 @@ public sealed partial class WorkspaceService
                 task.WorkWindowStart = item.WorkWindowStart ?? task.WorkWindowStart; task.WorkWindowEnd = item.WorkWindowEnd ?? task.WorkWindowEnd;
                 if (item.Deadline is not null) task.IsHardDeadline = !item.DeadlineFromWorkWindow;
                 if (task.Deadline == original.Deadline && task.EstimatedMinutes == original.EstimatedMinutes && task.Priority == original.Priority &&
-                    task.Splittable == original.Splittable && task.IsHardDeadline == original.IsHardDeadline && task.WorkWindowStart == original.WorkWindowStart && task.WorkWindowEnd == original.WorkWindowEnd && task.TaskType == original.TaskType) continue;
+                    task.Splittable == original.Splittable && task.IsHardDeadline == original.IsHardDeadline && task.WorkWindowStart == original.WorkWindowStart && task.WorkWindowEnd == original.WorkWindowEnd && task.TaskType == original.TaskType && item.Importance == null) continue;
                 task.UpdatedAt = Now;
                 summary.Add(new("TASK", task.Name, AgentTaskSummary(original, state.Preference), AgentTaskSummary(task, state.Preference), task.Id));
             }
@@ -483,10 +484,19 @@ public sealed partial class WorkspaceService
                 task.WorkWindowStart = item.WorkWindowStart; task.WorkWindowEnd = item.WorkWindowEnd;
                 summary.Add(new("TASK", task.Name, "", AgentTaskSummary(task, state.Preference), task.Id));
             }
+            if (item.Importance != null && (item.TaskId == null || task.ImportanceConfirmedAt == null ||
+                System.Text.RegularExpressions.Regex.IsMatch(request, "quan trọng|quan trong|importance|ít quan trọng|it quan trong", System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100))))
+            {
+                var suggestion = SuggestedImportance(item.Importance, request);
+                var explicitCorrection = item.TaskId != null && System.Text.RegularExpressions.Regex.IsMatch(request, "quan trọng|quan trong|importance", System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+                if (suggestion.Level != "Unknown" || item.TaskId == null) WriteImportance(task, suggestion, explicitCorrection ? Now : null, explicitCorrection ? "User" : "AI");
+            }
+            var summaryIndex = summary.FindLastIndex(change => change.Kind == "TASK" && change.TaskId == task.Id);
+            if (summaryIndex >= 0) summary[summaryIndex] = summary[summaryIndex] with { After = AgentTaskSummary(task, state.Preference) };
             ValidTask(new(task.Name, task.Description, task.Deadline, task.EstimatedMinutes, task.Priority, task.TaskType, task.Splittable, task.MinimumSessionMinutes));
             Require(task.WorkWindowStart is null && task.WorkWindowEnd is null || task.WorkWindowStart is not null && task.WorkWindowEnd > task.WorkWindowStart &&
                 task.WorkWindowEnd <= Now.AddDays(31) && task.Deadline > task.WorkWindowStart, "TASK_WORK_WINDOW", "Khung giờ thực hiện không hợp lệ hoặc nằm sau deadline.", 409);
-            Require(task.Deadline > Now && task.Deadline.Year <= 2100, "DEADLINE_CONFLICT", "Deadline phải ở tương lai.", 409);
+            Require((task.Deadline > Now || item.Importance != null && state.Tasks.Any(original => original.Id == task.Id && SameTaskContract(original, task))) && task.Deadline.Year <= 2100, "DEADLINE_CONFLICT", "Deadline phải ở tương lai.", 409);
             Require(await db.TaskTypes.AnyAsync(x => x.Code == task.TaskType && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không hợp lệ.");
             taskChanges.Add(task); affected.Add(task.Id);
         }
@@ -511,6 +521,9 @@ public sealed partial class WorkspaceService
                 candidate.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled).Select(x => x.Id)) affected.Add(id);
         Require(intent.OptimizationQuery is not null || !candidate.Sessions.Any(x => affected.Contains(x.TaskId) && x.Status == WorkSessionStatus.Scheduled && x.Start >= Now.AddMinutes(5).AddDays(intent.HorizonDays) &&
             !engine.FreeSlots(candidate, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End)), "AGENT_HORIZON_CONFLICT", "Có phiên bị ảnh hưởng ngoài phạm vi đang lập lịch. Hãy mở rộng phạm vi hoặc chỉnh riêng phiên đó.", 409);
+        if (ChatMatch(request, @"\b(?:quan trong|importance)\b").Success && !ChatMatch(request, @"\b(?:(?:xep|sap xep|len) lich|reschedule|schedule)\b").Success &&
+            !intent.Reschedule && intent.OptimizationQuery == null && weekly == null && exceptions.Count == 0 && events.Count == 0 && removedExceptions.Length == 0 &&
+            taskChanges.Count > 0 && taskChanges.All(task => state.Tasks.Any(original => original.Id == task.Id && SameTaskContract(original, task)))) affected.Clear();
         return (new(weekly, exceptions.ToArray(), events.ToArray(), taskChanges.ToArray(), removedExceptions.Select(x => x.Id).ToArray(), urgentEventIds, clippedClasses.ToArray(),
             timetableContext && events.Count > 0 || (weekly is not null || exceptions.Count > 0) &&
                 candidate.Events.Any(x => x.End > Now && x.Start <= Now.AddDays(30) && x.EventType == "CLASS")),
@@ -521,6 +534,7 @@ public sealed partial class WorkspaceService
     private static string AgentTaskSummary(WorkTask task, WorkPreference preference) =>
         $"{task.EstimatedMinutes} phút · hạn chót {LocalTime(task.Deadline, preference)}" +
         (task.Priority != 2 ? " · ưu tiên " + (task.Priority switch { 1 => "thấp", 3 => "cao", _ => "khẩn cấp" }) : "") +
+        (task.EffectiveImportance == "Important" ? " · quan trọng: " + task.ImportanceReason : task.EffectiveImportance == "Lower" ? " · mức ảnh hưởng thấp hơn: " + task.ImportanceReason : "") +
         (!task.Splittable ? " · làm liên tục" : "") +
         (task.WorkWindowStart is { } from && task.WorkWindowEnd is { } to ? $" · thực hiện {LocalWindow(from, to, preference)}" : "");
     private static string LocalWindow(DateTimeOffset start, DateTimeOffset end, WorkPreference preference) => $"{LocalTime(start, preference)} → {LocalTime(end, preference)}";
@@ -548,7 +562,7 @@ public sealed partial class WorkspaceService
         foreach (var task in changes.Tasks)
         {
             Require(await db.TaskTypes.AnyAsync(x => x.Code == task.TaskType && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không còn hoạt động; hãy tạo lại bản xem trước.", 409);
-            Require(task.Deadline > Now && (task.WorkWindowStart is null && task.WorkWindowEnd is null || task.WorkWindowStart is not null && task.WorkWindowEnd > task.WorkWindowStart && task.Deadline > task.WorkWindowStart),
+            Require((task.Deadline > Now || view.Plan == null && state.Tasks.Any(original => original.Id == task.Id && SameTaskContract(original, task))) && (task.WorkWindowStart is null && task.WorkWindowEnd is null || task.WorkWindowStart is not null && task.WorkWindowEnd > task.WorkWindowStart && task.Deadline > task.WorkWindowStart),
                 "TASK_WORK_WINDOW", "Deadline hoặc khung giờ thực hiện trong bản xem trước không còn hợp lệ.", 409);
         }
         var applicationTime = Now;
@@ -567,6 +581,8 @@ public sealed partial class WorkspaceService
             Events = state.Events.Where(x => !changes.Events.Any(e => e.Id == x.Id)).Concat(changes.Events).ToArray(), Tasks = state.Tasks.Where(x => !changes.Tasks.Any(t => t.Id == x.Id)).Concat(changes.Tasks).ToArray() };
         ValidateProtectedSessions(candidate);
         var plan = view.Plan;
+        Require(plan?.PriorityPolicy == null || plan.PriorityPolicy == (state.EisenhowerScheduling ? "eisenhower-v1" : "legacy"),
+            "AGENT_PREVIEW_STALE", "Chính sách ưu tiên đã thay đổi. Hãy xem phương án mới.", 409);
         var eventCalendar = candidate with { Sessions = candidate.Sessions.Where(session => plan is null || session.Status != WorkSessionStatus.Scheduled ||
             session.Start < plan.Start || session.Start >= plan.End || plan.Sessions.Any(proposed => proposed.Preserved && proposed.Id == session.Id)).ToArray() };
         foreach (var item in changes.Events) ValidateEventConflicts(eventCalendar, [item], item.Id);

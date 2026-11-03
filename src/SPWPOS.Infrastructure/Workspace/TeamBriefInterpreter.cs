@@ -26,7 +26,8 @@ public sealed partial class TaskInterpreter
             "notes":{"type":"array","items":{"type":"string"}},
             "sourceReferences":{"type":"array","items":{"type":"string"}},
             "estimatedMinutes":{"type":"integer"},
-            "deadline":{"type":["string","null"]},"deadlineEvidence":{"type":"string"}
+            "deadline":{"type":["string","null"]},"deadlineEvidence":{"type":"string"},
+            "importance":{"type":["object","null"],"additionalProperties":false,"required":["level","reason","confidence","evidence"],"properties":{"level":{"type":"string"},"reason":{"type":"string"},"confidence":{"type":"number"},"evidence":{"type":"string"}}}
           }}}
         }}
         """);
@@ -54,12 +55,14 @@ public sealed partial class TaskInterpreter
             Use user text as clarification of project facts, including an explicit corrected deadline. Never invent deadlines or intermediate milestones.
             Resolve relative dates using current UTC now and timeZoneId. ISO timestamps MUST have an explicit timezone offset.
             deadlineEvidence must quote the exact excerpt supporting that deadline (from the document or user clarification).
-            If the deadline is missing, contradictory, unreadable, or already past, ask a specific Vietnamese question and return tasks=[].
+            If the scope is readable but a deadline is missing, contradictory, unreadable, or already past, KEEP all memberCount work packages and their full requirements/deliverables/notes; use deadline=null for the unresolved deadlines and ask one concise Vietnamese question in question. Do not discard the work breakdown just because the submission hour is missing.
+            A date-only project deadline is NOT permission to invent 23:59, 23:59:59 or another submission hour. Quote its date as deadlineEvidence, set deadline=null, and ask the leader for the common submission hour once. Preserve every readable requirement and apply one confirmed common project deadline to all packages without asking separate deadlines for each. Only use an explicit per-task deadline when the source actually specifies one. A later user clarification overrides the earlier unspecified or corrected deadline.
             If any pages/sections are unreadable or require external links, explain and ask for the actual missing content; do not claim you read it.
             Keep each task's full summary + lists + deadline evidence under 3500 characters. Preserve critical requirements; if impossible, ask to split the source.
             Return concise Vietnamese summary, splitReason explaining workload distribution, warnings for assumptions, and question='' only when complete.
             This is a preview. Never claim tasks were created, assigned, scheduled, completed or saved. Do not access private user data.
             """;
+        instructions += " Optionally include importance per task: level Important/Lower/Unknown, Vietnamese reason, confidence 0..1 and exact evidence quote. Importance is impact on goals/mandatory deliverables, not urgency or deadline proximity. Use Unknown without evidence. The leader confirms this draft.";
         var prompt = JsonSerializer.Serialize(new { context.MemberCount, context.TimeZoneId, context.Now,
             context.FileName, userClarification = context.Text, documentContent = context.DocumentText }, Json);
         try

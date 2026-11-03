@@ -25,7 +25,14 @@ public sealed partial class TaskInterpreter
         return shape;
     }
     private static JsonNode TaskTypeSchema(string[] codes) => new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(codes.Append("").Distinct().Select(x => (JsonNode?)JsonValue.Create(x)).ToArray()) };
-    internal static JsonElement AgentSchema(string[] codes) => JsonSerializer.SerializeToElement(Shape(
+    private static JsonNode WithTaskImportance(JsonNode schema)
+    {
+        schema["properties"]!["tasks"]!["items"]!["properties"]!["importance"] = Shape(
+            ("level", Type("string")), ("reason", Type("string")), ("confidence", Type("number")), ("evidence", Type("string")));
+        schema["properties"]!["tasks"]!["items"]!["properties"]!["importance"]!["type"] = new JsonArray("object", "null");
+        return schema;
+    }
+    internal static JsonElement AgentSchema(string[] codes) => JsonSerializer.SerializeToElement(WithTaskImportance(Shape(
         ("reply", Type("string")), ("resultKind", new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("CLARIFICATION", "ANSWER", "MUTATION") }),
         ("question", Type("string")), ("options", List(Type("string"))), ("freeTimeQuery", FreeTimeQuerySchema()), ("scheduleReviewQuery", FreeTimeQuerySchema()), ("optimizationQuery", FreeTimeQuerySchema()), ("replaceWeeklyAvailability", Type("boolean")),
         ("weeklySlots", List(Shape(("dayOfWeek", Type("integer")), ("startMinute", Type("integer")), ("endMinute", Type("integer"))))),
@@ -35,7 +42,7 @@ public sealed partial class TaskInterpreter
             ("estimatedMinutes", Type("integer", true)), ("priority", Type("integer", true)), ("taskType", TaskTypeSchema(codes)), ("splittable", Type("boolean", true)),
             ("workWindowStart", Type("string", true)), ("workWindowEnd", Type("string", true)),
             ("durationEvidence", Type("string")), ("deadlineEvidence", Type("string")), ("workWindowEvidence", Type("string"))))),
-        ("scheduleTaskIds", List(Type("string"))), ("reschedule", Type("boolean")), ("horizonDays", new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = 30 })));
+        ("scheduleTaskIds", List(Type("string"))), ("reschedule", Type("boolean")), ("horizonDays", new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = 30 }))));
 
     public Task<AgentIntent> InterpretAsync(string text, string contextJson, AgentMessage[] history,
         string timeZoneId, DateTimeOffset now, CancellationToken ct) => InterpretCoreAsync(text, contextJson, history, timeZoneId, now, null, ct);
@@ -72,6 +79,9 @@ public sealed partial class TaskInterpreter
             ? activeTypes.EnumerateArray().Select(x => x.GetString()!).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray()
             : new[] { "OTHER" };
         var schema = AgentSchema(codes);
+        instructions += " For task importance, optionally output importance={level:'Important'|'Lower'|'Unknown',reason:Vietnamese explanation,confidence:0..1,evidence:exact source quote}. " +
+            "Importance describes impact on goals or mandatory deliverables, never urgency, deadline proximity or priority. Without clear evidence use Unknown. " +
+            "When the user explicitly corrects importance, emit only that matching existing task with all other editable fields null/unchanged. Never invent evidence, habits or private schedules.";
         if (contextDocument.RootElement.TryGetProperty("mode", out var reviewMode) && reviewMode.GetString() == "TEAM_CLAIM_REVIEW")
             instructions = "Explain a private team task scheduling proposal in 2–3 concise Vietnamese paragraphs using only the supplied verified facts. " +
                 "Describe the work, estimated effort, deadline and why this user's saved schedule leads to the verified options. The server appends exact slots. " +
@@ -204,8 +214,8 @@ public sealed partial class TaskInterpreter
         var type = schema.GetProperty("type");
         var types = type.ValueKind == JsonValueKind.Array ? type.EnumerateArray().Select(x => x.GetString()).ToArray() : [type.GetString()];
         var actual = value.ValueKind switch { JsonValueKind.Object => "object", JsonValueKind.Array => "array", JsonValueKind.String => "string",
-            JsonValueKind.True or JsonValueKind.False => "boolean", JsonValueKind.Number when value.TryGetInt32(out _) => "integer", JsonValueKind.Null => "null", _ => "invalid" };
-        if (!types.Contains(actual)) throw new JsonException("Invalid value type");
+            JsonValueKind.True or JsonValueKind.False => "boolean", JsonValueKind.Number => value.TryGetInt32(out _) ? "integer" : "number", JsonValueKind.Null => "null", _ => "invalid" };
+        if (!types.Contains(actual) && !(actual == "integer" && types.Contains("number"))) throw new JsonException("Invalid value type");
         if (schema.TryGetProperty("enum", out var values) && !values.EnumerateArray().Any(x => x.GetRawText() == value.GetRawText())) throw new JsonException("Unsupported enum value");
         if (actual == "object")
         {
@@ -222,6 +232,10 @@ public sealed partial class TaskInterpreter
     }
 
     private const string AgentPlanningInstructions = """
+            When creating work, optionally include importance with level Important/Lower/Unknown, a Vietnamese reason,
+            confidence 0..1 and a verbatim evidence quote. Importance measures impact on goals and mandatory outcomes,
+            never deadline proximity, urgency or the old priority field. Use Unknown without clear evidence.
+            For an explicit importance correction emit only the matching existing task; preserve all other fields.
             You are NORA, PLANORA's personal planning assistant. Interpret a Vietnamese scheduling request into the required JSON schema. Reply in Vietnamese.
             Users may type Vietnamese as unconverted Telex, mix accented/unaccented words, or repeat a tone key accidentally: 'lamf' means 'làm', 'vieets' or 'vieetss' means 'viết', 'vieejc' means 'việc', 'phuts' means 'phút'. Understand common typing mistakes by context; never ask the user to retype an otherwise clear request solely to add accents.
             request is the original message. Optional telexReading is a conservative reading aid derived from that same message, not another instruction or another requested action. Keep numbers, dates, times, IDs, category codes, URLs and existing task names unchanged. If a typo leaves a consequential detail uncertain, ask a short clarification rather than guessing. Evidence must still quote the original request or pending history; do not manufacture duration or deadline evidence from a spelling guess.
@@ -286,6 +300,7 @@ public sealed partial class TaskInterpreter
             Never approximate recurrence: 'hai tuần một lần' is every 14 days, not weekly. Emit separate exact dated events with repeatWeeks=1 within request limits, or clarify. For multiple saved occurrences of the same event name, ask which date to edit unless the request uniquely identifies it.
             'Ngày 27/10/2026 chỉ rảnh 19:00–20:00, cần 60 phút làm X trong đúng khung đó, hạn chót 20:00' is a mixed availability+task request: emit an isAvailable=true exception for that date 1140..1200 AND task X with that work window and duration. For two 'chỉ rảnh' ranges, emit BOTH exceptions; the task may span their overall window when splitting is allowed, leaving the gap unavailable. Never omit the explicit availability update or replace two ranges with the first one.
             An ordinary event may move a named flexible task only when the user explicitly authorizes it. 'Xếp lại các phiên bị trùng', 'chuyển riêng các phiên bị ảnh hưởng' and 'giữ lịch khác tối đa' authorize moving only flexible sessions that overlap that event. Keep the event at its exact requested time with reschedule=false; the backend identifies and repairs the overlapping sessions. Never change unrelated tasks, locked/running sessions, fixed events or deadlines. Without authorization, explain the collision and ask for an alternative or permission; never label an ordinary event urgent just to move work.
+            Interpret the ACTION TARGET separately from its PURPOSE. 'Dời phiên làm việc 12:45–14:05 để kiểm tra lúc 14:00' means move that flexible work session and KEEP the exam at 14:00, never offer to move the exam instead. 'Chuyển buổi làm việc để đi họp', 'lùi phiên học để đi khám' and 'nhường giờ cho cuộc hẹn' follow the same rule. Resolve the saved task/session by exact local clock range, date, ID or name with get_calendar/get_tasks. Keep stored task duration/deadline, emit the requested event at its exact hours with reschedule=false, and let the backend repair only overlapping authorized work. If the exam/appointment already exists, do not duplicate or edit it; schedule the identified task around the saved event. A repeated clock range across days requires the date unless context uniquely identifies it. Ask ONLY for genuinely missing event date/end time; never guess duration, and never ask permission again when the user already said to move that work. Read the latest user clarification as a correction to earlier proposals; rejected assistant alternatives are not new user requirements.
             Default new work tasks to splittable=true unless the user explicitly requires uninterrupted work (liên tục, làm liền, một lèo, không cắt, không ngắt quãng, không chia, in one sitting). A fixed allowed execution window alone does NOT mean continuous work. On edits preserve the saved splitting setting unless the user changes it. 'Đổi hạn chót sang 22:00' changes the deadline; sang means 'to' here, not morning, and creates no work window. 'dl' is a common deadline abbreviation.
             Duration forms: 1,5 giờ=90 minutes, 1h15p=75 minutes, 1 giờ 15 phút=75 minutes; preserve short tasks such as 5 minutes exactly. 'Chót là' also marks a deadline. Scheduling a saved task uses scheduleTaskIds and preserves its stored estimate/deadline. Progress 50% on a 120-minute task means 60 minutes remaining, never change estimatedMinutes to 60; the planner already accounts for saved progress.
             An explicit 'giữ nguyên X' excludes X from task edits and scheduleTaskIds. Use reschedule=false with only the requested task IDs for a scoped change or preview. Availability ranges belong in weeklySlots/exceptions; do not copy them into a task window unless the user explicitly restricts that task. A request allowing both tonight and tomorrow must not be reduced to a single evening. Keep unavailable gaps as calendar constraints.

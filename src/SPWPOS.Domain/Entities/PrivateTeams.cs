@@ -43,6 +43,9 @@ public sealed class TeamMembership
     public Guid UserId { get; set; }
     public string Role { get; set; } = "Member";
     public bool Active { get; set; } = true;
+    public string ApprovalStatus { get; set; } = "Approved";
+    public Guid? JoinInviteId { get; set; }
+    public DateTimeOffset? RequestedAt { get; set; }
     public Guid Version { get; set; } = Guid.NewGuid();
     public Guid MutationVersion { get; set; } = Guid.NewGuid();
 }
@@ -56,10 +59,17 @@ public sealed class TeamInvite
     public int RemainingUses { get; set; } = 20;
     public Guid Version { get; set; } = Guid.NewGuid();
 }
-public sealed class TeamTask
+public sealed class TeamTask : ITaskImportance
 {
+    public string ImportanceLevel { get; set; } = "Unknown";
+    public string ImportanceSource { get; set; } = "Unknown";
+    public string ImportanceReason { get; set; } = "";
+    public double? ImportanceConfidence { get; set; }
+    public DateTimeOffset? ImportanceConfirmedAt { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TeamId { get; set; }
+    public Guid? SourceDocumentId { get; set; }
+    public Guid? DesignatedUserId { get; set; }
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public int EstimatedMinutes { get; set; }
@@ -78,6 +88,17 @@ public sealed class TeamTask
     public bool? CompletionApproved { get; set; }
     public string? CompletionReviewNote { get; set; }
     public int ProgressBeforeReview { get; set; }
+}
+public sealed class TeamTaskDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid TeamId { get; set; }
+    public Guid UploadedBy { get; set; }
+    public string Name { get; set; } = "";
+    public string MimeType { get; set; } = "";
+    public byte[] Content { get; set; } = [];
+    public int Size { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }
 public sealed class TeamTaskAssignment
 {

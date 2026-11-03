@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Encodings.Web;
 
 namespace SPWPOS.Infrastructure.Commerce;
 
@@ -35,13 +36,14 @@ public static class PayOsPaymentSignatures
     }
     private static byte[] Mac(string value, string key) => HMACSHA256.HashData(Encoding.UTF8.GetBytes(key), Encoding.UTF8.GetBytes(value));
 
-    public static bool VerifyData(JsonElement data, string? signature, string checksumKey)
+    public static bool VerifyData(JsonElement data, string? signature, string checksumKey, bool allowTransactions = false)
     {
         if (string.IsNullOrWhiteSpace(checksumKey) || signature?.Length != 64 || data.ValueKind != JsonValueKind.Object) return false;
         try
         {
-            // Current payment response/webhook fields are scalar. Unknown nested
-            // structures fail closed until a reviewed protocol update supports them.
+            // The payment-information API signs transactions as compact JSON,
+            // preserving array order and sorting each transaction's keys. This
+            // matches payOS' official CryptoProvider, not the payouts protocol.
             var fields = new SortedDictionary<string, string>(StringComparer.Ordinal);
             foreach (var property in data.EnumerateObject())
             {
@@ -59,6 +61,9 @@ public static class PayOsPaymentSignatures
                         value = number.ToString(CultureInfo.InvariantCulture); break;
                     case JsonValueKind.True: value = "true"; break;
                     case JsonValueKind.False: value = "false"; break;
+                    case JsonValueKind.Array when allowTransactions && property.Name == "transactions":
+                        if (!TryCanonicalTransactions(property.Value, out value)) return false;
+                        break;
                     default: return false;
                 }
                 fields.Add(property.Name, value);
@@ -68,6 +73,66 @@ public static class PayOsPaymentSignatures
             return CryptographicOperations.FixedTimeEquals(Mac(canonical, checksumKey), Convert.FromHexString(signature));
         }
         catch (FormatException) { return false; }
+    }
+
+    private static bool TryCanonicalTransactions(JsonElement transactions, out string value)
+    {
+        value = "";
+        if (transactions.GetArrayLength() > 100) return false;
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
+        {
+            writer.WriteStartArray();
+            foreach (var transaction in transactions.EnumerateArray())
+            {
+                if (transaction.ValueKind != JsonValueKind.Object) return false;
+                var properties = transaction.EnumerateObject().OrderBy(x => x.Name, StringComparer.Ordinal).ToArray();
+                if (properties.Length > 100 || properties.Select(x => x.Name).Distinct(StringComparer.Ordinal).Count() != properties.Length) return false;
+                writer.WriteStartObject();
+                foreach (var property in properties)
+                {
+                    if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array or JsonValueKind.Undefined) return false;
+                    if (property.Value.ValueKind == JsonValueKind.Number && !property.Value.TryGetInt64(out _)) return false;
+                    writer.WritePropertyName(property.Name);
+                    property.Value.WriteTo(writer);
+                }
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+        }
+        value = Encoding.UTF8.GetString(stream.ToArray());
+        return true;
+    }
+
+    public static PayOsPaymentState? VerifyPaymentInformation(JsonElement root, string checksumKey)
+    {
+        try
+        {
+            if (root.ValueKind != JsonValueKind.Object || root.EnumerateObject().Select(x => x.Name).Distinct(StringComparer.Ordinal).Count() != root.EnumerateObject().Count() ||
+                root.GetProperty("code").GetString() != "00" ||
+                !VerifyData(root.GetProperty("data"), root.GetProperty("signature").GetString(), checksumKey, allowTransactions: true)) return null;
+            var data = root.GetProperty("data");
+            var code = data.GetProperty("orderCode").GetInt64();
+            var id = data.GetProperty("id").GetString();
+            var status = data.GetProperty("status").GetString();
+            var amount = data.GetProperty("amount").GetInt32();
+            var paid = data.GetProperty("amountPaid").GetInt32();
+            var remaining = data.GetProperty("amountRemaining").GetInt32();
+            if (code is <= 0 or > 9007199254740991 || string.IsNullOrWhiteSpace(id) || id.Length > 100 ||
+                status is not ("PAID" or "PENDING" or "PROCESSING" or "EXPIRED" or "CANCELLED" or "UNDERPAID") || amount <= 0 || paid < 0 || remaining < 0) return null;
+            var transactions = new List<PayOsTransaction>();
+            foreach (var transaction in data.GetProperty("transactions").EnumerateArray())
+            {
+                var reference = transaction.GetProperty("reference").GetString();
+                var account = transaction.GetProperty("accountNumber").GetString();
+                var transactionAmount = transaction.GetProperty("amount").GetInt32();
+                if (transactionAmount <= 0 || string.IsNullOrWhiteSpace(reference) || reference.Length > 100 ||
+                    string.IsNullOrWhiteSpace(account) || account.Length > 100 || transactions.Any(x => x.Reference == reference)) return null;
+                transactions.Add(new(transactionAmount, reference, account));
+            }
+            return new(code, amount, id, status, paid, remaining, transactions.ToArray());
+        }
+        catch (Exception error) when (error is InvalidOperationException or KeyNotFoundException or FormatException or OverflowException) { return null; }
     }
 
     public static PayOsVerifiedPayment? VerifyWebhook(ReadOnlyMemory<byte> body, string checksumKey)

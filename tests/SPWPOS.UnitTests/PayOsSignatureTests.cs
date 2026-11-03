@@ -36,4 +36,15 @@ public sealed class PayOsSignatureTests
         using var nested=JsonDocument.Parse("""{"amount":10000,"newField":{"a":1}}""");
         Assert.False(PayOsPaymentSignatures.VerifyData(nested.RootElement,new string('0',64),SyntheticKey));
     }
+    [Fact] public void Payment_information_verifies_sorted_transaction_json_and_rejects_tampering()
+    {
+        const string json = """{"status":"PAID","transactions":[{"reference":"receipt-1","amount":10000,"accountNumber":"123456","description":"Mua cáo MILO","counterAccountName":null}],"amountRemaining":0,"id":"link-123","amountPaid":10000,"amount":10000,"orderCode":123,"canceledAt":null}""";
+        const string canonical = """amount=10000&amountPaid=10000&amountRemaining=0&canceledAt=&id=link-123&orderCode=123&status=PAID&transactions=[{"accountNumber":"123456","amount":10000,"counterAccountName":null,"description":"Mua cáo MILO","reference":"receipt-1"}]""";
+        using var envelope = JsonDocument.Parse("{\"code\":\"00\",\"data\":" + json + ",\"signature\":\"" + Hmac(canonical) + "\"}");
+        var payment = PayOsPaymentSignatures.VerifyPaymentInformation(envelope.RootElement, SyntheticKey);
+        Assert.NotNull(payment); Assert.Equal(10000, payment.AmountPaid); Assert.Single(payment.Transactions);
+        using var tampered = JsonDocument.Parse(envelope.RootElement.GetRawText().Replace("Mua cáo MILO", "Other"));
+        Assert.Null(PayOsPaymentSignatures.VerifyPaymentInformation(tampered.RootElement, SyntheticKey));
+        Assert.False(PayOsPaymentSignatures.VerifyData(envelope.RootElement.GetProperty("data"), Hmac(canonical), SyntheticKey));
+    }
 }

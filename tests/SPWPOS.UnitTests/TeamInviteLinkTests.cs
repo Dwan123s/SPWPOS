@@ -19,7 +19,8 @@ public sealed partial class PrivateTeamPlanningTests
         Assert.Equal(Team, await Use(h, s => s.JoinTeamAsync(Other, " " + invite.Code.ToLowerInvariant() + " ", Ct)));
         Assert.Equal(Team, await Use(h, s => s.JoinTeamAsync(Other, invite.Code, Ct)));
         Assert.Equal(before - 1, await h.DbAsync(db => db.TeamInvites.Select(x => x.RemainingUses).SingleAsync(Ct)));
-        Assert.Equal(1, await h.DbAsync(db => db.TeamActivities.CountAsync(x => x.ActorId == Other && x.Kind == "MEMBER_JOINED", Ct)));
+        Assert.Equal(1, await h.DbAsync(db => db.TeamActivities.CountAsync(x => x.ActorId == Other && x.Kind == "MEMBER_JOIN_REQUESTED", Ct)));
+        Assert.False(await h.DbAsync(db => db.TeamMemberships.AnyAsync(x => x.UserId == Other && x.Active, Ct)));
     }
     [Theory] [InlineData("revoked")] [InlineData("expired")] [InlineData("exhausted")]
     public async Task Invalid_invites_cannot_be_previewed_or_used_to_join(string reason)

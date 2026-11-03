@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { button, dateFmt, timeFmt } from "./ui.jsx";
 import { nextWorkflowStep } from "./workflow.js";
 import { scheduledFocus, scheduleClock } from "./scheduled-focus.js";
+import { FinishWorkButton } from "./work-time-review.jsx";
 import "./styles/scheduled-focus.css";
 
-export function ScheduledFocus({ workspace }) {
+export function ScheduledFocus({ workspace, onWorkspaceChanged }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const refresh = () => {
@@ -90,6 +91,12 @@ export function ScheduledFocus({ workspace }) {
           />
         )}
         <div className="cockpit-actions">
+          {current && focus.kind !== "event" && (
+            <FinishWorkButton
+              sessionId={focus.id}
+              onWorkspaceChanged={onWorkspaceChanged}
+            />
+          )}
           {focus
             ? button(
                 "Chi tiết lịch",

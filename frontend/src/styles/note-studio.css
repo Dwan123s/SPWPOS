@@ -1,16 +1,5 @@
-/* A quiet writing surface; planning remains in a separate review step. */
-.planning-console .planning-dashboard {
-  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.65fr);
-}
-.planning-console .intelligence-column {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.planning-console .intelligence-column > .console-column-heading,
-.planning-console .intelligence-column > .console-workload {
-  grid-column: 1 / -1;
-}
+/* Notes styles are loaded on navigation prefetch as well as on entry.
+   Dashboard columns belong to planning-console.css; never override them here. */
 .calendar-planning-layout {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
@@ -81,12 +70,6 @@
   }
 }
 @media (max-width: 800px) {
-  .planning-console .planning-dashboard {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .planning-console .intelligence-column {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .calendar-task-context .calendar-task-queue {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -149,6 +149,29 @@ if (args.Contains("--check-ai-config", StringComparer.Ordinal))
     return;
 }
 var firebaseSettings = builder.Configuration.GetSection("Firebase").Get<FirebaseSettings>() ?? new();
+if (Array.IndexOf(args, "--reconcile-skin-payment") is var paymentIndex && paymentIndex >= 0)
+{
+    try
+    {
+        if (paymentIndex + 1 >= args.Length || !Guid.TryParse(args[paymentIndex + 1], out var purchaseId))
+            throw new ArgumentException("A purchase ID is required.");
+        using var scope = app.Services.CreateScope();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var purchase = await db.SkinPurchases.AsNoTracking().SingleAsync(x => x.Id == purchaseId, timeout.Token);
+        var result = await scope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Commerce.SkinPaymentService>()
+            .GetAsync(purchase.UserId, purchase.Id, timeout.Token);
+        var owned = await db.OwnedPetSkins.AnyAsync(x => x.UserId == purchase.UserId && x.SkinCode == purchase.SkinCode, timeout.Token);
+        Console.WriteLine($"Purchase {purchase.Id}: status={result.Status}; skin-owned={owned}.");
+    }
+    catch (Exception exception)
+    {
+        Console.Error.WriteLine(exception is AuthException failure ? $"Payment reconciliation failed: {failure.Code}." : $"Payment reconciliation failed ({exception.GetType().Name}).");
+        Environment.ExitCode = 1;
+    }
+    await app.DisposeAsync();
+    return;
+}
 if (args.Contains("--check-schema", StringComparer.Ordinal))
 {
     try
@@ -257,6 +280,7 @@ app.Use(async (context, next) =>
         var requestLimit = context.Request.Path.Value is "/api/agent/turns" or "/api/agent/turns/stream" ? 8 * 1024 * 1024
             : context.Request.Path.Value == "/api/agent/images/timetable" ? TimetableImageLimits.MaxBytes
             : context.Request.Path.StartsWithSegments("/api/teams") && context.Request.Path.Value!.EndsWith("/briefs", StringComparison.Ordinal) ? 12000000
+            : context.Request.Path.StartsWithSegments("/api/teams/tasks") && context.Request.Path.Value!.EndsWith("/source", StringComparison.Ordinal) ? 12000000
             : context.Request.Path.StartsWithSegments("/api/teams/tasks") && context.Request.Path.Value!.EndsWith("/completion/submit", StringComparison.Ordinal) ? 29000000 : 3 * 1024 * 1024;
         if (context.Request.ContentLength > requestLimit)
         { await ApiProblems.WriteAsync(context, 413, "REQUEST_TOO_LARGE", "Request body is too large.", context.RequestAborted); return; }
@@ -274,8 +298,14 @@ app.Use(async (context, next) =>
     {
         var googleScripts = firebaseSettings.Enabled ? " https://apis.google.com" : "";
         var googleConnections = firebaseSettings.Enabled ? $" https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://{firebaseSettings.AuthDomain}" : "";
-        var googleFrames = firebaseSettings.Enabled ? $"https://{firebaseSettings.AuthDomain}" : "'none'";
-        context.Response.Headers.ContentSecurityPolicy = $"default-src 'self'; script-src 'self'{googleScripts}; style-src 'self'; img-src 'self' data:; connect-src 'self'{googleConnections}; frame-src {googleFrames}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+        var paymentsReady = context.RequestServices.GetRequiredService<IOptions<SPWPOS.Infrastructure.Commerce.PayOsOptions>>().Value.Ready;
+        var paymentScripts = paymentsReady ? " https://cdn.payos.vn/payos-checkout/v1/stable/payos-initialize.js" : "";
+        var paymentConnections = paymentsReady ? " https://payos.vn" : "";
+        var frames = new List<string>();
+        if (firebaseSettings.Enabled) frames.Add($"https://{firebaseSettings.AuthDomain}");
+        if (paymentsReady) frames.AddRange(["https://pay.payos.vn", "https://next.pay.payos.vn"]);
+        var frameSources = frames.Count == 0 ? "'none'" : string.Join(" ", frames);
+        context.Response.Headers.ContentSecurityPolicy = $"default-src 'self'; script-src 'self'{googleScripts}{paymentScripts}; style-src 'self'; img-src 'self' data:; connect-src 'self'{googleConnections}{paymentConnections}; frame-src {frameSources}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     }
     await next();
 });

@@ -1,5 +1,6 @@
 import { nodeList, lines } from "./react-ui.jsx";
 import { RoutePage } from "./route-pages.jsx";
+import { adminRoutes, isAdminRoute } from "./admin-navigation.js";
 import { ConnectionState } from "./connection-state.jsx";
 import { Loading } from "./loading.jsx";
 import { setScreen, setSlot } from "./store.js";
@@ -34,6 +35,7 @@ import {
   minuteValue,
 } from "./ui.jsx";
 import { api, submit } from "./api.js";
+import { syncPetProfile } from "./pet-appearance.jsx";
 import { captureTeamInvite, pendingTeamInvite } from "./team-invite-link.js";
 import {
   resetNotificationFeed,
@@ -70,7 +72,7 @@ import {
 } from "./calendar.jsx";
 import { categoryModal, adminUsers, adminStatus } from "./page-actions.jsx";
 const routes = {
-  teams: ["Nhóm đồ án", "Cùng nhận việc, giữ lịch cá nhân riêng tư.", "users"],
+  teams: ["Quản lí nhóm", "Cùng nhận việc, giữ lịch cá nhân riêng tư.", "users"],
   agent: [
     "NORA · Trợ lý AI",
     "Cùng NORA dành thời gian cho những điều quan trọng.",
@@ -121,7 +123,7 @@ const routes = {
     "Thông tin cá nhân, danh mục công việc và bảo mật.",
     "settings",
   ],
-  admin: ["Quản trị", "Trạng thái hệ thống và quản lý tài khoản.", "users"],
+  ...adminRoutes,
 };
 let loading = false,
   working = false;
@@ -147,8 +149,7 @@ async function load(renderPage = true) {
   try {
     state.workspace = await api("/api/workspace");
     syncNotifications(state.workspace);
-    document.documentElement.dataset.noraSkin =
-      state.workspace.gamification?.selectedSkin || "classic";
+    syncPetProfile(state.workspace.gamification);
     state.loadedAt = Date.now();
     const input = {
       start: new Date().toISOString(),
@@ -180,13 +181,17 @@ async function loggedIn() {
 function render() {
   if (!state.workspace) return;
   state.route = location.hash.slice(1) || "today";
+  if (state.route === "admin") {
+    state.route = "admin-users";
+    history.replaceState(null, "", "#admin-users");
+  }
   if (state.route === "getting-started") {
     setScreen(<GettingStarted signedIn />, "getting-started");
     return;
   }
   if (
     !routes[state.route] ||
-    (state.route === "admin" && !state.roles.includes("Admin"))
+    (isAdminRoute(state.route) && !state.roles.includes("Admin"))
   )
     state.route = "today";
   const [title, description] = routes[state.route];
@@ -202,7 +207,7 @@ function render() {
           load(state.route !== "agent" && state.route !== "notes")
         }
         onReady={
-          state.route === "admin"
+          ["admin-users", "admin-system"].includes(state.route)
             ? () => loadAdmin().catch((e) => toast(e.message, "error"))
             : undefined
         }
@@ -215,14 +220,21 @@ function render() {
   syncDecorations();
 }
 async function loadAdmin(search = "") {
-  const [users, status, jobs, metrics, health] = await Promise.all([
-    api(`/api/admin/users?search=${encodeURIComponent(search)}`),
+  if (state.route === "admin-users") {
+    const users = await api(`/api/admin/users?search=${encodeURIComponent(search)}`);
+    if (state.route !== "admin-users") return;
+    state.adminUsers = users;
+    if ($("#admin-users")) setSlot("admin-users", adminUsers(users));
+    return;
+  }
+  if (state.route !== "admin-system") return;
+  const [status, jobs, metrics, health] = await Promise.all([
     api("/api/admin/status"),
     api("/api/admin/jobs"),
     api("/api/admin/metrics"),
     api("/api/admin/health"),
   ]);
-  state.adminUsers = users;
+  if (state.route !== "admin-system") return;
   if ($("#admin-jobs"))
     setSlot(
       "admin-jobs",
@@ -253,7 +265,6 @@ async function loadAdmin(search = "") {
         </tbody>
       </table>,
     );
-  if ($("#admin-users")) setSlot("admin-users", adminUsers(users));
   if ($("#system-status"))
     setSlot("system-status", adminStatus({ ...status, ...metrics, health }));
 }
@@ -1293,6 +1304,10 @@ export function onChange(event) {
     filterTasks();
 }
 export function startController() {
+  if (["returned", "cancelled"].includes(new URLSearchParams(location.search).get("payment"))) {
+    state.settingsTab = "pets";
+    history.replaceState(null, "", "#settings");
+  }
   captureTeamInvite();
   resetNotificationFeed();
   const stopNotificationPolling = startNotificationPolling(
@@ -1348,11 +1363,11 @@ export function startController() {
       !document.hidden &&
       !document.querySelector("#modal")?.open &&
       !working &&
+      !isAdminRoute(state.route) &&
       ![
         "time",
         "settings",
         "scenario",
-        "admin",
         "tasks",
         "notes",
         "agent",

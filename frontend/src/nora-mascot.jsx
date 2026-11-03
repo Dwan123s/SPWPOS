@@ -2,8 +2,8 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { MascotEyes } from "./mascot-eyes.jsx";
 import { icon } from "./ui.jsx";
 import "./styles/workspace-upgrade.css";
+import { PetArtwork, usePetAppearance } from "./pet-appearance.jsx";
 
-const image = "/assets/start/planora-owl-v1.png";
 const preferenceKey = "planora.nora.motion-paused";
 function readPaused() {
   try {
@@ -14,28 +14,33 @@ function readPaused() {
 }
 
 export function NoraAvatar() {
+  const { code, level } = usePetAppearance();
   return (
-    <span
-      className="nora-avatar"
-      aria-hidden="true"
-    >
-      <img src={image} alt="" width="64" height="64" decoding="async" />
+    <span className="nora-avatar" aria-hidden="true">
+      <PetArtwork code={code} level={level} />
     </span>
   );
 }
 
 export function NoraMascot({ thinking }) {
+  const { code, level } = usePetAppearance();
   return (
     <div
       className={`nora-mascot${thinking ? " is-thinking" : ""}`}
       role="img"
-      aria-label="NORA, linh vật cú xanh ôm cuốn lịch"
+      aria-label={
+        code === "fox"
+          ? "MILO, linh vật cáo nhỏ"
+          : "NORA, linh vật cú xanh ôm cuốn lịch"
+      }
     >
       <span className="nora-mascot-orbit" aria-hidden="true" />
       <span className="nora-mascot-halo" aria-hidden="true" />
       <div className="nora-mascot-figure">
-        <img src={image} alt="" width="1254" height="1254" decoding="async" />
-        <MascotEyes rootSelector=".nora-studio" />
+        <PetArtwork code={code} level={level} />
+        {code !== "fox" && level < 5 && (
+          <MascotEyes rootSelector=".nora-studio" />
+        )}
       </div>
       <span className="nora-mascot-shadow" aria-hidden="true" />
     </div>

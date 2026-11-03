@@ -11,7 +11,7 @@ using SPWPOS.Application.Authentication;
 namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class TaskInterpreter(HttpClient http, IConfiguration config, ILogger<TaskInterpreter> logger,
-    IVertexAccessTokenProvider? vertexTokens = null, AiUsageCollector? usageCollector = null) : ITaskInterpreter, IPlanningAgentInterpreter, IAgentVoiceTranscriber, IAgentTimetableImageReader, INoraAgentModel, IPolicyDraftInterpreter, ITeamBriefInterpreter
+    IVertexAccessTokenProvider? vertexTokens = null, AiUsageCollector? usageCollector = null) : ITaskInterpreter, IPlanningAgentInterpreter, IAgentVoiceTranscriber, IAgentTimetableImageReader, INoraAgentModel, IPolicyDraftInterpreter, ITeamBriefInterpreter, IImportanceInterpreter
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static string Fold(string text) => string.Concat(text.Normalize(NormalizationForm.FormD).Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)).ToLowerInvariant().Replace('đ', 'd');

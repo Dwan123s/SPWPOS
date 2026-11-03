@@ -1,0 +1,419 @@
+dialog.team-task-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, calc(100vw - 24px));
+  max-height: 90dvh;
+  padding: 0;
+  overflow: hidden;
+}
+.team-task-dialog .team-dialog-header {
+  flex-shrink: 0;
+  gap: 18px;
+  padding: 25px 28px 20px;
+  margin: 0;
+}
+.team-task-dialog .team-dialog-header > div {
+  min-width: 0;
+}
+.team-task-dialog .team-dialog-header h2 {
+  overflow-wrap: anywhere;
+  font-size: 21px;
+  margin: 9px 0;
+}
+.team-task-dialog .team-dialog-header .team-icon-button {
+  flex-shrink: 0;
+}
+.team-task-dialog-content {
+  padding: 22px 28px;
+  display: grid;
+  gap: 22px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.team-task-dialog-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.team-task-dialog-badges .team-priority {
+  font-size: 10px;
+  padding: 6px 9px;
+}
+.team-detail-status {
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 11px;
+  color: #a27a32;
+  background: #fff7e8;
+}
+.team-detail-status.status-Assigned {
+  color: #7960b4;
+  background: #f3efff;
+}
+.team-detail-status.status-Completed {
+  color: #328465;
+  background: #eaf8f1;
+}
+.team-task-dialog-facts {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1fr;
+  gap: 12px;
+}
+.team-task-dialog-facts > div {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #e5edf8;
+  border-radius: 10px;
+  background: #f9fbff;
+}
+.team-task-dialog-facts span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #8a9eb8;
+}
+.team-task-dialog-facts .icon {
+  width: 14px;
+  height: 14px;
+}
+.team-task-dialog-facts strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4f7095;
+  overflow-wrap: anywhere;
+}
+.team-task-dialog-progress > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #8a9eb8;
+}
+.team-task-dialog-progress strong {
+  color: #5683ba;
+}
+.team-task-dialog .team-row-requirements h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.team-task-dialog .team-row-requirements > p {
+  margin-bottom: 12px;
+}
+.team-task-dialog .team-row-review-note {
+  padding: 14px;
+  background: #fff9ed;
+  border: 1px solid #f0e3c5;
+  border-radius: 10px;
+}
+.team-task-dialog .team-task-dialog-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  color: #8a9eb8;
+}
+.team-task-dialog-privacy .icon {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+}
+.team-task-dialog-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 28px;
+  background: #fbfdff;
+  border-top: 1px solid #e9eff8;
+}
+.team-task-dialog-actions > .team-text-button {
+  font-size: 11px;
+}
+.team-task-dialog-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-left: auto;
+}
+.team-task-dialog button:focus-visible {
+  outline: 2px solid #76adf6;
+  outline-offset: 3px;
+}
+.team-task-notes > header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 16px;
+}
+.team-task-notes > header > span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #eaf3ff;
+  color: #4d8bdd;
+  flex-shrink: 0;
+}
+.team-task-dialog .team-task-notes h3 {
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.team-task-dialog .team-task-notes > header p {
+  font-size: 11px;
+  color: #899db4;
+}
+.team-task-note-sections {
+  display: grid;
+  gap: 12px;
+}
+.team-task-note-section {
+  min-width: 0;
+  padding: 17px 18px;
+  border: 1px solid #e4ebf5;
+  border-radius: 12px;
+  background: #fff;
+}
+.team-task-note-section.summary {
+  border-color: #dbe8fa;
+  background: #f5f9ff;
+}
+.team-task-dialog .team-task-note-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #3c628d;
+}
+.team-task-note-section h4 > span {
+  color: #7d9fc9;
+  display: flex;
+}
+.team-task-note-section h4 .icon {
+  width: 15px;
+  height: 15px;
+}
+.team-task-dialog .team-task-note-section p,
+.team-task-note-section li {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #536e8b;
+  overflow-wrap: anywhere;
+}
+.team-task-dialog .team-task-note-section p {
+  white-space: pre-wrap;
+  margin-top: 9px;
+}
+.team-task-note-section ul {
+  list-style: none;
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+}
+.team-task-note-section li {
+  position: relative;
+  padding-left: 17px;
+}
+.team-task-note-section li::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 0.8em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #87a9d4;
+}
+.team-task-note-section strong {
+  color: #3e6088;
+  font-weight: 600;
+}
+.team-task-work-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding-top: 13px;
+  color: #869ab2;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.team-task-work-mode .icon {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+}
+.team-task-dialog .team-task-notes-empty {
+  padding: 18px;
+  border: 1px dashed #dce7f4;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #8a9fb9;
+}
+.team-task-source-files {
+  border-top: 1px solid #e8eff7;
+  padding-top: 20px;
+  min-width: 0;
+}
+.team-task-source-files > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  margin-bottom: 13px;
+}
+.team-task-dialog .team-task-source-files h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.team-task-source-files h3 .icon {
+  color: #719bd0;
+  width: 17px;
+  height: 17px;
+}
+.team-task-source-files > header > span {
+  flex-shrink: 0;
+  background: #edf4fc;
+  color: #7496c1;
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+}
+.team-task-source-files > ul {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+.team-task-source-files li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dfeaf8;
+  border-radius: 11px;
+  background: #f8fbff;
+  min-width: 0;
+}
+.team-source-file-type {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 48px;
+  border: 1px solid #d8e7fc;
+  border-radius: 9px;
+  background: #edf4ff;
+  color: #4e80c1;
+  font-size: 9px;
+  font-weight: 650;
+}
+.team-task-source-files li > div {
+  display: grid;
+  gap: 6px;
+  min-width: 100px;
+  flex: 1;
+}
+.team-task-source-files li strong {
+  font-size: 12px;
+  color: #476b95;
+  overflow-wrap: anywhere;
+}
+.team-task-source-files li small {
+  font-size: 10px;
+  color: #8b9fb7;
+}
+.team-task-dialog .team-task-source-files .btn {
+  font-size: 11px;
+  min-height: 34px;
+  padding: 8px 12px;
+  box-shadow: none;
+}
+.team-task-dialog .team-task-source-files > p {
+  font-size: 11px;
+  color: #8b9fb7;
+}
+.team-source-attach {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+  margin-top: 13px;
+  padding: 14px;
+  border: 1px dashed #cbdcf2;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+.team-source-attach > strong {
+  font-size: 12px;
+  color: #4f7095;
+  overflow-wrap: anywhere;
+}
+.team-source-attach > small {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #8b9fb7;
+}
+.team-source-attach > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.team-task-dialog .team-source-attach .btn {
+  font-size: 11px;
+  min-height: 34px;
+  padding: 8px 12px;
+}
+@media (max-width: 599px) {
+  .team-task-note-section {
+    padding: 14px;
+  }
+  .team-task-source-files li {
+    gap: 10px;
+    padding: 12px;
+  }
+  .team-task-source-files li > button {
+    margin-left: auto;
+  }
+  .team-task-dialog .team-dialog-header {
+    padding: 18px;
+    gap: 10px;
+  }
+  .team-task-dialog .team-dialog-header h2 {
+    font-size: 18px;
+  }
+  .team-task-dialog-content {
+    padding: 18px;
+    gap: 18px;
+  }
+  .team-task-dialog-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .team-task-dialog-facts > div:last-child {
+    grid-column: 1 / -1;
+  }
+  .team-task-dialog-actions {
+    padding: 14px 18px;
+  }
+  .team-task-dialog-actions > div {
+    flex: 1 1 100%;
+  }
+  .team-task-dialog-actions > div .btn {
+    flex: 1;
+  }
+}

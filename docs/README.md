@@ -28,6 +28,9 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 - [Kịch bản demo PLANORA / Demo script](guides/DEMO_SCRIPT.md)
 - [Workspace phases 1–4 / Kiến trúc, EMA, XP và ghi nhận bù](features/WORKSPACE_UPGRADE_PHASES_1_TO_4.md)
+- [Hỏi kết quả khi hết giờ, thêm giờ và hoàn thành sớm](features/WORK_TIME_FOLLOWUP.md)
+- [Pet XP và skin MILO / Hướng dẫn cấu hình payOS](integrations/PAYOS_PET_SKINS.md)
+- [Admin: doanh thu, biểu đồ và lịch sử mua hàng](features/ADMIN_COMMERCE.md)
 - [Independent builds, same origin / Build riêng, chung địa chỉ](development/INDEPENDENT_BUILD_SAME_ORIGIN.md)
 - [Upgrade verification 28/10/2026 / Kết quả kiểm chứng](development/WORKSPACE_UPGRADE_VERIFICATION_2026-10-28.md)
 - [User guide / Hướng dẫn người dùng](guides/USER_GUIDE.md)
@@ -41,6 +44,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [NORA voice / Giọng nói NORA](features/NORA_VOICE.md)
 - [NORA timetable images / Đọc thời khóa biểu từ ảnh](features/NORA_TIMETABLE_IMAGES.md)
 - [Tasks and reminders / Công việc và nhắc nhở](features/PLANORA_TASK_AND_REMINDER_UPDATE.md)
+- [Eisenhower: ma trận, xếp lịch và quyền riêng tư](features/EISENHOWER.md)
 
 ## Integrations / Tích hợp
 
@@ -54,6 +58,8 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 - [Security / Bảo mật](development/SECURITY.md)
 - [Team development plan / Kế hoạch nhóm](development/TEAM_DEVELOPMENT_PLAN.md)
+- [Eisenhower implementation plan / Kế hoạch thực thi ma trận Eisenhower](plans/PLANORA_EISENHOWER_IMPLEMENTATION.md)
+- [Eisenhower verification / Kiểm chứng triển khai 02/11/2026](development/EISENHOWER_VERIFICATION_2026-11-02.md)
 - [Verification record / Hồ sơ kiểm chứng](development/VERIFICATION.md)
 - [NORA automated sandbox / Chạy và xuất kết quả kiểm thử NORA](development/NORA_SANDBOX.md)
 - [Use-case coverage / Phạm vi use case](development/USE_CASE_COVERAGE.md)

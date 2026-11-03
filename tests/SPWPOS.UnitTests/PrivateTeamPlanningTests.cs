@@ -103,7 +103,7 @@ public sealed partial class PrivateTeamPlanningTests
         await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.UpdateTeamProgressAsync(Leader, TaskId, new(task.Version, 100), Ct)));
         await Use(h, s => s.UpdateTeamProgressAsync(Member, TaskId, new(task.Version, 50), Ct)); task = (await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks[0]; Assert.Equal(50, task.Progress);
         var member = (await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Members.Single(x => x.UserId == Member);
-        await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.RemoveTeamMemberAsync(Leader, Team, Member, member.Version, Ct)));
+        await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.RemoveTeamMemberAsync(Member, Team, Member, member.Version, Ct)));
         var returned = await Use(h, s => s.PreviewTeamReturnAsync(Member, TaskId, Ct));
         await Use(h, s => s.ReturnTeamTaskAsync(Member, TaskId, task.Version, Ct, returned.Revision)); Assert.Null((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks[0].AssigneeId);
         Assert.Equal(0, await h.DbAsync(db => db.WorkSessions.CountAsync(x => x.Status == WorkSessionStatus.Scheduled, Ct)));

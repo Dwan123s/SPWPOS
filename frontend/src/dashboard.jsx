@@ -10,8 +10,9 @@ import {
 } from "./ui.jsx";
 import { dashboardModel } from "./dashboard-model.js";
 import { nextWorkflowStep, workflowSteps } from "./workflow.js";
-import { CatchUpCard } from "./catch-up.jsx";
+import { WorkTimeReviewCard } from "./work-time-review.jsx";
 import { ScheduledFocus } from "./scheduled-focus.jsx";
+import { EisenhowerFocus } from "./eisenhower.jsx";
 import "./styles/dashboard-insights.css";
 import {
   CalendarClock,
@@ -565,7 +566,8 @@ export function todayPage({ onWorkspaceChanged } = {}) {
     .every((step) => step.done);
   return (
     <>
-      <CatchUpCard onWorkspaceChanged={onWorkspaceChanged} />
+      <WorkTimeReviewCard onWorkspaceChanged={onWorkspaceChanged} />
+      <EisenhowerFocus />
       <div className="planning-dashboard">
         <section
           className="console-column backlog-column"
@@ -702,7 +704,10 @@ export function todayPage({ onWorkspaceChanged } = {}) {
               text={readyToPlan ? "Lịch đề xuất" : next.title || next.label}
             />
           </div>
-          <ScheduledFocus workspace={state.workspace} />
+          <ScheduledFocus
+            workspace={state.workspace}
+            onWorkspaceChanged={onWorkspaceChanged}
+          />
           <CalendarClock
             boundaries={[
               ...state.workspace.sessions,

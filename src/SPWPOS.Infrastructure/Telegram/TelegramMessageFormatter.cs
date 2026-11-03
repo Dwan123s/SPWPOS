@@ -54,7 +54,7 @@ public static class TelegramMessageFormatter
             message += $"<blockquote>📅 {Date(localStart)}\n🕒 <b>{time}</b>";
             if (details.End is { } finish && finish > start) message += $"\n⏱ Thời lượng: {Duration((finish - start).TotalMinutes)}";
             message += "</blockquote>\n\n";
-            message += notification.Kind == "SESSION_REVIEW" ? "Cập nhật kết quả phiên này trong PLANORA nhé."
+            message += notification.Kind == "SESSION_REVIEW" ? "Bạn đã làm xong chưa? Mở Hôm nay trong PLANORA: chọn Đã xong công việc, hoặc Cần thêm thời gian để xác nhận phiên bổ sung."
                 : start > now ? $"⏳ Bắt đầu sau {Duration((start - now).TotalMinutes)}"
                 : "🟢 Đang diễn ra";
         }

@@ -383,10 +383,10 @@ function NotificationItem({ item, task }) {
   const type = notificationType(item.kind);
   const meta = types[type];
   const target =
-    type === "team"
-      ? { label: "Mở công việc nhóm", route: "teams" }
-      : item.kind === "SESSION_REVIEW"
-        ? { label: "Ghi nhận kết quả", route: "today" }
+    item.kind === "SESSION_REVIEW"
+      ? { label: "Phản hồi NORA", route: "today" }
+      : type === "team"
+        ? { label: "Mở công việc nhóm", route: "teams" }
         : type === "session" || type === "event" || type === "schedule"
           ? { label: "Xem lịch làm việc", route: "calendar" }
           : task

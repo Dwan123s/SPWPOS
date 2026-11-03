@@ -61,10 +61,15 @@ export function NotificationPopups() {
             <strong>{item.title}</strong>
             <p>{item.message}</p>
             <a
-              href="#notifications"
+              href={
+                item.kind === "SESSION_REVIEW" ? "#today" : "#notifications"
+              }
               onClick={() => dismissNotificationPopup(item.id)}
             >
-              Xem thông báo {icon("arrow")}
+              {item.kind === "SESSION_REVIEW"
+                ? "Phản hồi NORA"
+                : "Xem thông báo"}{" "}
+              {icon("arrow")}
             </a>
           </div>
           <button

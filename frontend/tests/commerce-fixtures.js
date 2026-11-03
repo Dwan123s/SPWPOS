@@ -1,0 +1,41 @@
+export const revenueReport = {
+  from: "2026-11-01",
+  to: "2026-11-03",
+  groupBy: "day",
+  timeZone: "Asia/Ho_Chi_Minh",
+  generatedAt: "2026-11-03T05:00:00Z",
+  today: { amountVnd: 20000, paidOrders: 2 },
+  week: { amountVnd: 30000, paidOrders: 3 },
+  month: { amountVnd: 40000, paidOrders: 4 },
+  allTime: { amountVnd: 120000, paidOrders: 12 },
+  selected: { amountVnd: 40000, paidOrders: 4 },
+  payingCustomers: 3,
+  points: [
+    { from: "2026-11-01", to: "2026-11-01", amountVnd: 10000, paidOrders: 1 },
+    { from: "2026-11-02", to: "2026-11-02", amountVnd: 10000, paidOrders: 1 },
+    { from: "2026-11-03", to: "2026-11-03", amountVnd: 20000, paidOrders: 2 },
+  ],
+};
+export const purchase = {
+  id: "purchase-1",
+  orderCode: 123456789,
+  userId: "buyer",
+  email: "member@example.com",
+  buyerName: "Nguyễn Minh Anh",
+  skinCode: "fox",
+  productName: "Skin MILO",
+  amountVnd: 10000,
+  status: "PAID",
+  createdAt: "2026-11-02T06:00:00Z",
+  expiresAt: "2026-11-02T06:15:00Z",
+  paidAt: "2026-11-03T03:00:00Z",
+  receiptReference: "PAYOS-VERIFIED-123",
+};
+export const purchaseHistory = {
+  from: "2026-11-01",
+  to: "2026-11-03",
+  page: 1,
+  pageSize: 20,
+  total: 1,
+  items: [purchase],
+};
