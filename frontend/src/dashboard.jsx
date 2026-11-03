@@ -12,6 +12,7 @@ import { dashboardModel } from "./dashboard-model.js";
 import { nextWorkflowStep, workflowSteps } from "./workflow.js";
 import { WorkTimeReviewCard } from "./work-time-review.jsx";
 import { ScheduledFocus } from "./scheduled-focus.jsx";
+import { UpcomingFocus } from "./focus-timer.jsx";
 import { EisenhowerFocus } from "./eisenhower.jsx";
 import "./styles/dashboard-insights.css";
 import {
@@ -708,6 +709,7 @@ export function todayPage({ onWorkspaceChanged } = {}) {
             workspace={state.workspace}
             onWorkspaceChanged={onWorkspaceChanged}
           />
+          <UpcomingFocus workspace={state.workspace} />
           <CalendarClock
             boundaries={[
               ...state.workspace.sessions,

@@ -3,6 +3,7 @@ import { Slot, attrs, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
 import { CapacityRibbon } from "./capacity-ribbon.jsx";
 import { PetProgress } from "./pet-appearance.jsx";
+import { FocusLauncher } from "./focus-timer.jsx";
 import { PageTransition } from "./page-transition.jsx";
 import {
   WorkspaceAtmosphere,
@@ -252,6 +253,7 @@ export function workspaceShell(routes, title, description, body) {
               </div>
             </div>
             <div className="topbar-right">
+              <FocusLauncher compact />
               <PetProgress compact />
               <WorkspaceMotionControl />
               <NotificationBell />

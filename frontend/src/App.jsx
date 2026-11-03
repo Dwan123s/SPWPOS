@@ -4,10 +4,12 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   useSyncExternalStore,
 } from "react";
 import { getSnapshot, subscribe, dismissToast } from "./store.js";
-import { closeModal, button } from "./ui.jsx";
+import { closeModal, button, state } from "./ui.jsx";
+import { FocusTimerProvider } from "./focus-timer.jsx";
 import {
   startController,
   onClick,
@@ -25,6 +27,12 @@ function prefetchNavigation(event) {
   if (link) prefetchPage(link.dataset.id);
 }
 export function App({ initialize = true }) {
+  const [, workspaceChanged] = useState(0);
+  useEffect(() => {
+    const refresh = () => workspaceChanged((n) => n + 1);
+    window.addEventListener("workspace-updated", refresh);
+    return () => window.removeEventListener("workspace-updated", refresh);
+  }, []);
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot),
     dialog = useRef(null);
   useOutsideDismiss([dialog], closeModal, !!snapshot.modal);
@@ -47,73 +55,78 @@ export function App({ initialize = true }) {
     return () => animation?.cancel();
   }, [snapshot.modalKey, !!snapshot.modal]);
   return (
-    <div
-      onClick={onClick}
-      onSubmit={onSubmit}
-      onInput={onInput}
-      onChange={onChange}
-      onPointerOver={prefetchNavigation}
-      onFocusCapture={prefetchNavigation}
-      className="min-h-dvh text-slate-900 antialiased"
+    <FocusTimerProvider
+      uid={state.workspace?.profile?.id}
+      workspace={state.workspace}
     >
-      <Fragment
-        key={
-          snapshot.screenGroup ||
-          (snapshot.screenKey.startsWith("auth-")
-            ? "auth"
-            : snapshot.screenKey.startsWith("notifications-")
-              ? "notifications"
-              : snapshot.screenKey)
-        }
+      <div
+        onClick={onClick}
+        onSubmit={onSubmit}
+        onInput={onInput}
+        onChange={onChange}
+        onPointerOver={prefetchNavigation}
+        onFocusCapture={prefetchNavigation}
+        className="min-h-dvh text-slate-900 antialiased"
       >
-        {snapshot.screen || <Loading fullscreen />}
-      </Fragment>
-      <NotificationPopups />
-      <div id="toasts" aria-live="polite">
-        {snapshot.toasts.map((toast) => (
-          <div key={toast.id} className={`toast ${toast.type}`}>
-            {toast.message}
-            <button
-              type="button"
-              aria-label="Đóng thông báo"
-              onClick={() => dismissToast(toast.id)}
-              style={{
-                background: "none",
-                border: 0,
-                color: "inherit",
-                cursor: "pointer",
-                marginLeft: 12,
-              }}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
-      <dialog
-        ref={dialog}
-        id="modal"
-        aria-labelledby="modal-title"
-        onCancel={(event) => {
-          event.preventDefault();
-          closeModal();
-        }}
-      >
-        <div id="modal-content">
-          {snapshot.modal && (
-            <div key={snapshot.modalKey} className="modal-body">
-              <div className="modal-head">
-                <div>
-                  <h2 id="modal-title">{snapshot.modal.title}</h2>
-                  <p>{snapshot.modal.subtitle}</p>
-                </div>
-                {button("", "close-modal", "icon-only ghost", "", "close")}
-              </div>
-              {snapshot.modal.body}
+        <Fragment
+          key={
+            snapshot.screenGroup ||
+            (snapshot.screenKey.startsWith("auth-")
+              ? "auth"
+              : snapshot.screenKey.startsWith("notifications-")
+                ? "notifications"
+                : snapshot.screenKey)
+          }
+        >
+          {snapshot.screen || <Loading fullscreen />}
+        </Fragment>
+        <NotificationPopups />
+        <div id="toasts" aria-live="polite">
+          {snapshot.toasts.map((toast) => (
+            <div key={toast.id} className={`toast ${toast.type}`}>
+              {toast.message}
+              <button
+                type="button"
+                aria-label="Đóng thông báo"
+                onClick={() => dismissToast(toast.id)}
+                style={{
+                  background: "none",
+                  border: 0,
+                  color: "inherit",
+                  cursor: "pointer",
+                  marginLeft: 12,
+                }}
+              >
+                ×
+              </button>
             </div>
-          )}
+          ))}
         </div>
-      </dialog>
-    </div>
+        <dialog
+          ref={dialog}
+          id="modal"
+          aria-labelledby="modal-title"
+          onCancel={(event) => {
+            event.preventDefault();
+            closeModal();
+          }}
+        >
+          <div id="modal-content">
+            {snapshot.modal && (
+              <div key={snapshot.modalKey} className="modal-body">
+                <div className="modal-head">
+                  <div>
+                    <h2 id="modal-title">{snapshot.modal.title}</h2>
+                    <p>{snapshot.modal.subtitle}</p>
+                  </div>
+                  {button("", "close-modal", "icon-only ghost", "", "close")}
+                </div>
+                {snapshot.modal.body}
+              </div>
+            )}
+          </div>
+        </dialog>
+      </div>
+    </FocusTimerProvider>
   );
 }

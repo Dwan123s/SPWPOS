@@ -1,7 +1,7 @@
 const eligible = new Set(["Scheduled", "Running", "Paused"]);
-export function scheduledFocus(workspace, now = Date.now()) {
+export function focusEntries(workspace, now = Date.now()) {
   const tasks = new Map((workspace.tasks || []).map((task) => [task.id, task]));
-  const entries = [
+  return [
     ...(workspace.events || []).map((event) => ({
       ...event,
       kind: "event",
@@ -32,6 +32,9 @@ export function scheduledFocus(workspace, now = Date.now()) {
       Date.parse(item.end) > Date.parse(item.start) &&
       Date.parse(item.end) > now,
   );
+}
+export function scheduledFocus(workspace, now = Date.now()) {
+  const entries = focusEntries(workspace, now);
   const priority = (a, b) =>
     Number(b.urgent) - Number(a.urgent) ||
     Number(b.status === "Running") - Number(a.status === "Running") ||

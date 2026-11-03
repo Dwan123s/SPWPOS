@@ -4,6 +4,7 @@ import { nextWorkflowStep } from "./workflow.js";
 import { scheduledFocus, scheduleClock } from "./scheduled-focus.js";
 import { FinishWorkButton } from "./work-time-review.jsx";
 import "./styles/scheduled-focus.css";
+import { FocusLauncher } from "./focus-timer.jsx";
 
 export function ScheduledFocus({ workspace, onWorkspaceChanged }) {
   const [now, setNow] = useState(() => Date.now());
@@ -91,6 +92,7 @@ export function ScheduledFocus({ workspace, onWorkspaceChanged }) {
           />
         )}
         <div className="cockpit-actions">
+          <FocusLauncher compact />
           {current && focus.kind !== "event" && (
             <FinishWorkButton
               sessionId={focus.id}
