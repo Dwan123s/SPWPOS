@@ -110,7 +110,7 @@ export function timelineForDay(workspace, date) {
       .map((session) => ({
         ...session,
         kind: "session",
-        label: "Khoảng làm việc",
+        label: "Phiên công việc",
         name: taskNames.get(session.taskId) || "Công việc",
       })),
   ]

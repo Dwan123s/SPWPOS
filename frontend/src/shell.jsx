@@ -269,7 +269,7 @@ export function workspaceShell(routes, title, description, body) {
           {state.route === "today" && <CapacityRibbon />}
           <main className="content" id="main-content" tabIndex="-1">
             <PageTransition route={state.route}>
-              {state.route === "calendar" ? (
+              {["calendar", "teams"].includes(state.route) ? (
                 <h1 className="sr-only" tabIndex="-1">
                   {headline}
                 </h1>

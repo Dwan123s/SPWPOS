@@ -45,6 +45,7 @@ public sealed partial class WorkspaceService
     {
         Task Phase(string stage, string message) => publish?.Invoke(new("phase", stage, message), ct) ?? Task.CompletedTask;
         ValidateAgentImage(input.Image);
+        Require(input.CalendarKind is "Auto" or "Event" or "WorkSession", "VALIDATION_ERROR", "Chọn loại lịch hợp lệ.");
         Require(input.ConversationId != Guid.Empty && input.RequestId != Guid.Empty && !string.IsNullOrWhiteSpace(input.Text) && input.Text.Length <= 2000,
             "VALIDATION_ERROR", "Nhập yêu cầu tối đa 2000 ký tự và mã hội thoại hợp lệ.");
         var autoApply = input.AutoApply && !PreviewOnly(input.Text);
@@ -56,7 +57,7 @@ public sealed partial class WorkspaceService
             if (existing is not null)
             {
                 Require(existing.InputFingerprint.Length > 0 ? existing.InputFingerprint == AgentFingerprint(input) :
-                    existing.Text == input.Text.Trim() && existing.ConversationId == input.ConversationId && !input.UseCapacityFactor && !input.UseEstimateBias,
+                    existing.Text == input.Text.Trim() && existing.ConversationId == input.ConversationId && !input.UseCapacityFactor && !input.UseEstimateBias && input.CalendarKind == "Auto",
                     "AGENT_REQUEST_REUSED", "Mã yêu cầu đã dùng cho một nội dung hoặc chính sách khác.", 409);
                 if (existing.Status != "FAILED")
                 {
@@ -92,6 +93,8 @@ public sealed partial class WorkspaceService
                 ? await ApplyAgentTurnAsync(uid, saved.Id, ct) : saved;
         }
         var turnId = reserved.Turn.Id;
+        // Keep the original chat text/fingerprint; the explicit UI choice is trusted request context for inference.
+        input = input with { Text = CalendarKindPrompt(input) };
         try
         {
             // Shared by all model calls for this turn, including clarification
@@ -191,6 +194,7 @@ public sealed partial class WorkspaceService
                     intent = NormalizeAgentIntent(intent, input.Text, current, pending);
                     intent = GroundAgentDates(intent, input.Text, current.Preference, Now);
                 }
+                intent = RespectCalendarKind(intent, input.CalendarKind);
                 var categoryNotices = AgentCategoryNotices(interpreted, intent, input.Text, currentTaskTypes);
                 ValidateIntent(intent);
                 if (intent.FreeTimeQuery is not null) current = await AgentCalendarStateAsync(uid, current, ct);

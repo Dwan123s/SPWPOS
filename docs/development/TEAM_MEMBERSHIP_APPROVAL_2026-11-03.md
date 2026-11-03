@@ -10,6 +10,9 @@ Leader loại member bằng hộp xác nhận. Backend thu hồi quyền nhóm, 
 
 Giao diện tự cập nhật danh sách nhóm/yêu cầu mỗi 7 giây khi tab đang hiển thị. API chặn ngay từng request sau khi loại; khi nhận `TEAM_FORBIDDEN`, giao diện đóng dữ liệu nhóm và các popup liên quan. Nội dung đã được tải về trước khi loại không thể thu hồi từ thiết bị người nhận.
 
+Thông báo yêu cầu tham gia có nút **Mở nhóm để duyệt** trong hộp thông báo và popup mới. Nút mở đúng nhóm, cuộn và chuyển focus tới **Chờ duyệt tham gia** để trưởng nhóm chọn duyệt hoặc từ chối. API bổ sung `teamId` bằng cách tra membership gốc từ khóa thông báo, áp dụng cả thông báo đã lưu, không cần migration. API nhóm tiếp tục kiểm tra quyền truy cập.
+Nút chỉ hiện khi `joinRequestPending` còn đúng: membership vẫn chờ duyệt và version trùng yêu cầu gốc. Sau khi duyệt hoặc từ chối, nút tự ẩn cả trong hộp thông báo lẫn popup đang mở khi dữ liệu cập nhật. Thông báo cũ không hiện lại nút nếu người dùng gửi yêu cầu mới; trạng thái đã đọc độc lập với trạng thái duyệt.
+
 ## API và dữ liệu
 
 - `POST /api/teams/join` trả `{id, status}` với `Pending` hoặc `Approved`.

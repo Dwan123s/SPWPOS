@@ -2,6 +2,7 @@ import { useState } from "react";
 import { dateFmt, dayKey, icon, timeFmt } from "./ui.jsx";
 import { useNotificationFeed } from "./notification-popups.jsx";
 import { previewNotificationPopup } from "./notification-feed.js";
+import { requestTeamJoinReview } from "./team-notification-link.js";
 
 const types = {
   deadline: { label: "Hạn chót", glyph: "clock", tone: "amber" },
@@ -18,6 +19,7 @@ function notificationType(kind) {
       TEAM_COMPLETION_REQUEST: "team",
       TEAM_TASK_COMPLETED: "team",
       TEAM_COMPLETION_REJECTED: "team",
+      TEAM_JOIN_REQUEST: "team",
       DEADLINE: "deadline",
       SESSION_REMINDER: "session",
       SESSION_STARTED: "session",
@@ -383,19 +385,23 @@ function NotificationItem({ item, task }) {
   const type = notificationType(item.kind);
   const meta = types[type];
   const target =
-    item.kind === "SESSION_REVIEW"
-      ? { label: "Phản hồi NORA", route: "today" }
-      : type === "team"
-        ? { label: "Mở công việc nhóm", route: "teams" }
-        : type === "session" || type === "event" || type === "schedule"
-          ? { label: "Xem lịch làm việc", route: "calendar" }
-          : task
-            ? { label: "Xem công việc", taskId: task.id }
-            : type === "warning"
-              ? { label: "Xem tiến độ", route: "insights" }
-              : item.taskId
-                ? { label: "Mở danh sách công việc", route: "tasks" }
-                : null;
+    item.kind === "TEAM_JOIN_REQUEST"
+      ? item.joinRequestPending === false
+        ? null
+        : { label: "Mở nhóm để duyệt", route: "teams" }
+      : item.kind === "SESSION_REVIEW"
+        ? { label: "Phản hồi NORA", route: "today" }
+        : type === "team"
+          ? { label: "Mở công việc nhóm", route: "teams" }
+          : type === "session" || type === "event" || type === "schedule"
+            ? { label: "Xem lịch làm việc", route: "calendar" }
+            : task
+              ? { label: "Xem công việc", taskId: task.id }
+              : type === "warning"
+                ? { label: "Xem tiến độ", route: "insights" }
+                : item.taskId
+                  ? { label: "Mở danh sách công việc", route: "tasks" }
+                  : null;
   const validDate = Number.isFinite(Date.parse(item.createdAt));
   return (
     <li>
@@ -462,7 +468,15 @@ function NotificationItem({ item, task }) {
                   {icon("arrow")}
                 </button>
               ) : (
-                <a className="notice-open" href={`#${target.route}`}>
+                <a
+                  className={`notice-open${item.kind === "TEAM_JOIN_REQUEST" ? " notice-review-open" : ""}`}
+                  href={`#${target.route}`}
+                  onClick={
+                    item.kind === "TEAM_JOIN_REQUEST"
+                      ? () => requestTeamJoinReview(item.teamId)
+                      : undefined
+                  }
+                >
                   {target.label}
                   {icon("arrow")}
                 </a>

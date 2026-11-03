@@ -91,12 +91,81 @@ it("groups dates in the account time zone and routes each reminder to its releva
     "task",
   );
 });
-it.each(["EVENT_STARTED", "SESSION_STARTED"])("routes %s to the calendar as a separate notice", (kind) => {
-  workspace.notifications = [{ id: "started", kind, title: "Lịch đang diễn ra", message: "Đã đến giờ.", createdAt: "2026-10-14T02:00:00Z", isRead: false }];
+it.each(["EVENT_STARTED", "SESSION_STARTED"])(
+  "routes %s to the calendar as a separate notice",
+  (kind) => {
+    workspace.notifications = [
+      {
+        id: "started",
+        kind,
+        title: "Lịch đang diễn ra",
+        message: "Đã đến giờ.",
+        createdAt: "2026-10-14T02:00:00Z",
+        isRead: false,
+      },
+    ];
+    render(<NotificationCenter workspace={workspace} />);
+    expect(
+      screen
+        .getByRole("link", { name: "Xem lịch làm việc" })
+        .getAttribute("href"),
+    ).toBe("#calendar");
+    expect(
+      screen.getByRole("article", { name: "Lịch đang diễn ra" }),
+    ).toBeTruthy();
+  },
+);
+it("keeps a group approval link for old notifications without a resolved group", async () => {
+  workspace.notifications = [
+    {
+      id: "join",
+      kind: "TEAM_JOIN_REQUEST",
+      title: "Có yêu cầu tham gia nhóm",
+      message: "Có yêu cầu mới.",
+      createdAt: "2026-10-14T02:00:00Z",
+      isRead: false,
+    },
+  ];
   render(<NotificationCenter workspace={workspace} />);
-  expect(screen.getByRole("link", { name: "Xem lịch làm việc" }).getAttribute("href")).toBe("#calendar");
-  expect(screen.getByRole("article", { name: "Lịch đang diễn ra" })).toBeTruthy();
+  expect(
+    screen.getByRole("link", { name: "Mở nhóm để duyệt" }).getAttribute("href"),
+  ).toBe("#teams");
+  await userEvent
+    .setup()
+    .selectOptions(screen.getByLabelText("Loại thông báo"), "team");
+  expect(
+    screen.getByRole("article", { name: "Có yêu cầu tham gia nhóm" }),
+  ).toBeTruthy();
 });
+it.each([true, false])(
+  "hides approval only when the request is processed, regardless of read status %s",
+  (isRead) => {
+    const notice = {
+      id: "join",
+      kind: "TEAM_JOIN_REQUEST",
+      teamId: "team",
+      joinRequestPending: true,
+      title: "Có yêu cầu tham gia nhóm",
+      message: "Có yêu cầu mới.",
+      createdAt: "2026-10-14T02:00:00Z",
+      isRead,
+    };
+    workspace.notifications = [notice];
+    const view = render(<NotificationCenter workspace={workspace} />);
+    expect(screen.getByRole("link", { name: "Mở nhóm để duyệt" })).toBeTruthy();
+    workspace = {
+      ...workspace,
+      notifications: [{ ...notice, joinRequestPending: false }],
+    };
+    view.rerender(<NotificationCenter workspace={workspace} />);
+    expect(screen.queryByRole("link", { name: "Mở nhóm để duyệt" })).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "Mở công việc nhóm" }),
+    ).toBeNull();
+    expect(screen.getByRole("article", { name: notice.title })).toBeTruthy();
+  },
+);
+
 it("combines status, type and accent-insensitive search and can reset an empty result", async () => {
   render(<NotificationCenter workspace={workspace} />);
   const user = userEvent.setup();
@@ -126,13 +195,11 @@ it("combines status, type and accent-insensitive search and can reset an empty r
 });
 it("filters unread reminders by type from the overview shortcuts", async () => {
   render(<NotificationCenter workspace={workspace} />);
-  await userEvent
-    .setup()
-    .click(
-      within(screen.getByRole("complementary")).getByRole("button", {
-        name: "Cảnh báo lịch 1",
-      }),
-    );
+  await userEvent.setup().click(
+    within(screen.getByRole("complementary")).getByRole("button", {
+      name: "Cảnh báo lịch 1",
+    }),
+  );
   expect(screen.getAllByRole("article")).toHaveLength(1);
   expect(
     screen.getByRole("article", { name: "Kế hoạch cần xem lại" }),

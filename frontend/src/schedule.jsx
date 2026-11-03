@@ -16,12 +16,13 @@ import {
   calendarPhases,
 } from "./calendar-time.jsx";
 import { workflowSteps } from "./workflow.js";
+import { CalendarWeek } from "./calendar-week.jsx";
 export function weekStart(key) {
   const date = new Date(`${key}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
   return date.toISOString().slice(0, 10);
 }
-export function calendarPage() {
+export function calendarPage({ onWorkspaceChanged } = {}) {
   const base = weekStart(state.calendarStart || dayKey(Date.now()));
   state.calendarStart = base;
   const dates = Array.from(
@@ -37,8 +38,10 @@ export function calendarPage() {
   const view =
     state.calendarView ||
     (globalThis.matchMedia?.("(max-width: 800px)").matches ? "agenda" : "week");
-  const sessions = state.workspace.sessions.filter((s) =>
-    dates.includes(dayKey(s.start)),
+  const sessions = state.workspace.sessions.filter(
+    (s) =>
+      dayKey(s.start) <= dates[6] &&
+      dayKey(new Date(Date.parse(s.end) - 1)) >= dates[0],
   );
   const entries = (date) =>
     [
@@ -66,7 +69,8 @@ export function calendarPage() {
     const from = dayKey(e.start) < date ? "00:00" : timeFmt(e.start),
       to = dayKey(e.end) > date ? "24:00" : timeFmt(e.end);
     return (
-      <button key={`event-${e.id}-${date}`}
+      <button
+        key={`event-${e.id}-${date}`}
         type="button"
         className={`calendar-block fixed-event calendar-timed-card calendar-time-${phase}${compact ? "" : " calendar-agenda-entry"}`}
         data-action="event-detail"
@@ -87,7 +91,8 @@ export function calendarPage() {
     );
   };
   const block = (s, now, agenda = false) => (
-    <button key={`session-${s.id}`}
+    <button
+      key={`session-${s.id}`}
       type="button"
       className={`calendar-block calendar-timed-card calendar-time-${calendarPhase(s.start, s.end, now)} ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}${agenda ? " calendar-agenda-entry" : ""}`}
       data-action="session-detail"
@@ -160,14 +165,32 @@ export function calendarPage() {
           )}
         >
           {(now) =>
-            calendarMarkup(dates, view, sessions, entries, block, fixed, now)
+            calendarMarkup(
+              dates,
+              view,
+              sessions,
+              entries,
+              block,
+              fixed,
+              now,
+              onWorkspaceChanged,
+            )
           }
         </CalendarClock>
       </div>
     </div>
   );
 }
-function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
+function calendarMarkup(
+  dates,
+  view,
+  sessions,
+  entries,
+  block,
+  fixed,
+  now,
+  onWorkspaceChanged,
+) {
   return (
     <>
       {state.conflicts?.length ? (
@@ -276,52 +299,14 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
           </span>
         </div>
         {view === "week" ? (
-          <>
-            <div
-              className="calendar-scroll"
-              role="region"
-              aria-label="Lịch 7 ngày, cuộn dọc và ngang để xem thêm"
-              tabIndex="0"
-            >
-              <div className="week-grid">
-                {nodeList(
-                  dates.map((date) => (
-                    <section
-                      key={date}
-                      className={`week-day ${date === dayKey(now) ? "today" : ""}`}
-                    >
-                      <div className="week-day-header">
-                        <span>
-                          {new Intl.DateTimeFormat("vi-VN", {
-                            weekday: "short",
-                            timeZone: "UTC",
-                          }).format(new Date(`${date}T12:00:00Z`))}
-                        </span>
-                        <strong>{date.slice(8)}</strong>
-                        <small>
-                          {entries(date).length}
-                          {" mục"}
-                        </small>
-                      </div>
-                      <div className="day-blocks">
-                        {nodeList(
-                          entries(date).map((e) =>
-                            e.session
-                              ? block(e.session, now)
-                              : fixed(e.event, date, true, now),
-                          ),
-                        ) || (
-                          <div className="calendar-empty">
-                            —<span>Chưa có lịch</span>
-                          </div>
-                        )}
-                      </div>
-                    </section>
-                  )),
-                )}
-              </div>
-            </div>
-          </>
+          <CalendarWeek
+            dates={dates}
+            entries={entries}
+            block={block}
+            fixed={fixed}
+            now={now}
+            onWorkspaceChanged={onWorkspaceChanged}
+          />
         ) : (
           <div
             className="agenda-week"
@@ -363,7 +348,8 @@ function calendarMarkup(dates, view, sessions, entries, block, fixed, now) {
         )}
         <p className="calendar-hint">
           {icon("clock")}
-          Cuộn trong khung lịch để xem thêm. Bấm một mục để xem chi tiết và các thao tác với lịch.
+          Cuộn trong khung lịch để xem thêm. Bấm một mục để xem chi tiết và các
+          thao tác với lịch.
           {" Múi giờ "}
           {state.workspace.preference.timeZoneId}.
         </p>

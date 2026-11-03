@@ -1,9 +1,22 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { StrictMode } from "react";
 import { TeamsPage } from "../src/teams.jsx";
 import { TeamJoinRequests } from "../src/team-membership.jsx";
 import { state } from "../src/ui.jsx";
 import { workspace } from "./fixtures.js";
+import { NotificationCenter } from "../src/notifications.jsx";
+import {
+  pendingTeamJoinReview,
+  finishTeamJoinReview,
+  requestTeamJoinReview,
+} from "../src/team-notification-link.js";
 vi.mock("../src/api.js", () => ({ api: vi.fn() }));
 import { api } from "../src/api.js";
 const team = { id: "team", name: "SSG", role: "Leader" };
@@ -16,8 +29,92 @@ const applicant = {
 beforeEach(() => {
   vi.resetAllMocks();
   state.workspace = workspace();
+  finishTeamJoinReview(pendingTeamJoinReview(state.workspace.profile.id));
   window.history.replaceState({}, "", "/");
   sessionStorage.clear();
+});
+
+it("opens the notification's group and focuses approvals after navigation, including StrictMode", async () => {
+  state.workspace.notifications = [
+    {
+      id: "join",
+      kind: "TEAM_JOIN_REQUEST",
+      teamId: "requested-team",
+      title: "Có yêu cầu tham gia nhóm",
+      message: "Có yêu cầu mới.",
+      createdAt: "2026-11-03T01:26:00Z",
+      isRead: false,
+    },
+  ];
+  api.mockImplementation(async (path) => {
+    if (path === "/api/teams")
+      return [team, { ...team, id: "requested-team", name: "Nhóm đích" }];
+    if (path === "/api/teams/join-requests") return [];
+    if (path === "/api/teams/requested-team")
+      return {
+        team: { ...team, id: "requested-team", name: "Nhóm đích" },
+        members: [],
+        tasks: [],
+        activity: [],
+        joinRequests: [applicant],
+      };
+    return {};
+  });
+  const view = render(<NotificationCenter workspace={state.workspace} />);
+  const link = screen.getByRole("link", { name: "Mở nhóm để duyệt" });
+  expect(link.getAttribute("href")).toBe("#teams");
+  fireEvent.click(link);
+  view.rerender(
+    <StrictMode>
+      <TeamsPage />
+    </StrictMode>,
+  );
+  expect(
+    await screen.findByRole("button", { name: "Duyệt Ngọc" }),
+  ).toBeTruthy();
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("region", { name: "Duyệt yêu cầu tham gia" }),
+    ),
+  );
+  expect(api.mock.calls.some(([path]) => path === "/api/teams/team")).toBe(
+    false,
+  );
+  expect(api.mock.calls.some(([, method]) => method === "POST")).toBe(false);
+  expect(state.workspace.notifications[0].isRead).toBe(false);
+});
+
+it("handles a review link while the groups screen is already mounted and shows access errors", async () => {
+  api.mockImplementation(async (path) => {
+    if (path === "/api/teams") return [team];
+    if (path === "/api/teams/join-requests") return [];
+    if (path === "/api/teams/unavailable")
+      throw new Error("Bạn không còn quyền truy cập nhóm này.");
+    if (path === "/api/teams/team")
+      return {
+        team,
+        members: [],
+        tasks: [],
+        activity: [],
+        joinRequests: [applicant],
+      };
+    return {};
+  });
+  render(<TeamsPage />);
+  await screen.findByRole("button", { name: "SSG" });
+  act(() => requestTeamJoinReview("unavailable"));
+  expect(await screen.findByRole("alert")).toHaveProperty(
+    "textContent",
+    "Bạn không còn quyền truy cập nhóm này.",
+  );
+  act(() => requestTeamJoinReview("team"));
+  expect(
+    await screen.findByRole("button", { name: "Duyệt Ngọc" }),
+  ).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(document.activeElement).toBe(
+    screen.getByRole("region", { name: "Duyệt yêu cầu tham gia" }),
+  );
 });
 
 it("submits a pending request without opening private group data", async () => {

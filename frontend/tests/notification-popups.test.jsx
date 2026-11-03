@@ -20,6 +20,10 @@ import {
 } from "../src/notification-feed.js";
 import { startNotificationPolling } from "../src/notification-polling.js";
 import { state } from "../src/ui.jsx";
+import {
+  pendingTeamJoinReview,
+  finishTeamJoinReview,
+} from "../src/team-notification-link.js";
 const reminder = (id, isRead = false) => ({
   id,
   kind: "SESSION_REMINDER",
@@ -43,9 +47,55 @@ beforeEach(() => {
   state.workspace = null;
 });
 afterEach(() => {
+  finishTeamJoinReview(pendingTeamJoinReview(state.workspace?.profile?.id));
   cleanup();
   resetNotificationFeed();
   vi.useRealTimers();
+});
+
+it("opens the requesting group from a new join popup and dismisses the popup", () => {
+  setup();
+  render(<NotificationPopups />);
+  act(() =>
+    syncNotifications({
+      ...state.workspace,
+      notifications: [
+        {
+          ...reminder("join"),
+          kind: "TEAM_JOIN_REQUEST",
+          teamId: "team-target",
+        },
+      ],
+    }),
+  );
+  const link = screen.getByRole("link", { name: "Mở nhóm để duyệt" });
+  expect(link.getAttribute("href")).toBe("#teams");
+  fireEvent.click(link);
+  expect(pendingTeamJoinReview("member")?.teamId).toBe("team-target");
+  expect(pendingTeamJoinReview("other")).toBeNull();
+  expect(notificationSnapshot().popups).toHaveLength(0);
+});
+
+it("removes a resolved approval action from an already visible popup on refresh", () => {
+  setup();
+  render(<NotificationPopups />);
+  const notice = {
+    ...reminder("join"),
+    kind: "TEAM_JOIN_REQUEST",
+    teamId: "team-target",
+    joinRequestPending: true,
+  };
+  act(() => syncNotifications({ ...state.workspace, notifications: [notice] }));
+  expect(screen.getByRole("link", { name: "Mở nhóm để duyệt" })).toBeTruthy();
+  act(() =>
+    syncNotifications({
+      ...state.workspace,
+      notifications: [{ ...notice, joinRequestPending: false }],
+    }),
+  );
+  expect(screen.queryByRole("link", { name: "Mở nhóm để duyệt" })).toBeNull();
+  expect(screen.getByText(notice.title)).toBeTruthy();
+  expect(notificationSnapshot().popups[0].joinRequestPending).toBe(false);
 });
 
 it("shows existing unread once and updates the bell and popup on new arrivals", () => {

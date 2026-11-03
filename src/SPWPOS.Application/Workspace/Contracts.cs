@@ -81,7 +81,7 @@ public sealed record IntelligenceView(int RemainingMinutes, int CalendarFreeMinu
     BiasView[] Biases, RiskView[] Tasks, int PlannedMinutes, int ActualMinutes, int HorizonDemandMinutes = 0,
     CapacityDayView[]? Days = null, DateTimeOffset? RangeStart = null, DateTimeOffset? RangeEnd = null);
 public sealed record ScenarioView(IntelligenceView Before, IntelligenceView After, PlanView ProposedPlan, int AddedMinutes);
-public sealed record NotificationView(Guid Id, string Kind, string Title, string Message, Guid? TaskId, DateTimeOffset CreatedAt, bool IsRead);
+public sealed record NotificationView(Guid Id, string Kind, string Title, string Message, Guid? TaskId, DateTimeOffset CreatedAt, bool IsRead, Guid? TeamId = null, bool? JoinRequestPending = null);
 public sealed record WorkspaceView(ProfileView Profile, PreferenceView Preference, CategoryView[] Categories,
     TaskView[] Tasks, AvailabilityInput[] Availability, ExceptionView[] Exceptions, EventView[] Events,
     SessionView[] Sessions, NotificationView[] Notifications, NotificationSettingInput NotificationSettings, string[]? Features = null,
@@ -154,6 +154,7 @@ public interface IWorkspaceService
     Task<PlanWarning[]> DetectConflictsAsync(Guid userId, PlanInput input, CancellationToken ct);
     Task ApplyPlanAsync(Guid userId, Guid id, CancellationToken ct);
     Task EditSessionAsync(Guid userId, Guid id, SessionEdit input, CancellationToken ct);
+    Task<CalendarMoveResult> MoveCalendarItemAsync(Guid userId, CalendarMoveInput input, CancellationToken ct);
     Task LockSessionAsync(Guid userId, Guid id, bool locked, CancellationToken ct);
     Task SplitSessionAsync(Guid userId, Guid id, SplitInput input, CancellationToken ct);
     Task ExecuteSessionAsync(Guid userId, Guid id, string action, CancellationToken ct);

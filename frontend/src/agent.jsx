@@ -7,6 +7,7 @@ import { NoraResultCard } from "./nora-result-card.jsx";
 import { NoraSchedulePanel } from "./nora-schedule-panel.jsx";
 import { askNora, takeAgentDraft, secretaryMode } from "./agent-handoff.js";
 import { NoraEventEditor } from "./nora-event-editor.jsx";
+import { NoraCalendarKind } from "./nora-calendar-kind.jsx";
 import {
   NoraScheduleAlternatives,
   scheduleAlternativeView,
@@ -330,6 +331,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const [conversationId, setConversationId] = useState(null);
   const [text, setText] = useState(takeAgentDraft);
   const [autoApply, setAutoApply] = useState(true);
+  const [calendarKind, setCalendarKind] = useState("Auto");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -580,6 +582,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       body =
         retry.current?.text === messageText &&
         retry.current?.image?.data === attachedImage?.data &&
+        (retry.current?.calendarKind || "Auto") === (withImage ? "Event" : calendarKind) &&
         retry.current.conversationId === conversationId
           ? retry.current
           : {
@@ -587,6 +590,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
               requestId: streamState.current.requestId,
               text: messageText,
               autoApply,
+              calendarKind: withImage ? "Event" : calendarKind,
               useCapacityFactor: false,
               useEstimateBias: false,
               ...(attachedImage ? { image: attachedImage } : {}),
@@ -827,6 +831,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     setMessageCursor(null);
     setText("");
     setPending(null);
+    setCalendarKind("Auto");
     retry.current = null;
     setError("");
     setHistoryOpen(false);
@@ -1579,6 +1584,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                   }}
                 />
               </label>
+              <NoraCalendarKind value={calendarKind} hasImage={!!image.attachment} disabled={busy || loading || voice.active || conversationArchived} onChange={(value) => { setCalendarKind(value); retry.current = null; }} />
               <div className="agent-composer-actions">
                 <label
                   className="agent-toggle nora-save-toggle"

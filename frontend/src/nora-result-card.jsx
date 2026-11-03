@@ -81,6 +81,7 @@ export function NoraResultCard({
           return (
             <li key={index}>
               <div>
+                {["EVENT", "TASK", "SESSION"].includes(change.kind) && <span className="nora-result-kind">{change.kind === "EVENT" ? "Sự kiện cố định" : change.kind === "TASK" ? "Công việc · có thể cấu hình ưu tiên" : "Phiên công việc"}</span>}
                 <strong>{change.name}</strong>
                 {compareTimes && ["SESSION", "EVENT"].includes(change.kind) && change.before && (
                   <p>Giờ cũ: {compactScheduleText(change.before)}</p>
@@ -137,7 +138,7 @@ export function NoraResultCard({
       {!!sessions.length && (
         <div className="nora-result-sessions">
           <p className="nora-session-count">
-            {sessions.length} khoảng làm việc ·{" "}
+            {sessions.length} phiên công việc ·{" "}
             {sessions.reduce(
               (sum, item) =>
                 sum +

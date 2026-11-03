@@ -99,9 +99,29 @@ public sealed partial class WorkspaceService
                 $"session-started:{session.Id}:{session.Start.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
         }
     }
-    public Task<NotificationView[]> GetNotificationsAsync(Guid uid, CancellationToken ct) => Mine<InAppNotification>(uid).AsNoTracking()
-        .Where(x => x.IsVisible).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(100)
-        .Select(x => new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null)).ToArrayAsync(ct);
+    public async Task<NotificationView[]> GetNotificationsAsync(Guid uid, CancellationToken ct)
+    {
+        var rows = await Mine<InAppNotification>(uid).AsNoTracking()
+            .Where(x => x.IsVisible).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(100)
+            .Select(x => new { View = new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null, null, null), x.DedupeKey }).ToArrayAsync(ct);
+        if (rows.All(x => x.View.Kind != "TEAM_JOIN_REQUEST")) return rows.Select(x => x.View).ToArray();
+        // Existing join notices already identify the applicant membership in their
+        // dedupe key. Resolve it in one batch so old inbox entries work as well.
+        var memberships = new Dictionary<Guid, (Guid Id, Guid Version)>();
+        foreach (var row in rows.Where(x => x.View.Kind == "TEAM_JOIN_REQUEST"))
+        {
+            var parts = row.DedupeKey.Split(':');
+            if (parts.Length > 2 && parts[0] == "team-join" && Guid.TryParse(parts[1], out var membershipId) && Guid.TryParse(parts[2], out var version))
+                memberships[row.View.Id] = (membershipId, version);
+        }
+        var ids = memberships.Values.Select(x => x.Id).Distinct().ToArray();
+        var teams = await db.TeamMemberships.AsNoTracking().Where(x => ids.Contains(x.Id))
+            .Select(x => new { x.Id, x.TeamId, x.Active, x.ApprovalStatus, x.Version }).ToDictionaryAsync(x => x.Id, ct);
+        return rows.Select(row => row.View.Kind != "TEAM_JOIN_REQUEST" ? row.View
+            : memberships.TryGetValue(row.View.Id, out var request) && teams.TryGetValue(request.Id, out var member)
+                ? row.View with { TeamId = member.TeamId, JoinRequestPending = !member.Active && member.ApprovalStatus == "Pending" && member.Version == request.Version }
+                : row.View with { JoinRequestPending = false }).ToArray();
+    }
     public Task MarkNotificationAsync(Guid uid, Guid id, CancellationToken ct) => Mutate(uid, async () => (await Find<InAppNotification>(uid, id, ct)).ReadAt = Now, ct, false);
     public Task<AdminUserView[]> SearchUsersAsync(string? search, CancellationToken ct)
     {

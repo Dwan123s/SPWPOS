@@ -9,7 +9,8 @@ public sealed partial class WorkspaceService
 {
     private static string AgentFingerprint(AgentTurnInput input) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
         $"{input.ConversationId:D}\n{input.Text.Trim()}\n{input.UseCapacityFactor}\n{input.UseEstimateBias}" +
-        (input.Image is null ? "" : $"\n{input.Image.Name}\n{input.Image.MimeType}\n{input.Image.Data}"))));
+        (input.Image is null ? "" : $"\n{input.Image.Name}\n{input.Image.MimeType}\n{input.Image.Data}") +
+        (input.CalendarKind == "Auto" ? "" : $"\nCalendarKind:{input.CalendarKind}"))));
     private static string PageCursor(DateTimeOffset date, Guid id) => Convert.ToBase64String(Encoding.UTF8.GetBytes($"{date.UtcTicks}:{id:D}"));
     private static (DateTimeOffset Date, Guid Id)? ReadCursor(string? cursor)
     {

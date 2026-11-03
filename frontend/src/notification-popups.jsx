@@ -6,6 +6,7 @@ import {
   subscribeNotifications,
 } from "./notification-feed.js";
 import "./styles/notification-popups.css";
+import { requestTeamJoinReview } from "./team-notification-link.js";
 
 export function useNotificationFeed() {
   return useSyncExternalStore(
@@ -60,17 +61,32 @@ export function NotificationPopups() {
           <div className="reminder-popup-content">
             <strong>{item.title}</strong>
             <p>{item.message}</p>
-            <a
-              href={
-                item.kind === "SESSION_REVIEW" ? "#today" : "#notifications"
-              }
-              onClick={() => dismissNotificationPopup(item.id)}
-            >
-              {item.kind === "SESSION_REVIEW"
-                ? "Phản hồi NORA"
-                : "Xem thông báo"}{" "}
-              {icon("arrow")}
-            </a>
+            {!(
+              item.kind === "TEAM_JOIN_REQUEST" &&
+              item.joinRequestPending === false
+            ) && (
+              <a
+                href={
+                  item.kind === "TEAM_JOIN_REQUEST"
+                    ? "#teams"
+                    : item.kind === "SESSION_REVIEW"
+                      ? "#today"
+                      : "#notifications"
+                }
+                onClick={() => {
+                  if (item.kind === "TEAM_JOIN_REQUEST")
+                    requestTeamJoinReview(item.teamId);
+                  dismissNotificationPopup(item.id);
+                }}
+              >
+                {item.kind === "TEAM_JOIN_REQUEST"
+                  ? "Mở nhóm để duyệt"
+                  : item.kind === "SESSION_REVIEW"
+                    ? "Phản hồi NORA"
+                    : "Xem thông báo"}{" "}
+                {icon("arrow")}
+              </a>
+            )}
           </div>
           <button
             type="button"

@@ -175,7 +175,7 @@ public sealed partial class WorkspaceService
                 }
                 case "prepare_changes":
                 {
-                    lastDraft = NormalizeRuntimeDraft(args.GetProperty("intent"), source, state, pending, types);
+                    lastDraft = NormalizeRuntimeDraft(args.GetProperty("intent"), source, state, pending, types, input.CalendarKind);
                     Require(lastDraft.Question.Length == 0, "CLARIFICATION_REQUIRED", lastDraft.Question);
                     var id = Guid.NewGuid().ToString("N"); drafts[id] = lastDraft;
                     return new("OK", new { draftId = id, businessDataSaved = false,
@@ -188,7 +188,7 @@ public sealed partial class WorkspaceService
                     AgentIntent draft;
                     if (call.Name == "propose_changes")
                     {
-                        draft = NormalizeRuntimeDraft(args.GetProperty("intent"), source, state, pending, types);
+                        draft = NormalizeRuntimeDraft(args.GetProperty("intent"), source, state, pending, types, input.CalendarKind);
                         lastDraft = draft;
                         Require(draft.Question.Length == 0, "CLARIFICATION_REQUIRED", draft.Question);
                     }

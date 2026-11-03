@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { state, dateFmt, timeFmt, icon } from "./ui.jsx";
 import { askNora } from "./agent-handoff.js";
@@ -37,6 +37,10 @@ import "./team-task-board.css";
 import "./team-task-detail.css";
 import "./team-recipient-select.css";
 import { takeEisenhowerTeamTask } from "./eisenhower.jsx";
+import {
+  pendingTeamJoinReview,
+  finishTeamJoinReview,
+} from "./team-notification-link.js";
 
 export function PrivateClaimPreview({
   claim,
@@ -197,6 +201,45 @@ export function TeamsPage({ onWorkspaceChanged }) {
   const [joinRequests, setJoinRequests] = useState([]);
   const [joinMessage, setJoinMessage] = useState("");
   const [removingMember, setRemovingMember] = useState(null);
+  const joinReviewRef = useRef(null);
+  const [reviewTeamId, setReviewTeamId] = useState(null);
+  useEffect(() => {
+    let live = true;
+    const open = async () => {
+      const request = pendingTeamJoinReview(uid);
+      if (!request) return;
+      setError("");
+      try {
+        const next = await api(
+          `/api/teams/${encodeURIComponent(request.teamId)}`,
+        );
+        if (!live || pendingTeamJoinReview(uid) !== request) return;
+        setDetail(next);
+        setReviewTeamId(next.team.id);
+        finishTeamJoinReview(request);
+      } catch (failure) {
+        if (live && pendingTeamJoinReview(uid) === request) {
+          setError(failure.message);
+          finishTeamJoinReview(request);
+        }
+      }
+    };
+    open();
+    window.addEventListener("team-join-review", open);
+    return () => {
+      live = false;
+      window.removeEventListener("team-join-review", open);
+    };
+  }, [uid]);
+  useEffect(() => {
+    if (reviewTeamId !== detail?.team.id || !joinReviewRef.current) return;
+    joinReviewRef.current.focus({ preventScroll: true });
+    joinReviewRef.current.scrollIntoView?.({
+      behavior: "smooth",
+      block: "center",
+    });
+    setReviewTeamId(null);
+  }, [reviewTeamId, detail?.team.id]);
   useEffect(() => {
     if (!joinLink?.code) return;
     let live = true;
@@ -269,7 +312,9 @@ export function TeamsPage({ onWorkspaceChanged }) {
           try {
             const list = await api("/api/teams");
             if (live) setTeams(list);
-          } catch { /* Group data is already cleared even if the list refresh fails. */ }
+          } catch {
+            /* Group data is already cleared even if the list refresh fails. */
+          }
         }
       }
     }, 7000);
@@ -581,6 +626,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
               />
               <TeamJoinRequests
                 detail={detail}
+                sectionRef={joinReviewRef}
                 busy={busy}
                 onReview={(request, approved) =>
                   run(async () => {

@@ -41,6 +41,7 @@ export function syncNotifications(workspace) {
     ? workspace.notifications
     : [];
   const unread = items.filter((item) => !item.isRead);
+  const latestItems = new Map(items.map((item) => [item.id, item]));
   const unreadIds = new Set(unread.map((item) => item.id));
   const summaryId = `summary:${userId}`;
   const fresh = unread
@@ -59,7 +60,7 @@ export function syncNotifications(workspace) {
         .map((item) =>
           item.summary
             ? { ...item, title: `Bạn có ${unread.length} thông báo chưa đọc` }
-            : item,
+            : { ...item, ...latestItems.get(item.id) },
         );
   let popups = [];
   if (workspace.notificationSettings?.inAppEnabled !== false) {

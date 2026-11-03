@@ -36,7 +36,7 @@ public sealed partial class WorkspaceService
         @"\b(?:toi uu|xep lai|sap xep lai|lap lai lich|doi (?:cac |nhung )?phien|doi lich|doi cac (?:viec|cong viec)|reschedule|replan)\b").Success &&
         !ChatMatch(source, @"\b(?:khong|dung|chua) (?:duoc |tu dong )?(?:doi (?:cac )?phien|doi lich|xep lai|toi uu)\b").Success);
 
-    private AgentIntent NormalizeRuntimeDraft(JsonElement payload, string source, PlanningState state, AgentPendingRequest? pending, string[] types)
+    private AgentIntent NormalizeRuntimeDraft(JsonElement payload, string source, PlanningState state, AgentPendingRequest? pending, string[] types, string calendarKind = "Auto")
     {
         var intent = TaskInterpreter.DecodeAgentIntent(payload, types);
         ValidateIntent(intent, true);
@@ -45,6 +45,7 @@ public sealed partial class WorkspaceService
         intent = NormalizeAgentIntent(intent, source, state, pending);
         intent = RecognizeAgentOptimization(intent, source, state.Preference);
         intent = GroundAgentDates(intent, source, state.Preference, Now);
+        intent = RespectCalendarKind(intent, calendarKind);
         ValidateIntent(intent);
         var normalizedSource = MatchText(source);
         var directives = RequestMatches(normalizedSource, @"\b(?:(?<split>khong can (?:lam )?lien tuc)|(?<continuous>lien tuc|khong (?:duoc )?(?:chia|tach)(?: nho)?)|(?<split>(?:(?:cho phep|dong y|co the|duoc|hay) )?chia nho|chia thanh|tach thanh|split))\b");

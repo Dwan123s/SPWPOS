@@ -291,6 +291,14 @@ it("shows optimization comparisons inside NORA and applies only after confirmati
   expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
 });
 
+it.each(["Event", "WorkSession"])("sends explicit calendar kind %s separately from the original message", async (kind) => {
+  render(<AgentPage />);await ready();
+  fireEvent.change(screen.getByLabelText("Loại lịch", { selector: "select" }), { target: { value: kind } });
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  await waitFor(() => expect(calls.some((call) => call.url === "/api/agent/turns/stream")).toBe(true));
+  const body = calls.find((call) => call.url === "/api/agent/turns/stream").body;
+  expect(body.calendarKind).toBe(kind);expect(body.text).not.toContain("User calendar choice");
+});
 it("offers an optimization prompt without immediately sending it", async () => {
   render(<AgentPage />);
   await waitFor(() =>

@@ -23,11 +23,16 @@ export function MyJoinRequests({ requests = [] }) {
   );
 }
 
-export function TeamJoinRequests({ detail, busy, onReview }) {
+export function TeamJoinRequests({ detail, busy, onReview, sectionRef }) {
   if (detail.team.role !== "Leader") return null;
   const requests = detail.joinRequests || [];
   return (
-    <section className="team-panel" aria-label="Duyệt yêu cầu tham gia">
+    <section
+      ref={sectionRef}
+      tabIndex={-1}
+      className="team-panel"
+      aria-label="Duyệt yêu cầu tham gia"
+    >
       <div className="team-panel-heading">
         <h3>Chờ duyệt tham gia</h3>
         <span className="team-count">{requests.length}</span>

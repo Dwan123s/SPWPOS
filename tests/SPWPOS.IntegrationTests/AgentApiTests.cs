@@ -20,6 +20,20 @@ public sealed class AgentApiTests
         { base.ConfigureWebHost(builder); builder.ConfigureServices(s => s.AddSingleton<ITaskInterpreter>(Ai)); }
     }
 
+    [Fact] public async Task Calendar_kind_is_bound_validated_and_keeps_events_separate_from_work_sessions_over_HTTP()
+    {
+        await using var f=new Factory();using var client=await f.ClientAsync();await WorkspaceFlowTests.Authorize(f,client);
+        f.Ai.Response=now=>AgentAiTestDouble.Empty() with{Events=[new("Khám nha khoa",now.AddDays(1),now.AddDays(1).AddHours(1),EventType:"APPOINTMENT")]};
+        var input=new AgentTurnInput(Guid.NewGuid(),Guid.NewGuid(),"Khám nha khoa ngày mai, giữ đúng khung giờ.",CalendarKind:"WorkSession");
+        var mismatch=(await WorkspaceFlowTests.Send(client,HttpMethod.Post,"/api/agent/turns",input)).GetProperty("data");
+        Assert.Equal("NEEDS_INPUT",mismatch.GetProperty("status").GetString());
+        var empty=(await WorkspaceFlowTests.Send(client,HttpMethod.Get,"/api/workspace")).GetProperty("data");Assert.Empty(empty.GetProperty("events").EnumerateArray());Assert.Empty(empty.GetProperty("tasks").EnumerateArray());
+        var saved=(await WorkspaceFlowTests.Send(client,HttpMethod.Post,"/api/agent/turns",input with{RequestId=Guid.NewGuid(),ConversationId=Guid.NewGuid(),CalendarKind="Event"})).GetProperty("data");
+        Assert.Equal("APPLIED",saved.GetProperty("status").GetString());
+        var after=(await WorkspaceFlowTests.Send(client,HttpMethod.Get,"/api/workspace")).GetProperty("data");Assert.Single(after.GetProperty("events").EnumerateArray());Assert.Empty(after.GetProperty("tasks").EnumerateArray());Assert.Empty(after.GetProperty("sessions").EnumerateArray());
+        await WorkspaceFlowTests.Send(client,HttpMethod.Post,"/api/agent/turns",input with{RequestId=Guid.NewGuid(),CalendarKind="Invalid"},HttpStatusCode.BadRequest);
+    }
+
     [Fact]
     public async Task New_urgent_meeting_overrides_a_saved_urgent_meeting_and_persists_both_urgency_flags()
     {

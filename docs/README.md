@@ -29,6 +29,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [Kịch bản demo PLANORA / Demo script](guides/DEMO_SCRIPT.md)
 - [Workspace phases 1–4 / Kiến trúc, EMA, XP và ghi nhận bù](features/WORKSPACE_UPGRADE_PHASES_1_TO_4.md)
 - [Hỏi kết quả khi hết giờ, thêm giờ và hoàn thành sớm](features/WORK_TIME_FOLLOWUP.md)
+- [Kéo thả đổi giờ/ngày và thời lượng trên lịch tuần](features/CALENDAR_DRAG_DROP.md)
 - [Pet XP và skin MILO / Hướng dẫn cấu hình payOS](integrations/PAYOS_PET_SKINS.md)
 - [Admin: doanh thu, biểu đồ và lịch sử mua hàng](features/ADMIN_COMMERCE.md)
 - [Independent builds, same origin / Build riêng, chung địa chỉ](development/INDEPENDENT_BUILD_SAME_ORIGIN.md)

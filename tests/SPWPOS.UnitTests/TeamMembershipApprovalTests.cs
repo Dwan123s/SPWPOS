@@ -10,6 +10,11 @@ public sealed partial class PrivateTeamPlanningTests
         await using var h = await Setup(); var invite = await Use(h, s => s.CreateTeamInviteAsync(Leader, Team, Ct));
         await Use(h, s => s.JoinTeamAsync(Other, invite.Code, Ct));
         await Use(h, s => s.JoinTeamAsync(Other, invite.Code, Ct));
+        var notice = Assert.Single(await Workspace(h, s => s.GetNotificationsAsync(Leader, Ct)), x => x.Kind == "TEAM_JOIN_REQUEST");
+        Assert.Equal(Team, notice.TeamId);
+        Assert.True(notice.JoinRequestPending);
+        Assert.False(notice.IsRead);
+        Assert.DoesNotContain(await Workspace(h, s => s.GetNotificationsAsync(Member, Ct)), x => x.Id == notice.Id);
         Assert.Empty(await Use(h, s => s.ListTeamsAsync(Other, Ct)));
         Assert.Equal("Pending", Assert.Single(await Use(h, s => s.ListMyTeamJoinRequestsAsync(Other, Ct))).Status);
         Assert.Equal("Pending", (await Use(h, s => s.PreviewTeamInviteAsync(Other, invite.Code, Ct))).RequestStatus);
@@ -22,6 +27,7 @@ public sealed partial class PrivateTeamPlanningTests
         Assert.Empty((await Use(h, s => s.GetTeamAsync(Member, Team, Ct))).JoinRequests!);
         await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ReviewTeamJoinRequestAsync(Member, Team, Other, new(request.Version, true), Ct)));
         await Use(h, s => s.ReviewTeamJoinRequestAsync(Leader, Team, Other, new(request.Version, true), Ct));
+        Assert.False(Assert.Single(await Workspace(h, s => s.GetNotificationsAsync(Leader, Ct)), x => x.Id == notice.Id).JoinRequestPending);
         Assert.Single(await Use(h, s => s.ListTeamsAsync(Other, Ct)));
         Assert.Equal(3, (await Use(h, s => s.GetTeamAsync(Other, Team, Ct))).Members.Length);
         Assert.Empty(await Use(h, s => s.ListMyTeamJoinRequestsAsync(Other, Ct)));
@@ -34,11 +40,16 @@ public sealed partial class PrivateTeamPlanningTests
         await using var h = await Setup(); var invite = await Use(h, s => s.CreateTeamInviteAsync(Leader, Team, Ct));
         await Use(h, s => s.JoinTeamAsync(Other, invite.Code, Ct));
         var request = Assert.Single((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).JoinRequests!);
+        var originalNotice = Assert.Single(await Workspace(h, s => s.GetNotificationsAsync(Leader, Ct)), x => x.Kind == "TEAM_JOIN_REQUEST");
         await Use(h, s => s.ReviewTeamJoinRequestAsync(Leader, Team, Other, new(request.Version, false), Ct));
+        Assert.False(Assert.Single(await Workspace(h, s => s.GetNotificationsAsync(Leader, Ct)), x => x.Id == originalNotice.Id).JoinRequestPending);
         Assert.Equal("Rejected", Assert.Single(await Use(h, s => s.ListMyTeamJoinRequestsAsync(Other, Ct))).Status);
         Assert.Equal("JOIN_REJECTED", (await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.JoinTeamAsync(Other, invite.Code, Ct)))).Code);
         var next = await Use(h, s => s.CreateTeamInviteAsync(Leader, Team, Ct));
         await Use(h, s => s.JoinTeamAsync(Other, next.Code, Ct));
+        var notices = await Workspace(h, s => s.GetNotificationsAsync(Leader, Ct));
+        Assert.False(Assert.Single(notices, x => x.Id == originalNotice.Id).JoinRequestPending);
+        Assert.True(Assert.Single(notices, x => x.Kind == "TEAM_JOIN_REQUEST" && x.Id != originalNotice.Id).JoinRequestPending);
         request = Assert.Single((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).JoinRequests!);
         await Use(h, s => s.RevokeTeamInviteAsync(Leader, Team, next.Id, Ct));
         Assert.Equal("INVITE_INVALID", (await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ReviewTeamJoinRequestAsync(Leader, Team, Other, new(request.Version, true), Ct)))).Code);

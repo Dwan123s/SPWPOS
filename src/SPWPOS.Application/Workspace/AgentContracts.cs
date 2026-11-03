@@ -3,7 +3,8 @@ namespace SPWPOS.Application.Workspace;
 
 public sealed record AgentTurnInput(Guid ConversationId, Guid RequestId,
     [Required, StringLength(2000)] string Text, bool AutoApply = true,
-    bool UseCapacityFactor = false, bool UseEstimateBias = false, AgentImage? Image = null);
+    bool UseCapacityFactor = false, bool UseEstimateBias = false, AgentImage? Image = null,
+    string CalendarKind = "Auto");
 public sealed record AgentImage(string Name, string MimeType, string? Data = null, string? Url = null);
 public sealed record AgentTaskCommand(Guid? TaskId, string Name, DateTimeOffset? Deadline,
     int? EstimatedMinutes, int? Priority, string TaskType, bool? Splittable,
