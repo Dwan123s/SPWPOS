@@ -231,10 +231,28 @@ it("keeps the verified agent tool trace visible after loading a conversation", a
   render(<AgentPage />);
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  await screen.findByText(/NORA Agent · 3 lần dùng công cụ/);
+  await screen.findByText(/NORA · Đã kiểm tra yêu cầu/);
   expect(screen.getByText("Đọc lịch đã lưu · đã kiểm tra")).toBeTruthy();
   expect(screen.getByText("Thử phương án lịch · cần điều chỉnh")).toBeTruthy();
   expect(screen.queryByText(/thoughtSignature/)).toBeNull();
+});
+
+it("shows a direct assistant reply and its understood purpose without a tool counter", async () => {
+  result.status = "ANSWERED";
+  result.changes = [];
+  result.plan = null;
+  result.canUndo = false;
+  result.run = {
+    id: "direct-run", mode: "Agent", status: "COMPLETED", modelTurns: 1, toolCalls: 0, steps: [],
+    understanding: { intent: "Advice", summary: "Bạn muốn lời khuyên để bớt quá tải.", needsPersonalData: false, missingDetails: [] },
+  };
+  render(<AgentPage />);
+  await ready();
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  await screen.findByText(/NORA · Phản hồi trực tiếp/);
+  expect(screen.getByText("Bạn muốn lời khuyên để bớt quá tải.")).toBeTruthy();
+  expect(screen.queryByText(/lần dùng công cụ/)).toBeNull();
+  expect(screen.queryByRole("button", { name: /Áp dụng/ })).toBeNull();
 });
 
 it("renders detailed schedule advice as readable paragraphs and sections without apply actions", async () => {

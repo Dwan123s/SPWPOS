@@ -74,7 +74,7 @@ public sealed partial class WorkspaceService
             return task;
         }).ToArray(), ScheduleTaskIds = intent.ScheduleTaskIds.Concat(intent.Tasks.Where(x => x.TaskId is not null).Select(x => x.TaskId!.Value)).Distinct().ToArray() };
         Require(intent.Question.Length > 0 || HasAgentActions(intent), "DRAFT_HAS_NO_ACTION", "Bản nháp phải có hành động; câu hỏi chỉ đọc dùng công cụ đọc.");
-        Require(!HasAgentActions(intent) || !ChatMatch(source, @"\b(?:chi xem|chi tu van|khong thay doi|khong tao|read only)\b").Success,
+        Require(!HasAgentActions(intent) || !ChatMatch(source, @"\b(?:chi xem(?! truoc\b)|chi tu van|khong thay doi|khong tao|read only)\b").Success,
             "READ_ONLY_REQUEST", "Yêu cầu chỉ đọc không được chuẩn bị thay đổi.");
         Require(!intent.Reschedule || RuntimeReplanAllowed(source) || intent.Events.Length > 0,
             "REPLAN_NOT_AUTHORIZED", "Chưa có yêu cầu xếp lại các phiên đã lưu.");

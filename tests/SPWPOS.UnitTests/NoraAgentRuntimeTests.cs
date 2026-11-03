@@ -28,6 +28,7 @@ public sealed partial class NoraAgentRuntimeTests
     {
         public NoteAgentCapabilities Capabilities => new(true, Provider: "Gemini");
         public bool AgentAvailable => true;
+        public bool SupportsRequestUnderstanding { get; set; }
         public int Calls { get; private set; }
         public string DraftText { get; set; } = Draft;
         public Func<NoraModelRequest, int, Task<NoraModelReply>>? Decision { get; set; }

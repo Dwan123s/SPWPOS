@@ -147,9 +147,10 @@ function Turn({
         {turn.run?.mode === "Agent" && (
           <details className="nora-completed-process">
             <summary>
-              {icon(turn.status === "BLOCKED" ? "clock" : "check")}NORA Agent ·{" "}
-              {turn.run.toolCalls} lần dùng công cụ
+              {icon(turn.status === "BLOCKED" ? "clock" : "check")}NORA ·{" "}
+              {turn.run.toolCalls > 0 ? "Đã kiểm tra yêu cầu" : "Phản hồi trực tiếp"}
             </summary>
+            {turn.run.understanding?.summary && <p>{turn.run.understanding.summary}</p>}
             <ol aria-label="Các hành động đã thực hiện">
               {(turn.run.steps || []).map((step) => (
                 <li key={step.sequence}>

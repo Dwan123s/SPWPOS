@@ -2,6 +2,8 @@
 
 Từ bản nâng cấp 31/10/2026, chat NORA trên Gemini/Vertex AI có vòng gọi công cụ do model điều phối. Xem [runtime Agent, cấu hình, giới hạn và kịch bản kiểm thử](NORA_AGENT_RUNTIME.md). Chế độ `Workflow` vẫn có thể được chọn trong cấu hình.
 
+Từ 04/11/2026, Agent [xác định mục đích trước khi dùng công cụ](NORA_ASSISTANT_FIRST.md): trò chuyện/tư vấn được trả lời trực tiếp, thiếu chi tiết thiết yếu thì hỏi trước, truy vấn lịch đơn giản kết thúc sau dữ liệu đã xác minh. Không thêm lượt gọi mô hình chỉ để phân loại, không buộc người dùng xác nhận lại yêu cầu đã rõ. “Chỉ xem trước” tạo phương án để xem, khác với yêu cầu chỉ đọc.
+
 ## Tiếng Việt gõ Telex chưa chuyển dấu
 
 NORA hỗ trợ đọc các từ Telex thông dụng trong yêu cầu lập lịch, kể cả khi trộn với chữ đã có dấu hoặc gõ lặp phím dấu:

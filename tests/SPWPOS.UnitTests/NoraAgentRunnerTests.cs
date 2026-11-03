@@ -91,4 +91,24 @@ public sealed class NoraAgentRunnerTests
         }, (_, _) => throw new InvalidOperationException("Must not execute terminal"));
         Assert.Equal("BLOCKED", result.Terminal.Kind); Assert.All(result.Trace, x => Assert.Equal("ERROR", x.Status));
     }
+
+    [Fact] public async Task Assessed_analysis_hides_mutation_tools_and_stops_repeated_reads_after_one_real_execution()
+    {
+        var rounds = 0; var executions = 0;
+        var result = await new NoraAgentRunner().RunAsync("instructions", Json(new { role = "user", parts = new[] { new { text = "Phân tích lịch" } } }),
+            [Tool("get_preferences"), Tool("propose_changes"), Tool("finish_answer"), Tool("ask_user")], new(), 0, 0,
+            (request, _) => {
+                if (rounds > 0)
+                {
+                    Assert.False(request.RequireUnderstanding);
+                    Assert.DoesNotContain(request.Tools, t => t.Name == "propose_changes");
+                }
+                else Assert.True(request.RequireUnderstanding);
+                return Task.FromResult(Call("get_preferences", rounds++) with {
+                    Understanding = rounds == 1 ? new("Analysis", "Phân tích khả năng làm việc hiện tại.", true, []) : null });
+            }, (_, _) => { executions++; return Task.FromResult(new NoraToolResult("OK", new { limit = 90 })); },
+            (_, _, _, _) => Task.CompletedTask, Ct, requireUnderstanding: true);
+        Assert.Equal("AGENT_REPEATED_ACTION", result.Terminal.Reply);
+        Assert.Equal(1, executions); Assert.Equal(3, result.ModelTurns);
+    }
 }

@@ -11,6 +11,7 @@ public static class NoraToolRegistry
     });
     private static object String(bool nullable = false) => new { type = nullable ? new[] { "string", "null" } : ["string"] };
     internal static NoraToolDefinition[] Create(string[] codes) => [
+        new("reply_to_user", "Respond naturally in Vietnamese to conversation, encouragement, planning advice or explanations that do not require saved personal data. This is a direct response, not a calendar tool. Never claim to have read or changed saved tasks/calendar. Use ask_user for essential missing facts, answer_calendar/answer_free_time for live data, propose_changes for requested actions.", Object(("reply", String())), "Trò chuyện với bạn"),
         new("get_tasks", "Find the account's active tasks by name/ID or list active work. Resolve duplicate names; use real IDs before editing.", Object(("query", String())), "Đọc công việc"),
         new("get_calendar", "Read saved calendar items between explicit-offset start and end; includes fixed commitments and locked sessions.", Object(("start", String()), ("end", String())), "Đọc lịch đã lưu"),
         new("get_preferences", "Read timezone, available hours, breaks and daily/session limits. This tool cannot change settings.", Object(), "Kiểm tra giờ rảnh và giới hạn"),

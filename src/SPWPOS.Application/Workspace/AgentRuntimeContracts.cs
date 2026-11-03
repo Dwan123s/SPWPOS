@@ -12,15 +12,17 @@ public sealed class NoraAgentOptions
 }
 public sealed record NoraToolDefinition(string Name, string Description, JsonElement Parameters, string Label);
 public sealed record NoraToolCall(string Id, string Name, JsonElement Arguments, string? ProviderId = null);
-public sealed record NoraModelRequest(string Instructions, JsonElement[] Contents, NoraToolDefinition[] Tools);
-public sealed record NoraModelReply(JsonElement Content, NoraToolCall[] Calls);
+public sealed record NoraRequestUnderstanding(string Intent, string Summary, bool NeedsPersonalData, string[] MissingDetails);
+public sealed record NoraModelRequest(string Instructions, JsonElement[] Contents, NoraToolDefinition[] Tools, bool RequireUnderstanding = false);
+public sealed record NoraModelReply(JsonElement Content, NoraToolCall[] Calls, NoraRequestUnderstanding? Understanding = null);
 public interface INoraAgentModel
 {
     bool AgentAvailable { get; }
+    bool SupportsRequestUnderstanding => false;
     Task<NoraModelReply> NextAgentStepAsync(NoraModelRequest request, CancellationToken ct);
 }
 public sealed record NoraToolResult(string Status, object? Data = null, string? ErrorCode = null, string? Message = null);
 public sealed record NoraToolTrace(int Sequence, string Tool, string Label, string Status, long DurationMs);
-public sealed record NoraRunView(Guid Id, string Mode, string Status, int ModelTurns, int ToolCalls, NoraToolTrace[] Steps);
+public sealed record NoraRunView(Guid Id, string Mode, string Status, int ModelTurns, int ToolCalls, NoraToolTrace[] Steps, NoraRequestUnderstanding? Understanding = null);
 public sealed record NoraTerminal(string Kind, string Reply = "", string Question = "", string[]? Options = null, string? CandidateId = null);
-public sealed record NoraRunnerResult(NoraTerminal Terminal, NoraToolTrace[] Trace, int ModelTurns, int ToolCalls);
+public sealed record NoraRunnerResult(NoraTerminal Terminal, NoraToolTrace[] Trace, int ModelTurns, int ToolCalls, NoraRequestUnderstanding? Understanding = null);

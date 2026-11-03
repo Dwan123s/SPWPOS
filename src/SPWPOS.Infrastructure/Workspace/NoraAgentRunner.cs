@@ -26,7 +26,7 @@ public sealed class NoraAgentRunner
         Func<NoraModelRequest, CancellationToken, Task<NoraModelReply>> model,
         Func<NoraToolCall, CancellationToken, Task<NoraToolResult>> execute,
         Func<NoraToolTrace, string, NoraToolResult, CancellationToken, Task> record,
-        CancellationToken ct)
+        CancellationToken ct, bool requireUnderstanding = false)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(limits.TimeoutSeconds));
@@ -36,11 +36,13 @@ public sealed class NoraAgentRunner
         var cache = new Dictionary<string, NoraToolResult>(StringComparer.Ordinal);
         var callIds = new Dictionary<string, string>(StringComparer.Ordinal);
         var rounds = priorModelTurns; var calls = priorToolCalls; var consecutiveErrors = 0;
+        NoraRequestUnderstanding? understanding = null;
+        var repeatedActions = 0;
         // Audit counters span the goal; resource limits apply to this user turn.
         // A clarification answer must still have room to finish its proposal.
         var modelLimit = priorModelTurns + limits.MaxModelTurns;
         var toolLimit = priorToolCalls + limits.MaxToolCalls;
-        NoraRunnerResult Stop(string code) => new(new("BLOCKED", code), trace.ToArray(), rounds, calls);
+        NoraRunnerResult Stop(string code) => new(new("BLOCKED", code), trace.ToArray(), rounds, calls, understanding);
         try
         {
             while (rounds < modelLimit && calls < toolLimit)
@@ -49,9 +51,35 @@ public sealed class NoraAgentRunner
                 var budget = $"\nCURRENT TURN BUDGET: {modelLimit - rounds + 1} model responses including this one and {toolLimit - calls} tool calls remain. " +
                     "A successful simulation already includes feasibility and warnings; do not re-evaluate the same candidate. " +
                     "When the requested changes are complete and feasible, finish_proposal next. Ask only for essential missing facts; never invent feasibility to finish.";
-                var reply = await model(new(instructions + budget, contents.ToArray(), tools), token);
+                var availableTools = understanding is null ? tools : tools.Where(t => NoraRequestPolicy.Allows(understanding, t.Name)).ToArray();
+                var reply = await model(new(instructions + budget, contents.ToArray(), availableTools,
+                    RequireUnderstanding: requireUnderstanding && understanding is null), token);
                 if (reply.Content.ValueKind != JsonValueKind.Object || reply.Calls.Length is 0 or > 6)
                     throw new AuthException("AGENT_INVALID_STEP", "AI chưa chọn được hành động hợp lệ. Lịch chưa thay đổi.", 503);
+                if (understanding is null && reply.Understanding is { } assessment)
+                {
+                    NoraRequestPolicy.Validate(assessment); understanding = assessment;
+                }
+                if (requireUnderstanding && understanding is null)
+                    throw new AuthException("AGENT_INTENT_MISSING", "NORA chưa xác định rõ mục đích yêu cầu. Chưa đọc hoặc thay đổi lịch.", 503);
+                // Validate the whole batch before performing any personal-data read
+                // or simulation. A public intent summary never authorizes mutation.
+                if (understanding is not null && reply.Calls.Any(c => !NoraRequestPolicy.Allows(understanding, c.Name)))
+                {
+                    if (understanding.MissingDetails.Length > 0)
+                        return new(new("QUESTION", "Mình cần làm rõ một chi tiết trước khi tiếp tục.",
+                            understanding.MissingDetails[0]), trace.ToArray(), rounds, calls, understanding);
+                    return Stop("AGENT_INTENT_MISMATCH");
+                }
+                if (reply.Calls is [var direct] && direct.Name == "reply_to_user")
+                {
+                    if (understanding is null || !NoraRequestPolicy.Allows(understanding, direct.Name)) return Stop("AGENT_INTENT_MISMATCH");
+                    var definition = tools.Single(t => t.Name == direct.Name);
+                    TaskInterpreter.ValidateShape(direct.Arguments, definition.Parameters);
+                    var text = direct.Arguments.GetProperty("reply").GetString();
+                    if (string.IsNullOrWhiteSpace(text) || text.Length > 4000) return Stop("AGENT_INVALID_STEP");
+                    return new(new("ANSWER", text.Trim()), trace.ToArray(), rounds, calls, understanding);
+                }
                 contents.Add(reply.Content);
                 var observations = new List<object>();
                 foreach (var call in reply.Calls)
@@ -72,16 +100,22 @@ public sealed class NoraAgentRunner
                             ? new("ERROR", ErrorCode: "MIXED_TERMINAL", Message: "Kết thúc hoặc hỏi người dùng phải là hành động riêng.")
                             : await ValidatedExecution(call, definition, execute, token);
                     }
-                    else if (cache.TryGetValue(fingerprint, out var saved)) result = saved;
+                    else if (cache.TryGetValue(fingerprint, out var saved))
+                    {
+                        // A cache hit avoids a DB read but still costs a model round.
+                        // Do not burn the entire turn re-asking the same question.
+                        if (understanding is not null && ++repeatedActions >= 2) return Stop("AGENT_REPEATED_ACTION");
+                        result = saved;
+                    }
                     else
                     {
                         result = await ValidatedExecution(call, definition, execute, token);
-                        cache[fingerprint] = result;
+                        if (result.Status != "ERROR") cache[fingerprint] = result;
                     }
                     var step = new NoraToolTrace(calls, call.Name, definition?.Label ?? "Hành động không được hỗ trợ", result.Status, watch.ElapsedMilliseconds);
                     trace.Add(step); await record(step, fingerprint, result, token);
                     if (result.Status == "TERMINAL" && result.Data is NoraTerminal terminal)
-                        return new(terminal, trace.ToArray(), rounds, calls);
+                        return new(terminal, trace.ToArray(), rounds, calls, understanding);
                     consecutiveErrors = result.Status == "ERROR" ? consecutiveErrors + 1 : 0;
                     if (consecutiveErrors >= 3) return Stop("REPEATED_TOOL_ERRORS");
                     var response = new Dictionary<string, object?> { ["name"] = call.Name,

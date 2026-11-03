@@ -49,7 +49,7 @@ public sealed partial class WorkspaceService
         Require(input.ConversationId != Guid.Empty && input.RequestId != Guid.Empty && !string.IsNullOrWhiteSpace(input.Text) && input.Text.Length <= 2000,
             "VALIDATION_ERROR", "Nhập yêu cầu tối đa 2000 ký tự và mã hội thoại hợp lệ.");
         var autoApply = input.AutoApply && !PreviewOnly(input.Text);
-        await Phase("READING", "Đang đọc lịch và giờ rảnh của bạn");
+        await Phase("READING", "Đang tiếp nhận yêu cầu của bạn");
         // Reserve the idempotency key before calling AI, then release the account lock.
         var reserved = await Mutate(uid, async () =>
         {
@@ -176,7 +176,8 @@ public sealed partial class WorkspaceService
                     }
                 }
             }
-            await Phase("PLANNING", "Đang kiểm tra khung giờ, deadline và xung đột");
+            if (runtime?.ReadReply is null && intent.Question.Length == 0)
+                await Phase("PLANNING", "Đang kiểm tra khung giờ, deadline và xung đột");
             // Another HTTP request could have modified the account during the AI call.
             db.ChangeTracker.Clear();
             var view = await Mutate(uid, async () =>
@@ -197,6 +198,9 @@ public sealed partial class WorkspaceService
                 intent = RespectCalendarKind(intent, input.CalendarKind);
                 var categoryNotices = AgentCategoryNotices(interpreted, intent, input.Text, currentTaskTypes);
                 ValidateIntent(intent);
+                if (runtime?.ReadReply is { } directReply && !HasAgentActions(intent))
+                    return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text, directReply,
+                        "ANSWERED", "", null, [], [], turn.CreatedAt, Run: runtime.View));
                 if (intent.FreeTimeQuery is not null) current = await AgentCalendarStateAsync(uid, current, ct);
                 if (intent.OptimizationQuery is { } optimizationScope)
                 {
