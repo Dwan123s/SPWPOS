@@ -35,6 +35,22 @@ Ba gợi ý mẫu chỉ điền và focus ô nhập; không gọi AI hoặc lưu
 
 ## Cách sử dụng
 
+### Ưu tiên hoàn thành trong cùng ngày — 03/11/2026
+
+Bộ lập lịch xét ngày sớm còn giờ khả dụng trước, sau đó chấm điểm các khoảng giờ trong ngày. Giờ làm việc ưu tiên là sở thích mềm: không chọn buổi sáng ngày sau chỉ vì phần còn lại hôm nay nằm ngoài khung ưu tiên. Một task có thể gồm nhiều phiên trong cùng ngày, vẫn giữ thời gian nghỉ, giờ ăn/ngủ, lịch cố định, phiên được bảo vệ, phụ thuộc, deadline, khung thực hiện riêng và giới hạn phút mỗi ngày. Khi ngày đó không đủ giờ hợp lệ, phần còn lại mới chuyển sang ngày sau.
+
+Ví dụ task 120 phút, bắt đầu xét lúc 16:12, rảnh tới 18:00 và 18:30–22:00, phiên tối đa 90 phút, nghỉ 10 phút: có thể xếp 16:12–17:42 và 18:30–19:00 trong cùng ngày. Quy tắc áp dụng khi tạo/xem lại phương án; không tự sửa các lịch đã lưu. Yêu cầu rõ ngày mai hoặc một khung giờ riêng vẫn được giữ nguyên.
+
+### Nhường giờ cho việc quan trọng gần deadline — 03/11/2026
+
+Khi tạo/cập nhật một công việc quan trọng còn hạn trong 48 giờ, NORA thử giữ nguyên các phiên khác trước. Nếu thiếu thời gian, bộ lập lịch tự tìm các phiên linh hoạt từ thời điểm lập lịch đến deadline thuộc việc có deadline muộn hơn. Không cần gán mức ưu tiên 4 để kích hoạt bước này. AI đọc được mức quan trọng đã lưu; không tự suy ra rằng mọi việc sát hạn đều quan trọng.
+
+Chỉ thử dời phiên chưa bắt đầu, chưa ghi nhận thời gian làm và không khóa. Giữ nguyên lịch cố định, giờ ăn/ngủ/nghỉ, phiên đang làm/tạm dừng, tiền nhiệm, khung thực hiện, giới hạn phiên/ngày và deadline của mọi công việc. Phiên của cùng task nằm ngoài khoảng cần nhường vẫn được giữ. Chỉ nhận phương án cải thiện thiếu hụt mà không làm việc khác thiếu thời gian hơn hoặc trễ hạn hơn; không gia hạn deadline để làm lịch có vẻ khả thi. Mỗi lần kiểm tra tối đa 8 phương án nhường giờ, trong phạm vi lập lịch hiện có.
+
+Ví dụ report SWP tăng từ 120 lên 240 phút, hạn trưa mai; report SSG105 chiếm hai giờ tối nay nhưng hạn thứ Bảy: NORA có thể đề xuất chuyển các phiên SSG105 sang khoảng hợp lệ sau đó để dành chỗ cho SWP. Phương án hiển thị giờ cũ/mới và luôn cần người dùng xác nhận, kể cả bật tự lưu; hỗ trợ hoàn tác. Không tự sửa task chung của nhóm hoặc lịch tài khoản khác. Tắt tự xếp lại hoặc nói “không dời các task khác” thì không tự thử bước nhường giờ.
+
+Thông báo AI đạt hạn mức là lỗi dịch vụ/quota, không phải kết quả kiểm tra thiếu giờ của bộ lập lịch. Bước nhường giờ chạy bằng bộ tính lịch của máy chủ, không cần thêm lượt gọi mô hình. Model hiện có được giữ nguyên.
+
 ### Nhập thời khóa biểu tự động — 01/11/2026
 
 Gửi ảnh thời khóa biểu trong NORA hoặc nhập thời gian biểu bằng lời. Khi ngày áp dụng, giờ học và số tuần lặp đã rõ, NORA nhập các buổi học, tự tính các khoảng rảnh và trả báo cáo 7 ngày tính từ buổi học đầu tiên còn hiệu lực. Báo cáo liệt kê lịch bận, từng khoảng rảnh kèm số phút, tổng phút theo ngày và khoảng trống dài nhất. Các phiên linh hoạt bị lịch học đè lên được kiểm tra/xếp lại trước khi lưu.

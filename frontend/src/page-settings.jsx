@@ -25,6 +25,7 @@ import { Loading } from "./loading.jsx";
 import { NoraInventory } from "./nora-inventory.jsx";
 import { GoogleCalendarCard } from "./google-calendar.jsx";
 import { TelegramCard } from "./telegram.jsx";
+import { NotificationSoundSettings } from "./notification-sound-settings.jsx";
 export function settingsPage() {
   const p = state.workspace.profile || {},
     n = state.workspace.notificationSettings || {};
@@ -302,6 +303,7 @@ export function settingsPage() {
               </div>
             </div>
             <form data-form="notification-settings">
+              <NotificationSoundSettings userId={state.workspace.profile?.id} disabled={n.inAppEnabled === false} />
               <label className="checkbox-switch-card">
                 <input
                   type="checkbox"

@@ -251,6 +251,7 @@ async function navigate(route, title) {
     window.dispatchEvent(new Event("hashchange"));
   });
   await screen.findByRole("heading", { level: 1, name: title });
+  await waitFor(() => expect(document.querySelector(".page-skeleton")).toBeNull());
 }
 
 it("accepts a username in the login field and keeps email recovery separate", async () => {

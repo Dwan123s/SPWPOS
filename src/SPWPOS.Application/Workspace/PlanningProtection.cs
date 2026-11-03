@@ -5,6 +5,12 @@ public sealed partial class PlanningEngine
 {
     public PlanView Generate(PlanningState state, PlanInput input, DateTimeOffset now)
     {
+        var plan = GeneratePrioritized(state, input, now);
+        return RescueImminentDeadline(state, input, now, plan);
+    }
+
+    private PlanView GeneratePrioritized(PlanningState state, PlanInput input, DateTimeOffset now)
+    {
         var policy = state.EisenhowerScheduling ? "eisenhower-v1" : "legacy";
         var baseline = GenerateProtected(state with { EisenhowerScheduling = false }, input, now) with { PriorityPolicy = policy };
         if (!state.EisenhowerScheduling || !state.Tasks.Any(t => t.EffectiveImportance == "Important")) return baseline;

@@ -348,7 +348,7 @@ export function CalendarWeek({
         )}
         {error && <p role="alert">{error}</p>}
       </div>
-      <p className="calendar-drag-instructions" id="calendar-drag-help">
+      <p className="sr-only" id="calendar-drag-help">
         Kéo thẻ để đổi giờ/ngày · Kéo mép dưới để đổi thời lượng · Esc để hủy.
         Trên điện thoại, dùng nút kéo. Bàn phím: giữ Alt + phím mũi tên.
       </p>

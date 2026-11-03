@@ -48,7 +48,7 @@ public sealed partial class WorkspaceService
                 events=new { total=events.Length,included=Math.Min(100,events.Length),truncated=events.Length>100 },
                 sessions=new { total=sessions.Length,included=Math.Min(100,sessions.Length),truncated=sessions.Length>100 },
                 history=new { maximumTurns=8, truncatedPossible=true } },
-            tasks=tasks.Select(x=>new {x.Id,x.Name,Deadline=Local(x.Deadline),WorkWindowStart=LocalOrNull(x.WorkWindowStart),WorkWindowEnd=LocalOrNull(x.WorkWindowEnd),x.EstimatedMinutes,x.Progress,x.Splittable,x.MinimumSessionMinutes,x.Priority,x.TaskType,status=x.Status.ToString()}),
+            tasks=tasks.Select(x=>new {x.Id,x.Name,Deadline=Local(x.Deadline),WorkWindowStart=LocalOrNull(x.WorkWindowStart),WorkWindowEnd=LocalOrNull(x.WorkWindowEnd),x.EstimatedMinutes,x.Progress,x.Splittable,x.MinimumSessionMinutes,x.Priority,x.TaskType,importance=ImportanceDto(x),status=x.Status.ToString()}),
             availability=state.Availability.Select(x=>new AvailabilityInput(x.DayOfWeek,x.StartMinute,x.EndMinute)),
             availabilityPolicy=state.Policy is { } policy ? PolicyDto(policy) : null,
             dailyRoutine=CurrentRoutineDays(state),
@@ -56,7 +56,7 @@ public sealed partial class WorkspaceService
             events=events.Take(100).Select(x=>new{x.Id,x.Name,Start=Local(x.Start),End=Local(x.End),x.EventType,x.Description,IsUrgent=IsUrgentEvent(x)}),
             sessions=sessions.Take(100).Select(x=>new{x.TaskId,Start=Local(x.Start),End=Local(x.End),x.IsLocked,status=x.Status.ToString()}),
             dependencies=state.Dependencies.Select(x=>new{x.TaskId,x.PredecessorId}),
-            preference=new {state.Preference.MaximumDailyMinutes,state.Preference.MaximumSessionMinutes,state.Preference.MinimumSessionMinutes,state.Preference.BreakMinutes,state.Preference.PlanningHorizonDays}
+            preference=new {state.Preference.MaximumDailyMinutes,state.Preference.MaximumSessionMinutes,state.Preference.MinimumSessionMinutes,state.Preference.BreakMinutes,state.Preference.PlanningHorizonDays,state.Preference.AutoReschedule}
         },AgentJson);
         return (json,notices.ToArray());
     }

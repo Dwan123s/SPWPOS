@@ -1130,3 +1130,14 @@
     }
   }
 }
+.nora-result-kind {
+  display: inline-block !important;
+  width: fit-content;
+  font-size: 10px !important;
+  line-height: 1.4;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #edf5ff;
+  color: #3872ad;
+  margin: 0 0 5px;
+}

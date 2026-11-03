@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { icon, state } from "./ui.jsx";
 import {
   dismissNotificationPopup,
@@ -7,6 +7,7 @@ import {
 } from "./notification-feed.js";
 import "./styles/notification-popups.css";
 import { requestTeamJoinReview } from "./team-notification-link.js";
+import { startNotificationSound } from "./notification-sound.js";
 
 export function useNotificationFeed() {
   return useSyncExternalStore(
@@ -45,6 +46,7 @@ export function NotificationUnreadCount() {
   ) : null;
 }
 export function NotificationPopups() {
+  useEffect(() => startNotificationSound(() => state.workspace), []);
   const feed = useNotificationFeed();
   if (!feed.userId || !feed.popups.length) return null;
   return (

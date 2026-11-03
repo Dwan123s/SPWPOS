@@ -124,12 +124,12 @@ public sealed partial class WorkspaceService
                         (query.Length == 0 || x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || x.Id.ToString() == query)).ToArray();
                     return new("OK", new { total = tasks.Length, truncated = tasks.Length > 100,
                         tasks = tasks.Take(100).Select(x => new { x.Id, x.Name, x.TaskType, x.Priority, x.EstimatedMinutes,
-                            x.Deadline, x.WorkWindowStart, x.WorkWindowEnd, x.Splittable, status = x.Status.ToString() }),
+                            x.Deadline, x.WorkWindowStart, x.WorkWindowEnd, x.Splittable, importance = ImportanceDto(x), status = x.Status.ToString() }),
                         dependencies = state.Dependencies.Where(x => tasks.Take(100).Any(t => t.Id == x.TaskId)).Take(300).ToArray() });
                 }
                 case "get_preferences":
                     readObserved = true;
-                    return new("OK", new { preference = new { state.Preference.TimeZoneId, state.Preference.MaximumDailyMinutes,
+                    return new("OK", new { preference = new { state.Preference.TimeZoneId, state.Preference.MaximumDailyMinutes, state.Preference.AutoReschedule,
                         state.Preference.MinimumSessionMinutes, state.Preference.MaximumSessionMinutes, state.Preference.BreakMinutes,
                         state.Preference.PreferredPeriod, state.Preference.PreferredStartMinute, state.Preference.PreferredEndMinute },
                         weeklyAvailability = state.Availability.Select(x => new { x.DayOfWeek, x.StartMinute, x.EndMinute }),

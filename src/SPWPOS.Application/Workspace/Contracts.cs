@@ -60,6 +60,8 @@ public sealed record PlanInput(DateTimeOffset Start, [Range(1, 30)] int HorizonD
     public DateTimeOffset? WindowEnd { get; init; }
     [System.Text.Json.Serialization.JsonIgnore]
     public int UrgentDisplacementDays { get; init; } = 2;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool AllowDeadlineRescue { get; init; } = true;
 }
 public sealed record PlanWarning(Guid TaskId, string TaskName, string Code, string Message, int UnscheduledMinutes);
 public sealed record ProposedSession(Guid Id, Guid TaskId, DateTimeOffset Start, DateTimeOffset End, string ReasonCode, bool Preserved);

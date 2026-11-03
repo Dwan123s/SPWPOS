@@ -225,7 +225,7 @@ public sealed partial class WorkspaceService
                 var hasChanges = changes.Weekly is not null || changes.Exceptions.Length > 0 || changes.Events.Length > 0 || changes.Tasks.Length > 0;
                 var planInput = new PlanInput(intent.OptimizationQuery is { } scope && scope.Start > Now.AddMinutes(5) ? scope.Start : Now.AddMinutes(5),
                     intent.HorizonDays, affected, true, "AVAILABILITY_CHANGED", UseCapacityFactor: input.UseCapacityFactor, UseEstimateBias: input.UseEstimateBias)
-                    { WindowEnd = intent.OptimizationQuery?.End };
+                    { WindowEnd = intent.OptimizationQuery?.End, AllowDeadlineRescue = DeadlineRescueAllowed(input.Text) };
                 var planningCandidate = selected is null ? ProtectUnselectedSessionReferences(eventRequest, candidate, intent.Events) : candidate;
                 PlanView? plan = selected is not null ? selected.Plan : changes.UrgentEventIds is { Length: > 0 } urgentEventIds
                     ? engine.GenerateForUrgentEvents(planningCandidate, planInput, Now, urgentEventIds)

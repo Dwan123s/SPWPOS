@@ -231,12 +231,6 @@
   color: #a25040;
   line-height: 1.6;
 }
-.calendar-drag-instructions {
-  font-size: 11px;
-  color: #7c91ab;
-  line-height: 1.7;
-  margin: 8px 0 12px;
-}
 @media (max-width: 800px) {
   .calendar-workspace .calendar-hour-grid {
     grid-template-columns: 44px repeat(7, 140px);
@@ -244,9 +238,6 @@
   }
   .calendar-workspace .calendar-time-scroll {
     max-height: 65dvh;
-  }
-  .calendar-drag-instructions {
-    font-size: 10px;
   }
   .calendar-drag-handle {
     width: 24px;

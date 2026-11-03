@@ -79,3 +79,24 @@
     right: 16px;
   }
 }
+.notice-sound-settings {
+  margin: 14px 0;
+}
+.notice-sound-settings label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.notice-sound-settings input {
+  width: 16px;
+  height: 16px;
+  accent-color: #0869dc;
+}
+.notice-sound-settings p {
+  margin: 6px 0 10px;
+  color: #607b91;
+  font-size: 12px;
+  line-height: 1.5;
+}

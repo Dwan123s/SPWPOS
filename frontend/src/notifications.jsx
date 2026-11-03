@@ -3,6 +3,7 @@ import { dateFmt, dayKey, icon, timeFmt } from "./ui.jsx";
 import { useNotificationFeed } from "./notification-popups.jsx";
 import { previewNotificationPopup } from "./notification-feed.js";
 import { requestTeamJoinReview } from "./team-notification-link.js";
+import { NotificationSoundSettings } from "./notification-sound-settings.jsx";
 
 const types = {
   deadline: { label: "Hạn chót", glyph: "clock", tone: "amber" },
@@ -371,6 +372,10 @@ export function NotificationCenter({ workspace }) {
             >
               Thử popup
             </button>
+            <NotificationSoundSettings
+              userId={workspace.profile?.id}
+              disabled={settings.inAppEnabled === false}
+            />
           </section>
           <p className="notice-read-hint">
             {icon("check")} Đã đọc chỉ ghi nhận bạn đã xem thông báo. Tiến độ

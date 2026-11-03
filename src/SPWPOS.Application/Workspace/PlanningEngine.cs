@@ -167,8 +167,8 @@ public sealed partial class PlanningEngine
         {
             var task = tasks.Values.Where(t => state.Dependencies.Where(d => d.TaskId == t.Id).All(d => done.ContainsKey(d.PredecessorId)))
                 .OrderByDescending(t => promoted?.Contains(t.Id) == true)
-                .ThenByDescending(t => urgentFirst && t.Priority == 4)
                 .ThenByDescending(t => urgentFirst && urgency?.RequestedUrgentTaskIds?.Contains(t.Id) == true)
+                .ThenByDescending(t => urgentFirst && t.Priority == 4)
                 .ThenByDescending(t => important.Contains(t.Id))
                 .ThenBy(t => t.Deadline).ThenByDescending(t => t.Priority).ThenBy(t => t.Id).FirstOrDefault();
             if (task is null)
@@ -203,14 +203,18 @@ public sealed partial class PlanningEngine
                     task.WorkWindowEnd is { } to && to < x.End ? to : x.End)).Where(x => x.End > x.Start);
             if (urgency?.Displaced.TryGetValue(task.Id, out var move) == true)
                 candidates = DisplacedWindows(candidates, move, remaining, task.Splittable, state.Preference.MaximumSessionMinutes, zone);
-            // Compare every feasible window against the explicit multi-objective
-            // penalty, then allocate with the same hard feasibility checks.
+            // Use the earliest feasible local day before scoring hours within it.
+            // Productive-hour and fragmentation bonuses must not leave today's
+            // usable evening empty just to select tomorrow's preferred morning.
             // Urgent displacement has an explicit proximity/day policy. Optimize
             // ordinary work without overriding that higher-priority constraint.
-            var orderedCandidates = task.Priority == 4 || urgency?.Displaced.ContainsKey(task.Id) == true
+            var orderedCandidates = urgency?.Displaced.ContainsKey(task.Id) == true
                 ? candidates
-                : candidates.OrderBy(window => ScoreCandidate(task, window, remaining, state.Preference, earliest,
-                    trialBudgets.GetValueOrDefault(Day(window.Start))).PenaltyScore).ThenBy(window => window.Start);
+                : task.Priority == 4
+                ? candidates.OrderBy(window => Day(window.Start > earliest ? window.Start : earliest))
+                : candidates.OrderBy(window => Day(window.Start > earliest ? window.Start : earliest))
+                    .ThenBy(window => ScoreCandidate(task, window, remaining, state.Preference, earliest,
+                        trialBudgets.GetValueOrDefault(Day(window.Start))).PenaltyScore).ThenBy(window => window.Start);
             foreach (var slot in orderedCandidates)
             {
                 // Preferred windows may be visited before earlier fallback windows.
@@ -254,7 +258,7 @@ public sealed partial class PlanningEngine
             free = FocusSlots(state, start, end, allBlocks.Concat(completedBlocks));
         }
         return new(Guid.Empty, state.Preference.Revision, start, end, schedule.OrderBy(x => x.Start).ToArray(), warnings.ToArray(),
-            ["Ưu tiên công việc khẩn, sau đó theo deadline và thứ tự phụ thuộc.", $"Khả năng sử dụng thời gian: {factor:P0}; " + (input.UseEstimateBias ? $"dữ liệu ước lượng chỉ cá nhân hóa từ {MinimumBiasSamples} mẫu." : "dùng thời lượng công việc đã xác định trong yêu cầu."), "Giữ phiên đã khóa/đang thực hiện; không vượt deadline cứng. Phiên sau deadline mềm luôn có cảnh báo."], false, UseEstimateBias: input.UseEstimateBias);
+            ["Ưu tiên công việc khẩn, sau đó theo deadline và thứ tự phụ thuộc.", "Ưu tiên ngày sớm còn giờ phù hợp và hoàn thành trong ngày nếu đủ thời gian; giờ làm việc ưu tiên không đẩy phần việc còn lại sang ngày sau.", $"Khả năng sử dụng thời gian: {factor:P0}; " + (input.UseEstimateBias ? $"dữ liệu ước lượng chỉ cá nhân hóa từ {MinimumBiasSamples} mẫu." : "dùng thời lượng công việc đã xác định trong yêu cầu."), "Giữ phiên đã khóa/đang thực hiện; không vượt deadline cứng. Phiên sau deadline mềm luôn có cảnh báo."], false, UseEstimateBias: input.UseEstimateBias);
     }
     public IntelligenceView Analyze(PlanningState state, PlanInput input, DateTimeOffset now)
     {

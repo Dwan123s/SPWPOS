@@ -1,3 +1,5 @@
+import { playNotificationSound } from "./notification-sound.js";
+
 const listeners = new Set();
 let snapshot = { userId: null, enabled: false, items: [], popups: [] };
 let announced = new Set();
@@ -80,8 +82,10 @@ export function syncNotifications(workspace) {
         : []
       : fresh;
     popups = [...incoming, ...previous].slice(0, 3);
-    unread.forEach((item) => announced.add(item.id));
+    if (!initial && fresh.length) playNotificationSound(userId);
   }
+  // Do not replay a backlog when in-app notifications are enabled again.
+  unread.forEach((item) => announced.add(item.id));
   publish({
     userId,
     enabled: workspace.notificationSettings?.inAppEnabled !== false,
@@ -106,6 +110,7 @@ export function dismissNotificationPopup(id) {
 }
 export function previewNotificationPopup() {
   if (!snapshot.userId || !snapshot.enabled) return;
+  playNotificationSound(snapshot.userId);
   const item = {
     id: "popup-preview",
     preview: true,

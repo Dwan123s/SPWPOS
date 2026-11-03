@@ -36,6 +36,9 @@ public sealed partial class WorkspaceService
         @"\b(?:toi uu|xep lai|sap xep lai|lap lai lich|doi (?:cac |nhung )?phien|doi lich|doi cac (?:viec|cong viec)|reschedule|replan)\b").Success &&
         !ChatMatch(source, @"\b(?:khong|dung|chua) (?:duoc |tu dong )?(?:doi (?:cac )?phien|doi lich|xep lai|toi uu)\b").Success);
 
+    private static bool DeadlineRescueAllowed(string source) => !ChatMatch(source,
+        @"\b(?:(?:khong|dung|chua)\s+(?:duoc\s+|tu dong\s+)?(?:doi|di doi|sap xep lai|xep lai)\s+(?:(?:cac|nhung)\s+)?(?:lich|phien|task|viec|cong viec)|giu nguyen\s+(?:(?:cac|nhung)\s+)?(?:lich|phien|task|viec|cong viec)\s+khac)\b").Success;
+
     private AgentIntent NormalizeRuntimeDraft(JsonElement payload, string source, PlanningState state, AgentPendingRequest? pending, string[] types, string calendarKind = "Auto")
     {
         var intent = TaskInterpreter.DecodeAgentIntent(payload, types);
@@ -105,7 +108,7 @@ public sealed partial class WorkspaceService
         }
         Require(end is null || end > start, "INVALID_RANGE", "Khoảng thực hiện đã qua hoặc không còn hợp lệ.");
         var planInput = new PlanInput(start, intent.HorizonDays, affected, true, "AVAILABILITY_CHANGED",
-            input.UseCapacityFactor, input.UseEstimateBias) { WindowEnd = end };
+            input.UseCapacityFactor, input.UseEstimateBias) { WindowEnd = end, AllowDeadlineRescue = DeadlineRescueAllowed(source) };
         var planningCandidate = ProtectUnselectedSessionReferences(source, candidate, intent.Events);
         PlanView? plan = changes.UrgentEventIds is { Length: > 0 } urgent
             ? engine.GenerateForUrgentEvents(planningCandidate, planInput, Now, urgent)

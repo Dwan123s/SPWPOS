@@ -143,13 +143,14 @@ public sealed class PlanningTests
         var local = TimeZoneInfo.ConvertTime(instant, zone);
         Assert.Equal(3, local.Hour); Assert.Equal(0, local.Minute);
     }
-    [Fact] public void Preferred_hours_are_used_before_other_hours_without_blocking_urgent_deadline()
+    [Fact] public void Available_evening_is_used_before_next_days_preferred_hours_and_respects_deadline()
     {
         var evening = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero).AddHours(19); var task = Task(minutes: 60); task.Deadline = evening.AddDays(1);
         var state = State(task) with { Availability = Enumerable.Range(0, 7).Select(day => new WeeklyAvailability { DayOfWeek = day, StartMinute = 0, EndMinute = 1440 }).ToArray() };
         var plan = engine.Generate(state, new(evening, 2), evening);
-        Assert.Equal(8, plan.Sessions.Single().Start.Hour);
-        Assert.True(plan.Sessions.Single().Start > evening);
+        Assert.Empty(plan.Warnings);
+        Assert.Equal(evening, Assert.Single(plan.Sessions).Start);
+        Assert.Equal(evening.AddHours(1), plan.Sessions.Single().End);
         task.Deadline = evening.AddHours(2);
         var urgent = engine.Generate(state, new(evening, 2), evening);
         Assert.Empty(urgent.Warnings); Assert.True(urgent.Sessions.Single().End <= task.Deadline);

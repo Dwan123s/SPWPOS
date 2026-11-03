@@ -5,6 +5,7 @@
 - Hệ thống giữ các phiên khác, kiểm tra sự kiện cố định, thời gian nghỉ, giới hạn làm việc, hệ số năng lực và phụ thuộc. Nếu không đủ thời gian hoặc có cảnh báo, lịch được mở để xem trước; chỉ áp dụng tự động khi không có cảnh báo. Nếu xếp lịch lỗi sau khi tạo việc, công việc vẫn được lưu.
 - Quản trị có tên đăng nhập, ngày tạo, lần đăng nhập gần nhất, số phiên đăng nhập chưa hết hạn và số công việc hoàn thành / tổng số. Công việc đã xóa và phiên đăng nhập hết hạn không được đếm. Tìm kiếm hỗ trợ tên đăng nhập. Phần pet được để sau.
 - Bật nhắc qua email trong Cài đặt → Thông báo. Xem [cấu hình Gmail](../integrations/GMAIL_SMTP.md); không nhập App Password vào chat hoặc Git.
+- Web có âm báo ngắn khi nhận thông báo mới, mặc định bật. Trong **Thông báo** hoặc **Cài đặt → Thông báo**, dùng **Âm thanh thông báo** để bật/tắt và **Nghe thử âm báo** để kiểm tra. Lựa chọn lưu theo tài khoản trên trình duyệt này, có hiệu lực ngay. Cần bấm hoặc gõ trên trang trước để trình duyệt cho phép âm thanh. Thông báo cũ lúc mở trang, đọc lại hoặc polling không phát lặp; một lượt nhận nhiều thông báo chỉ phát một âm. Tắt thông báo trong ứng dụng cũng tắt âm báo. Âm thanh đi cùng cơ chế polling hiện tại khi tab đang hiển thị, không phải thông báo hệ điều hành khi đóng web.
 
 ## Áp dụng trên môi trường development
 
