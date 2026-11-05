@@ -182,7 +182,7 @@ public sealed partial class PlanningEngine
             // A minimum session preference must never manufacture extra work.
             // Allow a whole short task (or its final remaining work) in one session.
             var minimum = Math.Min(remaining, Math.Max(task.MinimumSessionMinutes, state.Preference.MinimumSessionMinutes));
-            if (!task.Splittable && preserve.Any(x => x.TaskId == task.Id) && remaining > 0)
+            if (!task.CanSplit && preserve.Any(x => x.TaskId == task.Id) && remaining > 0)
             { warnings.Add(new(task.Id, task.Name, "NON_SPLITTABLE_PRESERVED", "Phiên đã giữ không đủ thời lượng cho công việc không thể chia nhỏ.", remaining)); continue; }
             var tentative = new List<ProposedSession>(); var trialBudgets = new Dictionary<DateOnly, int>(budgets);
             var preferredWindows = free.Select(slot =>
@@ -194,7 +194,7 @@ public sealed partial class PlanningEngine
             }).Where(slot => slot.End > slot.Start).ToArray();
             // Prefer the configured productive hours across the horizon. Fall back to
             // other available hours so soft preferences never block a hard deadline.
-            var choices = preferredWindows.Concat(task.Splittable ? free.SelectMany(slot => Subtract(slot, preferredWindows)) : free).ToArray();
+            var choices = preferredWindows.Concat(task.CanSplit ? free.SelectMany(slot => Subtract(slot, preferredWindows)) : free).ToArray();
             var strictDeadline = task.IsHardDeadline || task.Priority == 4 || urgency?.Displaced.ContainsKey(task.Id) == true ||
                 urgency?.ProtectedTaskIds?.Contains(task.Id) == true;
             var candidates = choices.Select(x => new TimeSlot(x.Start, x.End < task.Deadline ? x.End : task.Deadline)).Where(x => x.End > x.Start)
@@ -202,7 +202,7 @@ public sealed partial class PlanningEngine
                 .Select(x => new TimeSlot(task.WorkWindowStart is { } from && from > x.Start ? from : x.Start,
                     task.WorkWindowEnd is { } to && to < x.End ? to : x.End)).Where(x => x.End > x.Start);
             if (urgency?.Displaced.TryGetValue(task.Id, out var move) == true)
-                candidates = DisplacedWindows(candidates, move, remaining, task.Splittable, state.Preference.MaximumSessionMinutes, zone);
+                candidates = DisplacedWindows(candidates, move, remaining, task.CanSplit, state.Preference.MaximumSessionMinutes, zone);
             // Use the earliest feasible local day before scoring hours within it.
             // Productive-hour and fragmentation bonuses must not leave today's
             // usable evening empty just to select tomorrow's preferred morning.
@@ -230,16 +230,16 @@ public sealed partial class PlanningEngine
                     while (remaining > 0 && cursor < limit && budget > 0)
                     {
                         var space = Math.Min((int)Math.Floor((limit - cursor).TotalMinutes), budget);
-                        var duration = task.Splittable ? Math.Min(remaining, Math.Min(space, state.Preference.MaximumSessionMinutes)) : remaining;
+                        var duration = task.CanSplit ? Math.Min(remaining, Math.Min(space, state.Preference.MaximumSessionMinutes)) : remaining;
                         if (duration > space || duration > state.Preference.MaximumSessionMinutes || duration < minimum) break;
-                        if (task.Splittable && remaining > duration && remaining - duration < minimum) duration -= minimum - (remaining - duration);
+                        if (task.CanSplit && remaining > duration && remaining - duration < minimum) duration -= minimum - (remaining - duration);
                         if (duration <= 0 || remaining > duration && duration < minimum) break;
                         var reason = urgency?.Displaced.TryGetValue(task.Id, out var moved) == true
                             ? moved.NearDeadline ? "URGENT_NEAR_DEADLINE_MOVE" : "URGENT_FLEXIBLE_MOVE"
                             : task.Priority == 4 ? "URGENT_TASK_FIRST" : "DEADLINE_PRIORITY_CAPACITY";
                         tentative.Add(new(Guid.NewGuid(), task.Id, cursor, cursor.AddMinutes(duration), reason, false));
                         remaining -= duration; budget -= duration; cursor = cursor.AddMinutes(duration + state.Preference.BreakMinutes);
-                        if (!task.Splittable) break;
+                        if (!task.CanSplit) break;
                     }
                     trialBudgets[day] = budget;
                 }
@@ -249,8 +249,10 @@ public sealed partial class PlanningEngine
             if (remaining > 0)
             {
                 // Partial sessions are useful, but do not satisfy dependencies until the whole task fits.
-                warnings.Add(new(task.Id, task.Name, task.Deadline <= start ? "DEADLINE_PASSED" : "INSUFFICIENT_CAPACITY",
-                    "Không đủ thời gian phù hợp trước hạn chót; phần còn lại chưa được xếp lịch.", remaining));
+                warnings.Add(new(task.Id, task.Name, task.Deadline <= start ? "DEADLINE_PASSED" : task.RequiresContinuousSession ? "NO_CONTIGUOUS_SLOT" : "INSUFFICIENT_CAPACITY",
+                    !task.CanSplit && task.Deadline > start
+                        ? $"Cần một khoảng liên tục đủ {remaining} phút và trong giới hạn thời lượng một phiên trước hạn chót; không thể ghép các khoảng rảnh rời nhau."
+                        : "Không đủ thời gian phù hợp trước hạn chót; phần còn lại chưa được xếp lịch.", remaining));
             }
             schedule.AddRange(tentative); budgets = trialBudgets;
             done = CompletionTimes(state, preservedSessions.Concat(schedule.Where(x => !x.Preserved)), bias, start);
@@ -289,7 +291,7 @@ public sealed partial class PlanningEngine
             { score += 55; reasons.Add("UNFINISHED_DEPENDENCY"); }
             else if (state.Dependencies.Where(x => x.TaskId == task.Id).Any(d => state.Tasks.Any(t => t.Id == d.PredecessorId && t.Status != WorkTaskStatus.Completed)))
             { score += 20; reasons.Add("UNFINISHED_DEPENDENCY"); }
-            if (task.Deadline <= end && !task.Splittable && !free.Any(s =>
+            if (task.Deadline <= end && !task.CanSplit && !free.Any(s =>
                 ((task.IsHardDeadline && task.Deadline < s.End ? task.Deadline : s.End) - s.Start).TotalMinutes >= minutes))
             { score += 30; reasons.Add("NO_CONTIGUOUS_SLOT"); }
             return new RiskView(task.Id, task.Name, score >= 55 ? "High" : score >= 20 ? "Medium" : "Low", Math.Min(100, score), reasons.ToArray(), minutes);

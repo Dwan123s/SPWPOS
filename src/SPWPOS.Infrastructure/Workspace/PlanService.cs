@@ -100,6 +100,8 @@ public sealed partial class WorkspaceService
         var others = occupied.Where(x => x.Id != excludeId).ToArray();
         var bias = useEstimateBias ? engine.Biases(state) : [new BiasView("All", 0, 1, false)];
         var remaining = engine.Remaining(task, bias) - others.Where(x => x.TaskId == taskId).Sum(x => (x.End - x.Start).TotalMinutes);
+        Require(task.CanSplit || !others.Any(x => x.TaskId == taskId) && Math.Abs(duration - remaining) < 0.001,
+            "CONTINUOUS_ACTIVITY_REQUIRED", "Hoạt động này phải được xếp đủ thời lượng trong một phiên liên tục; không thể chia nhỏ.", 409);
         Require((duration >= Math.Max(state.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) || duration == remaining && remaining > 0) && duration <= state.Preference.MaximumSessionMinutes,
             "SESSION_LENGTH", "Thời lượng phiên vượt giới hạn.");
         RequireSessionTime(engine.FreeSlots(state, start, end).Any(x => x.Start <= start && x.End >= end), "OUTSIDE_AVAILABILITY", "Phiên ngoài thời gian rảnh hoặc trùng sự kiện cố định.",
@@ -162,7 +164,7 @@ public sealed partial class WorkspaceService
     public Task SplitSessionAsync(Guid uid, Guid id, SplitInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
         var session = await Find<WorkSession>(uid, id, ct); var task = await Find<WorkTask>(uid, session.TaskId, ct); var preference = await Preference(uid, ct);
-        Require(task.Splittable && session.Status == WorkSessionStatus.Scheduled && !session.IsLocked && session.Start >= Now, "CANNOT_SPLIT", "Phiên không thể chia nhỏ.");
+        Require(task.CanSplit && session.Status == WorkSessionStatus.Scheduled && !session.IsLocked && session.Start >= Now, "CANNOT_SPLIT", "Phiên không thể chia nhỏ.");
         var minimum = Math.Max(task.MinimumSessionMinutes, preference.MinimumSessionMinutes); var midpoint = session.Start.AddMinutes(input.FirstMinutes);
         Require(input.FirstMinutes >= minimum && (session.End - midpoint).TotalMinutes >= minimum, "SESSION_LENGTH", "Mỗi phần phải đủ thời lượng tối thiểu.");
         var state = await State(uid, ct);

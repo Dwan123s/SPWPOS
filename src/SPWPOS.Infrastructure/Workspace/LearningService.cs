@@ -84,5 +84,6 @@ public sealed partial class WorkspaceService
         record.InAppEnabled = input.InAppEnabled; record.DeadlineLeadHours = input.DeadlineLeadHours;
         record.EmailEnabled = input.EmailEnabled;
         record.SessionReminderLeadMinutes = input.SessionReminderLeadMinutes; record.WorkloadWarningLevel = input.WorkloadWarningLevel;
+        await RefreshNoraReminderChannelsAsync(uid,ct);
     }, ct, false);
 }

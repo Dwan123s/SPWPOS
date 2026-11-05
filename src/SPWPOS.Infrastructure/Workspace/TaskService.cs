@@ -6,6 +6,8 @@ namespace SPWPOS.Infrastructure.Workspace;
 public sealed partial class WorkspaceService
 {
     public Task<Guid> SaveTaskAsync(Guid uid, Guid? id, TaskInput input, CancellationToken ct) => Mutate(uid, async () =>
+        await SaveTaskCoreAsync(uid, id, input, ct), ct);
+    private async Task<Guid> SaveTaskCoreAsync(Guid uid, Guid? id, TaskInput input, CancellationToken ct)
     {
         ValidTask(input);
         WorkTask? existingTask = null;
@@ -39,7 +41,7 @@ public sealed partial class WorkspaceService
                 "LOCKED_SESSION_CONFLICT", "Deadline mới xung đột với phiên đã khóa.", 409);
             task.Name = input.Name.Trim(); task.Description = input.Description ?? ""; task.Deadline = input.Deadline;
             task.EstimatedMinutes = input.EstimatedMinutes; task.Priority = input.Priority; task.TaskType = type; task.IsHardDeadline = input.IsHardDeadline;
-            task.Splittable = input.Splittable; task.MinimumSessionMinutes = input.MinimumSessionMinutes; task.CategoryId = input.CategoryId; task.ParentId = input.ParentId; task.UpdatedAt = Now;
+            task.Splittable = ActivityContinuity.CanSplit(input.Name, input.TaskType, input.Splittable); task.MinimumSessionMinutes = input.MinimumSessionMinutes; task.CategoryId = input.CategoryId; task.ParentId = input.ParentId; task.UpdatedAt = Now;
             Require(task.WorkWindowStart is null || task.Deadline > task.WorkWindowStart, "TASK_WORK_WINDOW", "Deadline mới phải sau thời điểm bắt đầu khung thực hiện đã lưu.", 409);
         }
         else
@@ -53,7 +55,7 @@ public sealed partial class WorkspaceService
         Require(!PlanningEngine.HasCycle(tasks.Where(x => x.Id != task.Id).Append(task), edges),
             "DEPENDENCY_CYCLE", "Quan hệ cha/con và phụ thuộc tạo thành vòng lặp.", 409);
         return task.Id;
-    }, ct);
+    }
     public Task DeleteTaskAsync(Guid uid, Guid id, CancellationToken ct) => Mutate(uid, async () =>
     {
         var task = await Find<WorkTask>(uid, id, ct); var ids = await Mine<WorkTask>(uid).Where(x => x.ParentId == id && !x.IsDeleted).Select(x => x.Id).ToListAsync(ct); ids.Add(id);

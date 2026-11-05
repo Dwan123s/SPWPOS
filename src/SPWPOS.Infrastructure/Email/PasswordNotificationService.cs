@@ -37,25 +37,32 @@ public sealed class PasswordNotificationWorker(IServiceScopeFactory scopes, ILog
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        try
         {
-            try
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+            while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                await using var scope = scopes.CreateAsyncScope();
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                var now = scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow();
-                var ids = await db.PasswordChangeNotifications.AsNoTracking().Where(x => x.SentAt == null && x.NextAttemptAt <= now)
-                    .Select(x => x.UserId).Distinct().OrderBy(x => x).Take(20).ToListAsync(stoppingToken);
-                foreach (var id in ids)
+                try
                 {
-                    // Fresh context prevents stale notification tracking across account locks.
-                    await using var deliveryScope = scopes.CreateAsyncScope();
-                    await deliveryScope.ServiceProvider.GetRequiredService<PasswordNotificationService>().SendPendingAsync(id, stoppingToken);
+                    await using var scope = scopes.CreateAsyncScope();
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var now = scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow();
+                    var ids = await db.PasswordChangeNotifications.AsNoTracking().Where(x => x.SentAt == null && x.NextAttemptAt <= now)
+                        .Select(x => x.UserId).Distinct().OrderBy(x => x).Take(20).ToListAsync(stoppingToken);
+                    foreach (var id in ids)
+                    {
+                        // Fresh context prevents stale notification tracking across account locks.
+                        await using var deliveryScope = scopes.CreateAsyncScope();
+                        await deliveryScope.ServiceProvider.GetRequiredService<PasswordNotificationService>().SendPendingAsync(id, stoppingToken);
+                    }
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
+                catch (Exception ex) { logger.LogWarning("Security notification worker failed ({FailureType})", ex.GetType().Name); }
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
-            catch (Exception ex) { logger.LogWarning("Security notification worker failed ({FailureType})", ex.GetType().Name); }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Cancellation during timer waits or retry delays is a normal shutdown.
         }
     }
 }

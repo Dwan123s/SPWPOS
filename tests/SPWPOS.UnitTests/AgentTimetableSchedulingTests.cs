@@ -7,6 +7,29 @@ namespace SPWPOS.UnitTests;
 
 public sealed partial class AgentFreeTimeTests
 {
+    [Fact]
+    public async Task Combined_timetables_replan_flexible_work_around_busy_hours_from_both_images()
+    {
+        var ai = Ai(); ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [
+            new("Lịch học", At(840), At(900), EventType: "CLASS"),
+            new("Lịch làm", At(900), At(960), EventType: "WORK")] };
+        await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
+        var task = new WorkTask { UserId = user.Id, Name = "Báo cáo", Deadline = At(1020), EstimatedMinutes = 60, Splittable = false, IsHardDeadline = true };
+        await h.DbAsync(async db => {
+            var availability = await db.WeeklyAvailability.SingleAsync(Ct); availability.StartMinute = 840; availability.EndMinute = 1020;
+            db.WorkTasks.Add(task);
+            db.WorkSessions.Add(new() { UserId = user.Id, TaskId = task.Id, Start = At(840), End = At(900) });
+            await db.SaveChangesAsync(Ct);
+        });
+        var image = new AgentImage("Lịch học.png", "image/png", "iVBORw0KGgo=", AdditionalImages: [new("Lịch làm.png", "image/png", "iVBORw0KGgo=")]);
+        var result = await UseAgent(h, s => s.SendAgentTurnAsync(user.Id,
+            new(Guid.NewGuid(), Guid.NewGuid(), "Gộp hai thời khóa biểu và xếp lịch quanh giờ bận", Image: image), Ct));
+        Assert.Equal("APPLIED", result.Status);
+        Assert.Equal(2, ai.LastImage!.GetImages().Length);
+        Assert.Equal(2, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
+        var session = await h.DbAsync(db => db.WorkSessions.SingleAsync(x => x.Status == WorkSessionStatus.Scheduled, Ct));
+        Assert.Equal(At(960), session.Start); Assert.Equal(At(1020), session.End);
+    }
     [Theory] [InlineData("flexible")] [InlineData("locked")] [InlineData("fixed")]
     public async Task An_uploaded_timetable_keeps_class_hours_and_replans_only_flexible_work(string mode)
     {

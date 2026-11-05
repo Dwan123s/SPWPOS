@@ -21,13 +21,28 @@ public sealed partial class WorkspaceService
         return new(note.Id, note.Title, note.Content, note.Version, note.CreatedAt, note.UpdatedAt,
             note.AnalysisJson.Length == 0 ? null : JsonSerializer.Deserialize<NoteAnalysis>(note.AnalysisJson, NoteJson),
             JsonSerializer.Deserialize<Guid[]>(note.CreatedTaskIdsJson, NoteJson)!, note.PlanId,
-            processing.AnalysisImported, processing.Content.Length > 0, processing.PendingTaskIds);
+            processing.AnalysisImported, processing.Content.Length > 0, processing.PendingTaskIds,
+            processing.InboxCompletedAt is not null, processing.InboxCompletedAt,
+            null);
     }
     private static void CheckNoteVersion(PlanningNote note, Guid? version) =>
         Require(version == note.Version, "NOTE_STALE", "Ghi chú đã thay đổi. Tải lại ghi chú trước khi tiếp tục.", 409);
 
     public async Task<NoteView[]> GetNotesAsync(Guid uid, CancellationToken ct) =>
         (await Mine<PlanningNote>(uid).AsNoTracking().OrderByDescending(x => x.UpdatedAt).Take(200).ToArrayAsync(ct)).Select(NoteViewOf).ToArray();
+
+    public Task<NoteView> SetInboxCompletionAsync(Guid uid, Guid id, NoteInboxCompletionInput input, CancellationToken ct) => Mutate(uid, async () =>
+    {
+        var note = await Find<PlanningNote>(uid, id, ct);
+        CheckNoteVersion(note, input.Version);
+        var processing = ProcessingOf(note);
+        Require(!processing.AnalysisImported, "INBOX_ALREADY_PROCESSED", "Mục này đã chuyển thành công việc. Cập nhật trạng thái trong Công việc.", 409);
+        if ((processing.InboxCompletedAt is not null) == input.Completed) return NoteViewOf(note);
+        SetProcessing(note, processing with { InboxCompletedAt = input.Completed ? Now : null,
+            InboxReminderAt = input.Completed ? null : processing.InboxReminderAt });
+        note.Version = Guid.NewGuid(); note.UpdatedAt = Now;
+        return NoteViewOf(note);
+    }, ct, false);
 
     public Task<NoteView> SaveNoteAsync(Guid uid, Guid? id, NoteInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
@@ -49,7 +64,7 @@ public sealed partial class WorkspaceService
         if (note.Content != content)
         {
             var processing = await ProcessingWithTasks(note, ct);
-            SetProcessing(note, processing with { AnalysisImported = false, PendingTaskIds = [] });
+            SetProcessing(note, processing with { AnalysisImported = false, PendingTaskIds = [], InboxReminderAt = null });
             note.AnalysisJson = ""; note.PlanId = null;
         }
         note.Title = title; note.Content = content; note.Version = Guid.NewGuid(); note.UpdatedAt = Now;
@@ -70,15 +85,18 @@ public sealed partial class WorkspaceService
         CheckNoteVersion(snapshot, input.Version);
         var processing = await ProcessingWithTasks(snapshot, ct);
         var zone = (await State(uid, ct)).Preference.TimeZoneId;
+        var analysisContent = snapshot.Content;
+        if (processing.MatrixDraft?.Deadline is { } draftDeadline)
+            analysisContent += "\nHạn chót đã chọn: " + TimeZoneInfo.ConvertTime(draftDeadline, PlanningEngine.Zone(zone)).ToString("dd/MM/yyyy HH:mm") + " (" + zone + ").";
         // Provider calls happen outside the account transaction; verify the note again before saving.
         var analysis = await RunJob(uid, "AI_REQUEST", async () =>
         {
             var result = processing.Content == snapshot.Content
                 ? new NoteAnalysis([], interpreter.Capabilities.Provider, ["Không có hoạt động mới để thêm vào lịch."], Activities: [])
                 : processing.Content.Length > 0
-                    ? await interpreter.AnalyzeNoteChangesAsync(snapshot.Content,
+                    ? await interpreter.AnalyzeNoteChangesAsync(analysisContent,
                         new(processing.Content, processing.TaskNames, processing.ActivityKeys), zone, Now, ct)
-                    : await interpreter.AnalyzeNoteAsync(snapshot.Content, true, zone, Now, ct);
+                    : await interpreter.AnalyzeNoteAsync(analysisContent, true, zone, Now, ct);
             Require(result.Source is "OpenAI" or "Gemini" or "VertexAI", "NOTE_AI_UNAVAILABLE", "Ghi chú cần được phân tích bằng AI. Vui lòng thử lại.", 503);
             return result;
         }, ct);
@@ -133,6 +151,7 @@ public sealed partial class WorkspaceService
             if (knownNames.Add(NoteName(taskInput.Name)))
             {
                 var task = NewTask(uid, taskInput, Now);
+                ApplyMatrixDraftClassification(note, [task]);
                 db.WorkTasks.Add(task);
                 ids.Add(task.Id);
                 existingIds.Add(task.Id);
@@ -144,7 +163,7 @@ public sealed partial class WorkspaceService
         Require(activeCount + ids.Count <= 500, "TASK_LIMIT", "Tối đa 500 công việc đang hoạt động.");
         if (input.Tasks.Length == analysis.Tasks.Length)
             knownNames.UnionWith(analysis.Tasks.Select(x => NoteName(x.Name)));
-        SetProcessing(note, processing with { Content = note.Content, TaskNames = knownNames.ToArray(), PendingTaskIds = ids.ToArray(), AnalysisImported = true, ImportVersion = input.Version });
+        SetProcessing(note, processing with { Content = note.Content, TaskNames = knownNames.ToArray(), PendingTaskIds = ids.ToArray(), AnalysisImported = true, ImportVersion = input.Version, InboxReminderAt = null });
         note.AnalysisJson = JsonSerializer.Serialize(analysis with { Tasks = accepted.ToArray() }, NoteJson);
         note.CreatedTaskIdsJson = JsonSerializer.Serialize(existingIds.Distinct().ToArray(), NoteJson);
         note.Version = Guid.NewGuid(); note.UpdatedAt = Now;

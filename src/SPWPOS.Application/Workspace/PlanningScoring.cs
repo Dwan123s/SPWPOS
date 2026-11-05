@@ -16,7 +16,7 @@ public sealed partial class PlanningEngine
         var start = window.Start > earliest ? window.Start : earliest;
         var available = Math.Min(Math.Max(0, (window.End - start).TotalMinutes), Math.Max(0, budget));
         var duration = Math.Min(remaining, Math.Min(available, preference.MaximumSessionMinutes));
-        if (duration <= 0 || !task.Splittable && duration < remaining)
+        if (duration <= 0 || !task.CanSplit && duration < remaining)
             return new(start, start, double.MaxValue / 10000, 0, 0, 0);
         var end = start.AddMinutes(duration);
         var slack = (task.Deadline - end).TotalMinutes;

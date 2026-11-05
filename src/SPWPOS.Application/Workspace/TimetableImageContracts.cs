@@ -5,6 +5,8 @@ public sealed record TimetableImageReading(string Text, string[] Warnings, bool 
 public static class TimetableImageLimits
 {
     public const int MaxBytes = 5 * 1024 * 1024;
+    public const int MaxImages = 2;
+    public const int MaxChatRequestBytes = 15 * 1024 * 1024;
     public const int MaxTextLength = 1600;
     public static bool ValidImage(ReadOnlySpan<byte> image, string mimeType) => mimeType switch
     {

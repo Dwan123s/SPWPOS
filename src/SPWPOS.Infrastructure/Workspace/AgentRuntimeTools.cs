@@ -63,7 +63,8 @@ public sealed partial class WorkspaceService
             var original = task.TaskId is { } id ? state.Tasks.SingleOrDefault(x => x.Id == id) : null;
             // A simulation cannot manufacture feasibility by relaxing a saved or
             // explicit constraint. A later, explicit user directive may change it.
-            if (original is { Splittable: false } && !allowSplit || intent.Tasks.Length == 1 && continuous)
+            if (ActivityContinuity.RequiresContinuousSession(task.Name, task.TaskType) || original is { RequiresContinuousSession: true } ||
+                original is { Splittable: false } && !allowSplit || intent.Tasks.Length == 1 && continuous)
                 task = task with { Splittable = false };
             if (original is not null && task.Deadline > original.Deadline && !changeDeadline)
                 task = task with { Deadline = original.Deadline };

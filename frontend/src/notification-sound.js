@@ -65,11 +65,13 @@ export function startNotificationSound(readWorkspace) {
 }
 export function playNotificationSound(uid) {
   if (!notificationSoundEnabled(uid) || context?.state !== "running") return;
+  const tones = [];
   try {
     const now = context.currentTime;
     // A short, quiet two-note chime generated locally, without media downloads.
     [659.25, 880].forEach((frequency, index) => {
       const oscillator = context.createOscillator();
+      tones.push(oscillator);
       const gain = context.createGain();
       const start = now + index * 0.14;
       oscillator.type = "sine";
@@ -89,4 +91,24 @@ export function playNotificationSound(uid) {
   } catch {
     /* A sound failure must never interrupt notifications. */
   }
+  return () => tones.forEach(tone => {try {tone.stop();} catch { /* Already ended. */ }});
+}
+
+export function startNoraReminderAlarm(uid) {
+  let stopTone;
+  const ring = () => {
+    stopTone?.();
+    stopTone = playNotificationSound(uid);
+  };
+  const interact = () => { if(notificationSoundEnabled(uid)) unlockSound(); ring(); };
+  ring();
+  const timer = setInterval(ring, 1800);
+  const unsubscribe = subscribeNotificationSound(ring);
+  document.addEventListener("pointerdown", interact, true);
+  document.addEventListener("keydown", interact, true);
+  return () => {
+    clearInterval(timer); stopTone?.(); unsubscribe();
+    document.removeEventListener("pointerdown", interact, true);
+    document.removeEventListener("keydown", interact, true);
+  };
 }

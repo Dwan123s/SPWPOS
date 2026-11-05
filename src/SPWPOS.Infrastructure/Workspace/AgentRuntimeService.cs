@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using SPWPOS.Application.Authentication;
 using SPWPOS.Application.Workspace;
@@ -62,6 +63,7 @@ public sealed partial class WorkspaceService
         var candidates = new Dictionary<string, RuntimeCandidate>(StringComparer.Ordinal);
         var state = Copy(snapshot);
         AgentIntent? lastDraft = null;
+        NoraReminderCommand? reminderCommand = null;
         string? verifiedReply = null;
         var readObserved = false;
         var calendarObserved = false;
@@ -123,6 +125,29 @@ public sealed partial class WorkspaceService
             var args = call.Arguments;
             switch (call.Name)
             {
+                case "manage_reminder":
+                {
+                    var operation=Text(args,"operation",10);
+                    Require(operation == "List" || understanding is null || understanding.Intent == "Mutation",
+                        "REMINDER_INTENT_MISMATCH", "Đặt hoặc hủy lời nhắc cần yêu cầu rõ ràng từ bạn.");
+                    DateTimeOffset? at=null;
+                    if(args.GetProperty("at").ValueKind != JsonValueKind.Null)
+                    {
+                        var value=args.GetProperty("at").GetString()!;
+                        Require(Regex.IsMatch(value,@"(?:Z|[+-]\d{2}:\d{2})$",RegexOptions.CultureInvariant,TimeSpan.FromMilliseconds(100)) &&
+                            DateTimeOffset.TryParse(value,System.Globalization.CultureInfo.InvariantCulture,System.Globalization.DateTimeStyles.None,out _),
+                            "INVALID_REMINDER_TIME","Giờ nhắc cần ngày giờ và múi giờ đầy đủ.");
+                        at=DateTimeOffset.Parse(value,System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    Guid? id=null;
+                    if(args.GetProperty("reminderId").ValueKind != JsonValueKind.Null)
+                    {
+                        Require(Guid.TryParse(args.GetProperty("reminderId").GetString(),out var parsed),"INVALID_REMINDER","Mã lời nhắc không hợp lệ.");
+                        id=parsed;
+                    }
+                    reminderCommand=new(operation,Text(args,"message",500),at,id);
+                    return new("TERMINAL",new NoraTerminal("REMINDER"));
+                }
                 case "get_tasks":
                 {
                     readObserved = true;
@@ -288,7 +313,8 @@ public sealed partial class WorkspaceService
             remainingSimulations = limits.MaxSimulations,
             policy = "Read data using tools. All actions are drafts until a server-validated proposal is applied. Fixed/locked/running commitments are protected." };
         var parts = new List<object> { new { text = JsonSerializer.Serialize(initialData, AgentJson) } };
-        if (image?.Data is { Length: > 0 }) parts.Add(new { inlineData = new { mimeType = image.MimeType, data = image.Data } });
+        if (image is not null) foreach (var part in image.GetImages())
+            if (part.Data is { Length: > 0 }) parts.Add(new { inlineData = new { mimeType = part.MimeType, data = part.Data } });
         try
         {
             var result = await new NoraAgentRunner().RunAsync(TaskInterpreter.AgentRuntimeInstructions,
@@ -318,7 +344,7 @@ public sealed partial class WorkspaceService
                 }, ct, requireUnderstanding: provider.SupportsRequestUnderstanding);
             var terminal = result.Terminal;
             modelTurns = result.ModelTurns; toolCalls = result.ToolCalls;
-            var status = terminal.Kind switch { "PROPOSAL" => "PROPOSED", "ANSWER" => "COMPLETED", "QUESTION" => "WAITING_FOR_INPUT", _ => "BLOCKED" };
+            var status = terminal.Kind switch { "PROPOSAL" or "REMINDER" => "PROPOSED", "ANSWER" => "COMPLETED", "QUESTION" => "WAITING_FOR_INPUT", _ => "BLOCKED" };
             // The bounded timeout may have expired. Final metadata uses a separate,
             // short token; it cannot apply any business changes.
             using var finish = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -333,6 +359,7 @@ public sealed partial class WorkspaceService
             if (terminal.Kind == "QUESTION")
                 return new(NormalizeAgentIntent(EmptyRuntimeIntent(terminal.Reply) with {
                     Question = terminal.Question, Options = terminal.Options }, input.Text, state, pending), null, null, view);
+            if (terminal.Kind == "REMINDER") return new(EmptyRuntimeIntent() with {Reminder=reminderCommand},null,null,view);
             if (terminal.Kind == "ANSWER") return new(EmptyRuntimeIntent(terminal.Reply), null, terminal.Reply, view);
             var stoppedReply = terminal.Reply is "AGENT_BUDGET_EXCEEDED" or "TOOL_BUDGET_EXCEEDED" or "AGENT_TIME_LIMIT"
                 ? "NORA đã chạm giới hạn xử lý của lượt này trước khi hoàn tất. Lịch chưa thay đổi. Bạn có thể nhắn “Tiếp tục xử lý” trong hội thoại này; mình sẽ dùng lại thông tin bạn đã gửi."

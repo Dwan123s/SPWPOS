@@ -18,6 +18,8 @@ export function createPageResource(load, name) {
   return resource;
 }
 const pages = {
+  profile: createPageResource(() => import("./social.jsx"), "ProfilePage"),
+  friends: createPageResource(() => import("./social.jsx"), "FriendsPage"),
   teams: createPageResource(() => import("./teams.jsx"), "TeamsPage"),
   today: createPageResource(() => import("./dashboard.jsx"), "todayPage"),
   tasks: createPageResource(() => import("./page-tasks.jsx"), "tasksPage"),

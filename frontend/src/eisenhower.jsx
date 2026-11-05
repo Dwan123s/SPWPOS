@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import { state, icon, dateFmt, timeFmt } from "./ui.jsx";
 import { askNora } from "./agent-handoff.js";
 import "./eisenhower.css";
+import { EisenhowerBoard } from "./eisenhower-board.jsx";
 
 export const eisenhowerEnabled = () =>
   state.workspace?.features?.includes("eisenhower-v1") === true;
@@ -83,7 +84,7 @@ function useEisenhower() {
     if (!enabled) return;
     let live = true,
       timer;
-    setView(null);
+    setView((current) => (current?.ownerKey === key ? current : null));
     setError("");
     fetchView(key)
       .then((result) => {
@@ -173,145 +174,29 @@ function TaskItem({ task }) {
     </article>
   );
 }
-function Quadrant({ column, tasks }) {
-  const [page, setPage] = useState(0);
-  const last = Math.max(0, Math.ceil(tasks.length / 4) - 1),
-    current = Math.min(page, last);
-  useEffect(() => setPage(0), [tasks.map((task) => task.id).join("|")]);
-  return (
-    <section
-      className={`eis-quadrant ${column.tone}`}
-      aria-label={column.label}
-    >
-      <header>
-        <div>
-          <h3>
-            <span>
-              {column.id.startsWith("Q")
-                ? column.id
-                : icon(column.id === "Review" ? "check" : "spark")}
-            </span>
-            {column.label}
-          </h3>
-          <p>{column.caption}</p>
-        </div>
-        <strong>{tasks.length}</strong>
-      </header>
-      <div className="eis-items">
-        {tasks.slice(current * 4, current * 4 + 4).map((task) => (
-          <TaskItem key={task.id} task={task} />
-        ))}
-        {!tasks.length && (
-          <p className="eis-empty">Chưa có công việc trong nhóm này.</p>
-        )}
-      </div>
-      {last > 0 && (
-        <nav
-          className="eis-pagination"
-          aria-label={`Phân trang ${column.label}`}
-        >
-          <button
-            type="button"
-            aria-label={`Trang trước ${column.label}`}
-            disabled={current === 0}
-            onClick={() => setPage(current - 1)}
-          >
-            ←
-          </button>
-          <span>
-            {current + 1} / {last + 1}
-          </span>
-          <button
-            type="button"
-            aria-label={`Trang tiếp ${column.label}`}
-            disabled={current === last}
-            onClick={() => setPage(current + 1)}
-          >
-            →
-          </button>
-        </nav>
-      )}
-    </section>
-  );
-}
 export function EisenhowerMatrix() {
   const { view, error, retry } = useEisenhower();
-  const [query, setQuery] = useState(""),
-    [mobile, setMobile] = useState("Q1");
-  const all = view?.tasks || [],
-    tasks = all.filter((task) =>
-      task.name.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")),
-    );
   return (
-    <section className="eis-workspace" aria-label="Ma trận Eisenhower">
-      <div className="eis-heading">
-        <div>
-          <span className="team-eyebrow">TẬP TRUNG ĐÚNG VIỆC</span>
-          <h2>Ma trận Eisenhower</h2>
-          <p>Độ gấp được tính theo lịch riêng của bạn, trong 30 ngày tới.</p>
-        </div>
-        <label className="team-search">
-          {icon("search")}
-          <input
-            aria-label="Tìm trong ma trận"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm công việc…"
-          />
-        </label>
-      </div>
-      {error ? (
-        <p className="eis-feedback" role="alert">
-          {error}{" "}
-          <button type="button" onClick={retry}>
-            Thử lại
-          </button>
-        </p>
-      ) : !view ? (
-        <p className="eis-feedback" role="status">
-          Đang đánh giá công việc từ lịch của bạn…
-        </p>
-      ) : (
-        <>
-          <div
-            className="eis-mobile-tabs"
-            role="group"
-            aria-label="Chọn nhóm Eisenhower"
-          >
-            {quadrants.map((column) => (
-              <button
-                key={column.id}
-                type="button"
-                aria-pressed={mobile === column.id}
-                onClick={() => setMobile(column.id)}
-              >
-                {column.label}
-                <span>
-                  {tasks.filter((task) => task.quadrant === column.id).length}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="eis-grid">
-            {quadrants.map((column) => (
-              <div
-                key={column.id}
-                className={mobile === column.id ? "eis-visible" : ""}
-              >
-                <Quadrant
-                  column={column}
-                  tasks={tasks.filter((task) => task.quadrant === column.id)}
-                />
-              </div>
-            ))}
-          </div>
-          <p className="eis-footnote">
-            {icon("lock")} Xem và phân loại không thay đổi lịch. “Có thể để sau”
-            vẫn giữ các deadline đã cam kết.
-          </p>
-        </>
-      )}
-    </section>
+    <EisenhowerBoard
+      view={view}
+      error={error}
+      retry={retry}
+      columns={quadrants}
+      onRefresh={async () => {
+        const owner = state.workspace.profile.id;
+        const fresh = await api("/api/workspace");
+        if (state.workspace.profile.id !== owner || fresh.profile.id !== owner)
+          return;
+        state.workspace = fresh;
+        invalidateEisenhower();
+      }}
+      onOpenTeam={(task) => {
+        if (!task.teamTaskId) return;
+        pendingTeamTask = { teamId: task.teamId, taskId: task.teamTaskId };
+        location.hash = "teams";
+        window.dispatchEvent(new Event("eisenhower-open-team"));
+      }}
+    />
   );
 }
 export function EisenhowerFocus() {
@@ -332,7 +217,7 @@ export function EisenhowerFocus() {
                 ? 4
                 : 5;
   const tasks = [...(view?.tasks || [])]
-    .filter((task) => task.quadrant !== "Q4")
+    .filter((task) => task.quadrant !== "Q4" && task.kind !== "Draft")
     .sort(
       (a, b) =>
         rank(a) - rank(b) || Date.parse(a.deadline) - Date.parse(b.deadline),

@@ -33,12 +33,21 @@
   box-shadow: 0 1px 0 #d9e5f3;
   padding: 8px 10px;
   background: #f5f9ff;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 35px 28px;
+  grid-template-areas: "weekday date add" "count date add";
+  column-gap: 5px;
+  align-items: center;
+  text-align: left;
 }
 .calendar-workspace .calendar-hour-grid .week-day.today .week-day-header {
   background: #e9f3ff;
 }
 .calendar-workspace .calendar-hour-grid .week-day-header strong {
   font-size: 20px;
+  grid-area: date;
+  justify-self: center;
+  margin: 0;
 }
 .calendar-hours {
   position: sticky;
@@ -253,5 +262,97 @@
   }
   .calendar-workspace .calendar-hour-grid .week-day-header {
     border-radius: 0;
+  }
+}
+.calendar-create-help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 9px;
+  color: #7b8fa8;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.calendar-create-help button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #dbe6f5;
+  border-radius: 7px;
+  background: #fff;
+  color: #5279ac;
+  font: inherit;
+  cursor: pointer;
+}
+.calendar-create-help .icon {
+  width: 13px;
+  height: 13px;
+}
+.calendar-create-help [aria-pressed="true"] {
+  color: #1465cd;
+  background: #eaf3ff;
+  border-color: #8db6ed;
+}
+.calendar-day-track {
+  cursor: crosshair;
+}
+.calendar-past-range {
+  position: absolute;
+  inset: 0 0 auto;
+  background: repeating-linear-gradient(
+    135deg,
+    #7a8da30a 0,
+    #7a8da30a 3px,
+    transparent 3px,
+    transparent 8px
+  );
+  pointer-events: none;
+}
+.calendar-add-day:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.calendar-day-track.is-select-mode {
+  touch-action: none;
+}
+.calendar-create-ghost {
+  background: #ddecffee;
+  border-style: dashed;
+}
+.calendar-is-selecting,
+.calendar-is-selecting * {
+  user-select: none;
+  cursor: crosshair !important;
+}
+.calendar-add-day {
+  grid-area: add;
+  justify-self: end;
+  position: static;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: #e8f0fb;
+  color: #5a80b2;
+  cursor: pointer;
+}
+.calendar-add-day .icon {
+  width: 15px;
+  height: 15px;
+}
+.calendar-add-day:focus-visible,
+.calendar-create-help button:focus-visible {
+  outline: 2px solid #337bdc;
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .calendar-create-help button {
+    min-height: 44px;
   }
 }

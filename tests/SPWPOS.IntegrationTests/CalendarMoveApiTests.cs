@@ -11,6 +11,20 @@ namespace SPWPOS.IntegrationTests;
 public sealed class CalendarMoveApiTests
 {
     private static CancellationToken Ct=>TestContext.Current.CancellationToken;
+    [Fact] public async Task Manual_event_API_rejects_past_start_without_saving_the_series()
+    {
+        await using var f = new ApiFactory(); using var client = await f.ClientAsync();
+        await Authorize(f, client);
+        var now = f.Clock.GetUtcNow();
+        await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Quá khứ", now.AddHours(-1), now.AddHours(1), RepeatWeeks: 3), expected: HttpStatusCode.BadRequest);
+        await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Hiện tại", now, now.AddHours(1)), expected: HttpStatusCode.BadRequest);
+        var workspace = (await Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Empty(workspace.GetProperty("events").EnumerateArray());
+        var id = (await Send(client, HttpMethod.Post, "/api/time/events", new EventInput("Tương lai", now.AddHours(1), now.AddHours(2)))).GetProperty("data").GetProperty("id").GetGuid();
+        await Send(client, HttpMethod.Put, $"/api/time/events/{id}", new EventInput("Dời về quá khứ", now.AddHours(-2), now.AddHours(-1)), expected: HttpStatusCode.BadRequest);
+        workspace = (await Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data");
+        Assert.Equal(now.AddHours(1), Assert.Single(workspace.GetProperty("events").EnumerateArray()).GetProperty("start").GetDateTimeOffset());
+    }
     [Fact]public async Task Drag_drop_HTTP_preserves_type_checks_revision_and_supports_undo(){
         await using var f=new ApiFactory();using var client=await f.ClientAsync();
         using(var anon=await client.PostAsync("/api/calendar/move",new StringContent("{}",System.Text.Encoding.UTF8,"application/json"),Ct))Assert.Equal(HttpStatusCode.Unauthorized,anon.StatusCode);

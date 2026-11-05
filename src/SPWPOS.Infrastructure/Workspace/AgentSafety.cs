@@ -226,6 +226,8 @@ public sealed partial class WorkspaceService
                 else if (original is null && !continuity) task = task with { Splittable = true };
                 else if (original is not null && !continuity && !splitting) task = task with { Splittable = original.Splittable };
             }
+            if (ActivityContinuity.RequiresContinuousSession(task.Name, task.TaskType) || original is { RequiresContinuousSession: true })
+                task = task with { Splittable = false };
             if (original?.WorkWindowStart is not null && window is null &&
                 !ChatMatch(request, @"\b(?:doi|chuyen|mo rong|thu hep)\b[^.!?;\r\n]{0,60}\b(?:khung|gio|ngay)\b").Success)
                 task = task with { WorkWindowStart = original.WorkWindowStart, WorkWindowEnd = original.WorkWindowEnd };

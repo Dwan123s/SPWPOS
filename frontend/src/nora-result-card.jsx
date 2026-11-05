@@ -23,6 +23,7 @@ export function NoraResultCard({
   const saved = turn.status === "APPLIED",
     preview = turn.status === "PREVIEW",
     undone = turn.status === "UNDONE";
+  const reminder = turn.changes?.some(change => change.kind === "REMINDER");
   const confirmMove = preview && turn.plan?.hasUrgentReplan;
   const optimization = turn.plan?.isOptimization;
   const compareTimes = confirmMove || optimization;
@@ -42,7 +43,7 @@ export function NoraResultCard({
         {icon(saved ? "check" : undone ? "undo" : "calendar")}
         <h3>
           {optimization && preview ? "Phương án tối ưu lịch" : saved
-            ? "Lịch đã lưu"
+            ? reminder ? "Lời nhắc đã cập nhật" : "Lịch đã lưu"
             : preview
               ? "Xem trước thay đổi"
               : undone
@@ -57,7 +58,7 @@ export function NoraResultCard({
       )}
       {saved && !turn.canUndo && (
         <p className="nora-result-hint">
-          Kết quả của yêu cầu này. Lịch hiện tại có thể đã thay đổi.
+          {reminder ? "Kết quả của yêu cầu này. Xem trạng thái hiện tại trong Lời nhắc." : "Kết quả của yêu cầu này. Lịch hiện tại có thể đã thay đổi."}
         </p>
       )}
       {confirmMove && (
@@ -177,24 +178,24 @@ export function NoraResultCard({
             {confirmMove ? "Xác nhận dời lịch" : optimization || turn.plan?.hasDeadlineProtection ? "Xác nhận kế hoạch" : "Lưu thay đổi"}
           </button>
         )}
-        <button
+        {!reminder && <button
           type="button"
           onClick={(event) => onViewResult(turn, event.currentTarget)}
         >
           {icon("panel")}Xem kết quả này
-        </button>
-        <a
+        </button>}
+        {!reminder && <a
           href="#calendar"
           onClick={() => {
             state.calendarStart = resultDate(turn);
           }}
         >
           Mở lịch {icon("arrow")}
-        </a>
+        </a>}
       </div>
       {preview && (
         <p className="nora-result-hint">
-          Chưa lưu vào lịch. Bản xem trước có hiệu lực tối đa 30 phút.
+          {reminder ? "Chưa đặt lời nhắc. Bấm Lưu thay đổi để áp dụng." : "Chưa lưu vào lịch. Bản xem trước có hiệu lực tối đa 30 phút."}
         </p>
       )}
       {((turn.reply && !explanation) || turn.outcome) && (

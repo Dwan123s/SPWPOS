@@ -19,7 +19,7 @@ public sealed record TaskView(Guid Id, string Name, string Description, DateTime
     bool Splittable, int MinimumSessionMinutes, Guid? CategoryId, Guid? ParentId, string Status, int Progress,
     DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, Guid[] Dependencies, bool IsHardDeadline = false, string CreationSource = "MANUAL",
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default,
-    ImportanceView? Importance = null);
+    ImportanceView? Importance = null, bool RequiresContinuousSession = false);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
 public sealed record CategoryView(Guid Id, string Name, string Color);
@@ -130,6 +130,9 @@ public interface IWorkspaceService
     Task<PlanView> PreviewNoteActivitiesAsync(Guid userId, Guid noteId, NoteActivityPlanInput input, CancellationToken ct);
     Task<NoteScheduleResult> ApplyNoteActivitiesAsync(Guid userId, Guid noteId, Guid planId, NoteApplyInput input, CancellationToken ct);
     Task<NoteView[]> GetNotesAsync(Guid userId, CancellationToken ct);
+    Task<NoteView> SetInboxCompletionAsync(Guid userId, Guid id, NoteInboxCompletionInput input, CancellationToken ct);
+    Task<NoraReminderView[]> GetNoraRemindersAsync(Guid userId, CancellationToken ct);
+    Task CancelNoraReminderAsync(Guid userId, Guid id, CancellationToken ct);
     Task<WorkspaceView> SetNoteTaskCompletionAsync(Guid userId, Guid noteId, Guid taskId, NoteTaskCompletionInput input, CancellationToken ct);
     Task<NoteView> SaveNoteAsync(Guid userId, Guid? id, NoteInput input, CancellationToken ct);
     Task DeleteNoteAsync(Guid userId, Guid id, Guid version, CancellationToken ct);

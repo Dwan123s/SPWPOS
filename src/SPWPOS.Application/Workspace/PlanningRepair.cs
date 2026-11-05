@@ -26,7 +26,7 @@ public sealed partial class PlanningEngine
         {
             var blockedIds = best.Warnings.Where(x => x.UnscheduledMinutes > 0).Select(x => x.TaskId).ToHashSet();
             var blocked = state.Tasks.Where(x => blockedIds.Contains(x.Id) && !attempted.Contains(x.Id))
-                .OrderBy(x => x.Splittable).ThenByDescending(x => x.WorkWindowStart != null || x.WorkWindowEnd != null)
+                .OrderBy(x => x.CanSplit).ThenByDescending(x => x.WorkWindowStart != null || x.WorkWindowEnd != null)
                 .ThenBy(x => x.Deadline).ThenBy(x => x.Id).FirstOrDefault();
             if (blocked is null) break;
             attempted.Add(blocked.Id);

@@ -85,6 +85,39 @@ public sealed class NoteActivitiesTests
         Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
         Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
     }
+    [Theory] [InlineData(-60)] [InlineData(-1)] [InlineData(0)]
+    public async Task Event_with_both_times_but_a_past_or_current_start_reports_the_actual_problem(int offset)
+    {
+        var (h, uid, note) = await Setup(); await using var lifetime = h;
+        var start = h.Clock.GetUtcNow().AddMinutes(offset);
+        var activity = new NoteActivity("EVENT", "Đá bóng", Type: "OTHER", Start: start, End: start.AddDays(1));
+        var error = await Assert.ThrowsAsync<AuthException>(() => Call(h,
+            s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, [activity]), Ct)));
+        Assert.Equal("EVENT_IN_PAST", error.Code);
+        Assert.Contains("Giờ bắt đầu", error.Message);
+        Assert.DoesNotContain("Bổ sung giờ", error.Message);
+        Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
+        Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+        Assert.Empty(await h.DbAsync(db => db.PlanProposals.ToArrayAsync(Ct)));
+    }
+    [Fact] public async Task Missing_or_backwards_event_times_have_distinct_errors_and_corrected_times_can_be_saved()
+    {
+        var (h, uid, note) = await Setup(); await using var lifetime = h;
+        var start = h.Clock.GetUtcNow().AddHours(1);
+        var activity = new NoteActivity("EVENT", "Đá bóng", Type: "OTHER", Start: start, End: null);
+        var missing = await Assert.ThrowsAsync<AuthException>(() => Call(h,
+            s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, [activity]), Ct)));
+        Assert.Equal("NOTE_ACTIVITY_INCOMPLETE", missing.Code);
+        var backwards = await Assert.ThrowsAsync<AuthException>(() => Call(h,
+            s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, [activity with { End = start.AddMinutes(-1) }]), Ct)));
+        Assert.Equal("NOTE_ACTIVITY_TIME_INVALID", backwards.Code);
+        var corrected = activity with { End = start.AddDays(1) };
+        var plan = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, [corrected]), Ct));
+        Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
+        await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, plan.Id, new(note.Version), Ct));
+        var saved = Assert.Single(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
+        Assert.Equal(start, saved.Start); Assert.Equal(start.AddDays(1), saved.End);
+    }
     [Fact] public async Task Invalid_activity_cannot_bypass_validation_during_incremental_filtering()
     {
         var (h, uid, note) = await Setup(); await using var lifetime = h;
@@ -153,6 +186,39 @@ public sealed class NoteActivitiesTests
         Assert.Single(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
         await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, plan.Id, new(note.Version), Ct));
         Assert.Single(await h.DbAsync(db => db.AvailabilityExceptions.ToArrayAsync(Ct)));
+    }
+    [Fact] public async Task Confirmed_routine_can_schedule_note_work_without_manually_configured_weekly_hours()
+    {
+        var (h, uid, note) = await Setup(); await using var lifetime = h;
+        await h.DbAsync(async db => {
+            db.WeeklyAvailability.RemoveRange(await db.WeeklyAvailability.ToArrayAsync(Ct));
+            db.AvailabilityPolicies.Add(new() { UserId = uid, ConfirmedAt = h.Clock.GetUtcNow(), AwakeStart = 0, AwakeEnd = 1440, CommuteMinutes = 0 });
+            await db.SaveChangesAsync(Ct);
+        });
+        var activity = Activities(h.Clock.GetUtcNow())[3] with { EstimatedMinutes = 30 };
+        var plan = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, [activity]), Ct));
+        Assert.DoesNotContain(plan.Warnings, w => w.UnscheduledMinutes > 0);
+        Assert.Equal(activity.Start, Assert.Single(plan.Sessions).Start);
+        Assert.Empty(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(Ct)));
+        Assert.Empty(await h.DbAsync(db => db.WorkTasks.ToArrayAsync(Ct)));
+    }
+    [Fact] public async Task No_configured_hours_returns_a_preview_warning_and_only_explicit_one_off_confirmation_enables_saving()
+    {
+        var (h, uid, note) = await Setup(); await using var lifetime = h;
+        await h.DbAsync(async db => { db.WeeklyAvailability.RemoveRange(await db.WeeklyAvailability.ToArrayAsync(Ct)); await db.SaveChangesAsync(Ct); });
+        var activity = Activities(h.Clock.GetUtcNow())[3] with { EstimatedMinutes = 30 };
+        var blocked = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id, new(note.Version, [activity]), Ct));
+        Assert.Contains(blocked.Warnings, w => w.Code == "NOTE_OUTSIDE_AVAILABILITY");
+        Assert.Equal("NOTE_PLAN_INCOMPLETE", (await Assert.ThrowsAsync<AuthException>(() => Call(h,
+            s => s.ApplyNoteActivitiesAsync(uid, note.Id, blocked.Id, new(note.Version), Ct)))).Code);
+        var allowed = await Call(h, s => s.PreviewNoteActivitiesAsync(uid, note.Id,
+            new(note.Version, [activity], AllowRequestedTimeOutsideAvailability: true), Ct));
+        Assert.DoesNotContain(allowed.Warnings, w => w.UnscheduledMinutes > 0);
+        Assert.Empty(await h.DbAsync(db => db.AvailabilityExceptions.ToArrayAsync(Ct)));
+        await Call(h, s => s.ApplyNoteActivitiesAsync(uid, note.Id, allowed.Id, new(note.Version), Ct));
+        Assert.Single(await h.DbAsync(db => db.WorkSessions.ToArrayAsync(Ct)));
+        Assert.Single(await h.DbAsync(db => db.AvailabilityExceptions.ToArrayAsync(Ct)));
+        Assert.Empty(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(Ct)));
     }
     [Fact] public async Task Stale_calendar_and_edited_notes_cannot_apply_an_old_proposal()
     {

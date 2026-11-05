@@ -99,6 +99,13 @@ beforeEach(() => {
                 name: body.image.name,
                 mimeType: body.image.mimeType,
                 url: "/api/agent/turns/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/image",
+                additionalImages: body.image.additionalImages?.map(
+                  (part, index) => ({
+                    name: part.name,
+                    mimeType: part.mimeType,
+                    url: `/api/agent/turns/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/image?index=${index + 1}`,
+                  }),
+                ),
               }
             : null,
         };
@@ -159,6 +166,42 @@ it("pastes a copied image into the composer, preserves typed text and schedules 
   expect(sent[0].text).not.toContain(extraction.text);
   expect(sent[0].image.data).toBeTruthy();
   expect(sent[0].autoApply).toBe(true);
+});
+it("submits two timetables together in one planning request without an OCR call", async () => {
+  render(<AgentPage />);
+  await waitFor(() =>
+    expect(screen.queryByText("Đang tải trợ lý…")).toBeNull(),
+  );
+  const second = new File(
+    [new Uint8Array([137, 80, 78, 71, 2])],
+    "lichlam.png",
+    { type: "image/png" },
+  );
+  fireEvent.change(screen.getByLabelText("Chọn ảnh thời khóa biểu"), {
+    target: { files: [file(), second] },
+  });
+  await screen.findByAltText("Ảnh thời khóa biểu đã chọn 1");
+  await screen.findByAltText("Ảnh thời khóa biểu đã chọn 2");
+  expect(sent).toHaveLength(0);
+  fireEvent.change(screen.getByLabelText("Yêu cầu của bạn"), {
+    target: { value: "Gộp cả hai lịch trong tuần tới và tìm giờ rảnh" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
+  await waitFor(() => expect(sent).toHaveLength(1));
+  expect(sent[0].image.name).toBe("thoikhoabieu.png");
+  expect(sent[0].image.additionalImages[0].name).toBe("lichlam.png");
+  expect(sent[0].image.additionalImages[0].data).toBeTruthy();
+  expect(imageCalls).toHaveLength(1);
+  expect(sent[0].text).toContain("cả hai lịch");
+  const secondPreview = await screen.findByRole("button", {
+    name: "Xem ảnh thời khóa biểu 2",
+  });
+  fireEvent.click(secondPreview);
+  expect(
+    screen
+      .getByRole("dialog", { name: "Ảnh thời khóa biểu phóng to" })
+      .querySelector("img").src,
+  ).toContain("/image?index=1");
 });
 
 it("accepts clipboard images from the files list when clipboard items are unavailable", async () => {
@@ -232,7 +275,9 @@ it("reads and schedules an image-only submission with automatic save in one Send
   expect(imageCalls).toHaveLength(1);
   expect(imageCalls[0].body.mimeType).toBe("image/png");
   expect(sent[0].autoApply).toBe(true);
-  expect(sent[0].text).toBe("Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.");
+  expect(sent[0].text).toBe(
+    "Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.",
+  );
   expect(sent[0].image.data).toBeTruthy();
   expect(sent[0].text).not.toContain("Chỉ xem trước");
   await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));

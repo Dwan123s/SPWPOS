@@ -20,6 +20,7 @@ public sealed partial class WorkspaceService
         Require(activities.Length > 0, "NOTE_NO_NEW_ACTIVITIES", "Không có hoạt động mới để thêm. Lịch đã lưu được giữ nguyên.", 409);
         var state = await State(uid, ct);
         var tasks = await NoteTasks(uid, activities, state, ct);
+        ApplyMatrixDraftClassification(note, tasks);
         var events = NoteEvents(uid, activities, state);
         var oneOffHours = input.AllowRequestedTimeOutsideAvailability ? NoteRequestedHours(uid, tasks, state.Preference) : [];
         var candidate = NoteCandidate(state with { Exceptions = state.Exceptions.Concat(oneOffHours).ToArray() }, tasks, events);
@@ -60,6 +61,7 @@ public sealed partial class WorkspaceService
         Require(!plan.Warnings.Any(x => x.UnscheduledMinutes > 0 || x.Code == "SOFT_DEADLINE_EXCEEDED"),
             "NOTE_PLAN_INCOMPLETE", "Chưa xếp đủ các hoạt động. Chỉnh thời lượng, giờ rảnh hoặc hạn chót rồi xem trước lại.", 409);
         var tasks = await NoteTasks(uid, context.Activities, state, ct);
+        ApplyMatrixDraftClassification(note, tasks);
         Require(tasks.Length == context.TaskIds.Length, "PLAN_STALE", "Đề xuất không còn hợp lệ.", 409);
         for (var i = 0; i < tasks.Length; i++) tasks[i].Id = context.TaskIds[i];
         var events = context.Events.Select(x => new FixedEvent { Id = x.Id, UserId = uid, Name = x.Name,
@@ -159,7 +161,7 @@ public sealed partial class WorkspaceService
             var type = NormalizeTaskType(activity.Type);
             Require(await db.TaskTypes.AnyAsync(x => x.Code == type && x.IsActive, ct), "INVALID_TASK_TYPE", $"Loại công việc của “{activity.Name}” không hợp lệ. Chọn lại loại công việc rồi xem lịch.");
             var input = new TaskInput(activity.Name, activity.Description, deadline, activity.EstimatedMinutes!.Value,
-                activity.Priority, type, activity.Start is null, Math.Max(5, Math.Min(state.Preference.MinimumSessionMinutes, activity.EstimatedMinutes.Value)),
+                activity.Priority, activity.Type, activity.Splittable && activity.Start is null, Math.Max(5, Math.Min(state.Preference.MinimumSessionMinutes, activity.EstimatedMinutes.Value)),
                 IsHardDeadline: activity.IsHardDeadline, CreationSource: "NATURAL_LANGUAGE");
             ValidTask(input);
             var task = NewTask(uid, input, Now);
@@ -176,8 +178,12 @@ public sealed partial class WorkspaceService
         var events = new List<FixedEvent>();
         foreach (var activity in activities.Where(x => x.Kind == "EVENT"))
         {
-            Require(activity.Start is not null && activity.End is not null && activity.Start >= Now,
+            Require(activity.Start is not null && activity.End is not null,
                 "NOTE_ACTIVITY_INCOMPLETE", $"Bổ sung giờ bắt đầu và kết thúc cho “{activity.Name}”.");
+            Require(activity.End > activity.Start, "NOTE_ACTIVITY_TIME_INVALID",
+                $"Giờ kết thúc của “{activity.Name}” phải sau giờ bắt đầu.");
+            Require(activity.Start > Now, "EVENT_IN_PAST",
+                $"Giờ bắt đầu của “{activity.Name}” đã qua hoặc trùng thời điểm hiện tại. Hãy chọn giờ bắt đầu sau thời điểm hiện tại rồi xem lại lịch đề xuất.");
             foreach (var item in EventOccurrences(uid, new(activity.Name, activity.Start!.Value, activity.End!.Value,
                 activity.Description, activity.Type, activity.RepeatWeeks, IsUrgent: activity.Priority == 4 ? true : null), state.Preference))
             {

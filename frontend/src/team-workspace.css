@@ -2040,6 +2040,28 @@
   background: #f0f5fc;
   justify-self: start;
 }
+.team-brief-count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #dce8fa;
+  border-radius: 12px;
+  background: #f6f9ff;
+  color: #537297;
+  font-size: 13px;
+}
+.team-brief-count select {
+  min-width: 125px;
+  padding: 8px 12px;
+  border: 1px solid #cbdcf4;
+  border-radius: 8px;
+  background: #fff;
+  color: #285f9e;
+  font: inherit;
+}
 .team-brief-modes button {
   display: inline-flex;
   align-items: center;
@@ -2312,3 +2334,6 @@
 .team-task-card .team-completion-file-list li {
   flex-wrap: wrap;
 }
+
+.team-member-profile-link { color: inherit; text-decoration: none; }
+.team-member-profile-link:hover { color: #0759c8; text-decoration: underline; }

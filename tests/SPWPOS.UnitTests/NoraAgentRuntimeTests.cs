@@ -70,6 +70,25 @@ public sealed partial class NoraAgentRuntimeTests
         await work.SetAvailabilityAsync(uid, new(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 480, 1320)).ToArray()), Ct);
     }
 
+    [Fact] public async Task Native_agent_receives_both_original_timetable_images_together()
+    {
+        var image = new AgentImage("Lịch học.png", "image/png", "iVBORw0KGgo=", AdditionalImages:
+            [new("Lịch làm.jpg", "image/jpeg", "/9j/AA==")]);
+        var model = new Model { Decision = (request, number) => {
+            var parts = request.Contents[0].GetProperty("parts");
+            Assert.Equal(3, parts.GetArrayLength());
+            Assert.Equal(image.Data, parts[1].GetProperty("inlineData").GetProperty("data").GetString());
+            Assert.Equal(image.AdditionalImages![0].Data, parts[2].GetProperty("inlineData").GetProperty("data").GetString());
+            Assert.Contains("read BOTH", request.Instructions);
+            return Task.FromResult(Call("ask_user", new { reply = "Đã xem cả hai ảnh.", question = "Bạn áp dụng từ ngày nào?", options = Array.Empty<string>() }, number));
+        } };
+        await using var h = await Harness(model); var user = await h.RegisterAsync();
+        var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id,
+            new(Guid.NewGuid(), Guid.NewGuid(), "Gộp hai thời khóa biểu và tìm giờ rảnh", Image: image), Ct));
+        Assert.Equal("NEEDS_INPUT", turn.Status);
+        Assert.False(await h.DbAsync(db => db.FixedEvents.AnyAsync(Ct)));
+    }
+
     [Fact] public async Task Timetable_agent_saves_fixed_hours_and_proposes_a_routine_for_review()
     {
         var node = System.Text.Json.Nodes.JsonNode.Parse(Draft)!;

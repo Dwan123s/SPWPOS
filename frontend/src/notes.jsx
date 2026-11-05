@@ -8,6 +8,7 @@ import { getGuide, completeGuideStep } from "./onboarding.js";
 import { NoteStudio } from "./note-studio.jsx";
 import { NoteChecklist } from "./note-checklist.jsx";
 import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
+import { takeInboxNote } from "./task-inbox-link.js";
 import {
   clearNoteAppearance,
   normalizeNoteAppearance,
@@ -98,8 +99,9 @@ export function NotesPage({ onWorkspaceChanged }) {
     );
   const hasTime =
     availabilityReady ||
-    !!state.workspace?.availability?.length ||
-    !!state.workspace?.exceptions?.some((e) => e.isAvailable);
+    !!workspace?.availabilityPolicy?.confirmed ||
+    !!workspace?.availability?.length ||
+    !!workspace?.exceptions?.some((e) => e.isAvailable);
   const proposalIssue = imported
     ? ""
     : dirty
@@ -129,9 +131,11 @@ export function NotesPage({ onWorkspaceChanged }) {
           setNotes(items);
           setAgent(capabilities);
           const guide = getGuide();
+          const inboxNoteId = takeInboxNote(state.workspace?.profile?.id);
           const activeNote =
-            guide.status === "active" &&
-            items.find((item) => item.id === guide.noteId);
+            items.find((item) => item.id === inboxNoteId) ||
+            (guide.status === "active" &&
+              items.find((item) => item.id === guide.noteId));
           if (activeNote) select(activeNote);
         }
       })
@@ -616,25 +620,32 @@ export function NotesPage({ onWorkspaceChanged }) {
       items.map((d, i) => (i === index ? { ...d, [key]: value } : d)),
     );
   const prepareActivities = (input) =>
-    run("Đang kiểm tra sự kiện và công việc…", () =>
-      api(`/api/notes/${currentNote.current.id}/proposals`, "POST", {
-        ...input,
-        version: currentNote.current.version,
-      }),
+    run(
+      "Đang kiểm tra sự kiện và công việc…",
+      () =>
+        api(`/api/notes/${currentNote.current.id}/proposals`, "POST", {
+          ...input,
+          version: currentNote.current.version,
+        }),
+      "activities",
     );
   const applyActivities = (planId) =>
-    run("Đang lưu sự kiện và công việc…", async () => {
-      const result = await api(
-        `/api/notes/${currentNote.current.id}/proposals/${planId}/apply`,
-        "POST",
-        { version: currentNote.current.version },
-      );
-      if (!alive.current) return;
-      remember(result.note);
-      activityReviewDirty.current = false;
-      await onWorkspaceChanged();
-      return result;
-    });
+    run(
+      "Đang lưu sự kiện và công việc…",
+      async () => {
+        const result = await api(
+          `/api/notes/${currentNote.current.id}/proposals/${planId}/apply`,
+          "POST",
+          { version: currentNote.current.version },
+        );
+        if (!alive.current) return;
+        remember(result.note);
+        activityReviewDirty.current = false;
+        await onWorkspaceChanged();
+        return result;
+      },
+      "activities",
+    );
 
   return (
     <>
@@ -702,6 +713,10 @@ export function NotesPage({ onWorkspaceChanged }) {
         applyActivities={applyActivities}
         onActivityReviewDirty={(value) => {
           activityReviewDirty.current = value;
+          if (value && failedAction === "activities") {
+            setError("");
+            setFailedAction(null);
+          }
         }}
         agent={agent}
         imported={imported}
@@ -818,7 +833,7 @@ export function NotesPage({ onWorkspaceChanged }) {
             {error && (
               <div role="alert" className="form-error note-feedback">
                 {error}
-                {failedAction && (
+                {failedAction && failedAction !== "activities" && (
                   <div className="form-actions">
                     <button
                       type="button"

@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -44,6 +45,32 @@ beforeEach(() => {
   state.workspace.profile.id = `eisenhower-user-${++fixtureId}`;
   invalidateEisenhower();
 });
+it("keeps the open checklist visible during a background reevaluation of the same revision", async () => {
+  const task = item(0, "Q1", {
+    version: "v1",
+    checklist: [{ id: "step", text: "Bước đang xem", completed: false }],
+  });
+  let finish;
+  api.mockResolvedValueOnce(response([task])).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render(<EisenhowerMatrix />);
+  await screen.findByRole("button", { name: "Công việc 0", exact: true });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Checklist Công việc 0 · 0/1" }),
+  );
+  act(() => invalidateEisenhower());
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+  expect(screen.getByRole("checkbox", { name: "Bước đang xem" })).toBeTruthy();
+  expect(
+    screen.queryByText("Đang đánh giá công việc từ lịch của bạn…"),
+  ).toBeNull();
+  await act(async () => finish(response([task])));
+  expect(screen.getByRole("checkbox", { name: "Bước đang xem" })).toBeTruthy();
+});
 it("switches from the existing list to a bounded matrix without requesting AI or mutating tasks", async () => {
   api.mockResolvedValue(
     response(Array.from({ length: 13 }, (_, n) => item(n))),
@@ -56,8 +83,8 @@ it("switches from the existing list to a bounded matrix without requesting AI or
     name: "Ma trận Eisenhower",
   });
   await within(matrix).findByRole("button", { name: "Công việc 0" });
-  expect(within(matrix).getAllByRole("article")).toHaveLength(4);
-  fireEvent.click(screen.getByRole("button", { name: "Trang tiếp Làm trước" }));
+  expect(within(matrix).getAllByRole("article")).toHaveLength(13);
+  expect(matrix.querySelectorAll(".eis-grid > div")).toHaveLength(4);
   expect(screen.getByRole("button", { name: "Công việc 4" })).toBeTruthy();
   fireEvent.change(screen.getByRole("textbox", { name: "Tìm trong ma trận" }), {
     target: { value: "Công việc 12" },
@@ -67,7 +94,7 @@ it("switches from the existing list to a bounded matrix without requesting AI or
   ).toBeTruthy();
   expect(
     api.mock.calls.every(
-      ([url, method]) => url === "/api/eisenhower" && !method,
+      ([url, method]) => ["/api/eisenhower", "/api/notes"].includes(url) && !method,
     ),
   ).toBe(true);
 });
@@ -91,6 +118,10 @@ it("keeps unknown, pending acceptance and reviews separate, and limits today's r
     ]),
   );
   const { unmount } = render(<EisenhowerMatrix />);
+  await screen.findByRole("button", { name: "Công việc 1" });
+  expect(screen.queryByRole("region", { name: "Cần làm rõ" })).toBeNull();
+  expect(screen.getByText("Chưa nhận")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Cần làm rõ/ }));
   await screen.findByRole("button", { name: "Công việc 0" });
   expect(
     within(screen.getByRole("region", { name: "Cần làm rõ" })).getByRole(
@@ -98,7 +129,9 @@ it("keeps unknown, pending acceptance and reviews separate, and limits today's r
       { name: "Công việc 0" },
     ),
   ).toBeTruthy();
-  expect(screen.getByText("Cần nhận task · Đánh giá dự kiến")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Chờ bạn duyệt/ }));
+  expect(screen.getByRole("region", { name: "Chờ bạn duyệt" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Công việc 2" })).toBeTruthy();
   unmount();
   render(<EisenhowerFocus />);
   await screen.findByRole("button", { name: "Công việc 4" });

@@ -5,6 +5,7 @@ import {
   notificationSoundEnabled,
   setNotificationSoundEnabled,
   startNotificationSound,
+  startNoraReminderAlarm,
 } from "../src/notification-sound.js";
 import {
   syncNotifications,
@@ -70,6 +71,21 @@ afterEach(() => {
   stop();
   resetNotificationFeed();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
+it("repeats a NORA alarm until stopped and immediately silences active tones", () => {
+  vi.useFakeTimers();
+  fireEvent.pointerDown(document);
+  const end = startNoraReminderAlarm("listener");
+  expect(audio.createOscillator).toHaveBeenCalledTimes(2);
+  act(() => vi.advanceTimersByTime(5400));
+  expect(audio.createOscillator).toHaveBeenCalledTimes(8);
+  const tones = audio.createOscillator.mock.results.map(result => result.value);
+  end();
+  expect(tones.at(-1).stop).toHaveBeenCalledTimes(2);
+  act(() => vi.advanceTimersByTime(10000));
+  expect(audio.createOscillator).toHaveBeenCalledTimes(8);
 });
 
 it("waits for user interaction, stays silent for history, then chimes once for a batch of new notices", () => {

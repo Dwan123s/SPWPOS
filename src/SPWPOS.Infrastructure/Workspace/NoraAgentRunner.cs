@@ -94,7 +94,7 @@ public sealed class NoraAgentRunner
                         throw new AuthException("AGENT_CALL_REUSED", "AI dùng lại mã hành động cho nội dung khác. Lịch chưa thay đổi.", 503);
                     callIds[call.Id] = fingerprint;
                     if (definition is null) result = new("ERROR", ErrorCode: "UNKNOWN_TOOL", Message: "Chỉ dùng công cụ được cung cấp.");
-                    else if (call.Name.StartsWith("finish_", StringComparison.Ordinal) || call.Name is "ask_user" or "propose_changes" or "answer_calendar" or "answer_free_time")
+                    else if (call.Name.StartsWith("finish_", StringComparison.Ordinal) || call.Name is "ask_user" or "propose_changes" or "answer_calendar" or "answer_free_time" or "manage_reminder")
                     {
                         result = reply.Calls.Length != 1
                             ? new("ERROR", ErrorCode: "MIXED_TERMINAL", Message: "Kết thúc hoặc hỏi người dùng phải là hành động riêng.")

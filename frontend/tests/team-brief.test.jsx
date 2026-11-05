@@ -43,7 +43,10 @@ beforeEach(() => {
     if (path === "/api/teams/brief-team")
       return {
         team,
-        members: [{ userId: "one", name: "An", role: "Leader" }, { userId: "two", name: "Bình", role: "Member" }],
+        members: [
+          { userId: "one", name: "An", role: "Leader" },
+          { userId: "two", name: "Bình", role: "Member" },
+        ],
         tasks: [],
         activity: [],
       };
@@ -94,7 +97,10 @@ it("retains the document when NORA needs a deadline and accepts clarification in
     if (path === "/api/teams/brief-team")
       return {
         team,
-        members: [{ userId: "one", name: "An", role: "Leader" }, { userId: "two", name: "Bình", role: "Member" }],
+        members: [
+          { userId: "one", name: "An", role: "Leader" },
+          { userId: "two", name: "Bình", role: "Member" },
+        ],
         tasks: [],
         activity: [],
       };
@@ -140,6 +146,38 @@ it("rejects unsupported files locally without calling AI", async () => {
     "Hỗ trợ PDF, Word (.docx), TXT và Markdown (.md).",
   );
   expect(api.mock.calls.some(([p]) => p.endsWith("/briefs"))).toBe(false);
+});
+it("lets the leader choose 1 through the member count and sends that choice with the brief", async () => {
+  await open();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Chia việc cho cả nhóm" }),
+  );
+  const select = screen.getByRole("combobox", {
+    name: "Số gói việc NORA sẽ chia",
+  });
+  expect([...select.options].map((option) => option.value)).toEqual(["1", "2"]);
+  expect(select.value).toBe("2");
+  fireEvent.change(select, { target: { value: "1" } });
+  expect(screen.getByText(/chia thành 1 gói việc/)).toBeTruthy();
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Mô tả công việc và hạn chót" }),
+    { target: { value: "Toàn bộ dự án, hạn ngày mai" } },
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "NORA phân tích & chia việc" }),
+  );
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/teams/brief-team/briefs", "POST", {
+      text: "Toàn bộ dự án, hạn ngày mai",
+      taskCount: 1,
+      file: null,
+    }),
+  );
+  fireEvent.change(select, { target: { value: "2" } });
+  expect(screen.queryByText("01. Thiết kế hệ thống")).toBeNull();
+  expect(
+    screen.getByRole("textbox", { name: "Mô tả công việc và hạn chót" }).value,
+  ).toBe("Toàn bộ dự án, hạn ngày mai");
 });
 it("keeps single-task text entry available", async () => {
   await open();

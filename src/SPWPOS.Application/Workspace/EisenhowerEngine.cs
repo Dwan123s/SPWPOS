@@ -49,6 +49,8 @@ public sealed partial class PlanningEngine
             }
             if (blocked) reasons.Add("DEPENDENCY_PENDING");
             if (importance == "Unknown") reasons.Add("IMPORTANCE_UNKNOWN");
+            var manualUrgency = task.UrgencyOverride is "Urgent" or "NotUrgent";
+            if (manualUrgency) { urgency = task.UrgencyOverride; reasons.Add("USER_URGENCY"); }
             var quadrant = importance == "Unknown" || urgency == "Unknown" ? "Unknown" :
                 importance == "Important" ? urgency == "Urgent" ? "Q1" : "Q2" : urgency == "Urgent" ? "Q3" : "Q4";
             var explanation = reasons.Contains("OVERDUE") ? "Đã quá hạn và còn công việc cần xử lý."
@@ -59,8 +61,13 @@ public sealed partial class PlanningEngine
                 : urgency == "Urgent" ? "Deadline trong 24 giờ tới."
                 : "Còn quỹ thời gian và dự phòng trước hạn; nên chủ động sắp xếp sớm.";
             if (importance == "Unknown") explanation += " Chưa đủ căn cứ xác định mức quan trọng.";
+            if (manualUrgency) explanation += " Độ khẩn cấp do bạn chọn; cảnh báo deadline và thiếu giờ vẫn được giữ.";
             return new EisenhowerTaskView(task.Id, task.Name, task.Deadline, importance, urgency, quadrant, explanation,
-                reasons.ToArray(), remaining, available, atRisk, overdue, blocked, quadrant == "Unknown");
-        }).OrderBy(t => t.Deadline).ThenBy(t => t.Id).ToArray();
+                reasons.ToArray(), remaining, available, atRisk, overdue, blocked, quadrant == "Unknown",
+                Version: task.Version, Order: task.MatrixOrder, UrgencySource: manualUrgency ? "User" : "Auto",
+                Recommendation: quadrant is "Q1" or "Q2" ? "SuggestSchedule" : quadrant == "Q3" ? remaining <= 15 ? "QuickAction" : "OnDemand" : quadrant == "Q4" ? "Backlog" : "Clarify",
+                Description: task.Description, EstimatedMinutes: task.EstimatedMinutes, Progress: task.Progress, CanEdit: true, Splittable: task.CanSplit,
+                RequiresContinuousSession: task.RequiresContinuousSession);
+        }).OrderBy(t => t.Order).ThenBy(t => t.Deadline).ThenBy(t => t.Id).ToArray();
     }
 }

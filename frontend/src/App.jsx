@@ -10,6 +10,7 @@ import {
 import { getSnapshot, subscribe, dismissToast } from "./store.js";
 import { closeModal, button, state } from "./ui.jsx";
 import { FocusTimerProvider } from "./focus-timer.jsx";
+import { NoraReminderClock } from "./nora-reminders.jsx";
 import {
   startController,
   onClick,
@@ -81,6 +82,7 @@ export function App({ initialize = true }) {
           {snapshot.screen || <Loading fullscreen />}
         </Fragment>
         <NotificationPopups />
+        <NoraReminderClock key={state.workspace?.profile?.id} userId={state.workspace?.profile?.id} />
         <div id="toasts" aria-live="polite">
           {snapshot.toasts.map((toast) => (
             <div key={toast.id} className={`toast ${toast.type}`}>

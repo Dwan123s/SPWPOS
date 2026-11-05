@@ -5,12 +5,29 @@ const refreshSession = createSessionRefresh({
   probe: () => api("/api/browser-session/me", "GET", undefined, false),
   renew: () => api("/api/browser-session/refresh", "POST", undefined, false),
 });
+const requestCooldowns = new Map();
+function cooldownError(entry) {
+  const seconds = Math.max(1, Math.ceil((entry.until - Date.now()) / 1000));
+  const error = new Error(
+    entry.code === "RATE_LIMITED"
+      ? `Bạn thao tác hơi nhanh. Vui lòng chờ ${seconds} giây rồi thử lại.`
+      : entry.message,
+  );
+  error.status = 429;
+  error.code = entry.code;
+  error.retryAfter = seconds;
+  return error;
+}
 export async function api(
   path,
   method = "GET",
   body = undefined,
   retry = true,
 ) {
+  const cooldownKey = `${method}:${path.split("?")[0]}`;
+  const cooldown = requestCooldowns.get(cooldownKey);
+  if (cooldown?.until > Date.now()) throw cooldownError(cooldown);
+  requestCooldowns.delete(cooldownKey);
   const response = await fetch(path, {
     method,
     credentials: "same-origin",
@@ -55,6 +72,21 @@ export async function api(
     json = {};
   }
   if (!response.ok) {
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("Retry-After");
+      const seconds = /^\d+$/.test(retryAfter ?? "")
+        ? Number(retryAfter)
+        : (Date.parse(retryAfter) - Date.now()) / 1000;
+      const entry = {
+        until:
+          Date.now() +
+          Math.max(1, Number.isFinite(seconds) ? seconds : 60) * 1000,
+        code: json.error?.code ?? "RATE_LIMITED",
+        message: json.error?.message || "Vui lòng chờ một chút rồi thử lại.",
+      };
+      requestCooldowns.set(cooldownKey, entry);
+      throw cooldownError(entry);
+    }
     const e = new Error(
       json.error?.message || "Không thể thực hiện yêu cầu. Hãy thử lại.",
     );

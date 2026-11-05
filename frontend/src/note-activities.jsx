@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { dateFmt, icon, localInput, minutes, toUtc } from "./ui.jsx";
 import { NotePlanPreview } from "./note-plan-preview.jsx";
 import "./styles/note-activities.css";
@@ -65,14 +65,16 @@ function explainWarning(warning, proposal, workspace) {
   }
   return "Lịch đề xuất có phiên làm sau hạn chót của công việc này.";
 }
-function fieldIssues(activity) {
+function fieldIssues(activity, now = Date.now()) {
   const errors = {};
   if (!activity.name?.trim()) errors.name = "Nhập tên hoạt động.";
   if (activity.kind === "EVENT") {
     if (invalidDate(activity.start)) errors.start = "Bổ sung ngày giờ bắt đầu.";
+    else if (Date.parse(activity.start) <= now)
+      errors.start = "Giờ bắt đầu đã qua. Chọn giờ sau thời điểm hiện tại.";
     if (invalidDate(activity.end)) errors.end = "Bổ sung ngày giờ kết thúc.";
     else if (
-      !errors.start &&
+      !invalidDate(activity.start) &&
       new Date(activity.end) <= new Date(activity.start)
     )
       errors.end = "Giờ kết thúc phải sau giờ bắt đầu.";
@@ -89,6 +91,10 @@ function fieldIssues(activity) {
       errors.deadline = "Bổ sung hạn chót hoặc giờ bắt đầu.";
     if (activity.start && invalidDate(activity.start))
       errors.start = "Kiểm tra giờ bắt đầu.";
+    else if (activity.start && Date.parse(activity.start) <= now)
+      errors.start = "Giờ bắt đầu đã qua. Chọn lại giờ hoặc bỏ chọn mục này.";
+    else if (activity.start && Date.parse(activity.start) < now + 5 * 60000)
+      errors.start = "Giờ bắt đầu công việc phải cách hiện tại ít nhất 5 phút.";
     if (
       activity.end &&
       (invalidDate(activity.end) ||
@@ -99,6 +105,9 @@ function fieldIssues(activity) {
       errors.end = "Khung giờ chưa đủ thời lượng công việc.";
     if (activity.deadline && invalidDate(activity.deadline))
       errors.deadline = "Kiểm tra hạn chót.";
+    else if (activity.deadline && Date.parse(activity.deadline) <= now)
+      errors.deadline =
+        "Hạn chót đã qua. Chọn lại hạn chót hoặc bỏ chọn mục này.";
     if (
       activity.deadline &&
       !errors.deadline &&
@@ -117,7 +126,8 @@ function fieldIssues(activity) {
   }
   return errors;
 }
-const issue = (activity) => Object.values(fieldIssues(activity))[0] || "";
+const issue = (activity, now) =>
+  Object.values(fieldIssues(activity, now))[0] || "";
 // Legacy analysis messages are unstructured. Only retire a missing-field remark
 // when it names a now-valid activity and contains no other scheduling concern.
 function resolvedRemark(message, drafts, originals) {
@@ -152,6 +162,16 @@ export function NoteActivitiesReview({
   apply,
   onReviewDirty,
 }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const refresh = () => setNow(Date.now());
+    const timer = setInterval(refresh, 10000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   const [drafts, setDrafts] = useState(() =>
     note.analysis.activities.map((activity) => {
       const types = activity.kind === "EVENT" ? eventTypes : taskTypes;
@@ -175,19 +195,18 @@ export function NoteActivitiesReview({
   const [editError, setEditError] = useState("");
   const [allowRequestedHours, setAllowRequestedHours] = useState(false);
   const previewHeading = useRef(null);
+  const activityNodes = useRef([]);
   const selectionHintId = useId();
   const saveHintId = useId();
   const selected = drafts.filter((x) => x.selected);
-  const incomplete = selected.filter(issue);
+  const incomplete = selected.filter((activity) => issue(activity, now));
   const analysisMessages = (note.analysis.messages || []).filter(
     (message) => !resolvedRemark(message, drafts, note.analysis.activities),
   );
   const countEvents = selected.filter((x) => x.kind === "EVENT").length;
   const countTasks = selected.length - countEvents;
   const fixedTasks = selected.filter((x) => x.kind === "TASK" && x.start);
-  const needsGeneralHours = selected.some(
-    (x) => x.kind === "TASK" && (!x.start || !allowRequestedHours),
-  );
+  const needsGeneralHours = selected.some((x) => x.kind === "TASK" && !x.start);
   const blocked = !!busy || dirty || !hasAiAnalysis;
   const blockingWarnings = (proposal?.warnings || []).filter(
     (warning) =>
@@ -198,6 +217,7 @@ export function NoteActivitiesReview({
     (warning) => warning.code === "SOFT_DEADLINE_EXCEEDED",
   );
   const update = (index, field, value) => {
+    setNow(Date.now());
     setDrafts((items) =>
       items.map((item, i) =>
         i === index ? { ...item, [field]: value } : item,
@@ -214,6 +234,16 @@ export function NoteActivitiesReview({
       setEditError(error.message);
     }
   };
+  function showIssue(index) {
+    setExpanded((items) => items.map((open, i) => open || i === index));
+    requestAnimationFrame(() => {
+      const node = activityNodes.current[index];
+      node?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      node
+        ?.querySelector('[aria-invalid="true"]')
+        ?.focus({ preventScroll: true });
+    });
+  }
   if (note.planId)
     return (
       <div className="card note-activities-saved" role="status">
@@ -249,7 +279,7 @@ export function NoteActivitiesReview({
         )}
         <fieldset className="note-fields" disabled={blocked || !!proposal}>
           {drafts.map((activity, index) => {
-            const errors = fieldIssues(activity);
+            const errors = fieldIssues(activity, now);
             const problem = Object.values(errors)[0];
             const fixed = activity.kind === "EVENT";
             const errorProps = (field) => ({
@@ -272,6 +302,9 @@ export function NoteActivitiesReview({
             return (
               <article
                 key={index}
+                ref={(node) => {
+                  activityNodes.current[index] = node;
+                }}
                 className={`note-activity ${activity.selected && problem ? "needs-detail" : ""}`}
               >
                 <div className="note-activity-heading">
@@ -542,19 +575,90 @@ export function NoteActivitiesReview({
               />{" "}
               ngày tới
             </label>
-            <p className="reason" role="status">
-              {incomplete.length
-                ? `${incomplete.length} hoạt động cần bổ sung thông tin.`
-                : "Chưa tạo sự kiện, công việc hoặc lưu lịch. Bạn xác nhận sau khi xem đề xuất."}
-            </p>
+            {incomplete.length > 0 ? (
+              <div className="note-review-blockers" role="status">
+                <strong>
+                  {incomplete.length} mục cần kiểm tra trước khi xem lịch
+                </strong>
+                <ul>
+                  {drafts.map((activity, index) =>
+                    activity.selected && issue(activity, now) ? (
+                      <li key={index}>
+                        <button type="button" onClick={() => showIssue(index)}>
+                          {activity.name || `Hoạt động ${index + 1}`}
+                        </button>
+                        <span>
+                          Cần sửa:{" "}
+                          {Object.values(fieldIssues(activity, now)).join(" ")}
+                        </span>
+                      </li>
+                    ) : null,
+                  )}
+                </ul>
+                {selected.length > incomplete.length && (
+                  <button
+                    type="button"
+                    className="btn secondary small"
+                    onClick={() => {
+                      setDrafts((items) =>
+                        items.map((item) =>
+                          item.selected && issue(item, now)
+                            ? { ...item, selected: false }
+                            : item,
+                        ),
+                      );
+                      setProposal(null);
+                      setEditError("");
+                      onReviewDirty(true);
+                    }}
+                  >
+                    Chỉ giữ các mục hợp lệ đã chọn
+                  </button>
+                )}
+                <p>
+                  Các mục bỏ chọn vẫn nằm trong ghi chú và chưa được thêm vào
+                  lịch.
+                </p>
+              </div>
+            ) : (
+              <p className="reason" role="status">
+                Chưa tạo sự kiện, công việc hoặc lưu lịch. Bạn xác nhận sau khi
+                xem đề xuất.
+              </p>
+            )}
+            {!selected.length && (
+              <p className="reason" role="status">
+                Chọn ít nhất một hoạt động để xem lịch đề xuất.
+              </p>
+            )}
+            {note.analysis.needsReview && !reviewed && (
+              <p className="note-review-help">
+                Đánh dấu “Tôi đã kiểm tra các lưu ý” sau khi xem các mục để tiếp
+                tục.
+              </p>
+            )}
+            {!hasTime && fixedTasks.length > 0 && (
+              <p className="note-review-help">
+                Các công việc đã có giờ bắt đầu. Bạn có thể xem đề xuất để kiểm
+                tra khung giờ; chọn “Cho phép dùng giờ bắt đầu đã chọn” nếu muốn
+                dùng các giờ này ngoài giờ rảnh thường lệ.
+              </p>
+            )}
             {!hasTime && needsGeneralHours && (
-              <button
-                className="btn secondary"
-                disabled={blocked}
-                onClick={onSetTime}
-              >
-                Thiết lập giờ rảnh
-              </button>
+              <div className="note-hours-help">
+                <p>
+                  Chưa có giờ rảnh cho công việc chưa chọn giờ bắt đầu. Bạn vẫn
+                  có thể xem kiểm tra lịch; bổ sung giờ làm khi cần xếp các việc
+                  này.
+                </p>
+                <button
+                  className="btn secondary"
+                  disabled={blocked}
+                  onClick={onSetTime}
+                >
+                  Thiết lập giờ rảnh
+                </button>
+              </div>
             )}
             <button
               className="btn primary"
@@ -565,7 +669,6 @@ export function NoteActivitiesReview({
                 !Number.isInteger(horizon) ||
                 horizon < 1 ||
                 horizon > 30 ||
-                (needsGeneralHours && !hasTime) ||
                 (note.analysis.needsReview && !reviewed)
               }
               onClick={async () => {
@@ -674,7 +777,11 @@ export function NoteActivitiesReview({
               <button
                 className="btn primary"
                 aria-describedby={saveHintId}
-                disabled={blocked || blockingWarnings.length > 0}
+                disabled={
+                  blocked ||
+                  blockingWarnings.length > 0 ||
+                  incomplete.length > 0
+                }
                 onClick={() => apply(proposal.id)}
               >
                 Lưu sự kiện & công việc

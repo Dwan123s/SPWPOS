@@ -306,10 +306,18 @@ export function taskForm(task = {}, parentId = null) {
             <input
               type="checkbox"
               name="splittable"
-              defaultChecked={task.splittable ?? true}
+              defaultChecked={
+                !task.requiresContinuousSession && (task.splittable ?? true)
+              }
+              disabled={task.requiresContinuousSession === true}
             />
             Cho phép chia thành nhiều phiên làm việc
           </label>
+          {task.requiresContinuousSession && (
+            <p className="reason wide">
+              Hoạt động này cần diễn ra liên tục, không thể chia thành nhiều phiên.
+            </p>
+          )}
           <label className="field wide">
             Công việc cha
             <Select name="parentId">

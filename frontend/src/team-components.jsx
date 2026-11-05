@@ -435,10 +435,9 @@ export function TeamMembers({ detail, uid, busy, onRemove }) {
           <div className="team-member" key={m.userId}>
             <MemberAvatar member={m} tone={i % 3} />
             <div>
-              <strong>
-                {m.name}
-                {m.userId === uid ? " (bạn)" : ""}
-              </strong>
+              <a className="team-member-profile-link" href={`#profile/${m.userId}`} title={`Xem trang cá nhân của ${m.name}`}>
+                <strong>{m.name}{m.userId === uid ? " (bạn)" : ""}</strong>
+              </a>
               <small>
                 {m.role === "Leader" ? "Trưởng nhóm" : "Thành viên"}
               </small>
@@ -480,6 +479,8 @@ export function TeamTaskComposer({
   splitBrief,
   setSplitBrief,
   memberCount = 1,
+  taskCount = memberCount,
+  setTaskCount,
   members = [],
 }) {
   const upload = useRef(null);
@@ -527,7 +528,7 @@ export function TeamTaskComposer({
           <span>{icon("spark")}</span>
           <p>
             {splitBrief
-              ? `Nhóm hiện có ${memberCount} thành viên, gồm trưởng nhóm. NORA sẽ đọc yêu cầu và chia thành ${memberCount} gói việc có đầu ra rõ ràng để bạn xem lại.`
+              ? `Nhóm hiện có ${memberCount} thành viên, gồm trưởng nhóm. NORA sẽ đọc yêu cầu và chia thành ${taskCount} gói việc có đầu ra rõ ràng để bạn xem lại.`
               : "Nêu việc cần làm và hạn chót. Nếu chưa có thời lượng, NORA sẽ ước lượng để bạn xác nhận."}
           </p>
         </div>
@@ -538,6 +539,25 @@ export function TeamTaskComposer({
             onDraft();
           }}
         >
+          {!changeTask && splitBrief && (
+            <label className="team-brief-count">
+              <span>Số gói việc NORA sẽ chia</span>
+              <select
+                value={taskCount}
+                disabled={busy || reading}
+                onChange={(event) => setTaskCount?.(Number(event.target.value))}
+              >
+                {Array.from(
+                  { length: memberCount },
+                  (_, index) => index + 1,
+                ).map((count) => (
+                  <option key={count} value={count}>
+                    {count} gói việc
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {!changeTask && (
             <>
               <div className="team-brief-modes" aria-label="Cách tạo công việc">

@@ -99,7 +99,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
-    // Limit simultaneous expensive Argon2 computations as well as requests per IP.
+    // Limit simultaneous expensive Argon2 computations independently of API polling.
     o.GlobalLimiter = PartitionedRateLimiter.CreateChained(
         PartitionedRateLimiter.Create<HttpContext, string>(c =>
             HttpMethods.IsPost(c.Request.Method) && c.Request.Path.Value is
@@ -107,8 +107,16 @@ builder.Services.AddRateLimiter(o =>
             ? RateLimitPartition.GetConcurrencyLimiter("password-computation", _ => new ConcurrencyLimiterOptions
                 { PermitLimit = Math.Max(2, Math.Min(Environment.ProcessorCount, 8)), QueueLimit = 0 })
             : RateLimitPartition.GetNoLimiter("other-requests")),
-        PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetSlidingWindowLimiter(c.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new SlidingWindowRateLimiterOptions
-        { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 })));
+        PartitionedRateLimiter.Create<HttpContext, string>(c =>
+        {
+            if (!c.Request.Path.StartsWithSegments("/api")) return RateLimitPartition.GetNoLimiter("public-assets");
+            // Team/chat/notification polling shares the same API budget as user actions.
+            // Authenticated accounts behind one IP must not consume each other's budget.
+            var userId = c.User.Identity?.IsAuthenticated == true ? c.User.FindFirst("sub")?.Value : null;
+            var key = userId is not null ? $"user:{userId}" : $"ip:{c.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+            return RateLimitPartition.GetSlidingWindowLimiter(key, _ => new SlidingWindowRateLimiterOptions
+            { PermitLimit = userId is not null ? 240 : 60, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 });
+        }));
     o.AddPolicy("auth-ip", c => RateLimitPartition.GetSlidingWindowLimiter(
         $"{c.Connection.RemoteIpAddress}:{c.Request.Path}", _ => new SlidingWindowRateLimiterOptions
         { PermitLimit = c.Request.Path.Value?.Contains("request-otp", StringComparison.Ordinal) == true ? 5 : 20, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
@@ -277,7 +285,7 @@ app.Use(async (context, next) =>
         context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
         if (!context.Request.IsHttps)
         { await ApiProblems.WriteAsync(context, 400, "HTTPS_REQUIRED", "HTTPS is required.", context.RequestAborted); return; }
-        var requestLimit = context.Request.Path.Value is "/api/agent/turns" or "/api/agent/turns/stream" ? 8 * 1024 * 1024
+        var requestLimit = context.Request.Path.Value is "/api/agent/turns" or "/api/agent/turns/stream" ? TimetableImageLimits.MaxChatRequestBytes
             : context.Request.Path.Value == "/api/agent/images/timetable" ? TimetableImageLimits.MaxBytes
             : context.Request.Path.StartsWithSegments("/api/teams") && context.Request.Path.Value!.EndsWith("/briefs", StringComparison.Ordinal) ? 12000000
             : context.Request.Path.StartsWithSegments("/api/teams/tasks") && context.Request.Path.Value!.EndsWith("/source", StringComparison.Ordinal) ? 12000000

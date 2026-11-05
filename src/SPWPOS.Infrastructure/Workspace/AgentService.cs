@@ -176,7 +176,7 @@ public sealed partial class WorkspaceService
                     }
                 }
             }
-            if (runtime?.ReadReply is null && intent.Question.Length == 0)
+            if (runtime?.ReadReply is null && intent.Question.Length == 0 && intent.Reminder is null)
                 await Phase("PLANNING", "Đang kiểm tra khung giờ, deadline và xung đột");
             // Another HTTP request could have modified the account during the AI call.
             db.ChangeTracker.Clear();
@@ -185,6 +185,8 @@ public sealed partial class WorkspaceService
                 var turn = await Find<AgentTurn>(uid, turnId, ct); var current = await State(uid, ct);
                 Require(current.Preference.Revision == revision, "AGENT_STALE", "Lịch vừa thay đổi trong khi AI xử lý. Hãy thử lại với dữ liệu mới.", 409);
                 ValidateIntent(intent, true);
+                if (intent.Reminder is not null)
+                    return await PrepareNoraReminderAsync(uid, turn, intent, current.Preference, runtime?.View, ct);
                 var currentTaskTypes = intent.Tasks.Length == 0 ? [] : await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).Select(x => x.Code).ToArrayAsync(ct);
                 var interpreted = intent;
                 if (runtime is null)
@@ -562,6 +564,7 @@ public sealed partial class WorkspaceService
         var turn = await Find<AgentTurn>(uid, id, ct);
         if (turn.Status == "APPLIED") return TurnView(turn);
         Require(turn.Status == "PREVIEW" && turn.ExpiresAt > Now, "AGENT_PREVIEW_EXPIRED", "Bản xem trước không thể áp dụng hoặc đã hết hạn. Hãy gửi yêu cầu mới.", 409);
+        if (IsNoraReminder(turn)) return await ApplyNoraReminderAsync(uid, turn, ct);
         var state = await State(uid, ct);
         Require(state.Preference.Revision == turn.ExpectedRevision, "AGENT_STALE", "Dữ liệu đã thay đổi. Gửi lại yêu cầu để kiểm tra lịch mới.", 409);
         var changes = JsonSerializer.Deserialize<AgentChangeSet>(turn.ChangesJson, AgentJson)!; var view = TurnView(turn);
@@ -664,6 +667,7 @@ public sealed partial class WorkspaceService
     {
         var turn = await Find<AgentTurn>(uid, id, ct);
         if (turn.Status == "UNDONE") return TurnView(turn);
+        if (turn.Status == "APPLIED" && IsNoraReminder(turn)) return await UndoNoraReminderAsync(uid, turn, ct);
         var preference = await Preference(uid, ct);
         Require(turn.Status == "APPLIED" && turn.AppliedRevision == preference.Revision, "AGENT_UNDO_STALE", "Không thể hoàn tác vì dữ liệu đã thay đổi. Hãy dùng chat để điều chỉnh lịch hiện tại.", 409);
         var undo = JsonSerializer.Deserialize<AgentUndo>(turn.UndoJson, AgentJson)!;

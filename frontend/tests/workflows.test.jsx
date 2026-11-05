@@ -74,6 +74,12 @@ beforeEach(() => {
       if (url === "/api/browser-session/me")
         data = { user: profile, roles: sessionRoles };
       if (url === "/api/workspace") data = currentWorkspace;
+      if (url.startsWith("/api/social/people") || url.startsWith("/api/social/connections") || url.includes("/friends?offset="))
+        data = { items: [], nextOffset: null, hasMore: false };
+      else if (url.startsWith("/api/social/profiles/")) {
+        const id = url.split("/")[4];
+        data = { id, displayName: id === currentWorkspace.profile.id ? currentWorkspace.profile.displayName : "Người bạn trong nhóm", bio: "Giới thiệu công khai", avatarUrl: "", coverUrl: "", joinedAt: "2026-10-01T00:00:00Z", friendCount: 0, mutualFriendCount: 0, relationship: id === currentWorkspace.profile.id ? "Self" : "None" };
+      }
       if (options.method === "DELETE" && (/^\/api\/sessions\/[^/]+$/.test(url) || /^\/api\/time\/events\/[^/]+$/.test(url))) {
         if (failCalendarDelete) return { ok: false, status: 409, json: async () => ({ error: { code: "SESSION_NOT_DELETABLE", message: "Lịch đã thay đổi. Hãy tải lại trước khi xóa." } }) };
         const id = url.split("/").at(-1);
@@ -408,6 +414,7 @@ it("keeps rate-limit errors separate from password rejection feedback", async ()
   vi.mocked(fetch).mockResolvedValueOnce({
     ok: false,
     status: 429,
+    headers: new Headers(),
     json: async () => ({
       error: {
         code: "RATE_LIMITED",
@@ -419,8 +426,8 @@ it("keeps rate-limit errors separate from password rejection feedback", async ()
     .setup()
     .click(screen.getByRole("button", { name: "Đăng nhập", exact: true }));
   await waitFor(() =>
-    expect(document.querySelector(".form-error").textContent).toBe(
-      "Please wait before trying again.",
+    expect(document.querySelector(".form-error").textContent).toMatch(
+      /Bạn thao tác hơi nhanh\. Vui lòng chờ \d+ giây rồi thử lại\./,
     ),
   );
   expect(password.hasAttribute("aria-invalid")).toBe(false);
@@ -1326,6 +1333,38 @@ it("returns to today's work after explicitly saving a proposed schedule", async 
   expect(document.querySelector("#modal").open).toBe(false);
 });
 
+it("manually creates a calendar event from a selected day and keeps the form on a save conflict", async () => {
+  currentWorkspace.features = [...(currentWorkspace.features || []), "secretary-v1"];
+  state.calendarView = "week";
+  mount();
+  await navigate("calendar", "Lịch làm việc");
+  const add = screen.getAllByRole("button", { name: /^Thêm lịch ngày/ })[2];
+  const date = add.getAttribute("aria-label").replace("Thêm lịch ngày ", "");
+  await userEvent.setup().click(add);
+  const dialog = within(screen.getByRole("dialog"));
+  expect(dialog.getByLabelText("Bắt đầu").value).toBe(`${date}T09:00`);
+  expect(dialog.getByLabelText("Kết thúc").value).toBe(`${date}T10:00`);
+  expect(calls.some((call) => call.url === "/api/time/events")).toBe(false);
+  fireEvent.change(dialog.getByLabelText("Tên sự kiện"), { target: { value: "Lịch nhập thủ công" } });
+  const original = vi.mocked(fetch).getMockImplementation();
+  let conflict = true;
+  vi.mocked(fetch).mockImplementation(async (url, options = {}) => {
+    if (url === "/api/time/events" && options.method === "POST" && conflict)
+      return { ok: false, status: 409, json: async () => ({ error: { code: "EVENT_CONFLICT", message: "Khoảng giờ trùng với lịch đã có." } }) };
+    return original(url, options);
+  });
+  await userEvent.setup().click(dialog.getByRole("button", { name: "Lưu sự kiện" }));
+  await dialog.findByText("Khoảng giờ trùng với lịch đã có.");
+  expect(dialog.getByLabelText("Tên sự kiện").value).toBe("Lịch nhập thủ công");
+  conflict = false;
+  await userEvent.setup().click(dialog.getByRole("button", { name: "Lưu sự kiện" }));
+  await waitFor(() => expect(document.querySelector("#modal").open).toBe(false));
+  const request = calls.find((call) => call.url === "/api/time/events");
+  expect(request.body).toMatchObject({ name: "Lịch nhập thủ công", start: expect.any(String), end: expect.any(String), repeatWeeks: 1 });
+  expect(new Date(request.body.end) - new Date(request.body.start)).toBe(3600000);
+  expect(calls.some((call) => call.url.startsWith("/api/agent/") && call.url !== "/api/agent/reminders")).toBe(false);
+});
+
 it("shows apply only for real proposals and keeps simulations read-only", async () => {
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
@@ -1473,4 +1512,20 @@ it("finishing a session asks for progress and completes the whole task only on e
       calls.find((c) => c.url === "/api/tasks/task-1/status")?.body,
     ).toEqual({ status: "Completed", progress: 100 }),
   );
+});
+
+it("routes shared profile links and received friend invitations inside the workspace", async () => {
+  mount(); await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  const publicId = "22222222-2222-2222-2222-222222222222";
+  await navigate(`profile/${publicId}`, "Trang cá nhân");
+  await screen.findByRole("heading", { name: "Người bạn trong nhóm" });
+  expect(state.route).toBe("profile");
+  expect(location.hash).toBe(`#profile/${publicId}`);
+  expect(calls.some(call => call.url === `/api/social/profiles/${publicId}`)).toBe(true);
+  expect(screen.queryByRole("link", { name: "Chỉnh sửa hồ sơ" })).toBeNull();
+  await navigate("friends/incoming", "Bạn bè");
+  await screen.findByText("Chưa có lời mời mới");
+  expect(state.route).toBe("friends");
+  expect(within(screen.getByRole("navigation", { name: "Danh sách bạn bè" })).getByRole("button", { name: /Lời mời đã nhận/ }).getAttribute("aria-current")).toBe("page");
+  expect(calls.some(call => call.url === "/api/social/connections?kind=incoming&offset=0")).toBe(true);
 });

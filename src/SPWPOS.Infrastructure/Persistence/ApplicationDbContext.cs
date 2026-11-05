@@ -83,5 +83,6 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
         PrivateTeamModel.Configure(builder);
         EisenhowerModel.Configure(builder);
         TelegramModel.Configure(builder);
+        SocialModel.Configure(builder);
     }
 }

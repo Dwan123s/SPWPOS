@@ -8,7 +8,7 @@ namespace SPWPOS.Infrastructure.Workspace;
 public sealed partial class WorkspaceService
 {
     private static bool HasAgentActions(AgentIntent intent) => intent.ReplaceWeeklyAvailability || intent.WeeklySlots.Length > 0 ||
-        intent.Exceptions.Length > 0 || intent.Events.Length > 0 || intent.Tasks.Length > 0 || intent.ScheduleTaskIds.Length > 0 || intent.Reschedule;
+        intent.Exceptions.Length > 0 || intent.Events.Length > 0 || intent.Tasks.Length > 0 || intent.ScheduleTaskIds.Length > 0 || intent.Reschedule || intent.Reminder is not null;
 
     private static AgentIntent LimitAgentBatch(AgentIntent intent) => intent.Tasks is { Length: > 12 and <= 500 }
         ? ClarifyAgentIntent(intent with { Reply = "Một yêu cầu chỉ hỗ trợ tối đa 12 công việc. Mình chưa lưu công việc nào.", Options = [], Pending = null },

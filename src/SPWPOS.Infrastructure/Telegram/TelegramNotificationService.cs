@@ -108,7 +108,7 @@ public sealed class TelegramNotificationService(ApplicationDbContext db, ITelegr
         var zone = await db.WorkPreferences.AsNoTracking().Where(x => x.UserId == uid).Select(x => x.TimeZoneId).SingleOrDefaultAsync(ct) ?? "Asia/Ho_Chi_Minh";
         var now = Now;
         var rows = await db.InAppNotifications.Where(x => x.UserId == uid && x.TelegramPending && x.TelegramSentAt == null &&
-            x.NextTelegramAttemptAt <= now).OrderBy(x => x.CreatedAt).Take(20).ToArrayAsync(ct);
+            x.ScheduledFor <= now && x.NextTelegramAttemptAt <= now).OrderBy(x => x.CreatedAt).Take(20).ToArrayAsync(ct);
         foreach (var n in rows)
         {
             if (!user.IsActive || !user.EmailConfirmed || c is not { Enabled: true, ChatId: not null } || n.TelegramBindingId != c.BindingId)
@@ -136,6 +136,8 @@ public sealed class TelegramNotificationService(ApplicationDbContext db, ITelegr
     }
     private async Task<TelegramReminderDetails?> CurrentAsync(Guid uid, InAppNotification n, DateTimeOffset now, CancellationToken ct)
     {
+        if(n.Kind == "NORA_REMINDER")
+            return n.ScheduledFor <= now && n.ScheduledFor >= now.AddDays(-1) ? new(n.Message,Start:n.ScheduledFor) : null;
         if (n.Kind is "EVENT_REMINDER" or "EVENT_STARTED")
         {
             var e = await db.FixedEvents.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == uid && x.Id == n.FixedEventId, ct);

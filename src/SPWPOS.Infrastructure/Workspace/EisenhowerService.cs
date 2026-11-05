@@ -66,15 +66,20 @@ public sealed partial class WorkspaceService
         var now = Now;
         if (eisenhowerOptions?.Value.Enabled != true) return new([], now, now.AddMinutes(1), "disabled", Enabled: false);
         var (state, map, reviews) = await EisenhowerState(uid, ct);
+        var drafts = await MatrixDrafts(uid, ct);
         // Includes task metadata, inherited team importance, assignment and every scheduling constraint.
-        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { uid, state, map, reviews }))));
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { uid, state, map, reviews, drafts }))));
         var key = "eisenhower:" + uid + ":" + fingerprint;
         if (eisenhowerCache?.TryGetValue<EisenhowerView>(key, out var cached) == true && cached != null && cached.NextEvaluationAt > now) return cached;
-        var tasks = engine.AssessEisenhower(state, now).Select(t => map.TryGetValue(t.Id, out var link)
-            ? t with { Kind = link.Kind, TeamTaskId = link.SharedId, TeamId = link.TeamId } : t).Concat(reviews).ToArray();
-        var next = tasks.Select(t => t.Deadline.AddHours(-24)).Where(t => t > now).DefaultIfEmpty(now.AddSeconds(30)).Min();
+        var tasks = engine.AssessEisenhower(state, now).Select(t => {
+            var personal = state.Tasks.Single(x => x.Id == t.Id);
+            t = t with { Checklist = ReadTaskChecklist(personal) };
+            return map.TryGetValue(t.Id, out var link)
+                ? t with { Kind = link.Kind, TeamTaskId = link.SharedId, TeamId = link.TeamId, CanEdit = false } : t;
+        }).Concat(reviews).Concat(drafts).ToArray();
+        var next = tasks.Where(t => t.Deadline > now.AddHours(24)).Select(t => t.Deadline!.Value.AddHours(-24)).DefaultIfEmpty(now.AddSeconds(30)).Min();
         if (next > now.AddSeconds(30)) next = now.AddSeconds(30);
-        var view = new EisenhowerView(tasks, now, next, fingerprint);
+        var view = new EisenhowerView(tasks, now, next, fingerprint, Revision: state.Preference.Revision);
         eisenhowerCache?.Set(key, view, next);
         return view;
     }

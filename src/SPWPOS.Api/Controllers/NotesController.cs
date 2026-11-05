@@ -9,6 +9,8 @@ public sealed class NotesController(IWorkspaceService service) : WorkspaceContro
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct) => Data(await service.GetNotesAsync(UserId, ct));
     [HttpPost] public async Task<IActionResult> Create(NoteInput input, CancellationToken ct) => Data(await service.SaveNoteAsync(UserId, null, input, ct));
     [HttpPut("{id:guid}")] public async Task<IActionResult> Update(Guid id, NoteInput input, CancellationToken ct) => Data(await service.SaveNoteAsync(UserId, id, input, ct));
+    [HttpPatch("{id:guid}/completion")] public async Task<IActionResult> CompleteInbox(Guid id, NoteInboxCompletionInput input, CancellationToken ct) =>
+        Data(await service.SetInboxCompletionAsync(UserId, id, input, ct));
     [HttpDelete("{id:guid}")] public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid? version, CancellationToken ct)
     { await service.DeleteNoteAsync(UserId, id, version ?? Guid.Empty, ct); return Done(); }
     [HttpPost("{id:guid}/analyze")] public async Task<IActionResult> Analyze(Guid id, NoteAnalysisInput input, CancellationToken ct) => Data(await service.AnalyzeNoteAsync(UserId, id, input, ct));

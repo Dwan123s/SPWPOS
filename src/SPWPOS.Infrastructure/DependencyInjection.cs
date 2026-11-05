@@ -90,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<SPWPOS.Application.Workspace.IEisenhowerService>(p => p.GetRequiredService<SPWPOS.Infrastructure.Workspace.WorkspaceService>());
         services.AddScoped<SPWPOS.Infrastructure.Workspace.WorkspaceHistoryMaintenance>();
         services.AddScoped<SPWPOS.Infrastructure.Workspace.WorkspaceService>();
+        services.AddScoped<SPWPOS.Application.Workspace.ISocialService, SPWPOS.Infrastructure.Workspace.SocialService>();
         services.AddOptions<SPWPOS.Application.Workspace.NoraAgentOptions>().BindConfiguration("NoraAgent")
             .Validate(x => (x.Mode is "Workflow" or "Agent") && x.MaxModelTurns is >= 2 and <= 16 && x.MaxToolCalls is >= 1 and <= 30 &&
                 x.MaxSimulations is >= 1 and <= 5 && x.TimeoutSeconds is >= 15 and <= 180, "Invalid NORA runtime limits.").ValidateOnStart();

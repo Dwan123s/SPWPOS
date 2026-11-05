@@ -72,7 +72,21 @@ import {
 } from "./calendar.jsx";
 import { categoryModal, adminUsers, adminStatus } from "./page-actions.jsx";
 const routes = {
-  teams: ["Quản lí nhóm", "Cùng nhận việc, giữ lịch cá nhân riêng tư.", "users"],
+  profile: [
+    "Trang cá nhân",
+    "Chia sẻ đôi điều về bạn và kết nối với mọi người.",
+    "users",
+  ],
+  friends: [
+    "Bạn bè",
+    "Tìm người quen, gửi lời mời và quản lý kết nối của bạn.",
+    "users",
+  ],
+  teams: [
+    "Quản lí nhóm",
+    "Cùng nhận việc, giữ lịch cá nhân riêng tư.",
+    "users",
+  ],
   agent: [
     "NORA · Trợ lý AI",
     "Cùng NORA dành thời gian cho những điều quan trọng.",
@@ -180,7 +194,21 @@ async function loggedIn() {
 }
 function render() {
   if (!state.workspace) return;
-  state.route = location.hash.slice(1) || "today";
+  const profileMatch = location.hash
+    .slice(1)
+    .match(
+      /^profile\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i,
+    );
+  const friendsMatch = location.hash
+    .slice(1)
+    .match(/^friends\/(people|friends|incoming|outgoing)$/);
+  state.socialFriendsTab = friendsMatch?.[1] || null;
+  state.profileUserId = profileMatch?.[1] || null;
+  state.route = profileMatch
+    ? "profile"
+    : friendsMatch
+      ? "friends"
+      : location.hash.slice(1) || "today";
   if (state.route === "admin") {
     state.route = "admin-users";
     history.replaceState(null, "", "#admin-users");
@@ -203,6 +231,8 @@ function render() {
       <RoutePage
         key={state.route}
         route={state.route}
+        profileId={state.profileUserId}
+        friendsTab={state.socialFriendsTab}
         onWorkspaceChanged={() =>
           load(state.route !== "agent" && state.route !== "notes")
         }
@@ -221,7 +251,9 @@ function render() {
 }
 async function loadAdmin(search = "") {
   if (state.route === "admin-users") {
-    const users = await api(`/api/admin/users?search=${encodeURIComponent(search)}`);
+    const users = await api(
+      `/api/admin/users?search=${encodeURIComponent(search)}`,
+    );
     if (state.route !== "admin-users") return;
     state.adminUsers = users;
     if ($("#admin-users")) setSlot("admin-users", adminUsers(users));
@@ -1121,10 +1153,15 @@ async function formAction(form, data, nextAction = null) {
       );
       await refreshAfter();
       break;
-    case "event":
+    case "event": {
+      const start = toUtc(String(data.get("start")));
+      if (!id && Date.parse(start) <= Date.now())
+        throw new Error(
+          "Không thể tạo lịch trong quá khứ. Hãy chọn giờ bắt đầu sau thời điểm hiện tại.",
+        );
       await api(`/api/time/events${id ? `/${id}` : ""}`, id ? "PUT" : "POST", {
         name: String(data.get("name")),
-        start: toUtc(String(data.get("start"))),
+        start,
         end: toUtc(String(data.get("end"))),
         description: String(data.get("description") || ""),
         eventType: String(data.get("eventType") || "OTHER"),
@@ -1133,6 +1170,7 @@ async function formAction(form, data, nextAction = null) {
       });
       await refreshAfter();
       break;
+    }
     case "plan":
       planModal(
         await api(
@@ -1304,7 +1342,11 @@ export function onChange(event) {
     filterTasks();
 }
 export function startController() {
-  if (["returned", "cancelled"].includes(new URLSearchParams(location.search).get("payment"))) {
+  if (
+    ["returned", "cancelled"].includes(
+      new URLSearchParams(location.search).get("payment"),
+    )
+  ) {
     state.settingsTab = "pets";
     history.replaceState(null, "", "#settings");
   }

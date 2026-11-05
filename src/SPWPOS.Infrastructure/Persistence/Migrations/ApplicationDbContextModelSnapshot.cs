@@ -1040,6 +1040,48 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.ToTable("FixedEvents");
                 });
 
+            modelBuilder.Entity("SPWPOS.Domain.Entities.Friendship", b =>
+                {
+                    b.Property<Guid>("UserLowId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserHighId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("RequestedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserLowId", "UserHighId");
+
+                    b.HasIndex("UserHighId", "Status");
+
+                    b.HasIndex("UserLowId", "Status");
+
+                    b.ToTable("Friendships", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Friendships_Pair", "[UserLowId] <> [UserHighId]");
+
+                            t.HasCheckConstraint("CK_Friendships_Requester", "[RequestedById] = [UserLowId] OR [RequestedById] = [UserHighId]");
+
+                            t.HasCheckConstraint("CK_Friendships_Status", "[Status] IN ('Pending', 'Accepted')");
+                        });
+                });
+
             modelBuilder.Entity("SPWPOS.Domain.Entities.GoogleCalendarConnection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2838,6 +2880,11 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("CoverUrl")
+                        .IsRequired()
+                        .HasMaxLength(3000000)
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -3041,6 +3088,13 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ChecklistJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("[]");
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -3099,6 +3153,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsHardDeadline")
                         .HasColumnType("bit");
 
+                    b.Property<long>("MatrixOrder")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("MinimumSessionMinutes")
                         .HasColumnType("int");
 
@@ -3132,6 +3189,13 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UrgencyOverride")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)")
+                        .HasDefaultValue("Auto");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -3390,6 +3454,21 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.Friendship", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserHighId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserLowId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

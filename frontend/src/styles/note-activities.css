@@ -75,7 +75,7 @@
   }
   .note-activity-fields {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
     gap: 12px;
     margin: 12px 0;
   }
@@ -150,4 +150,85 @@
       gap: 8px;
     }
   }
+}
+
+.note-studio .note-activity-fields input,
+.note-studio .note-activity-fields select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #d9e3ef;
+  border-radius: 9px;
+  background: #f9fbff;
+  color: #294663;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  color-scheme: light;
+}
+.note-studio .note-activity-fields input:focus,
+.note-studio .note-activity-fields select:focus {
+  border-color: #78a8ee;
+  box-shadow: 0 0 0 3px #0874f910;
+}
+.note-studio .note-activity-fields input[aria-invalid="true"] {
+  border-color: #c78829;
+  background: #fffaf0;
+}
+.note-studio .note-activity-fields input:disabled,
+.note-studio .note-activity-fields select:disabled {
+  opacity: 0.65;
+}
+.note-studio .note-activity-fields input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.note-review-blockers {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #f0d7a5;
+  border-radius: 10px;
+  background: #fffaf0;
+  color: #866125;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.note-review-blockers ul {
+  padding-left: 18px;
+  margin: 9px 0 12px;
+}
+.note-review-blockers li {
+  margin: 7px 0;
+}
+.note-review-blockers li span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.note-review-blockers li button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #705018;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.note-review-blockers p,
+.note-hours-help p {
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 9px 0;
+}
+.note-hours-help {
+  border: 1px solid #dce8f7;
+  padding: 12px;
+  border-radius: 10px;
+  margin: 12px 0;
+  color: #6b819b;
+  background: #f7faff;
 }

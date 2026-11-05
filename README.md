@@ -95,6 +95,10 @@ Vite build lại khi sửa JSX/CSS. Tải lại `https://localhost:7043/` để 
 
 Khi sửa backend C# (ví dụ DTO hoặc quy tắc mật khẩu), dừng API đang chạy và chạy lại `Start-Development.ps1 -SkipCertificateTrust` để build và nạp code mới. Tải lại trang chỉ cập nhật frontend; API đang chạy vẫn dùng assembly đã nạp trước đó.
 
+Nếu gặp `Failed to bind ... 7043: address already in use`, cổng HTTPS đang được một tiến trình khác sử dụng. `Start-Development.ps1` kiểm tra API trong cả `bin` và `artifacts/api-runtime`, kiểm tra cổng trước khi chuẩn bị môi trường, và chặn chạy trùng trong suốt phiên server. Dừng phiên cũ bằng `Ctrl+C` trong terminal đã chạy nó trước khi khởi động lại. Có thể xem PID giữ cổng bằng `Get-NetTCPConnection -State Listen -LocalPort 7043 | Select-Object LocalAddress, OwningProcess`; nếu API được chạy nền bằng `Restart-PlanoraApi.ps1`, dùng lại script đó để thay phiên API của checkout này.
+
+Khi demo nhiều tài khoản bằng các browser khác nhau trên cùng máy, mỗi tài khoản có hạn mức API riêng (240 request/phút) để tải nền nhóm/chat/thông báo không dùng chung hạn mức theo IP. Request API chưa đăng nhập vẫn giới hạn 60/phút/IP; đăng nhập, OTP, ảnh và giọng nói có thêm hạn mức riêng. HTTP 429 trả thời gian chờ qua `Retry-After`; frontend tạm ngừng gửi lại cùng thao tác trong thời gian này và giữ phiên đăng nhập.
+
 `dotnet publish src/SPWPOS.Api -c Release` tự build và đóng gói frontend. Bản triển khai chỉ cần ASP.NET Core runtime và cấu hình backend.
 
 ## Cấu hình

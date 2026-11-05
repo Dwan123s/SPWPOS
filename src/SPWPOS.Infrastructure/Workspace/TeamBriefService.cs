@@ -22,10 +22,12 @@ public sealed partial class WorkspaceService
             "VALIDATION_ERROR", "Gửi tài liệu hoặc mô tả công việc, tối đa 12.000 ký tự.");
         var members = await BriefMembers(teamId, ct);
         Require(members.Length is >= 1 and <= 20, "TEAM_BRIEF_MEMBER_LIMIT", "Mỗi lần phân tích hỗ trợ nhóm tối đa 20 thành viên. Hãy chia dự án thành các nhóm nhỏ hơn.");
+        var taskCount = input.TaskCount ?? members.Length;
+        Require(taskCount >= 1 && taskCount <= members.Length, "TEAM_BRIEF_TASK_COUNT", "Chọn số gói việc từ 1 đến số thành viên hiện có trong nhóm.");
         var document = input.File == null ? null : TeamBriefReader.Read(input.File);
         var zone = await db.WorkPreferences.AsNoTracking().Where(x => x.UserId == uid).Select(x => x.TimeZoneId).SingleOrDefaultAsync(ct) ?? "Asia/Ho_Chi_Minh";
         var result = await RunJob(uid, "AI_REQUEST", () => ((ITeamBriefInterpreter)interpreter).AnalyzeTeamBriefAsync(
-            new(members.Length, zone, Now, document?.Name, input.Text, document?.Text, document?.PdfData), ct), ct);
+            new(members.Length, zone, Now, document?.Name, input.Text, document?.Text, document?.PdfData, taskCount), ct), ct);
         // No calendars, profile details or member names were sent to the model.
         db.ChangeTracker.Clear();
         await TeamMember(uid, teamId, ct, true);
@@ -36,8 +38,8 @@ public sealed partial class WorkspaceService
         if (result.Tasks.Length == 0)
             return new(Guid.Empty, result.Summary, string.IsNullOrWhiteSpace(result.Question) ? "Chưa đủ thông tin. Hãy bổ sung phạm vi công việc và deadline." : result.Question,
                 result.SplitReason, members.Length, document?.Name, [], result.Warnings);
-        Require(result.Tasks.Length == members.Length && result.Tasks.Select(x => x.Name?.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() == result.Tasks.Length,
-            "TEAM_BRIEF_SPLIT_INVALID", "NORA chưa chia đủ các gói việc khác nhau theo số thành viên hiện tại. Hãy yêu cầu phân tích lại.", 503);
+        Require(result.Tasks.Length == taskCount && result.Tasks.Select(x => x.Name?.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() == result.Tasks.Length,
+            "TEAM_BRIEF_SPLIT_INVALID", "NORA chưa chia đúng số gói việc đã chọn. Hãy yêu cầu phân tích lại.", 503);
         var source = input.Text + "\n" + document?.Text;
         var tasks = new List<SharedTaskView>();
         var pendingTasks = new List<TeamBriefPendingTask>();

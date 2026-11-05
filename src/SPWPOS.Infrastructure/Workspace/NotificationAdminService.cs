@@ -43,6 +43,7 @@ public sealed partial class WorkspaceService
     }
     public Task EnsureNotificationsAsync(Guid uid, CancellationToken ct) => Mutate(uid, async () =>
     {
+        await RefreshNoraReminderChannelsAsync(uid,ct);
         var settings = await db.NotificationSettings.SingleOrDefaultAsync(x => x.UserId == uid, ct) ?? new();
         var state = await State(uid, ct); bool missed = false;
         missed=state.Sessions.Any(s=>s.End<=Now && s.Status==WorkSessionStatus.Scheduled);
@@ -74,6 +75,7 @@ public sealed partial class WorkspaceService
     }, ct, false);
     public Task EnsureStartedNotificationsAsync(Guid uid, CancellationToken ct) => Mutate(uid, async () =>
     {
+        await RefreshNoraReminderChannelsAsync(uid,ct);
         await AddStartedNotifications(uid, Now, ct);
         await EnsureTimeReviewNotifications(uid,ct);
         return true;
@@ -102,7 +104,7 @@ public sealed partial class WorkspaceService
     public async Task<NotificationView[]> GetNotificationsAsync(Guid uid, CancellationToken ct)
     {
         var rows = await Mine<InAppNotification>(uid).AsNoTracking()
-            .Where(x => x.IsVisible).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(100)
+            .Where(x => x.IsVisible && x.ScheduledFor <= Now).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(100)
             .Select(x => new { View = new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null, null, null), x.DedupeKey }).ToArrayAsync(ct);
         if (rows.All(x => x.View.Kind != "TEAM_JOIN_REQUEST")) return rows.Select(x => x.View).ToArray();
         // Existing join notices already identify the applicant membership in their
@@ -194,73 +196,82 @@ public sealed class WorkspaceNotificationWorker(IServiceScopeFactory scopes, Not
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
-        var tick = 0;
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        try
         {
-            try
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            var tick = 0;
+            while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                var failuresBefore = status.Failures;
-                var fullScan = ++tick % 6 == 0;
-                Guid[] users;
-                using (var scope = scopes.CreateScope())
+                try
                 {
-                    var scanDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    var accounts = scanDb.Users.Where(x => x.IsActive && x.EmailConfirmed);
-                    if (!fullScan)
+                    var failuresBefore = status.Failures;
+                    var fullScan = ++tick % 6 == 0;
+                    Guid[] users;
+                    using (var scope = scopes.CreateScope())
                     {
-                        var now = clock.GetUtcNow(); var cutoff = now.AddMinutes(-2);
-                        var due = scanDb.FixedEvents.Where(x => x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId)
-                            .Union(scanDb.WorkSessions.Where(x => (x.Status == WorkSessionStatus.Scheduled || x.Status == WorkSessionStatus.Running) &&
-                                x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId))
-                            .Union(scanDb.WorkSessions.Where(x=>x.End<=now && x.End>=cutoff &&
-                                (x.Status==WorkSessionStatus.Scheduled || x.Status==WorkSessionStatus.Running || x.Status==WorkSessionStatus.Paused || x.Status==WorkSessionStatus.Completed)).Select(x=>x.UserId));
-                        accounts = accounts.Where(x => due.Contains(x.Id));
-                    }
-                    users = await accounts.Select(x => x.Id).ToArrayAsync(stoppingToken);
-                }
-                foreach (var uid in users)
-                {
-                    try
-                    {
-                        using var scope = scopes.CreateScope();
-                        var workspace = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
-                        if (fullScan)
+                        var scanDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                        var accounts = scanDb.Users.Where(x => x.IsActive && x.EmailConfirmed);
+                        if (!fullScan)
                         {
-                            await workspace.EnsureNotificationsAsync(uid, stoppingToken);
-                            await workspace.ScanRecoveryAsync(uid, stoppingToken);
+                            var now = clock.GetUtcNow(); var cutoff = now.AddMinutes(-2);
+                            var due = scanDb.FixedEvents.Where(x => x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId)
+                                .Union(scanDb.WorkSessions.Where(x => (x.Status == WorkSessionStatus.Scheduled || x.Status == WorkSessionStatus.Running) &&
+                                    x.Start <= now && x.Start >= cutoff && x.End > now).Select(x => x.UserId))
+                                .Union(scanDb.WorkSessions.Where(x=>x.End<=now && x.End>=cutoff &&
+                                    (x.Status==WorkSessionStatus.Scheduled || x.Status==WorkSessionStatus.Running || x.Status==WorkSessionStatus.Paused || x.Status==WorkSessionStatus.Completed)).Select(x=>x.UserId))
+                                .Union(scanDb.InAppNotifications.Where(x=>x.Kind=="NORA_REMINDER" && x.ScheduledFor<=now &&
+                                    (x.ReadAt==null && x.ScheduledFor>=now.AddDays(-1) || x.EmailPending && x.NextEmailAttemptAt<=now || x.TelegramPending && x.NextTelegramAttemptAt<=now)).Select(x=>x.UserId));
+                            accounts = accounts.Where(x => due.Contains(x.Id));
                         }
-                        else await workspace.EnsureStartedNotificationsAsync(uid, stoppingToken);
-                        // A delivery channel failure must not prevent the other channel from sending.
-                        try {
-                            using var telegramScope = scopes.CreateScope();
-                            await telegramScope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Telegram.TelegramNotificationService>().SendPendingAsync(uid, stoppingToken);
-                        }
-                        catch (Exception e) when (e is not OperationCanceledException) { logger.LogWarning("Telegram delivery failed ({FailureType}).", e.GetType().Name); }
-                        if (fullScan) await scope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Email.ReminderNotificationService>().SendPendingAsync(uid, stoppingToken);
+                        users = await accounts.Select(x => x.Id).ToArrayAsync(stoppingToken);
                     }
-                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
-                    catch (Exception e)
+                    foreach (var uid in users)
                     {
-                        // One unavailable account must not prevent reminders for others.
-                        status.Failed(); logger.LogWarning("Notification scan for {UserId} failed with {FailureType}", uid, e.GetType().Name);
-                        using var failureScope = scopes.CreateScope(); var failureDb = failureScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                        failureDb.SystemJobRuns.Add(new() { UserId = uid, JobType = "NOTIFICATION_SCAN", Status = "FAILED", ErrorMessage = e.GetType().Name, StartedAt = DateTimeOffset.UtcNow, FinishedAt = DateTimeOffset.UtcNow });
-                        await failureDb.SaveChangesAsync(stoppingToken);
+                        try
+                        {
+                            using var scope = scopes.CreateScope();
+                            var workspace = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
+                            if (fullScan)
+                            {
+                                await workspace.EnsureNotificationsAsync(uid, stoppingToken);
+                                await workspace.ScanRecoveryAsync(uid, stoppingToken);
+                            }
+                            else await workspace.EnsureStartedNotificationsAsync(uid, stoppingToken);
+                            // A delivery channel failure must not prevent the other channel from sending.
+                            try {
+                                using var telegramScope = scopes.CreateScope();
+                                await telegramScope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Telegram.TelegramNotificationService>().SendPendingAsync(uid, stoppingToken);
+                            }
+                            catch (Exception e) when (e is not OperationCanceledException) { logger.LogWarning("Telegram delivery failed ({FailureType}).", e.GetType().Name); }
+                            await scope.ServiceProvider.GetRequiredService<SPWPOS.Infrastructure.Email.ReminderNotificationService>().SendPendingAsync(uid, stoppingToken);
+                        }
+                        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
+                        catch (Exception e)
+                        {
+                            // One unavailable account must not prevent reminders for others.
+                            status.Failed(); logger.LogWarning("Notification scan for {UserId} failed with {FailureType}", uid, e.GetType().Name);
+                            using var failureScope = scopes.CreateScope(); var failureDb = failureScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                            failureDb.SystemJobRuns.Add(new() { UserId = uid, JobType = "NOTIFICATION_SCAN", Status = "FAILED", ErrorMessage = e.GetType().Name, StartedAt = DateTimeOffset.UtcNow, FinishedAt = DateTimeOffset.UtcNow });
+                            await failureDb.SaveChangesAsync(stoppingToken);
+                        }
                     }
+                    if (fullScan) using (var resultScope = scopes.CreateScope())
+                    {
+                        var resultDb = resultScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                        var success = status.Failures == failuresBefore;
+                        resultDb.SystemJobRuns.Add(new() { JobType = "NOTIFICATION_SCAN", Status = success ? "SUCCESS" : "FAILED", ErrorMessage = success ? null : "PARTIAL_SCAN_FAILURE", StartedAt = DateTimeOffset.UtcNow, FinishedAt = DateTimeOffset.UtcNow });
+                        await resultDb.SaveChangesAsync(stoppingToken);
+                        await resultScope.ServiceProvider.GetRequiredService<WorkspaceHistoryMaintenance>().PruneAsync(stoppingToken);
+                    }
+                    if (fullScan && status.Failures == failuresBefore) status.LastSuccess = DateTimeOffset.UtcNow;
                 }
-                if (fullScan) using (var resultScope = scopes.CreateScope())
-                {
-                    var resultDb = resultScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    var success = status.Failures == failuresBefore;
-                    resultDb.SystemJobRuns.Add(new() { JobType = "NOTIFICATION_SCAN", Status = success ? "SUCCESS" : "FAILED", ErrorMessage = success ? null : "PARTIAL_SCAN_FAILURE", StartedAt = DateTimeOffset.UtcNow, FinishedAt = DateTimeOffset.UtcNow });
-                    await resultDb.SaveChangesAsync(stoppingToken);
-                    await resultScope.ServiceProvider.GetRequiredService<WorkspaceHistoryMaintenance>().PruneAsync(stoppingToken);
-                }
-                if (fullScan && status.Failures == failuresBefore) status.LastSuccess = DateTimeOffset.UtcNow;
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+                catch (Exception e) { status.Failed(); logger.LogWarning("Workspace notification scan failed with {FailureType}", e.GetType().Name); }
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
-            catch (Exception e) { status.Failed(); logger.LogWarning("Workspace notification scan failed with {FailureType}", e.GetType().Name); }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Cancellation during timer waits or retry delays is a normal shutdown.
         }
     }
 }

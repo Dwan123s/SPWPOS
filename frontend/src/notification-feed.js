@@ -80,9 +80,9 @@ export function syncNotifications(workspace) {
             },
           ]
         : []
-      : fresh;
+      : fresh.filter(item => !["NORA_REMINDER", "INBOX_REMINDER"].includes(item.kind));
     popups = [...incoming, ...previous].slice(0, 3);
-    if (!initial && fresh.length) playNotificationSound(userId);
+    if (!initial && fresh.some(item => !["NORA_REMINDER", "INBOX_REMINDER"].includes(item.kind))) playNotificationSound(userId);
   }
   // Do not replay a backlog when in-app notifications are enabled again.
   unread.forEach((item) => announced.add(item.id));

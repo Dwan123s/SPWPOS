@@ -44,6 +44,7 @@ function Get-CimInstance {
     # No actual process inspection or termination in script fixtures.
     return @()
 }
+function Get-NetTCPConnection { param($State, $LocalPort, $ErrorAction) return @() }
 function Assert-Condition([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }

@@ -6,6 +6,7 @@ public sealed class UserProfile
     public string DisplayName { get; set; } = "";
     public string Bio { get; set; } = "";
     public string AvatarUrl { get; set; } = "";
+    public string CoverUrl { get; set; } = "";
     public string TimeZoneId { get; set; } = "Asia/Ho_Chi_Minh";
     public DateTimeOffset UpdatedAt { get; set; }
 }

@@ -18,12 +18,14 @@ public sealed class ReminderNotificationService(ApplicationDbContext db, IEmailS
         var enabled = user.IsActive && user.EmailConfirmed && await db.NotificationSettings.AnyAsync(x => x.UserId == userId && x.EmailEnabled, ct);
         var now = clock.GetUtcNow();
         var pending = await db.InAppNotifications.Where(x => x.UserId == userId && x.EmailPending &&
-            x.EmailSentAt == null && x.NextEmailAttemptAt <= now).OrderBy(x => x.CreatedAt).Take(20).ToArrayAsync(ct);
+            x.EmailSentAt == null && x.ScheduledFor <= now && x.NextEmailAttemptAt <= now).OrderBy(x => x.CreatedAt).Take(20).ToArrayAsync(ct);
         foreach (var notification in pending)
         {
             var task = await db.WorkTasks.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId && x.Id == notification.TaskId, ct);
             var current = enabled && task is { IsDeleted: false, Status: not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled };
-            if (notification.Kind == "SESSION_REMINDER")
+            if(notification.Kind == "NORA_REMINDER")
+                current = enabled && notification.ScheduledFor <= now && notification.ScheduledFor >= now.AddDays(-1);
+            else if (notification.Kind == "SESSION_REMINDER")
             {
                 var session = await db.WorkSessions.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId && x.Id == notification.SessionId, ct);
                 current &= session is { Status: WorkSessionStatus.Scheduled } && session.Start > now &&

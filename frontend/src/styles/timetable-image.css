@@ -10,6 +10,19 @@
   color: var(--muted, #59718e);
   cursor: pointer;
 }
+.nora-message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+}
+.nora-message-images .nora-message-image {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+.nora-timetable-heading + .nora-timetable-heading {
+  margin-top: 10px;
+}
 .nora-studio .agent-user-message .nora-message-image {
   display: block;
   padding: 0;

@@ -2,6 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { icon } from "./ui.jsx";
 import "./styles/timetable-image.css";
 
+export const TIMETABLE_IMAGE_MAX_COUNT = 2;
+export const timetableImagePayload = (attachment, preview = false) => {
+  if (!attachment) return null;
+  const parts = (attachment.images || [attachment]).map((part) => ({
+    name: part.file.name,
+    mimeType: part.file.type,
+    ...(preview ? { url: part.preview } : { data: part.preview.split(",")[1] }),
+  }));
+  return {
+    ...parts[0],
+    ...(parts.length > 1 ? { additionalImages: parts.slice(1) } : {}),
+  };
+};
 export const TIMETABLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const TIMETABLE_TEXT_MAX_LENGTH = 1600;
 const formats = ["image/png", "image/jpeg", "image/webp"];
@@ -43,7 +56,24 @@ export function useTimetableImage({ enabled, readImage }) {
     },
     [],
   );
-  function remove() {
+  function remove(index) {
+    if (typeof index === "number" && attachment?.images?.length > 1) {
+      cancel();
+      const images = attachment.images.filter(
+        (_, position) => position !== index,
+      );
+      setAttachment({
+        ...attachment,
+        ...images[0],
+        images,
+        text: "",
+        warnings: [],
+        needsReview: false,
+      });
+      setPhase("selected");
+      setError("");
+      return;
+    }
     cancel();
     setAttachment(null);
     setPhase("idle");
@@ -53,15 +83,27 @@ export function useTimetableImage({ enabled, readImage }) {
     cancel();
     setPhase(attachment ? (attachment.text ? "ready" : "selected") : "idle");
   }
-  async function select(file) {
-    if (!file || !enabledRef.current) return;
-    if (!formats.includes(file.type)) {
-      setError("Bạn chọn ảnh PNG, JPG hoặc WebP nhé.");
+  async function select(selection) {
+    if (!selection || !enabledRef.current) return;
+    const files = Array.isArray(selection) ? selection : [selection];
+    if (!files.length) return;
+    const existing =
+      files.length === 1
+        ? attachment?.images || (attachment ? [attachment] : [])
+        : [];
+    if (existing.length + files.length > TIMETABLE_IMAGE_MAX_COUNT) {
+      setError("Mỗi lần gửi tối đa 2 ảnh thời khóa biểu.");
       return;
     }
-    if (!file.size || file.size > TIMETABLE_IMAGE_MAX_BYTES) {
-      setError("Ảnh cần có dung lượng từ 1 byte đến 5 MB.");
-      return;
+    for (const file of files) {
+      if (!formats.includes(file.type)) {
+        setError("Bạn chọn ảnh PNG, JPG hoặc WebP nhé.");
+        return;
+      }
+      if (!file.size || file.size > TIMETABLE_IMAGE_MAX_BYTES) {
+        setError("Ảnh cần có dung lượng từ 1 byte đến 5 MB.");
+        return;
+      }
     }
     cancel();
     const controller = new AbortController();
@@ -70,11 +112,19 @@ export function useTimetableImage({ enabled, readImage }) {
     setError("");
     setPhase("selecting");
     try {
-      const preview = await previewImage(file, controller.signal);
+      const images = [
+        ...existing,
+        ...(await Promise.all(
+          files.map(async (file) => ({
+            file,
+            preview: await previewImage(file, controller.signal),
+          })),
+        )),
+      ];
       if (session.current !== controller) return;
       setAttachment({
-        file,
-        preview,
+        ...images[0],
+        images,
         text: "",
         warnings: [],
         needsReview: false,
@@ -90,19 +140,22 @@ export function useTimetableImage({ enabled, readImage }) {
   function paste(event) {
     if (!enabledRef.current || phase === "reading") return;
     const clipboard = event.clipboardData;
-    const item = Array.from(clipboard?.items || []).find(
-      (entry) => entry.kind === "file" && entry.type?.startsWith("image/"),
-    );
-    const file =
-      item?.getAsFile?.() ||
-      Array.from(clipboard?.files || []).find((entry) =>
-        entry.type?.startsWith("image/"),
-      );
+    const items = Array.from(clipboard?.items || [])
+      .filter(
+        (entry) => entry.kind === "file" && entry.type?.startsWith("image/"),
+      )
+      .map((entry) => entry.getAsFile?.())
+      .filter(Boolean);
+    const files = items.length
+      ? items
+      : Array.from(clipboard?.files || []).filter((entry) =>
+          entry.type?.startsWith("image/"),
+        );
     // Leave ordinary text/HTML pastes to the browser. Only accept actual
     // clipboard image files; never fetch an image URL copied from a page.
-    if (!file) return;
+    if (!files.length) return;
     event.preventDefault();
-    void select(file);
+    void select(files);
   }
   async function read() {
     if (!attachment || !enabledRef.current || phase === "reading") return;
@@ -113,7 +166,19 @@ export function useTimetableImage({ enabled, readImage }) {
     setPhase("reading");
     setError("");
     try {
-      const reading = await readImage(attachment.file, controller.signal);
+      const readings = [];
+      for (const part of attachment.images || [attachment])
+        readings.push(await readImage(part.file, controller.signal));
+      const reading =
+        readings.length === 1
+          ? readings[0]
+          : {
+              text: readings
+                .map((item, index) => `Ảnh ${index + 1}:\n${item.text}`)
+                .join("\n\n"),
+              warnings: readings.flatMap((item) => item.warnings),
+              needsReview: readings.some((item) => item.needsReview),
+            };
       if (session.current !== controller) return;
       setAttachment((previous) => ({ ...previous, ...reading }));
       setPhase("ready");
@@ -153,21 +218,22 @@ export function TimetableImageButton({ image, disabled }) {
       <input
         ref={field}
         type="file"
+        multiple
         accept={formats.join(",")}
         className="nora-sr-only"
         aria-label="Chọn ảnh thời khóa biểu"
         disabled={disabled}
         onChange={(event) => {
-          const file = event.target.files?.[0];
+          const files = Array.from(event.target.files || []);
           event.target.value = "";
-          image.select(file);
+          image.select(files);
         }}
       />
       <button
         type="button"
         className="nora-image-button"
         aria-label="Đính kèm ảnh thời khóa biểu"
-        title="Đính kèm ảnh thời khóa biểu"
+        title="Đính kèm tối đa 2 ảnh thời khóa biểu"
         disabled={disabled}
         onClick={() => field.current?.click()}
       >
@@ -187,26 +253,48 @@ export function TimetableImagePreview({ image, disabled, provider }) {
     >
       {value && (
         <>
-          <div className="nora-timetable-heading">
-            <img src={value.preview} alt="Ảnh thời khóa biểu đã chọn" />
-            <div>
-              <strong>{value.file.name}</strong>
-              <small>Thời khóa biểu · PNG, JPG, WebP · tối đa 5 MB</small>
-            </div>
-            <button
-              type="button"
-              aria-label="Gỡ ảnh thời khóa biểu"
-              disabled={disabled}
-              onClick={image.remove}
+          {(value.images || [value]).map((part, index, parts) => (
+            <div
+              className="nora-timetable-heading"
+              key={`${part.file.name}:${index}`}
             >
-              {icon("close")}
-            </button>
-          </div>
+              <img
+                src={part.preview}
+                alt={
+                  parts.length === 1
+                    ? "Ảnh thời khóa biểu đã chọn"
+                    : `Ảnh thời khóa biểu đã chọn ${index + 1}`
+                }
+              />
+              <div>
+                <strong>{part.file.name}</strong>
+                <small>
+                  {parts.length > 1
+                    ? `Ảnh ${index + 1}/${parts.length} · `
+                    : ""}
+                  PNG, JPG, WebP · tối đa 5 MB/ảnh
+                </small>
+              </div>
+              <button
+                type="button"
+                aria-label={
+                  parts.length === 1
+                    ? "Gỡ ảnh thời khóa biểu"
+                    : `Gỡ ảnh thời khóa biểu: ${part.file.name}`
+                }
+                disabled={disabled}
+                onClick={() => image.remove(index)}
+              >
+                {icon("close")}
+              </button>
+            </div>
+          ))}
           {image.phase === "selected" && (
             <p>
               Bấm Gửi để NORA đọc ảnh bằng{" "}
-              {provider || "dịch vụ AI đang cấu hình"} và tự tính giờ rảnh từng ngày. Bạn có thể
-              ghi thêm ngày áp dụng hoặc số tuần học bên dưới.
+              {provider || "dịch vụ AI đang cấu hình"} và gộp lịch bận từ tối đa
+              2 ảnh để tính giờ rảnh từng ngày. Bạn có thể ghi thêm ngày áp dụng
+              hoặc số tuần học bên dưới.
             </p>
           )}
           {image.phase === "reading" && (
@@ -220,7 +308,9 @@ export function TimetableImagePreview({ image, disabled, provider }) {
                   aria-label="Nội dung thời khóa biểu"
                   rows={4}
                   value={value.text}
-                  maxLength={TIMETABLE_TEXT_MAX_LENGTH}
+                  maxLength={
+                    TIMETABLE_TEXT_MAX_LENGTH * (value.images?.length || 1)
+                  }
                   disabled={disabled}
                   onChange={(event) => image.edit(event.target.value)}
                 />

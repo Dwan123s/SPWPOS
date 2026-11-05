@@ -159,6 +159,10 @@ export function workspaceShell(routes, title, description, body) {
               <div className="nav-label">Không gian cá nhân</div>
               {nav(["today", "agent", "notes", "calendar", "tasks", "teams"])}
             </section>
+            <section className="nav-group" aria-label="Kết nối bạn bè">
+              <div className="nav-label">Kết nối</div>
+              {nav(["profile", "friends"])}
+            </section>
             <section className="nav-group" aria-label="Theo dõi và thiết lập">
               <div className="nav-label">Theo dõi & thiết lập</div>
               {nav(["insights", "time"])}
@@ -181,7 +185,7 @@ export function workspaceShell(routes, title, description, body) {
                 type="button"
                 aria-label="Hồ sơ của bạn"
                 data-action="nav"
-                data-id="settings"
+                data-id="profile"
                 title={
                   p.displayName ||
                   `${p.firstName || ""} ${p.lastName || ""}`.trim() ||

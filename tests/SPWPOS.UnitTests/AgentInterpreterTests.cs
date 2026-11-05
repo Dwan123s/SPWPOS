@@ -76,6 +76,22 @@ public sealed class AgentInterpreterTests
         Assert.False(body.RootElement.GetProperty("store").GetBoolean());
     }
     [Theory] [InlineData(false)] [InlineData(true)]
+    public async Task Two_timetables_are_sent_as_two_native_images_in_one_model_request(bool streaming)
+    {
+        using var provider = new Provider(stream: streaming); using var client = new HttpClient(provider);
+        var image = new AgentImage("Lịch học.png", "image/png", "iVBORw0KGgo=", AdditionalImages:
+            [new("Lịch làm.jpg", "image/jpeg", "/9j/AA==")]);
+        await Interpreter(client).InterpretImageAsync("Gộp hai thời khóa biểu và tìm giờ rảnh", "{}", [], "Asia/Ho_Chi_Minh",
+            DateTimeOffset.Parse("2026-10-14T06:00:00Z"), image, streaming ? (_, _) => Task.CompletedTask : null, TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(provider.Body);
+        var parts = body.RootElement.GetProperty("contents")[0].GetProperty("parts");
+        Assert.Equal(3, parts.GetArrayLength());
+        Assert.Equal(image.Data, parts[1].GetProperty("inlineData").GetProperty("data").GetString());
+        Assert.Equal(image.AdditionalImages![0].Data, parts[2].GetProperty("inlineData").GetProperty("data").GetString());
+        Assert.Equal("image/jpeg", parts[2].GetProperty("inlineData").GetProperty("mimeType").GetString());
+        Assert.Contains("read BOTH", body.RootElement.GetProperty("systemInstruction").ToString());
+    }
+    [Theory] [InlineData(false)] [InlineData(true)]
     public async Task Telex_reading_helps_the_provider_while_the_original_request_remains_available_for_evidence(bool streaming)
     {
         const string raw = "Tooi muoons lamf vieejc, vieetss baos caos 45 phuts truowsc 21h ngayf mai";

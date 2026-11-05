@@ -55,51 +55,65 @@ export function NotificationPopups() {
       aria-label="Nhắc nhở mới"
       aria-live="polite"
     >
-      {feed.popups.map((item) => (
-        <article className="reminder-popup" key={item.id}>
-          <span className="reminder-popup-icon" aria-hidden="true">
-            {icon("bell")}
-          </span>
-          <div className="reminder-popup-content">
-            <strong>{item.title}</strong>
-            <p>{item.message}</p>
-            {!(
-              item.kind === "TEAM_JOIN_REQUEST" &&
-              item.joinRequestPending === false
-            ) && (
-              <a
-                href={
-                  item.kind === "TEAM_JOIN_REQUEST"
-                    ? "#teams"
+      {feed.popups
+        .filter(
+          (item) => !["NORA_REMINDER", "INBOX_REMINDER"].includes(item.kind),
+        )
+        .map((item) => (
+          <article className="reminder-popup" key={item.id}>
+            <span className="reminder-popup-icon" aria-hidden="true">
+              {icon("bell")}
+            </span>
+            <div className="reminder-popup-content">
+              <strong>{item.title}</strong>
+              <p>{item.message}</p>
+              {!(
+                item.kind === "TEAM_JOIN_REQUEST" &&
+                item.joinRequestPending === false
+              ) && (
+                <a
+                  href={
+                    item.kind === "FRIEND_REQUEST"
+                      ? "#friends/incoming"
+                      : item.kind === "FRIEND_ACCEPTED"
+                        ? "#friends/friends"
+                        : item.kind === "TEAM_JOIN_REQUEST"
+                          ? "#teams"
+                          : item.kind === "SESSION_REVIEW"
+                            ? "#today"
+                            : item.kind === "NORA_REMINDER" ||
+                                item.kind === "INBOX_REMINDER"
+                              ? "#agent"
+                              : "#notifications"
+                  }
+                  onClick={() => {
+                    if (item.kind === "TEAM_JOIN_REQUEST")
+                      requestTeamJoinReview(item.teamId);
+                    dismissNotificationPopup(item.id);
+                  }}
+                >
+                  {item.kind === "TEAM_JOIN_REQUEST"
+                    ? "Mở nhóm để duyệt"
                     : item.kind === "SESSION_REVIEW"
-                      ? "#today"
-                      : "#notifications"
-                }
-                onClick={() => {
-                  if (item.kind === "TEAM_JOIN_REQUEST")
-                    requestTeamJoinReview(item.teamId);
-                  dismissNotificationPopup(item.id);
-                }}
-              >
-                {item.kind === "TEAM_JOIN_REQUEST"
-                  ? "Mở nhóm để duyệt"
-                  : item.kind === "SESSION_REVIEW"
-                    ? "Phản hồi NORA"
-                    : "Xem thông báo"}{" "}
-                {icon("arrow")}
-              </a>
-            )}
-          </div>
-          <button
-            type="button"
-            className="reminder-popup-close"
-            aria-label={`Đóng nhắc nhở: ${item.title}`}
-            onClick={() => dismissNotificationPopup(item.id)}
-          >
-            {icon("close")}
-          </button>
-        </article>
-      ))}
+                      ? "Phản hồi NORA"
+                      : item.kind === "NORA_REMINDER" ||
+                          item.kind === "INBOX_REMINDER"
+                        ? "Mở NORA"
+                        : "Xem thông báo"}{" "}
+                  {icon("arrow")}
+                </a>
+              )}
+            </div>
+            <button
+              type="button"
+              className="reminder-popup-close"
+              aria-label={`Đóng nhắc nhở: ${item.title}`}
+              onClick={() => dismissNotificationPopup(item.id)}
+            >
+              {icon("close")}
+            </button>
+          </article>
+        ))}
     </section>
   );
 }

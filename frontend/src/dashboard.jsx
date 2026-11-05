@@ -107,198 +107,212 @@ function DayRunway({ model, now }) {
           Dòng thời gian
         </button>
       </div>
-      {view === "agenda" && (
-        <div className="daily-agenda">
-          {timeline.map((item) => {
-            const rest = model.breaks.find(
-              (rest) => rest.span[0] === item.span[1],
-            );
-            const phase = calendarPhase(item.start, item.end, now);
-            const status =
-              item.status === "Completed" ? "Đã xong" : calendarPhases[phase];
-            return (
-              <Fragment key={`${item.kind}-${item.id}`}>
-                <div
-                  className={`daily-agenda-row calendar-time-${phase} ${phase === "current" ? "is-active" : ""} ${item.status === "Completed" ? "is-completed" : ""}`}
-                >
-                  <div className="daily-agenda-time">
-                    <strong>{timeFmt(item.start)}</strong>
-                    <span>{timeFmt(item.end)}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="daily-agenda-session"
-                    data-action={
-                      item.kind === "session" ? "session-detail" : "nav"
-                    }
-                    data-id={item.kind === "session" ? item.id : "calendar"}
+      <div
+        className="daily-schedule-scroll"
+        role="region"
+        aria-label={
+          view === "agenda"
+            ? "Danh sách lịch hôm nay, cuộn để xem thêm"
+            : "Dòng thời gian hôm nay, cuộn để xem thêm"
+        }
+        tabIndex={0}
+      >
+        {view === "agenda" && (
+          <div className="daily-agenda">
+            {timeline.map((item) => {
+              const rest = model.breaks.find(
+                (rest) => rest.span[0] === item.span[1],
+              );
+              const phase = calendarPhase(item.start, item.end, now);
+              const status =
+                item.status === "Completed" ? "Đã xong" : calendarPhases[phase];
+              return (
+                <Fragment key={`${item.kind}-${item.id}`}>
+                  <div
+                    className={`daily-agenda-row calendar-time-${phase} ${phase === "current" ? "is-active" : ""} ${item.status === "Completed" ? "is-completed" : ""}`}
                   >
-                    <div className="daily-agenda-session-top">
-                      <span
-                        className={`daily-agenda-status status-${item.status || "event"}`}
-                      >
-                        {icon(
-                          item.status === "Completed"
-                            ? "check"
-                            : item.kind === "event"
-                              ? "calendar"
-                              : "clock",
-                        )}
-                        {status}
-                      </span>
-                      <span className="daily-agenda-duration">
-                        {minutes(item.span[1] - item.span[0])}
-                      </span>
+                    <div className="daily-agenda-time">
+                      <strong>{timeFmt(item.start)}</strong>
+                      <span>{timeFmt(item.end)}</span>
                     </div>
-                    <strong className="daily-agenda-title">
-                      {item.taskName || item.name}
-                    </strong>
-                    <div className="daily-agenda-session-bottom">
-                      <span>
-                        {item.isLocked
-                          ? "Đã khóa lịch"
-                          : item.kind === "session"
-                            ? "Tự động theo lịch · Mở để xem chi tiết"
-                            : "Sự kiện cố định"}
-                      </span>
-                      {icon("arrow")}
+                    <button
+                      type="button"
+                      className="daily-agenda-session"
+                      data-action={
+                        item.kind === "session" ? "session-detail" : "nav"
+                      }
+                      data-id={item.kind === "session" ? item.id : "calendar"}
+                    >
+                      <div className="daily-agenda-session-top">
+                        <span
+                          className={`daily-agenda-status status-${item.status || "event"}`}
+                        >
+                          {icon(
+                            item.status === "Completed"
+                              ? "check"
+                              : item.kind === "event"
+                                ? "calendar"
+                                : "clock",
+                          )}
+                          {status}
+                        </span>
+                        <span className="daily-agenda-duration">
+                          {minutes(item.span[1] - item.span[0])}
+                        </span>
+                      </div>
+                      <strong className="daily-agenda-title">
+                        {item.taskName || item.name}
+                      </strong>
+                      <div className="daily-agenda-session-bottom">
+                        <span>
+                          {item.isLocked
+                            ? "Đã khóa lịch"
+                            : item.kind === "session"
+                              ? "Tự động theo lịch · Mở để xem chi tiết"
+                              : "Sự kiện cố định"}
+                        </span>
+                        {icon("arrow")}
+                      </div>
+                    </button>
+                  </div>
+                  {rest && (
+                    <div className="daily-agenda-rest">
+                      {icon("pause")}
+                      <span>Nghỉ {rest.span[1] - rest.span[0]} phút</span>
+                      <small>
+                        {clock(rest.span[0])}–{clock(rest.span[1])}
+                      </small>
                     </div>
-                  </button>
-                </div>
-                {rest && (
-                  <div className="daily-agenda-rest">
-                    {icon("pause")}
-                    <span>Nghỉ {rest.span[1] - rest.span[0]} phút</span>
-                    <small>
-                      {clock(rest.span[0])}–{clock(rest.span[1])}
-                    </small>
+                  )}
+                </Fragment>
+              );
+            })}
+            {!timeline.length && (
+              <div className="daily-agenda-empty">
+                <span>{icon("calendar")}</span>
+                <h3>Hôm nay còn trống</h3>
+                <p>{next.description}</p>
+                {button(
+                  next.label,
+                  next.action || "nav",
+                  "small secondary",
+                  next.route || "",
+                  next.symbol,
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {view === "timeline" && (
+          <>
+            <div className="runway-grid" style={{ height }}>
+              <div className="runway-hours">
+                {ticks.map((minute) => (
+                  <span key={minute} style={{ top: (minute - start) * scale }}>
+                    {clock(minute)}
+                  </span>
+                ))}
+              </div>
+              <div className="runway-lanes">
+                {ticks.map((minute) => (
+                  <div
+                    key={minute}
+                    className="runway-line"
+                    style={{ top: (minute - start) * scale }}
+                  />
+                ))}
+                {model.breaks.map((rest) => (
+                  <div
+                    key={rest.span[0]}
+                    className="runway-break"
+                    style={{
+                      top: (rest.span[0] - start) * scale,
+                      height: Math.max(
+                        2,
+                        (rest.span[1] - rest.span[0]) * scale,
+                      ),
+                    }}
+                  >
+                    <span title={`Nghỉ ${rest.span[1] - rest.span[0]} phút`}>
+                      {rest.span[1] - rest.span[0]}p
+                    </span>
+                  </div>
+                ))}
+                {timeline.map((item) => {
+                  const task = state.workspace.tasks.find(
+                    (task) => task.id === item.taskId,
+                  );
+                  const cyan =
+                    task?.taskType === "PROGRAMMING" ||
+                    ["Running", "Paused"].includes(item.status);
+                  return (
+                    <button
+                      key={`${item.kind}-${item.id}`}
+                      type="button"
+                      className={`runway-block calendar-time-${calendarPhase(item.start, item.end, now)} ${item.span[1] - item.span[0] < 45 ? "is-short" : ""} ${item.kind === "event" ? "runway-block--event" : cyan ? "runway-block--cyan" : "runway-block--blue"} ${item.status === "Completed" ? "is-completed" : ""}`}
+                      data-action={
+                        item.kind === "session" ? "session-detail" : "nav"
+                      }
+                      data-id={item.kind === "session" ? item.id : "calendar"}
+                      aria-label={`${item.taskName || item.name}, ${timeFmt(item.start)} đến ${timeFmt(item.end)}, ${minutes(item.span[1] - item.span[0])}`}
+                      style={{
+                        top: (item.span[0] - start) * scale + 2,
+                        height: Math.max(
+                          3,
+                          (item.span[1] - item.span[0]) * scale - 4,
+                        ),
+                        left: `${(item.lane / laneCount) * 100}%`,
+                        width: `${100 / laneCount}%`,
+                      }}
+                      title={`${item.taskName || item.name} · ${timeFmt(item.start)} — ${timeFmt(item.end)}`}
+                    >
+                      <span className="runway-block-title">
+                        {item.status === "Completed" && icon("check")}
+                        {item.taskName || item.name}
+                      </span>
+                      {item.span[1] - item.span[0] >= 45 && (
+                        <small>
+                          {timeFmt(item.start)} — {timeFmt(item.end)} ·{" "}
+                          {minutes(item.span[1] - item.span[0])}
+                          {item.isLocked ? " · Đã khóa" : ""}
+                        </small>
+                      )}
+                    </button>
+                  );
+                })}
+                {!timeline.length && (
+                  <div className="runway-empty">
+                    <span>{icon("calendar")}</span>
+                    <h3>Hôm nay còn trống</h3>
+                    <p>Biến công việc thành những khoảng thời gian cụ thể.</p>
+                    {button(
+                      "Lập kế hoạch",
+                      "generate-plan",
+                      "small secondary",
+                      "",
+                      "spark",
+                    )}
                   </div>
                 )}
-              </Fragment>
-            );
-          })}
-          {!timeline.length && (
-            <div className="daily-agenda-empty">
-              <span>{icon("calendar")}</span>
-              <h3>Hôm nay còn trống</h3>
-              <p>{next.description}</p>
-              {button(
-                next.label,
-                next.action || "nav",
-                "small secondary",
-                next.route || "",
-                next.symbol,
-              )}
+              </div>
             </div>
-          )}
-        </div>
-      )}
-      {view === "timeline" && (
-        <>
-          <div className="runway-grid" style={{ height }}>
-            <div className="runway-hours">
-              {ticks.map((minute) => (
-                <span key={minute} style={{ top: (minute - start) * scale }}>
-                  {clock(minute)}
-                </span>
-              ))}
+            <div className="runway-legend">
+              <span>
+                <i className="legend-cyan" />
+                Tập trung
+              </span>
+              <span>
+                <i className="legend-blue" />
+                Phiên làm việc
+              </span>
+              <span>
+                <i className="legend-rest" />
+                Đệm nghỉ
+              </span>
             </div>
-            <div className="runway-lanes">
-              {ticks.map((minute) => (
-                <div
-                  key={minute}
-                  className="runway-line"
-                  style={{ top: (minute - start) * scale }}
-                />
-              ))}
-              {model.breaks.map((rest) => (
-                <div
-                  key={rest.span[0]}
-                  className="runway-break"
-                  style={{
-                    top: (rest.span[0] - start) * scale,
-                    height: Math.max(2, (rest.span[1] - rest.span[0]) * scale),
-                  }}
-                >
-                  <span title={`Nghỉ ${rest.span[1] - rest.span[0]} phút`}>
-                    {rest.span[1] - rest.span[0]}p
-                  </span>
-                </div>
-              ))}
-              {timeline.map((item) => {
-                const task = state.workspace.tasks.find(
-                  (task) => task.id === item.taskId,
-                );
-                const cyan =
-                  task?.taskType === "PROGRAMMING" ||
-                  ["Running", "Paused"].includes(item.status);
-                return (
-                  <button
-                    key={`${item.kind}-${item.id}`}
-                    type="button"
-                    className={`runway-block calendar-time-${calendarPhase(item.start, item.end, now)} ${item.span[1] - item.span[0] < 45 ? "is-short" : ""} ${item.kind === "event" ? "runway-block--event" : cyan ? "runway-block--cyan" : "runway-block--blue"} ${item.status === "Completed" ? "is-completed" : ""}`}
-                    data-action={
-                      item.kind === "session" ? "session-detail" : "nav"
-                    }
-                    data-id={item.kind === "session" ? item.id : "calendar"}
-                    aria-label={`${item.taskName || item.name}, ${timeFmt(item.start)} đến ${timeFmt(item.end)}, ${minutes(item.span[1] - item.span[0])}`}
-                    style={{
-                      top: (item.span[0] - start) * scale + 2,
-                      height: Math.max(
-                        3,
-                        (item.span[1] - item.span[0]) * scale - 4,
-                      ),
-                      left: `${(item.lane / laneCount) * 100}%`,
-                      width: `${100 / laneCount}%`,
-                    }}
-                    title={`${item.taskName || item.name} · ${timeFmt(item.start)} — ${timeFmt(item.end)}`}
-                  >
-                    <span className="runway-block-title">
-                      {item.status === "Completed" && icon("check")}
-                      {item.taskName || item.name}
-                    </span>
-                    {item.span[1] - item.span[0] >= 45 && (
-                      <small>
-                        {timeFmt(item.start)} — {timeFmt(item.end)} ·{" "}
-                        {minutes(item.span[1] - item.span[0])}
-                        {item.isLocked ? " · Đã khóa" : ""}
-                      </small>
-                    )}
-                  </button>
-                );
-              })}
-              {!timeline.length && (
-                <div className="runway-empty">
-                  <span>{icon("calendar")}</span>
-                  <h3>Hôm nay còn trống</h3>
-                  <p>Biến công việc thành những khoảng thời gian cụ thể.</p>
-                  {button(
-                    "Lập kế hoạch",
-                    "generate-plan",
-                    "small secondary",
-                    "",
-                    "spark",
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="runway-legend">
-            <span>
-              <i className="legend-cyan" />
-              Tập trung
-            </span>
-            <span>
-              <i className="legend-blue" />
-              Phiên làm việc
-            </span>
-            <span>
-              <i className="legend-rest" />
-              Đệm nghỉ
-            </span>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </section>
   );
 }

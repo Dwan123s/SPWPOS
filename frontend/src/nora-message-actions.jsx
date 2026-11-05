@@ -58,30 +58,45 @@ export function NoraCopyButton({ text, label, onError }) {
 export function NoraPromptMessage({ text, image, createdAt, busy, onEdit }) {
   const [copyError, setCopyError] = useState(false);
   const preview = useRef(null);
-  const imageUrl =
-    image?.url &&
-    (/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(image.url) ||
-      /^\/api\/agent\/turns\/[a-f0-9-]+\/image$/i.test(image.url))
-      ? image.url
-      : null;
+  const [selectedImage, setSelectedImage] = useState(null);
+  const images = (
+    image ? [image, ...(image.additionalImages || [])] : []
+  ).filter(
+    (part) =>
+      typeof part.url === "string" &&
+      (/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(part.url) ||
+        /^\/api\/agent\/turns\/[a-f0-9-]+\/image(?:\?index=[01])?$/i.test(
+          part.url,
+        )),
+  );
   return (
     <div className="nora-prompt-message">
       <div className="agent-user-message">
         <span>Bạn</span>
-        {imageUrl && (
-          <>
-            <button
-              type="button"
-              className="nora-message-image"
-              aria-label="Xem ảnh thời khóa biểu"
-              onClick={() => preview.current?.showModal()}
-            >
-              <img
-                src={imageUrl}
-                alt={image.name || "Ảnh thời khóa biểu"}
-                loading="lazy"
-              />
-            </button>
+        {images.length > 0 && (
+          <div className="nora-message-images">
+            {images.map((part, index) => (
+              <button
+                type="button"
+                className="nora-message-image"
+                key={part.url}
+                aria-label={
+                  images.length === 1
+                    ? "Xem ảnh thời khóa biểu"
+                    : `Xem ảnh thời khóa biểu ${index + 1}`
+                }
+                onClick={() => {
+                  setSelectedImage(part);
+                  preview.current?.showModal();
+                }}
+              >
+                <img
+                  src={part.url}
+                  alt={part.name || "Ảnh thời khóa biểu"}
+                  loading="lazy"
+                />
+              </button>
+            ))}
             <dialog
               ref={preview}
               className="nora-image-dialog"
@@ -95,9 +110,14 @@ export function NoraPromptMessage({ text, image, createdAt, busy, onEdit }) {
               >
                 {icon("close")}
               </button>
-              <img src={imageUrl} alt={image.name || "Ảnh thời khóa biểu"} />
+              {selectedImage && (
+                <img
+                  src={selectedImage.url}
+                  alt={selectedImage.name || "Ảnh thời khóa biểu"}
+                />
+              )}
             </dialog>
-          </>
+          </div>
         )}
         {text && <p>{text}</p>}
       </div>

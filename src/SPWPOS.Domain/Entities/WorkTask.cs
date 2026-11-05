@@ -13,6 +13,9 @@ public sealed class WorkTask : OwnedRecord, ITaskImportance
     public string EffectiveImportance => ImportanceLevel == "Unknown" ? InheritedImportance ?? "Unknown" : ImportanceLevel;
     [System.ComponentModel.DataAnnotations.Schema.NotMapped] public int? ConfirmedRemainingMinutes { get; set; }
     public Guid Version { get; set; } = Guid.NewGuid();
+    public string UrgencyOverride { get; set; } = "Auto";
+    public long MatrixOrder { get; set; }
+    public string ChecklistJson { get; set; } = "[]";
     public bool TaskExperienceAwarded { get; set; }
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
@@ -32,6 +35,10 @@ public sealed class WorkTask : OwnedRecord, ITaskImportance
     public double? AdjustmentFactor { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public bool Splittable { get; set; } = true;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool RequiresContinuousSession => ActivityContinuity.RequiresContinuousSession(Name, TaskType);
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool CanSplit => Splittable && !RequiresContinuousSession;
     public int MinimumSessionMinutes { get; set; } = 25;
     public bool IsDeleted { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

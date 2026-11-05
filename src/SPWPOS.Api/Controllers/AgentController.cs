@@ -25,20 +25,20 @@ public sealed class AgentController(IPlanningAgentService service, ILogger<Agent
         return Data(value);
     }
     [HttpGet("turns/{id:guid}/image")]
-    public async Task<IActionResult> Image(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Image(Guid id, CancellationToken ct, [FromQuery] int index = 0)
     {
-        var image = await service.GetAgentImageAsync(UserId, id, ct);
+        var image = await service.GetAgentImageAsync(UserId, id, ct, index);
         Response.Headers.CacheControl = "no-store";
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return File(Convert.FromBase64String(image.Data!), image.MimeType);
     }
-    [HttpPost("turns"), RequestSizeLimit(8 * 1024 * 1024)] public async Task<IActionResult> Send(AgentTurnInput input, CancellationToken ct)
+    [HttpPost("turns"), RequestSizeLimit(TimetableImageLimits.MaxChatRequestBytes)] public async Task<IActionResult> Send(AgentTurnInput input, CancellationToken ct)
     {
         var turn = await service.SendAgentTurnAsync(UserId, input, ct);
         agentFileLog.TurnCompleted(turn, "SEND");
         return Data(turn);
     }
-    [HttpPost("turns/stream"), RequestSizeLimit(8 * 1024 * 1024)]
+    [HttpPost("turns/stream"), RequestSizeLimit(TimetableImageLimits.MaxChatRequestBytes)]
     public async Task Stream(AgentTurnInput input, CancellationToken ct)
     {
         Response.ContentType = "text/event-stream; charset=utf-8";

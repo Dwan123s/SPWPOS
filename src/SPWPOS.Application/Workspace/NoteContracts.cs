@@ -11,17 +11,20 @@ public sealed record NoteAnalysis(TaskInput[] Tasks, string Source, string[] Mes
 public sealed record NoteActivity(string Kind, string Name, string Description = "", string Type = "OTHER",
     DateTimeOffset? Start = null, DateTimeOffset? End = null, int? EstimatedMinutes = null,
     DateTimeOffset? Deadline = null, int Priority = 2, bool IsHardDeadline = false,
-    int RepeatWeeks = 1, string Question = "");
+    int RepeatWeeks = 1, string Question = "", bool Splittable = true);
 public sealed record NoteActivityPlanInput(Guid Version, [Required, MinLength(1), MaxLength(12)] NoteActivity[] Activities,
     [Range(1, 30)] int HorizonDays = 14, bool ReviewedConditions = false, bool AllowRequestedTimeOutsideAvailability = false);
 public sealed record NotePlanContext(Guid NoteId, Guid NoteVersion, NoteActivity[] Activities, Guid[] TaskIds, EventView[] Events,
     bool AllowRequestedTimeOutsideAvailability = false);
 public sealed record NoteApplyInput(Guid Version);
 public sealed record NoteTaskCompletionInput(Guid Version, bool Completed);
+public sealed record NoteInboxCompletionInput(Guid Version, bool Completed);
+public sealed record NoteInboxReminderInput(Guid Version);
 public sealed record NoteAgentCapabilities(bool AiAvailable, int MaxTasks = 12, string Provider = "OpenAI");
 public sealed record NoteView(Guid Id, string Title, string Content, Guid Version,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, NoteAnalysis? Analysis, Guid[] CreatedTaskIds, Guid? PlanId = null,
-    bool AnalysisImported = false, bool HasProcessedContent = false, Guid[]? PendingTaskIds = null);
+    bool AnalysisImported = false, bool HasProcessedContent = false, Guid[]? PendingTaskIds = null,
+    bool InboxCompleted = false, DateTimeOffset? InboxCompletedAt = null, DateTimeOffset? InboxReminderAt = null);
 public sealed record NoteAnalysisContext(string ProcessedContent, string[] ExistingTaskNames, string[] ExistingActivityKeys);
 public sealed record NoteScheduleInput(Guid Version, bool UseAi = true, [Range(1, 30)] int HorizonDays = 14);
 public sealed record NoteAgentStep(string Code, string Message);

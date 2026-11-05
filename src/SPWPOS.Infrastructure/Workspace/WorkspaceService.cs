@@ -56,6 +56,8 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         }
         var result = await action();
         db.ChangeTracker.DetectChanges();
+        foreach (var entry in db.ChangeTracker.Entries<WorkTask>().Where(x => x.State is EntityState.Added or EntityState.Modified))
+            entry.Entity.Splittable = entry.Entity.CanSplit;
         revision = revision && db.ChangeTracker.Entries().Any(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted);
         if (revision) preference.Revision = Guid.NewGuid();
         db.ChangeTracker.DetectChanges();
@@ -125,8 +127,8 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
             categories, state.Tasks.Select(t => new TaskView(t.Id, t.Name, t.Description, t.Deadline, t.EstimatedMinutes, engine.Adjusted(t, bias), engine.Remaining(t, bias),
                 (int)(sessionsByTask[t.Id].Sum(s => s.ActualSeconds) / 60),
                 (int)sessionsByTask[t.Id].Where(s => s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).Sum(s => (s.End - s.Start).TotalMinutes),
-                t.Priority, t.TaskType, t.Splittable, t.MinimumSessionMinutes, t.CategoryId, t.ParentId, t.Status.ToString(), t.Progress, t.CreatedAt, t.CompletedAt,
-                dependenciesByTask[t.Id].Select(d => d.PredecessorId).ToArray(), t.IsHardDeadline, t.CreationSource, t.WorkWindowStart, t.WorkWindowEnd, t.Version, ImportanceDto(t))).ToArray(),
+                t.Priority, t.TaskType, t.CanSplit, t.MinimumSessionMinutes, t.CategoryId, t.ParentId, t.Status.ToString(), t.Progress, t.CreatedAt, t.CompletedAt,
+                dependenciesByTask[t.Id].Select(d => d.PredecessorId).ToArray(), t.IsHardDeadline, t.CreationSource, t.WorkWindowStart, t.WorkWindowEnd, t.Version, ImportanceDto(t), t.RequiresContinuousSession)).ToArray(),
             state.Availability.Select(x => new AvailabilityInput(x.DayOfWeek, x.StartMinute, x.EndMinute)).ToArray(),
             state.Exceptions.Select(x => new ExceptionView(x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note, x.OverridesWeeklyAvailability)).ToArray(),
             state.Events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),
@@ -160,7 +162,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     private static WorkTask NewTask(Guid uid, TaskInput input, DateTimeOffset now) => new()
     {
         UserId = uid, Name = input.Name.Trim(), Description = input.Description ?? "", Deadline = input.Deadline,
-        EstimatedMinutes = input.EstimatedMinutes, Priority = input.Priority, TaskType = NormalizeTaskType(input.TaskType), Splittable = input.Splittable,
+        EstimatedMinutes = input.EstimatedMinutes, Priority = input.Priority, TaskType = NormalizeTaskType(input.TaskType), Splittable = ActivityContinuity.CanSplit(input.Name, input.TaskType, input.Splittable),
         IsHardDeadline = input.IsHardDeadline, CreationSource = input.CreationSource,
         MinimumSessionMinutes = input.MinimumSessionMinutes, CategoryId = input.CategoryId, ParentId = input.ParentId, CreatedAt = now, UpdatedAt = now
     };

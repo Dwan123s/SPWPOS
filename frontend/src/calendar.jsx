@@ -14,6 +14,7 @@ import {
   timeFmt,
   dayKey,
   localInput,
+  toast,
   field,
   modal,
   minutes,
@@ -97,6 +98,8 @@ export function sessionCard(s, calendarTime) {
 export function sessionDetail(id) {
   const s = sessionById(id);
   if (!s) return;
+  const task = state.workspace.tasks.find((item) => item.id === s.taskId);
+  const canSplit = task?.splittable === true && !task.requiresContinuousSession;
   modal(
     s.taskName,
     "Điều chỉnh lịch và xem thời gian thực tế.",
@@ -153,7 +156,7 @@ export function sessionDetail(id) {
               </button>
             </div>
           </form>
-          {!s.isLocked ? (
+          {!s.isLocked && canSplit ? (
             <form data-form="session-split" data-id={id} className="spaced">
               {field(
                 "Chia phiên: phần đầu (phút)",
@@ -169,9 +172,11 @@ export function sessionDetail(id) {
                 </button>
               </div>
             </form>
-          ) : (
-            ""
-          )}
+          ) : !canSplit ? (
+            <p className="reason spaced">
+              Hoạt động này cần một phiên liên tục đủ thời lượng, không thể chia nhỏ.
+            </p>
+          ) : null}
         </>
       ) : (
         ""
@@ -229,14 +234,18 @@ export function eventDetail(id) {
     </div>
   </>);
 }
-export function eventModal(event = {}) {
-  if (secretaryMode()) {
+export function eventModal(event = {}, { manual = false } = {}) {
+  if (secretaryMode() && !manual) {
     askNora(event.id ? `Tôi muốn điều chỉnh lịch cố định “${event.name}” (mã ${event.id}). Hỏi tôi thay đổi cần thực hiện.`
       : "Tôi có một lịch bận mới. Hỏi tôi nội dung và thời gian, rồi cập nhật quanh thời gian biểu cố định.");
     return;
   }
   const start = event.start || new Date(Date.now() + 3600000).toISOString(),
     end = event.end || new Date(Date.now() + 7200000).toISOString();
+  if (!event.id && Date.parse(start) <= Date.now()) {
+    toast("Không thể tạo lịch trong quá khứ. Hãy chọn khoảng giờ sắp tới.", "error");
+    return;
+  }
   modal(
     event.id ? "Sửa sự kiện" : "Thêm sự kiện cố định",
     "Khoảng này được đánh dấu bận. Khi tạo lịch lặp, mỗi lần xuất hiện có thể sửa hoặc xóa riêng.",
@@ -246,7 +255,7 @@ export function eventModal(event = {}) {
         "name",
         "text",
         event.name || "",
-        'required maxlength="200"',
+        { required: true, maxLength: 200, autoFocus: manual },
       )}
       <label className="field spaced">
         Loại sự kiện
@@ -287,7 +296,7 @@ export function eventModal(event = {}) {
           "start",
           "datetime-local",
           localInput(start),
-          "required",
+          event.id ? "required" : { required: true, min: localInput(Math.ceil((Date.now() + 1) / 60000) * 60000) },
         )}
         {field(
           "Kết thúc",

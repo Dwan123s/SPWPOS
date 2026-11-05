@@ -5,7 +5,12 @@ public sealed record AgentTurnInput(Guid ConversationId, Guid RequestId,
     [Required, StringLength(2000)] string Text, bool AutoApply = true,
     bool UseCapacityFactor = false, bool UseEstimateBias = false, AgentImage? Image = null,
     string CalendarKind = "Auto");
-public sealed record AgentImage(string Name, string MimeType, string? Data = null, string? Url = null);
+public sealed record AgentImageAttachment(string Name, string MimeType, string? Data = null, string? Url = null);
+public sealed record AgentImage(string Name, string MimeType, string? Data = null, string? Url = null,
+    AgentImageAttachment[]? AdditionalImages = null)
+{
+    public AgentImageAttachment[] GetImages() => [new(Name, MimeType, Data, Url), .. AdditionalImages ?? []];
+}
 public sealed record AgentTaskCommand(Guid? TaskId, string Name, DateTimeOffset? Deadline,
     int? EstimatedMinutes, int? Priority, string TaskType, bool? Splittable,
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null,
@@ -19,11 +24,14 @@ public sealed record AgentExceptionCommand(DateOnly Date, int StartMinute, int E
 public sealed record AgentEventCommand(string Name, DateTimeOffset Start, DateTimeOffset End,
     string Description = "", string EventType = "OTHER", int RepeatWeeks = 1, Guid? ExistingId = null);
 public sealed record AgentFreeTimeQuery(DateTimeOffset Start, DateTimeOffset End);
+public sealed record NoraReminderCommand(string Operation, string Message = "", DateTimeOffset? At = null, Guid? ReminderId = null);
+public sealed record NoraReminderView(Guid Id, string Message, DateTimeOffset At, bool Due);
 public sealed record AgentIntent(string Reply, string Question, bool ReplaceWeeklyAvailability,
     AvailabilityInput[] WeeklySlots, AgentExceptionCommand[] Exceptions, AgentEventCommand[] Events,
     AgentTaskCommand[] Tasks, Guid[] ScheduleTaskIds, bool Reschedule, int HorizonDays, string[]? Options = null,
     AgentPendingRequest? Pending = null, string? ResultKind = null, AgentFreeTimeQuery? FreeTimeQuery = null,
-    AgentFreeTimeQuery? ScheduleReviewQuery = null, AgentFreeTimeQuery? OptimizationQuery = null);
+    AgentFreeTimeQuery? ScheduleReviewQuery = null, AgentFreeTimeQuery? OptimizationQuery = null,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] NoraReminderCommand? Reminder = null);
 public sealed record AgentMessage(string Text, string Reply, string Status);
 public sealed record AgentChangeView(string Kind, string Name, string Before, string After, Guid? TaskId = null, string Reason = "");
 public sealed record AgentTurnView(Guid Id, Guid ConversationId, Guid RequestId, string Text,
@@ -63,7 +71,7 @@ public interface IPlanningAgentService
     Task<ConversationExport> ExportConversationAsync(Guid uid, Guid conversationId, CancellationToken ct);
     NoteAgentCapabilities GetAgentCapabilities();
     Task<AgentTurnView[]> GetAgentTurnsAsync(Guid uid, CancellationToken ct);
-    Task<AgentImage> GetAgentImageAsync(Guid uid, Guid turnId, CancellationToken ct);
+    Task<AgentImage> GetAgentImageAsync(Guid uid, Guid turnId, CancellationToken ct, int index = 0);
     Task<AgentTurnView> SendAgentTurnAsync(Guid uid, AgentTurnInput input, CancellationToken ct);
     Task<AgentTurnView> SendAgentTurnStreamingAsync(Guid uid, AgentTurnInput input,
         Func<AgentStreamEvent, CancellationToken, Task> publish, CancellationToken ct);

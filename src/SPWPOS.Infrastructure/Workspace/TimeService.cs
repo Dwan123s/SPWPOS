@@ -35,6 +35,7 @@ public sealed partial class WorkspaceService
     }, ct);
     public Task<Guid> SaveEventAsync(Guid uid, Guid? id, EventInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
+        Require(id != null || input.Start > Now, "EVENT_IN_PAST", "Không thể tạo lịch trong quá khứ. Hãy chọn giờ bắt đầu sau thời điểm hiện tại.");
         Require(id is null || input.RepeatWeeks == 1, "VALIDATION_ERROR", "Khi sửa sự kiện, chỉ cập nhật lần xuất hiện đang chọn.");
         var state = await State(uid, ct); var occurrences = EventOccurrences(uid, input, state.Preference);
         state = await CalendarStateAsync(uid, state, occurrences.Min(x => x.Start), occurrences.Max(x => x.End).AddDays(8), ct);
@@ -42,6 +43,7 @@ public sealed partial class WorkspaceService
         if (id is { } eventId)
         {
             var item = await Find<FixedEvent>(uid, eventId, ct); var occurrence = occurrences[0];
+            Require(input.Start == item.Start || input.Start > Now, "EVENT_IN_PAST", "Không thể chuyển lịch về quá khứ. Hãy chọn giờ bắt đầu sau thời điểm hiện tại.");
             var wasUrgent = IsUrgentEvent(item);
             item.Name = occurrence.Name; item.Start = occurrence.Start; item.End = occurrence.End; item.Description = occurrence.Description; item.EventType = occurrence.EventType;
             item.IsUrgent = input.IsUrgent ?? wasUrgent;

@@ -2,6 +2,36 @@ import { localInput, toUtc } from "./ui.jsx";
 export const hourHeight = 64;
 export const minuteHeight = hourHeight / 60;
 export const snapMinutes = 15;
+export function createCalendarRange(anchor, cursor = anchor, dragged = false) {
+  const dayOffset =
+    (Date.parse(`${cursor.date}T12:00:00Z`) -
+      Date.parse(`${anchor.date}T12:00:00Z`)) /
+    86400000;
+  const first = Math.max(
+    0,
+    Math.min(
+      1440 - snapMinutes,
+      Math.floor(anchor.minute / snapMinutes) * snapMinutes,
+    ),
+  );
+  const last = dayOffset * 1440 + Math.max(0, Math.min(1440, cursor.minute));
+  const from = dragged
+    ? Math.floor(Math.min(first, last) / snapMinutes) * snapMinutes
+    : first;
+  const to = dragged
+    ? Math.max(
+        from + snapMinutes,
+        Math.ceil(Math.max(first, last) / snapMinutes) * snapMinutes,
+      )
+    : Math.min(1440, first + 60);
+  const range = {
+    start: atMinute(anchor.date, from),
+    end: atMinute(anchor.date, to),
+  };
+  if (Date.parse(range.end) <= Date.parse(range.start))
+    throw new Error("Khoảng giờ không hợp lệ trong múi giờ đã chọn.");
+  return range;
+}
 export function wallMinute(value) {
   const [, time] = localInput(value).split("T");
   const [hour, minute] = time.split(":").map(Number);

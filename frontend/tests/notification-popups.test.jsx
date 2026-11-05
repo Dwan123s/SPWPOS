@@ -201,6 +201,58 @@ it("polls while editing a note, throttles scans, and stops cleanly", async () =>
   await act(async () => vi.advanceTimersByTimeAsync(60000));
   expect(request).toHaveBeenCalledTimes(calls);
 });
+it("loads a due Inbox reminder immediately without waiting for the polling interval", async () => {
+  setup();
+  const request = vi
+    .fn()
+    .mockResolvedValueOnce([])
+    .mockResolvedValue([reminder("inbox-due")]);
+  let stop;
+  await act(async () => {
+    stop = startNotificationPolling(() => state.workspace, request);
+  });
+  await act(async () => {
+    window.dispatchEvent(new Event("nora-reminder-due"));
+  });
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(request).toHaveBeenLastCalledWith("/api/notifications");
+  expect(notificationSnapshot().items[0].id).toBe("inbox-due");
+  stop();
+});
+it("queues a due reminder while an earlier notification request is still running", async () => {
+  setup();
+  let finish;
+  const request = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    )
+    .mockResolvedValue([reminder("queued-due")]);
+  const stop = startNotificationPolling(() => state.workspace, request);
+  await act(async () => {
+    window.dispatchEvent(new Event("nora-reminder-due"));
+    finish([]);
+  });
+  expect(request).toHaveBeenCalledTimes(2);
+  expect(notificationSnapshot().items[0].id).toBe("queued-due");
+  stop();
+});
+it("does not issue a fallback GET immediately after a rate-limited notification scan", async () => {
+  setup();
+  const request = vi
+    .fn()
+    .mockRejectedValue(Object.assign(new Error("Wait"), { status: 429 }));
+  let stop;
+  await act(async () => {
+    stop = startNotificationPolling(() => state.workspace, request);
+  });
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request).toHaveBeenCalledWith("/api/notifications/refresh", "POST");
+  stop();
+});
 it("ignores responses that arrive after logout", async () => {
   setup();
   let resolve;

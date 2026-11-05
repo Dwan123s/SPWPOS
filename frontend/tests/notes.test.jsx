@@ -8,10 +8,24 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NotesPage } from "../src/notes.jsx";
+import { openInboxNote } from "../src/task-inbox-link.js";
 
 import { state } from "../src/ui.jsx";
 import { getSnapshot, update } from "../src/store.js";
 beforeEach(() => update({ toasts: [] }));
+
+it("opens the exact saved Inbox draft in the note editor without creating or analyzing another note", async () => {
+  state.workspace.profile = { id: "inbox-owner" };
+  notes = [
+    { id: "first", title: "Bản khác", content: "Nội dung khác", version: "v1", createdTaskIds: [], updatedAt: "2026-11-04T01:00:00Z" },
+    { id: "chosen", title: "Ý tưởng cần hoàn thiện", content: "Làm rõ ý tưởng nhóm học tập", version: "v2", createdTaskIds: [], updatedAt: "2026-11-04T01:00:00Z" },
+  ];
+  openInboxNote("chosen");
+  render(<NotesPage />);
+  await waitFor(() => expect(screen.getByLabelText("Tiêu đề ghi chú").value).toBe("Ý tưởng cần hoàn thiện"));
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe("Làm rõ ý tưởng nhóm học tập");
+  expect(calls.some((call) => call.method === "POST")).toBe(false);
+});
 
 vi.mock("../src/calendar.jsx", () => ({ planModal: vi.fn() }));
 import { planModal } from "../src/calendar.jsx";

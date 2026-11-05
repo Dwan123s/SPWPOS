@@ -1,0 +1,147 @@
+.nora-reminders-dialog {
+  width: min(560px, calc(100vw - 28px));
+  max-height: min(700px, calc(100dvh - 32px));
+  padding: 22px;
+  border: 1px solid #c8e0f8;
+  border-radius: 22px;
+  background: #f9fcff;
+  color: #173d65;
+  box-shadow: 0 20px 80px #12375a33;
+  overflow-y: auto;
+}
+.nora-studio .nora-header-controls .nora-reminders-launcher::after { content: none; }
+.nora-reminders-dialog::backdrop {
+  background: #183b5b40;
+  backdrop-filter: blur(3px);
+}
+.nora-reminders-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.nora-reminders-dialog h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 19px;
+}
+.nora-reminders-dialog p {
+  font-size: 13px;
+  color: #54708c;
+}
+.nora-reminders-dialog ul {
+  list-style: none;
+  margin: 18px 0;
+  padding: 0;
+}
+.nora-reminders-dialog li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid #dfebf7;
+}
+.nora-reminders-dialog li > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.nora-reminders-dialog li strong {
+  display: block;
+  font-size: 14px;
+}
+.nora-reminders-dialog li span {
+  display: block;
+  font-size: 12px;
+  color: #5b7590;
+  margin-top: 5px;
+}
+.nora-reminders-dialog footer {
+  margin-top: 20px;
+}
+.nora-reminders-empty {
+  padding: 24px;
+  text-align: center;
+}
+.nora-reminder-alarm {
+  position: fixed;
+  z-index: 1200;
+  right: 22px;
+  top: 22px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: min(430px, calc(100vw - 28px));
+  max-height: calc(100dvh - 44px);
+  overflow-y: auto;
+  padding: 22px;
+  border: 2px solid #3f8aff;
+  border-radius: 20px;
+  background: #f7fbff;
+  color: #143f71;
+  box-shadow: 0 12px 55px #1c579b40;
+  animation: nora-alarm-pulse 1.8s ease-in-out infinite;
+  margin: 0;
+  left: auto;
+  bottom: auto;
+}
+.nora-reminder-alarm::backdrop {
+  background: #17395318;
+}
+.nora-alarm-bell {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #dcecff;
+  color: #0866dc;
+}
+.nora-alarm-bell .icon {
+  width: 24px;
+  height: 24px;
+}
+.nora-alarm-content {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.nora-alarm-content h2 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.nora-alarm-content p {
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 4px 0 10px;
+}
+.nora-alarm-caption {
+  display: block;
+  font-size: 12px;
+  color: #5d7791;
+  margin-bottom: 14px;
+}
+@keyframes nora-alarm-pulse {
+  50% {
+    border-color: #adcfff;
+    box-shadow:
+      0 12px 55px #1c579b28,
+      0 0 0 6px #428af520;
+  }
+}
+@media (max-width: 480px) {
+  .nora-reminder-alarm {
+    right: 14px;
+    top: 14px;
+    padding: 16px;
+    gap: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nora-reminder-alarm {
+    animation: none;
+  }
+}

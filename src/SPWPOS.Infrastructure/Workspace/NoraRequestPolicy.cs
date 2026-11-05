@@ -9,7 +9,7 @@ namespace SPWPOS.Infrastructure.Workspace;
 internal static class NoraRequestPolicy
 {
     internal static readonly string[] Intents = ["Conversation", "Advice", "Clarification", "CalendarQuery", "FreeTimeQuery", "TaskQuery", "Analysis", "Mutation"];
-    private static readonly HashSet<string> FirstTurnTools = ["reply_to_user", "ask_user", "answer_calendar", "answer_free_time", "get_tasks", "get_calendar", "get_preferences", "analyze_workload", "propose_changes"];
+    private static readonly HashSet<string> FirstTurnTools = ["reply_to_user", "ask_user", "answer_calendar", "answer_free_time", "get_tasks", "get_calendar", "get_preferences", "analyze_workload", "propose_changes", "manage_reminder"];
     internal static NoraToolDefinition[] OfferedTools(NoraModelRequest request) => request.RequireUnderstanding
         ? request.Tools.Where(t => FirstTurnTools.Contains(t.Name)).ToArray() : request.Tools;
     internal static void Validate(NoraRequestUnderstanding value)
@@ -49,7 +49,7 @@ internal static class NoraRequestPolicy
             "Advice" or "Analysis" => tool is "get_tasks" or "get_calendar" or "get_preferences" or "find_free_slots" or "analyze_workload" or "finish_answer",
             "CalendarQuery" => tool is "answer_calendar" or "get_calendar" or "finish_answer",
             "FreeTimeQuery" => tool is "answer_free_time" or "find_free_slots" or "get_calendar" or "finish_answer",
-            "TaskQuery" => tool is "get_tasks" or "finish_answer",
+            "TaskQuery" => tool is "get_tasks" or "finish_answer" or "manage_reminder",
             "Mutation" => tool is not "reply_to_user" and not "finish_answer",
             _ => false
         };

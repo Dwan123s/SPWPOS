@@ -66,9 +66,11 @@ const removeButton = (url) =>
       type="button"
       className="btn ghost small danger"
       id="avatar-remove-btn"
+      aria-label="Xóa ảnh"
+      title="Gỡ ảnh đại diện"
       data-action="remove-avatar"
     >
-      {icon("trash")} Xóa ảnh
+      {icon("trash")} <span className="avatar-remove-label">Xóa ảnh</span>
     </button>
   ) : null;
 export const avatarPreview = (p) => (
@@ -86,6 +88,7 @@ export function setAvatar(url) {
   if (input) input.value = url;
   setSlot("profile-avatar", avatarImage(url, state.workspace.profile));
   setSlot("profile-remove", removeButton(url));
+  input?.dispatchEvent(new Event("input", { bubbles: true }));
 }
 export function openAvatarCropper(src) {
   modal(

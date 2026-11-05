@@ -1,10 +1,12 @@
 # Eisenhower trong PLANORA
 
-Ngày cập nhật: 02/11/2026. Model NORA giữ `gemini-3.8-flash`.
+Bản nâng cấp 04/11/2026 cho phép [tạo task, checklist và kéo thả trực tiếp giữa các ô](EISENHOWER_TASK_BOARD.md). Người dùng có thể lưu lựa chọn quan trọng/khẩn cấp riêng, vẫn giữ deadline và cảnh báo thực tế; Calendar chỉ thay đổi sau khi áp dụng phương án.
+
+Ngày cập nhật: 04/11/2026. Model NORA giữ `gemini-3.8-flash`.
 
 ## Cách sử dụng
 
-Vào **Công việc → Eisenhower** để chuyển từ danh sách sang ma trận. Mỗi ô hiển thị tối đa bốn task/trang, có tổng số, tìm kiếm và phân trang. Điện thoại dùng tab chọn nhóm. Bấm tên công việc mở popup chi tiết; task nhóm mở đúng nhóm và task tương ứng, giữ quyền nhận việc và file đính kèm.
+Vào **Công việc → Eisenhower** để chuyển từ danh sách sang ma trận. Bốn ô 2×2 có tổng số và cuộn riêng, task dạng dòng với checklist thu gọn. Có tìm kiếm, lọc Cá nhân/Nhóm và thời hạn, sắp xếp thủ công/deadline/thời lượng. Hai tab **Cần làm rõ / Chờ bạn duyệt** tách khỏi bảng chính. Điện thoại dùng tab chọn ô. Bấm tên công việc mở popup chi tiết; task nhóm đã nhận mở checklist cá nhân với nút sang đúng nhóm/task để xem yêu cầu và file. Task chưa nhận hoặc chờ duyệt mở luồng nhóm tương ứng, giữ quyền nhận việc và duyệt kết quả.
 
 | Nhóm | Ý nghĩa |
 | --- | --- |

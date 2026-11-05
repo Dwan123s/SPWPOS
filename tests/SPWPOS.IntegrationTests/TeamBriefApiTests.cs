@@ -31,7 +31,9 @@ public sealed class TeamBriefApiTests
         var create = await client.PostAsJsonAsync("/api/teams", new { name = "API brief fixture" }, ct); Assert.Equal(HttpStatusCode.OK, create.StatusCode);
         using var team = JsonDocument.Parse(await create.Content.ReadAsStringAsync(ct)); var teamId = team.RootElement.GetProperty("data").GetProperty("id").GetGuid();
         var bytes = new byte[3 * 1024 * 1024]; Encoding.ASCII.GetBytes("%PDF-1.4").CopyTo(bytes, 0);
-        var input = new TeamBriefInput("hạn sau hai ngày", new("fixture.pdf", "application/pdf", Convert.ToBase64String(bytes)));
+        using var invalidCount = await client.PostAsJsonAsync($"/api/teams/{teamId}/briefs", new TeamBriefInput("hạn sau hai ngày", TaskCount: 2), ct);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidCount.StatusCode);
+        var input = new TeamBriefInput("hạn sau hai ngày", new("fixture.pdf", "application/pdf", Convert.ToBase64String(bytes)), TaskCount: 1);
         using var uploadBody = new StringContent(JsonSerializer.Serialize(input, new JsonSerializerOptions(JsonSerializerDefaults.Web)), Encoding.UTF8, "application/json");
         var upload = await client.PostAsync($"/api/teams/{teamId}/briefs", uploadBody, ct);
         Assert.Equal(HttpStatusCode.OK, upload.StatusCode);

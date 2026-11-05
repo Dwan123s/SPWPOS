@@ -10,6 +10,18 @@ public sealed partial class VertexAiInterpreterTests
         new("Thiết kế", "Thiết kế theo tài liệu", ["Yêu cầu 1"], ["ERD"], ["Đủ thực thể"], ["Phối hợp"], ["Trang 1"], 90, DateTimeOffset.Parse("2026-11-04T14:00:00Z"), "04/11/2026 21h")
     ], []), new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
+    [Fact] public async Task Team_brief_prompt_distinguishes_selected_package_count_from_actual_member_count()
+    {
+        using var provider = new Provider(BriefResponse); using var http = new HttpClient(provider);
+        await Interpreter(http).AnalyzeTeamBriefAsync(BriefContext with { TaskCount = 1 }, TestContext.Current.CancellationToken);
+        using var body = JsonDocument.Parse(provider.Body);
+        using var prompt = JsonDocument.Parse(body.RootElement.GetProperty("contents")[0].GetProperty("parts")[0].GetProperty("text").GetString()!);
+        Assert.Equal(2, prompt.RootElement.GetProperty("memberCount").GetInt32());
+        Assert.Equal(1, prompt.RootElement.GetProperty("taskCount").GetInt32());
+        var instructions = body.RootElement.GetProperty("systemInstruction").GetProperty("parts")[0].GetProperty("text").GetString()!;
+        Assert.Contains("exactly taskCount", instructions);
+    }
+
     [Theory] [InlineData("VertexAI")] [InlineData("Gemini")]
     public async Task Team_brief_uses_configured_flash_model_and_native_pdf_with_structured_work_notes(string providerName)
     {

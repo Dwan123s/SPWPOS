@@ -4,6 +4,7 @@ import "./styles/nora-entry.css";
 import "./styles/nora-refinement.css";
 import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import { NoraResultCard } from "./nora-result-card.jsx";
+import { NoraReminders, refreshNoraReminders } from "./nora-reminders.jsx";
 import { NoraSchedulePanel } from "./nora-schedule-panel.jsx";
 import { askNora, takeAgentDraft, secretaryMode } from "./agent-handoff.js";
 import { NoraEventEditor } from "./nora-event-editor.jsx";
@@ -37,6 +38,7 @@ import {
 import { useVoiceInput } from "./voice-input.js";
 import {
   useTimetableImage,
+  timetableImagePayload,
   TimetableImageButton,
   TimetableImagePreview,
 } from "./timetable-image.jsx";
@@ -51,7 +53,7 @@ import {
 const statuses = {
   PROCESSING: "Đang xử lý",
   PREVIEW: "Chờ áp dụng",
-  APPLIED: "Đã lưu lịch",
+  APPLIED: "Đã lưu",
   NEEDS_INPUT: "Cần làm rõ",
   BLOCKED: "Chưa đủ điều kiện",
   ANSWERED: "Đã trả lời",
@@ -148,9 +150,13 @@ function Turn({
           <details className="nora-completed-process">
             <summary>
               {icon(turn.status === "BLOCKED" ? "clock" : "check")}NORA ·{" "}
-              {turn.run.toolCalls > 0 ? "Đã kiểm tra yêu cầu" : "Phản hồi trực tiếp"}
+              {turn.run.toolCalls > 0
+                ? "Đã kiểm tra yêu cầu"
+                : "Phản hồi trực tiếp"}
             </summary>
-            {turn.run.understanding?.summary && <p>{turn.run.understanding.summary}</p>}
+            {turn.run.understanding?.summary && (
+              <p>{turn.run.understanding.summary}</p>
+            )}
             <ol aria-label="Các hành động đã thực hiện">
               {(turn.run.steps || []).map((step) => (
                 <li key={step.sequence}>
@@ -324,6 +330,7 @@ function Turn({
 
 export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const [turns, setTurns] = useState([]);
+  useEffect(() => { refreshNoraReminders(); }, [turns]);
   const [capabilities, setCapabilities] = useState(null);
   const [checkingAi, setCheckingAi] = useState(false);
   const aiCheckInFlight = useRef(false);
@@ -543,9 +550,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       text:
         draftText ||
         "Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.",
-      image: withImage
-        ? { name: image.attachment.file.name, url: image.attachment.preview }
-        : null,
+      image: withImage ? timetableImagePayload(image.attachment, true) : null,
       reply: "",
       phases: withImage
         ? [
@@ -563,11 +568,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     scrollToBottomActive.current = false;
     try {
       const attachedImage = withImage
-        ? {
-            name: image.attachment.file.name,
-            mimeType: image.attachment.file.type,
-            data: image.attachment.preview.split(",")[1],
-          }
+        ? timetableImagePayload(image.attachment)
         : null;
       controller.signal.throwIfAborted();
       if (!mounted.current) return;
@@ -580,8 +581,10 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         );
       body =
         retry.current?.text === messageText &&
-        retry.current?.image?.data === attachedImage?.data &&
-        (retry.current?.calendarKind || "Auto") === (withImage ? "Event" : "Auto") &&
+        JSON.stringify(retry.current?.image ?? null) ===
+          JSON.stringify(attachedImage) &&
+        (retry.current?.calendarKind || "Auto") ===
+          (withImage ? "Event" : "Auto") &&
         retry.current.conversationId === conversationId
           ? retry.current
           : {
@@ -629,9 +632,12 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         },
       }));
       replaceTurn(result);
+      refreshNoraReminders();
       if (result.status === "APPLIED") {
         setNotice(
-          "Đã lưu vào lịch. Bạn có thể hoàn tác trong kết quả vừa tạo.",
+          result.changes?.some(change => change.kind === "REMINDER")
+            ? "Đã cập nhật lời nhắc trong NORA."
+            : "Đã lưu vào lịch. Bạn có thể hoàn tác trong kết quả vừa tạo.",
         );
         setCalendarRevision((value) => value + 1);
       }
@@ -720,8 +726,8 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       setCalendarRevision((value) => value + 1);
       setNotice(
         action === "undo"
-          ? "Đã hoàn tác và khôi phục lịch trước đó."
-          : "Đã lưu thay đổi vào lịch.",
+          ? "Đã hoàn tác thay đổi."
+          : result.changes?.some(change => change.kind === "REMINDER") ? "Đã cập nhật lời nhắc." : "Đã lưu thay đổi vào lịch.",
       );
       await onWorkspaceChanged();
       const history = await api("/api/agent/turns");
@@ -735,8 +741,15 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
   const current = turns.filter(
     (turn) => turn.conversationId === conversationId,
   );
-  const timetableTurn = current.filter((turn) => turn.status === "APPLIED" && turn.suggestRoutine)
-    .reduce((latest, turn) => !latest || new Date(turn.createdAt) >= new Date(latest.createdAt) ? turn : latest, null);
+  const timetableTurn = current
+    .filter((turn) => turn.status === "APPLIED" && turn.suggestRoutine)
+    .reduce(
+      (latest, turn) =>
+        !latest || new Date(turn.createdAt) >= new Date(latest.createdAt)
+          ? turn
+          : latest,
+      null,
+    );
   useEffect(() => {
     const panel = historyPanel.current;
     if (!panel || typeof ResizeObserver !== "function") return;
@@ -1111,7 +1124,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           <NoraAvatar />
           <div>
             <h1>
-              NORA <span>Trợ lý lập lịch</span>
+              NORA <span>Trợ lý cá nhân</span>
             </h1>
           </div>
         </div>
@@ -1136,6 +1149,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             </span>
           )}
           <NoraMotionControl />
+          <NoraReminders onCompose={value => {setText(value);composerDock.current?.querySelector("textarea")?.focus();}} />
           <button
             type="button"
             className="nora-header-new"

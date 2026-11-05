@@ -45,7 +45,9 @@ The grouped image keeps every table and relationship with eight-column previews.
 - [NORA voice / Giọng nói NORA](features/NORA_VOICE.md)
 - [NORA timetable images / Đọc thời khóa biểu từ ảnh](features/NORA_TIMETABLE_IMAGES.md)
 - [Tasks and reminders / Công việc và nhắc nhở](features/PLANORA_TASK_AND_REMINDER_UPDATE.md)
+- [Inbox, Today và Next 7 Days](features/TASK_SMART_LISTS.md)
 - [Eisenhower: ma trận, xếp lịch và quyền riêng tư](features/EISENHOWER.md)
+- [Eisenhower: tạo task, checklist và kéo thả](features/EISENHOWER_TASK_BOARD.md)
 
 ## Integrations / Tích hợp
 
@@ -81,6 +83,7 @@ The grouped image keeps every table and relationship with eight-column previews.
 
 ## Plans and reviews / Kế hoạch và đánh giá
 
+- [NORA chủ động: báo cáo ngày, đề xuất việc và xử lý lệch lịch](plans/NORA_PROACTIVE_DAILY_ASSISTANT_2026-11-04.md)
 - [NORA agent architecture audit, 31 October / Đối chiếu Agent và workflow theo source](reviews/NORA_AGENT_ARCHITECTURE_AUDIT_2026-10-31.md)
 - [NORA agent upgrade plan, 31 October / Kế hoạch triển khai agent hoạch định](plans/NORA_AGENT_UPGRADE_PLAN_2026-10-31.md)
 - [Note flow audit, 25 October / Kiểm thử và đánh giá luồng Note](reviews/NOTE_FLOW_AUDIT_2026-10-25.md) · [Luồng chi tiết](features/NOTE_FLOW_2026-10-25.md) · [208 bản ghi kiểm thử](evidence/note-audit-2026-10-25/cases.csv)

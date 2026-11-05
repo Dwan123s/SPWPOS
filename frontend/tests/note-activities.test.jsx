@@ -41,11 +41,13 @@ const activities = [
     question: "Bạn cần bao lâu để làm báo cáo RDS?",
   },
 ];
-let calls, note, failApply, outsideHours, customWarnings;
+let calls, note, failApply, failPreview, outsideHours, customWarnings;
 beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-20T12:00:00Z"));
   localStorage.clear();
   calls = [];
   failApply = false;
+  failPreview = false;
   outsideHours = false;
   customWarnings = null;
   state.workspace = {
@@ -75,6 +77,18 @@ beforeEach(() => {
     vi.fn(async (url, options = {}) => {
       const body = options.body ? JSON.parse(options.body) : undefined;
       calls.push({ url, body, method: options.method });
+      if (url.endsWith("/proposals") && failPreview)
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({
+            error: {
+              code: "EVENT_IN_PAST",
+              message:
+                "Giờ bắt đầu của “Đá bóng” đã qua. Chọn giờ sau thời điểm hiện tại.",
+            },
+          }),
+        };
       let data;
       if (url === "/api/notes") data = [note];
       else if (url === "/api/notes/agent") data = { aiAvailable: true };
@@ -149,6 +163,94 @@ async function open() {
     await screen.findByRole("button", { name: "Thời gian biểu" }),
   );
 }
+it("shows a past event start beside its field instead of asking for times that are already present", async () => {
+  note.analysis.activities = [
+    {
+      ...activities[0],
+      name: "Đá bóng",
+      start: "2026-10-20T11:59:00Z",
+      end: "2026-10-21T11:59:00Z",
+    },
+  ];
+  await open();
+  const start = screen.getByLabelText("Bắt đầu Đá bóng");
+  expect(start.getAttribute("aria-invalid")).toBe("true");
+  expect(
+    screen.getByText("Giờ bắt đầu đã qua. Chọn giờ sau thời điểm hiện tại."),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }).disabled,
+  ).toBe(true);
+  expect(calls.some((x) => x.url.endsWith("/proposals"))).toBe(false);
+  fireEvent.change(start, { target: { value: "2026-10-20T20:00" } });
+  expect(start.getAttribute("aria-invalid")).toBeNull();
+  expect(
+    screen.queryByText("Giờ bắt đầu đã qua. Chọn giờ sau thời điểm hiện tại."),
+  ).toBeNull();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  await screen.findByRole("button", { name: "Lưu sự kiện & công việc" });
+  expect(
+    calls.find((x) => x.url.endsWith("/proposals")).body.activities[0],
+  ).toMatchObject({
+    start: "2026-10-20T13:00:00.000Z",
+    end: "2026-10-21T11:59:00Z",
+  });
+});
+it("clears an outdated server preview error after correcting the event and retries with the edited times", async () => {
+  note.analysis.activities = [{ ...activities[0], name: "Đá bóng" }];
+  failPreview = true;
+  await open();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  await screen.findByText(
+    "Giờ bắt đầu của “Đá bóng” đã qua. Chọn giờ sau thời điểm hiện tại.",
+  );
+  await userEvent.click(screen.getByText("Chỉnh sửa"));
+  fireEvent.change(screen.getByLabelText("Bắt đầu Đá bóng"), {
+    target: { value: "2026-10-21T08:00" },
+  });
+  expect(
+    screen.queryByText(
+      "Giờ bắt đầu của “Đá bóng” đã qua. Chọn giờ sau thời điểm hiện tại.",
+    ),
+  ).toBeNull();
+  failPreview = false;
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  await screen.findByRole("button", { name: "Lưu sự kiện & công việc" });
+  expect(calls.filter((x) => x.url.endsWith("/proposals"))).toHaveLength(2);
+  expect(
+    calls.filter((x) => x.url.endsWith("/proposals")).at(-1).body.activities[0]
+      .start,
+  ).toBe("2026-10-21T01:00:00.000Z");
+  expect(calls.some((x) => x.url.endsWith("/apply"))).toBe(false);
+});
+it("rechecks a pending event when returning to the tab after its start has passed", async () => {
+  note.analysis.activities = [
+    {
+      ...activities[0],
+      start: "2026-10-20T12:01:00Z",
+      end: "2026-10-20T13:00:00Z",
+    },
+  ];
+  await open();
+  expect(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }).disabled,
+  ).toBe(false);
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-10-20T12:02:00Z"));
+  fireEvent.focus(window);
+  expect(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }).disabled,
+  ).toBe(true);
+  expect(
+    screen.getByLabelText("Bắt đầu Đi học").getAttribute("aria-invalid"),
+  ).toBe("true");
+  expect(calls.some((x) => x.url.endsWith("/proposals"))).toBe(false);
+});
 it("explains the actual deadline and late finish, disables saving, and opens the affected task when returning to edit", async () => {
   note.analysis.activities = [
     {
@@ -467,4 +569,176 @@ it("events can be reviewed without availability or creating an incomplete task",
       .body.activities.map((x) => x.kind),
   ).toEqual(["EVENT", "EVENT", "EVENT"]);
   expect(calls.some((x) => x.url.endsWith("/apply"))).toBe(false);
+});
+it("uses a confirmed daily routine instead of requesting manual availability again", async () => {
+  state.workspace.availability = [];
+  state.workspace.availabilityPolicy = {
+    confirmed: true,
+    hasDailyRoutine: true,
+  };
+  note.analysis.activities = [
+    {
+      ...activities[3],
+      start: null,
+      estimatedMinutes: 30,
+      deadline: "2026-10-21T15:00:00Z",
+    },
+  ];
+  await open();
+  expect(
+    screen.queryByRole("button", { name: "Thiết lập giờ rảnh" }),
+  ).toBeNull();
+  const preview = screen.getByRole("button", { name: "Xem lịch đề xuất" });
+  expect(preview.disabled).toBe(false);
+  await userEvent.click(preview);
+  await screen.findByRole("button", { name: "Lưu sự kiện & công việc" });
+  expect(calls.some((x) => x.url === "/api/time/availability")).toBe(false);
+});
+it("allows a timed task to be checked without configured hours and asks before saving one-off hours", async () => {
+  state.workspace.availability = [];
+  outsideHours = true;
+  note.analysis.activities = [{ ...activities[3], estimatedMinutes: 30 }];
+  await open();
+  expect(
+    screen.queryByRole("button", { name: "Thiết lập giờ rảnh" }),
+  ).toBeNull();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  expect(
+    (await screen.findByRole("button", { name: "Lưu sự kiện & công việc" }))
+      .disabled,
+  ).toBe(true);
+  expect(
+    calls.find((x) => x.url.endsWith("/proposals")).body
+      .allowRequestedTimeOutsideAvailability,
+  ).toBe(false);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Dùng giờ đã chọn cho lần này" }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  expect(
+    (await screen.findByRole("button", { name: "Lưu sự kiện & công việc" }))
+      .disabled,
+  ).toBe(false);
+  expect(
+    calls.filter((x) => x.url.endsWith("/proposals")).at(-1).body
+      .allowRequestedTimeOutsideAvailability,
+  ).toBe(true);
+  expect(
+    calls.some(
+      (x) => x.url.endsWith("/apply") || x.url === "/api/time/availability",
+    ),
+  ).toBe(false);
+});
+it("shows every blocker for the SSG105 note and can keep only the valid selected activities", async () => {
+  vi.mocked(Date.now).mockReturnValue(Date.parse("2026-11-04T00:00:00Z"));
+  state.workspace.availability = [];
+  note.title = "Project SSG105";
+  note.analysis.needsReview = true;
+  note.analysis.activities = [
+    {
+      kind: "TASK",
+      name: "Chuẩn bị tiền quỹ",
+      type: "OTHER",
+      deadline: "2026-11-02T16:59:00Z",
+      estimatedMinutes: null,
+    },
+    {
+      kind: "TASK",
+      name: "Chế biến đồ ăn",
+      type: "OTHER",
+      start: "2026-11-03T09:00:00Z",
+      end: "2026-11-03T12:30:00Z",
+      estimatedMinutes: 210,
+    },
+    {
+      kind: "TASK",
+      name: "Đóng gói",
+      type: "OTHER",
+      start: "2026-11-03T12:30:00Z",
+      end: "2026-11-03T13:00:00Z",
+      estimatedMinutes: 30,
+    },
+    {
+      kind: "EVENT",
+      name: "Bán đồ ăn buổi sáng",
+      type: "WORK",
+      start: "2026-11-04T00:30:00Z",
+      end: "2026-11-04T04:30:00Z",
+    },
+    {
+      kind: "EVENT",
+      name: "Bán đồ ăn buổi chiều",
+      type: "WORK",
+      start: "2026-11-04T07:00:00Z",
+      end: "2026-11-04T10:45:00Z",
+    },
+    {
+      kind: "EVENT",
+      name: "Mua quà",
+      type: "OTHER",
+      start: "2026-11-05T09:00:00Z",
+      end: "2026-11-05T10:30:00Z",
+    },
+    {
+      kind: "EVENT",
+      name: "Tổ chức sự kiện",
+      type: "OTHER",
+      start: "2026-11-06T08:00:00Z",
+      end: "2026-11-06T10:30:00Z",
+    },
+  ];
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Project SSG105" }),
+  );
+  expect(
+    screen.getByText("3 mục cần kiểm tra trước khi xem lịch"),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }).disabled,
+  ).toBe(true);
+  expect(calls.some((x) => x.url.endsWith("/proposals"))).toBe(false);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Chỉ giữ các mục hợp lệ đã chọn" }),
+  );
+  expect(
+    screen.getByRole("checkbox", { name: "Chọn Chuẩn bị tiền quỹ" }).checked,
+  ).toBe(false);
+  expect(
+    screen.getByRole("checkbox", { name: "Chọn Chế biến đồ ăn" }).checked,
+  ).toBe(false);
+  expect(screen.getByRole("checkbox", { name: "Chọn Đóng gói" }).checked).toBe(
+    false,
+  );
+  expect(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }).disabled,
+  ).toBe(true);
+  await userEvent.click(
+    screen.getByRole("checkbox", {
+      name: "Tôi đã kiểm tra các lưu ý, giờ rảnh và điều kiện trong ghi chú.",
+    }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Xem lịch đề xuất" }),
+  );
+  await screen.findByRole("button", { name: "Lưu sự kiện & công việc" });
+  expect(
+    calls
+      .find((x) => x.url.endsWith("/proposals"))
+      .body.activities.map((x) => x.name),
+  ).toEqual([
+    "Bán đồ ăn buổi sáng",
+    "Bán đồ ăn buổi chiều",
+    "Mua quà",
+    "Tổ chức sự kiện",
+  ]);
+  expect(
+    calls.some(
+      (x) => x.url.endsWith("/apply") || x.url === "/api/time/availability",
+    ),
+  ).toBe(false);
 });

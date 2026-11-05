@@ -10,7 +10,9 @@ import {
   canDragCalendarItem,
   atMinute,
   wallMinute,
+  createCalendarRange,
 } from "./calendar-drag.js";
+import { useCalendarRangeSelect } from "./calendar-range-select.js";
 import "./calendar-week.css";
 
 export function CalendarWeek({
@@ -20,6 +22,7 @@ export function CalendarWeek({
   fixed,
   now,
   onWorkspaceChanged = async () => {},
+  onCreateEvent = () => {},
 }) {
   const host = useRef(null),
     scroll = useRef(null),
@@ -32,6 +35,16 @@ export function CalendarWeek({
     [error, setError] = useState(""),
     [undo, setUndo] = useState(null),
     [message, setMessage] = useState("");
+  const rangeSelect = useCalendarRangeSelect({
+    host,
+    scroll,
+    gesture,
+    suppressClick,
+    busy: busyRef,
+    scopeKey: `${state.workspace.profile?.id}:${dates[0]}`,
+    onSelect: onCreateEvent,
+    onError: setError,
+  });
   const allEntries = [
     ...state.workspace.sessions.map((session) => ({ session })),
     ...state.workspace.events.map((event) => ({ event })),
@@ -352,6 +365,20 @@ export function CalendarWeek({
         Kéo thẻ để đổi giờ/ngày · Kéo mép dưới để đổi thời lượng · Esc để hủy.
         Trên điện thoại, dùng nút kéo. Bàn phím: giữ Alt + phím mũi tên.
       </p>
+      <div className="calendar-create-help">
+        <span>Bấm ô trống hoặc kéo chọn khoảng giờ để thêm lịch thủ công.</span>
+        <button
+          type="button"
+          aria-pressed={rangeSelect.touchSelect}
+          disabled={busy}
+          onClick={() => rangeSelect.setTouchSelect((value) => !value)}
+        >
+          {icon("plus")}
+          {rangeSelect.touchSelect
+            ? "Đang chọn giờ · Esc để hủy"
+            : "Chọn khoảng giờ"}
+        </button>
+      </div>
       <div
         ref={scroll}
         className="calendar-scroll calendar-time-scroll"
@@ -394,13 +421,58 @@ export function CalendarWeek({
                 </span>
                 <strong>{date.slice(8)}</strong>
                 <small>{segments.length} mục</small>
+                <button
+                  type="button"
+                  className="calendar-add-day"
+                  disabled={
+                    busy ||
+                    date < dayKey(now) ||
+                    (date === dayKey(now) && wallMinute(now) >= 1425)
+                  }
+                  aria-label={`Thêm lịch ngày ${date}`}
+                  title="Thêm lịch thủ công"
+                  onClick={() => {
+                    try {
+                      onCreateEvent(
+                        createCalendarRange({
+                          date,
+                          minute:
+                            date === dayKey(Date.now())
+                              ? Math.max(
+                                  9 * 60,
+                                  Math.ceil((wallMinute(Date.now()) + 1) / 15) *
+                                    15,
+                                )
+                              : 9 * 60,
+                        }),
+                      );
+                    } catch (failure) {
+                      setError(failure.message);
+                    }
+                  }}
+                >
+                  {icon("plus")}
+                </button>
               </div>
               <div
-                className="calendar-day-track"
+                className={`calendar-day-track${rangeSelect.touchSelect ? " is-select-mode" : ""}`}
+                onPointerDown={rangeSelect.pointerDown}
                 data-calendar-date={date}
                 data-day-start={atMinute(date, 0)}
                 style={{ height: 24 * hourHeight }}
               >
+                {date <= dayKey(now) && (
+                  <div
+                    className="calendar-past-range"
+                    aria-hidden="true"
+                    style={{
+                      height:
+                        date < dayKey(now)
+                          ? "100%"
+                          : Math.min(1440, wallMinute(now) + 1) * minuteHeight,
+                    }}
+                  />
+                )}
                 {segments.map((segment) => {
                   const entry = segment,
                     editable = canDragCalendarItem(entry, now) && !busy;
@@ -476,6 +548,23 @@ export function CalendarWeek({
                       </strong>
                       <span>
                         {timeFmt(draft.range.start)}–{timeFmt(draft.range.end)}
+                      </span>
+                    </div>
+                  ))}
+                {rangeSelect.selection &&
+                  daySegments(
+                    [{ event: { ...rangeSelect.selection, id: "new-event" } }],
+                    date,
+                  ).map((segment) => (
+                    <div
+                      key="selection"
+                      className="calendar-drag-ghost calendar-create-ghost"
+                      style={{ top: segment.top, height: segment.height }}
+                    >
+                      <strong>Lịch mới</strong>
+                      <span>
+                        {timeFmt(rangeSelect.selection.start)}–
+                        {timeFmt(rangeSelect.selection.end)}
                       </span>
                     </div>
                   ))}

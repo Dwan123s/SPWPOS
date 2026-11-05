@@ -17,6 +17,7 @@ import {
 } from "./calendar-time.jsx";
 import { workflowSteps } from "./workflow.js";
 import { CalendarWeek } from "./calendar-week.jsx";
+import { eventModal } from "./calendar.jsx";
 export function weekStart(key) {
   const date = new Date(`${key}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
@@ -258,7 +259,13 @@ function calendarMarkup(
                 )),
               )}
             </div>
-            {button("Sự kiện", "new-event", "small secondary", "", "plus")}
+            <button
+              type="button"
+              className="btn small secondary"
+              onClick={() => eventModal({}, { manual: true })}
+            >
+              {icon("plus")}Sự kiện
+            </button>
             {workflowSteps(state.workspace)
               .slice(0, 3)
               .every((step) => step.done) &&
@@ -306,6 +313,7 @@ function calendarMarkup(
             fixed={fixed}
             now={now}
             onWorkspaceChanged={onWorkspaceChanged}
+            onCreateEvent={(range) => eventModal(range, { manual: true })}
           />
         ) : (
           <div
@@ -350,6 +358,7 @@ function calendarMarkup(
           {icon("clock")}
           Cuộn trong khung lịch để xem thêm. Bấm một mục để xem chi tiết và các
           thao tác với lịch.
+          {view === "week" && " Bấm hoặc kéo ô trống để thêm lịch thủ công."}
           {" Múi giờ "}
           {state.workspace.preference.timeZoneId}.
         </p>

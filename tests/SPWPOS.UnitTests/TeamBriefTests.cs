@@ -11,11 +11,36 @@ namespace SPWPOS.UnitTests;
 public sealed partial class PrivateTeamPlanningTests
 {
     private static TeamBriefAnalysis CompleteBrief(TeamBriefContext context) => new("Đồ án quản lý thời gian", "", "Chia thành các gói việc theo số người đang hoạt động.",
-        Enumerable.Range(1, context.MemberCount).Select(i => new TeamBriefTask("Gói việc " + i, "Tổng hợp yêu cầu hạng mục " + i,
+        Enumerable.Range(1, context.TaskCount ?? context.MemberCount).Select(i => new TeamBriefTask("Gói việc " + i, "Tổng hợp yêu cầu hạng mục " + i,
             ["Đọc yêu cầu trong mục " + i], ["Báo cáo và mã nguồn hạng mục " + i], ["Đáp ứng đủ yêu cầu; chạy kiểm thử"],
             ["Phối hợp bàn giao với các gói việc khác"], ["Mục " + i], 120, Tomorrow, "hạn ngày mai")).ToArray(), []);
     private static TeamBriefFile TextBrief(string text, string name = "Yêu cầu.txt") => new(name, "text/plain", Convert.ToBase64String(Encoding.UTF8.GetBytes(text)));
     private static TeamBriefInput BriefInput => new("Bổ sung: hạn ngày mai", TextBrief("Đồ án cần bản thiết kế, mã nguồn và báo cáo."));
+
+    [Theory] [InlineData(1)] [InlineData(2)]
+    public async Task Leader_can_choose_any_package_count_up_to_the_actual_membership(int count)
+    {
+        var ai = new AgentAiTestDouble { BriefResponse = CompleteBrief }; await using var h = await Setup(ai);
+        var draft = await Use(h, s => s.DraftTeamBriefAsync(Leader, Team, BriefInput with { TaskCount = count }, Ct));
+        Assert.Equal(2, draft.MemberCount); Assert.Equal(count, draft.Tasks.Length);
+        Assert.Equal(2, ai.BriefContext!.MemberCount); Assert.Equal(count, ai.BriefContext.TaskCount);
+        var result = await Use(h, s => s.ConfirmTeamBriefAsync(Leader, Team, draft.ProposalId, Ct));
+        Assert.Equal(count, result.TaskIds.Length);
+    }
+    [Theory] [InlineData(0)] [InlineData(-1)] [InlineData(3)]
+    public async Task Invalid_package_count_is_rejected_before_calling_AI(int count)
+    {
+        var ai = new AgentAiTestDouble { BriefResponse = CompleteBrief }; await using var h = await Setup(ai);
+        var error = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.DraftTeamBriefAsync(Leader, Team, BriefInput with { TaskCount = count }, Ct)));
+        Assert.Equal("TEAM_BRIEF_TASK_COUNT", error.Code); Assert.Equal(0, ai.Calls);
+    }
+    [Fact]
+    public async Task Model_must_honor_the_selected_count_even_when_it_differs_from_member_count()
+    {
+        var ai = new AgentAiTestDouble { BriefResponse = c => CompleteBrief(c with { TaskCount = 2 }) }; await using var h = await Setup(ai);
+        var error = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.DraftTeamBriefAsync(Leader, Team, BriefInput with { TaskCount = 1 }, Ct)));
+        Assert.Equal("TEAM_BRIEF_SPLIT_INVALID", error.Code);
+    }
 
     [Fact] public async Task Brief_reads_source_and_member_count_without_private_context_then_publishes_all_tasks_once()
     {

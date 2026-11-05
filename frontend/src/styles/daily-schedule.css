@@ -5,6 +5,21 @@
   font-size: 12px;
   padding-bottom: 12px;
 }
+.daily-schedule-scroll {
+  max-height: clamp(280px, 58dvh, 560px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #9ebbd6 #edf5fc;
+  padding: 3px 8px 3px 2px;
+}
+.daily-schedule-scroll:focus-visible {
+  outline: 2px solid #2878d8;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
 .daily-schedule-views {
   display: flex;
   padding: 4px;

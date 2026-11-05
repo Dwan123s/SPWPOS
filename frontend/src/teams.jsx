@@ -184,6 +184,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
     [draft, setDraft] = useState(null);
   const [briefFile, setBriefFile] = useState(null);
   const [splitBrief, setSplitBrief] = useState(false);
+  const [briefTaskCount, setBriefTaskCount] = useState(null);
   const [claim, setClaim] = useState(null),
     [claimOpen, setClaimOpen] = useState(false),
     [claimRequest, setClaimRequest] = useState(null),
@@ -409,6 +410,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
     setDraft(null);
     setBriefFile(null);
     setSplitBrief(false);
+    setBriefTaskCount(null);
     setError("");
     setComposerOpen(true);
   }
@@ -846,6 +848,14 @@ export function TeamsPage({ onWorkspaceChanged }) {
           splitBrief={splitBrief}
           setSplitBrief={setSplitBrief}
           memberCount={detail.members.length}
+          taskCount={Math.min(
+            briefTaskCount ?? detail.members.length,
+            detail.members.length,
+          )}
+          setTaskCount={(count) => {
+            setBriefTaskCount(count);
+            setDraft(null);
+          }}
           members={detail.members}
           busy={busy}
           error={error}
@@ -880,6 +890,10 @@ export function TeamsPage({ onWorkspaceChanged }) {
                   !changeTask && splitBrief
                     ? {
                         text,
+                        taskCount: Math.min(
+                          briefTaskCount ?? detail.members.length,
+                          detail.members.length,
+                        ),
                         file: briefFile
                           ? {
                               name: briefFile.name,

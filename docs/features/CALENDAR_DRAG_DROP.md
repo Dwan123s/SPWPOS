@@ -10,7 +10,25 @@ Vào **Lịch làm việc → Tuần**. Lịch tuần có lưới 24 giờ và b
 - Bấm bình thường vẫn mở popup chi tiết; kéo không mở popup. Bàn phím: focus nút kéo, **Alt + ↑/↓** đổi 15 phút, **Alt + ←/→** đổi ngày. Focus nút đổi thời lượng, Alt + ↑/↓ đổi giờ kết thúc.
 - Chế độ Danh sách giữ nguyên. Không tạo lịch mới bằng việc kéo task từ sidebar và không tự chuyển tuần trong lúc kéo; dùng điều hướng tuần để xem các ngày khác.
 
-## Ràng buộc
+## Thêm lịch thủ công bằng ô trống
+
+Trong chế độ **Tuần**, bấm vùng trống để mở form sự kiện với khoảng một giờ đã chọn; gần cuối ngày khoảng này dừng ở 00:00 hôm sau. Bấm giữ và kéo lên/xuống hoặc qua cột ngày khác để chọn khoảng bắt đầu/kết thúc theo nấc 15 phút. Khoảng chọn có nền xanh xem trước, tự cuộn khi kéo gần mép. Thả chuột mở popup điền tên, loại và mô tả; chỉ **Lưu sự kiện** mới gửi yêu cầu tạo lịch. Chọn giờ không tạo task hoặc gọi AI, kể cả khi bật chế độ NORA.
+
+Esc, pointer-cancel, thả ngoài khung, đổi tài khoản/tuần, mất focus hoặc rời trang hủy lựa chọn đang kéo. Chạm và cuộn trên điện thoại vẫn cuộn bình thường; bật **Chọn khoảng giờ** trước nếu muốn kéo bằng cảm ứng. Nút **+** ở đầu mỗi ngày mở form tại 09:00 của ngày đó, hỗ trợ bàn phím. Nút **Sự kiện** trên thanh công cụ mở form nhập tay ở cả chế độ Tuần và Danh sách.
+
+Ngày giờ dùng múi giờ tài khoản. Form vẫn kiểm tra thời gian và xung đột qua API sự kiện hiện có; báo lỗi ngay trong popup và giữ nội dung để sửa. Thao tác trên thẻ lịch đang có vẫn mở chi tiết hoặc di chuyển/đổi thời lượng theo cơ chế cũ.
+
+Không tạo được lịch bắt đầu trong quá khứ hoặc đúng thời điểm hiện tại: chặn từ lúc bấm/kéo, kiểm tra lại khi thả và khi lưu, đồng thời máy chủ từ chối `EVENT_IN_PAST`. Nút cộng ở ngày cũ bị vô hiệu; ngày hôm nay ưu tiên 09:00 hoặc mốc 15 phút sắp tới nếu đã qua 09:00. Phần giờ đã qua có nền gạch nhạt. Lịch sử vẫn xem được và sửa tên/mô tả khi giữ nguyên giờ bắt đầu; không chuyển giờ bắt đầu về quá khứ.
+
+Kiểm chứng chặn quá khứ: 30 kiểm thử frontend, 18 unit backend và 2 API integration đạt. Trình duyệt Edge với đồng hồ giả lập kiểm tra ngày cũ bị khóa, bấm/kéo ngược vào giờ đã qua không mở popup, nhập giờ quá khứ không gửi yêu cầu, popup hết hiệu lực bị chặn khi lưu và sửa sang giờ tương lai lưu được. Script local: `artifacts/calendar-past-browser-test.mjs`.
+
+### Sửa lỗi kéo tạo ngày 04/11/2026
+
+Đối chiếu thao tác [bấm giờ trống hoặc kéo để chọn khoảng dài hơn của Google Calendar](https://support.google.com/calendar/answer/72143?hl=en). Tái hiện bằng thao tác chuột trình duyệt thật: `pointerup` mở dialog, nhưng click tương thích phát sinh tiếp theo bị retarget vào backdrop và listener bấm ngoài đóng popup ngay. Giao diện giờ chặn riêng click kết thúc cử chỉ trước listener bấm ngoài; lần pointerdown kế tiếp vẫn tương tác bình thường. Dọn listener khi unmount/đổi phạm vi hoặc hết thời gian chờ. Tiêu đề ngày dùng ba cột riêng cho tên thứ, số ngày và nút cộng, thay vị trí tuyệt đối gây chồng lấp.
+
+Kiểm tra bằng Edge headless độc lập, API giả lập và dữ liệu thử, không ghi dữ liệu tài khoản thật: 1600/1280 px dùng chuột; 390 px dùng touch thật. Đạt chọn giờ sau cuộn, popup còn mở sau click từ pointerup, đúng 18:00–19:00, không ghi trước Lưu, lỗi trùng giữ tên đã nhập và lưu lại hiển thị sự kiện. Desktop kiểm tra thêm click một giờ, kéo ngược và Esc. Đo bounding box xác nhận nút cộng không giao số ngày ở cả bảy cột; không tràn ngang toàn trang hoặc lỗi JavaScript. Script và ảnh: `artifacts/calendar-create-browser-test.mjs`, `artifacts/calendar-create-fixed-*.png`. 34 kiểm thử giao diện liên quan đạt, gồm regression click tương thích và popup hiện có.
+
+## Ràng buộc lịch đã có
 
 Chỉ phiên Scheduled, chưa khóa, chưa bắt đầu/ghi nhận actual được kéo. Sự kiện đã bắt đầu không được kéo. Các mục này vẫn xem được qua popup. Sự kiện cố định trong tương lai được người dùng chủ động đổi giờ; đây không phải NORA tự dời lịch cố định.
 

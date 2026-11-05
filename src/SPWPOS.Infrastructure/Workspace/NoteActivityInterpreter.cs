@@ -13,11 +13,11 @@ public sealed partial class TaskInterpreter
     {"type":"object","additionalProperties":false,"required":["activities","needsReview","messages"],"properties":{
       "needsReview":{"type":"boolean"},"messages":{"type":"array","items":{"type":"string"}},
       "activities":{"type":"array","items":{"type":"object","additionalProperties":false,
-        "required":["kind","name","description","type","start","end","estimatedMinutes","deadline","priority","isHardDeadline","repeatWeeks","question"],
+        "required":["kind","name","description","type","start","end","estimatedMinutes","deadline","priority","isHardDeadline","repeatWeeks","question","splittable"],
         "properties":{"kind":{"type":"string","enum":["EVENT","TASK"]},"name":{"type":"string"},"description":{"type":"string"},"type":{"type":"string","enum":["WORK","OTHER","PROGRAMMING","WRITING","STUDY","MEETING_PREP","ADMIN","CLASS","MEETING","APPOINTMENT"]},
           "start":{"type":["string","null"],"description":"ISO 8601 timestamp with timezone offset, or null"},"end":{"type":["string","null"],"description":"ISO 8601 timestamp with timezone offset, or null"},"estimatedMinutes":{"type":["integer","null"],"description":"Task duration in minutes when stated; null for events or unknown task durations"},
           "deadline":{"type":["string","null"],"description":"Explicit completion deadline with timezone offset, or null"},"priority":{"type":"integer","minimum":1,"maximum":4},"isHardDeadline":{"type":"boolean"},
-          "repeatWeeks":{"type":"integer","minimum":1,"maximum":12},"question":{"type":"string"}}}}}}
+          "repeatWeeks":{"type":"integer","minimum":1,"maximum":12},"question":{"type":"string"},"splittable":{"type":"boolean","description":"False for events and uninterrupted/continuous tasks; preparation and ordinary tasks may be split."}}}}}}
     """);
 
     private static AiTaskResult? ReadNoteActivities(JsonElement root, JsonElement items, bool needsReview, int limit, string? timeZoneId)
@@ -79,7 +79,8 @@ public sealed partial class TaskInterpreter
             return new NoteActivity(kind, Text(x, "name"), Text(x, "description"), Text(x, "type").Trim().ToUpperInvariant(),
                 Date(x, "start"), Date(x, "end"), duration, Date(x, "deadline"), Number(x, "priority") ?? 2,
                 x.TryGetProperty("isHardDeadline", out var hard) && hard.ValueKind != JsonValueKind.Null && hard.GetBoolean(),
-                repeat == 0 ? 1 : repeat, Text(x, "question"));
+                repeat == 0 ? 1 : repeat, Text(x, "question"), kind == "TASK" &&
+                    (!x.TryGetProperty("splittable", out var split) || split.ValueKind == JsonValueKind.Null || split.GetBoolean()));
         }).ToArray();
         foreach (var activity in activities)
         {

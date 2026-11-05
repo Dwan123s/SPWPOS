@@ -13,6 +13,7 @@ import {
   TIMETABLE_IMAGE_MAX_BYTES,
   timetableRequest,
   useTimetableImage,
+  timetableImagePayload,
 } from "../src/timetable-image.jsx";
 
 const file = (name = "thoikhoabieu.png", type = "image/png") =>
@@ -22,6 +23,37 @@ const reading = {
   warnings: ["Chưa có ngày bắt đầu và số tuần áp dụng."],
   needsReview: true,
 };
+
+it("selects two images together, sends both payloads and removes each independently", async () => {
+  const readImage = vi.fn();
+  const { result } = renderHook(() =>
+    useTimetableImage({ enabled: true, readImage }),
+  );
+  await act(() =>
+    result.current.select([file("Lịch học.png"), file("Lịch làm.png")]),
+  );
+  expect(result.current.attachment.images).toHaveLength(2);
+  const payload = timetableImagePayload(result.current.attachment);
+  expect(payload.name).toBe("Lịch học.png");
+  expect(payload.additionalImages[0].name).toBe("Lịch làm.png");
+  expect(payload.additionalImages[0].data).toBeTruthy();
+  expect(readImage).not.toHaveBeenCalled();
+  act(() => result.current.remove(0));
+  expect(result.current.attachment.file.name).toBe("Lịch làm.png");
+  expect(
+    timetableImagePayload(result.current.attachment).additionalImages,
+  ).toBeUndefined();
+});
+it("can add a second image later and rejects a third without losing selected images", async () => {
+  const { result } = renderHook(() => useTimetableImage({ enabled: true }));
+  await act(() => result.current.select(file("one.png")));
+  await act(() => result.current.select(file("two.png")));
+  await act(() => result.current.select(file("three.png")));
+  expect(result.current.error).toContain("tối đa 2 ảnh");
+  expect(
+    result.current.attachment.images.map((part) => part.file.name),
+  ).toEqual(["one.png", "two.png"]);
+});
 
 function Picker({ readImage, enabled = true }) {
   const image = useTimetableImage({ enabled, readImage });

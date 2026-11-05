@@ -10,8 +10,10 @@ public sealed partial class WorkspaceService
 {
     // Kept independently of the latest analysis: saving a draft must never forget
     // which activities were committed, including tasks later renamed or deleted.
+    private sealed record MatrixDraftData(string Quadrant, DateTimeOffset? Deadline, long Order = 0);
     private sealed record NoteProcessing(string Content, string[] TaskNames, string[] ActivityKeys,
-        Guid[] PendingTaskIds, bool AnalysisImported, Guid? ImportVersion = null);
+        Guid[] PendingTaskIds, bool AnalysisImported, Guid? ImportVersion = null, MatrixDraftData? MatrixDraft = null,
+        DateTimeOffset? InboxCompletedAt = null, DateTimeOffset? InboxReminderAt = null);
     private static string NoteName(string value) => Regex.Replace(value.Trim().Normalize(NormalizationForm.FormKC), @"\s+", " ").ToUpperInvariant();
     private static string ActivityKey(NoteActivity activity) => activity.Kind == "TASK"
         ? "TASK|" + NoteName(activity.Name)
@@ -54,7 +56,7 @@ public sealed partial class WorkspaceService
         ]).ToArray()
     };
     private static NoteProcessing CommitActivities(PlanningNote note, NoteProcessing processing, NoteActivity[] activities, Guid[] taskIds) =>
-        processing with { Content = note.Content, AnalysisImported = true, PendingTaskIds = taskIds,
+        processing with { Content = note.Content, AnalysisImported = true, PendingTaskIds = taskIds, InboxReminderAt = null,
             TaskNames = processing.TaskNames.Concat(activities.Where(x => x.Kind == "TASK").Select(x => NoteName(x.Name))).Distinct().ToArray(),
             ActivityKeys = processing.ActivityKeys.Concat(activities.Select(ActivityKey)).Distinct().ToArray() };
 }

@@ -6,12 +6,14 @@ import { requestTeamJoinReview } from "./team-notification-link.js";
 import { NotificationSoundSettings } from "./notification-sound-settings.jsx";
 
 const types = {
+  friend: { label: "Kết bạn", glyph: "users", tone: "blue" },
   deadline: { label: "Hạn chót", glyph: "clock", tone: "amber" },
   session: { label: "Phiên làm việc", glyph: "calendar", tone: "blue" },
   event: { label: "Lịch hẹn", glyph: "calendar", tone: "blue" },
   warning: { label: "Cảnh báo lịch", glyph: "alertCircle", tone: "coral" },
   schedule: { label: "Thay đổi lịch", glyph: "refresh", tone: "teal" },
   team: { label: "Công việc nhóm", glyph: "users", tone: "teal" },
+  reminder: { label: "Lời nhắc NORA", glyph: "bell", tone: "blue" },
   other: { label: "Cập nhật khác", glyph: "bell", tone: "blue" },
 };
 function notificationType(kind) {
@@ -21,6 +23,10 @@ function notificationType(kind) {
       TEAM_TASK_COMPLETED: "team",
       TEAM_COMPLETION_REJECTED: "team",
       TEAM_JOIN_REQUEST: "team",
+      FRIEND_REQUEST: "friend",
+      FRIEND_ACCEPTED: "friend",
+      NORA_REMINDER: "reminder",
+      INBOX_REMINDER: "reminder",
       DEADLINE: "deadline",
       SESSION_REMINDER: "session",
       SESSION_STARTED: "session",
@@ -390,23 +396,33 @@ function NotificationItem({ item, task }) {
   const type = notificationType(item.kind);
   const meta = types[type];
   const target =
-    item.kind === "TEAM_JOIN_REQUEST"
-      ? item.joinRequestPending === false
-        ? null
-        : { label: "Mở nhóm để duyệt", route: "teams" }
-      : item.kind === "SESSION_REVIEW"
-        ? { label: "Phản hồi NORA", route: "today" }
-        : type === "team"
-          ? { label: "Mở công việc nhóm", route: "teams" }
-          : type === "session" || type === "event" || type === "schedule"
-            ? { label: "Xem lịch làm việc", route: "calendar" }
-            : task
-              ? { label: "Xem công việc", taskId: task.id }
-              : type === "warning"
-                ? { label: "Xem tiến độ", route: "insights" }
-                : item.taskId
-                  ? { label: "Mở danh sách công việc", route: "tasks" }
-                  : null;
+    type === "friend"
+      ? {
+          label: "Mở danh sách bạn bè",
+          route:
+            item.kind === "FRIEND_REQUEST"
+              ? "friends/incoming"
+              : "friends/friends",
+        }
+      : item.kind === "TEAM_JOIN_REQUEST"
+        ? item.joinRequestPending === false
+          ? null
+          : { label: "Mở nhóm để duyệt", route: "teams" }
+        : item.kind === "SESSION_REVIEW"
+          ? { label: "Phản hồi NORA", route: "today" }
+          : type === "reminder"
+            ? { label: "Mở NORA", route: "agent" }
+            : type === "team"
+              ? { label: "Mở công việc nhóm", route: "teams" }
+              : type === "session" || type === "event" || type === "schedule"
+                ? { label: "Xem lịch làm việc", route: "calendar" }
+                : task
+                  ? { label: "Xem công việc", taskId: task.id }
+                  : type === "warning"
+                    ? { label: "Xem tiến độ", route: "insights" }
+                    : item.taskId
+                      ? { label: "Mở danh sách công việc", route: "tasks" }
+                      : null;
   const validDate = Number.isFinite(Date.parse(item.createdAt));
   return (
     <li>

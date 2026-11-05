@@ -341,9 +341,9 @@ export function TeamChat({ teamId, name }) {
                   />
                   <div className="team-chat-message-content">
                     <div className="team-chat-author-line">
-                      <strong className="team-chat-author">
+                      <a className="team-chat-author team-member-profile-link" href={`#profile/${m.userId}`} title={`Xem trang cá nhân của ${author}`}>
                         {mine ? "Bạn" : author}
-                      </strong>
+                      </a>
                       <span
                         className="team-chat-pet"
                         title={`${petName} của ${mine ? "bạn" : author} · Cấp ${petLevel}`}
