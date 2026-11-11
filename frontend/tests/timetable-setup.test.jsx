@@ -16,10 +16,10 @@ const empty = () => ({
   sessions: [],
 });
 
-it("starts a new workspace with the fixed timetable before work hours or tasks", () => {
+it("starts with working hours even when the user already added a fixed event", () => {
   const workspace = empty();
   expect(needsTimetableSetup(workspace)).toBe(true);
-  expect(nextWorkflowStep(workspace).title).toBe("Gửi thời gian biểu");
+  expect(nextWorkflowStep(workspace).route).toBe("time");
   workspace.events.push({ eventType: "CLASS" });
   expect(needsTimetableSetup(workspace)).toBe(false);
   expect(nextWorkflowStep(workspace).title).toBe(
@@ -30,9 +30,9 @@ it("starts a new workspace with the fixed timetable before work hours or tasks",
     startMinute: 1140,
     endMinute: 1320,
   });
-  expect(nextWorkflowStep(workspace).title).toBe("Giao việc cho NORA");
+  expect(nextWorkflowStep(workspace).title).toBe("Thêm công việc");
   workspace.tasks.push({ status: "Todo" });
-  expect(nextWorkflowStep(workspace).route).toBe("agent");
+  expect(nextWorkflowStep(workspace).route).toBe("calendar");
   expect(workflowSteps(workspace)[3].title).toBe("Sắp xếp công việc");
 });
 

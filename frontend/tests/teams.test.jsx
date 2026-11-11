@@ -432,7 +432,7 @@ it("explains real blocking constraints instead of a generic insufficient-capacit
     screen.getByRole("button", { name: "Nhờ NORA phân tích điều kiện" }),
   ).toBeTruthy();
 });
-it("lets a member confirm work hours in the claim popup, then rechecks without automatically claiming", async () => {
+it("directs a member to working hours without automatically claiming", async () => {
   let configured = false;
   routes({
     "/api/teams/tasks/shared/preview": () =>
@@ -482,12 +482,8 @@ it("lets a member confirm work hours in the claim popup, then rechecks without a
     await screen.findByText("Còn một bước: xác nhận giờ có thể làm việc"),
   ).toBeTruthy();
   expect(screen.queryByText(/Cho phép thử dời phiên/)).toBeNull();
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Xác nhận chính sách và lịch" }),
-  );
-  expect(
-    await screen.findByRole("button", { name: "Xác nhận phương án 1" }),
-  ).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Mở Giờ rảnh" }).getAttribute("href")).toBe("#time");
+  expect(api.mock.calls.some(([p]) => p === "/api/time/policy/preview")).toBe(false);
   expect(
     api.mock.calls.some(([p]) => p === "/api/teams/claims/proposal/confirm"),
   ).toBe(false);

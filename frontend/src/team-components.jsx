@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { icon, dateFmt, timeFmt } from "./ui.jsx";
+import { icon, dateFmt, timeFmt, toUtc } from "./ui.jsx";
 import { readTeamBriefFile, TEAM_BRIEF_ACCEPT } from "./team-brief-file.js";
 import { TeamRecipientSelect } from "./team-recipient-select.jsx";
 import { ImportancePreview } from "./eisenhower.jsx";
@@ -471,6 +471,7 @@ export function TeamTaskComposer({
   busy,
   error,
   onDraft,
+  onManualDraft,
   onConfirm,
   onEditDraft,
   onClose,
@@ -524,6 +525,24 @@ export function TeamTaskComposer({
             {fileError || error}
           </p>
         )}
+        {!changeTask && onManualDraft && <details>
+          <summary>Nhập công việc thủ công</summary>
+          <form className="team-form" onSubmit={(event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            onManualDraft({ name: String(data.get("name")), description: String(data.get("description")),
+              estimatedMinutes: Number(data.get("estimatedMinutes")), deadline: toUtc(String(data.get("deadline"))),
+              priority: Number(data.get("priority")), splittable: data.has("splittable") });
+          }}>
+            <label>Tên công việc <input required name="name" maxLength={200} /></label>
+            <label>Mô tả <textarea name="description" maxLength={4000} /></label>
+            <label>Thời lượng công việc thủ công (phút) <input required name="estimatedMinutes" type="number" min="1" max="43200" /></label>
+            <label>Hạn chót (trong 30 ngày) <input required name="deadline" type="datetime-local" /></label>
+            <label>Ưu tiên <select name="priority" defaultValue="2"><option value="1">Thấp</option><option value="2">Vừa</option><option value="3">Cao</option><option value="4">Khẩn</option></select></label>
+            <label><input name="splittable" type="checkbox" defaultChecked /> Cho phép chia phiên</label>
+            <button type="submit" className="btn secondary" disabled={busy}>Xem bản nháp</button>
+          </form>
+        </details>}
         <div className="team-nora-caption">
           <span>{icon("spark")}</span>
           <p>

@@ -214,7 +214,15 @@ public sealed partial class WorkspaceService
                         return new("OK", new { range, total = slots.Length, truncated = slots.Length > 100, slots = slots.Take(100).ToArray() });
                     }
                     verifiedReply = null;
-                    return new("OK", engine.Analyze(calendar, new PlanInput(range.Start, Math.Clamp((int)Math.Ceiling((range.End - range.Start).TotalDays), 1, 30)) { WindowEnd = range.End }, Now));
+                    var analysis = engine.Analyze(calendar, new PlanInput(range.Start, Math.Clamp((int)Math.Ceiling((range.End - range.Start).TotalDays), 1, 30)) { WindowEnd = range.End }, Now);
+                    if (LocalDate(range.Start, state.Preference) == LocalDate(Now, state.Preference) &&
+                        LocalDate(range.End.AddTicks(-1), state.Preference) == LocalDate(Now, state.Preference))
+                    {
+                        var workload = await GetWorkloadAsync(uid, token);
+                        verifiedReply = workload.Next.Reason;
+                        return new("OK", new { analysis, next = workload.Next });
+                    }
+                    return new("OK", analysis);
                 }
                 case "prepare_changes":
                 {

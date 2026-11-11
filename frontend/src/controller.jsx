@@ -1,4 +1,4 @@
-import { nodeList, lines } from "./react-ui.jsx";
+import { nodeList } from "./react-ui.jsx";
 import { RoutePage } from "./route-pages.jsx";
 import { adminRoutes, isAdminRoute } from "./admin-navigation.js";
 import { ConnectionState } from "./connection-state.jsx";
@@ -44,7 +44,9 @@ import {
 import { startNotificationPolling } from "./notification-polling.js";
 import { GettingStarted } from "./getting-started.jsx";
 import { completeGuideStep } from "./onboarding.js";
-import { askNora, secretaryMode } from "./agent-handoff.js";
+import { EventConflictReview, openSessionOutcome } from "./workload.jsx";
+import { openInboxNote } from "./task-inbox-link.js";
+import { askNora } from "./agent-handoff.js";
 import { validateNewPassword } from "./password-policy.js";
 import {
   authSetup,
@@ -58,7 +60,6 @@ import {
   openTask,
   openDetail,
   taskInput,
-  taskForm,
   captureModal,
   breakdownModal,
 } from "./tasks.jsx";
@@ -169,10 +170,12 @@ async function load(renderPage = true) {
       start: new Date().toISOString(),
       horizonDays: 7,
     };
-    const [insights, conflicts] = await Promise.allSettled([
+    const [insights, conflicts, agent] = await Promise.allSettled([
       api("/api/intelligence", "POST", input),
       api("/api/plans/conflicts", "POST", input),
+      api("/api/agent/capabilities"),
     ]);
+    state.noraAvailable = agent.status === "fulfilled" && agent.value?.aiAvailable === true;
     state.insights = insights.status === "fulfilled" ? insights.value : null;
     state.conflicts = conflicts.status === "fulfilled" ? conflicts.value : null;
     state.analysisError =
@@ -302,7 +305,7 @@ async function loadAdmin(search = "") {
 }
 async function scheduleTask(id, triggerEvent = "MANUAL") {
   if (
-    !state.workspace.availability.length &&
+    !state.workspace.availabilityPolicy?.confirmed && !state.workspace.availability.length &&
     !state.workspace.exceptions.some((item) => item.isAvailable)
   ) {
     planOptions([id]);
@@ -314,30 +317,11 @@ async function scheduleTask(id, triggerEvent = "MANUAL") {
     affectedTaskIds: [id],
     isReschedule: true,
     triggerEvent,
+    strict: true,
   });
-  if (
-    plan.hasUrgentReplan ||
-    plan.hasDeadlineProtection ||
-    plan.warnings.length ||
-    !plan.sessions.some((session) => !session.preserved)
-  ) {
-    planModal(plan);
-    return;
-  }
-  await api(`/api/plans/${plan.id}/apply`, "POST");
-  await refreshAfter("Đã xếp công việc vào giờ rảnh.");
-  completeGuideStep(2);
+  planModal(plan);
 }
 function planOptions(affected = []) {
-  if (secretaryMode()) {
-    const names = affected.map((id) => taskById(id)?.name).filter(Boolean);
-    askNora(
-      names.length
-        ? `Hãy sắp xếp công việc ${names.map((name) => `“${name}”`).join(", ")} vào giờ rảnh đã xác nhận, giữ thời gian biểu cố định và deadline.`
-        : "Hãy kiểm tra các công việc đã lưu và sắp xếp vào giờ rảnh đã xác nhận, ưu tiên việc gấp và giữ thời gian biểu cố định.",
-    );
-    return;
-  }
   const go = (route) => {
     closeModal();
     navigation(route);
@@ -349,14 +333,14 @@ function planOptions(affected = []) {
   ) {
     modal(
       "Nhập việc trước khi tạo lịch",
-      "Bạn chưa có công việc cần làm. Thêm một việc hoặc nhập ghi chú để AI tạo công việc.",
+      "Bạn chưa có công việc cần làm. Thêm một việc hoặc ghi nháp để xem lại sau.",
       <div className="form-actions">
         <button
           type="button"
           className="btn primary"
           onClick={() => go("notes")}
         >
-          Nhập việc bằng AI
+          Mở Ghi chú
         </button>
         <button
           type="button"
@@ -373,14 +357,14 @@ function planOptions(affected = []) {
     return;
   }
   if (
-    !state.workspace.availability.length &&
+    !state.workspace.availabilityPolicy?.confirmed && !state.workspace.availability.length &&
     !state.workspace.exceptions.some((item) => item.isAvailable)
   ) {
     modal(
-      "Xác nhận giờ làm việc với NORA",
-      "Gửi thời gian biểu cố định và cho NORA biết giờ sinh hoạt, ngủ/nghỉ hoặc giờ có thể làm việc. NORA sẽ cấu hình quanh lịch của bạn.",
-      <button type="button" className="btn primary" onClick={() => go("agent")}>
-        Mở NORA
+      "Thiết lập giờ làm",
+      "Xác nhận giờ bạn có thể làm việc trước khi xếp lịch.",
+      <button type="button" className="btn primary" onClick={() => go("time")}>
+        Mở Giờ rảnh
       </button>,
     );
     return;
@@ -429,6 +413,7 @@ function planOptions(affected = []) {
         <button className="btn primary" type="submit">
           Tạo đề xuất
         </button>
+        {state.noraAvailable && <button type="button" className="btn ghost" onClick={() => askNora("Giúp tôi xem phương án sắp xếp công việc. Chưa thay đổi lịch.")}>Nhờ NORA</button>}
       </div>
     </form>,
   );
@@ -640,10 +625,10 @@ async function action(name, id, element) {
       );
       break;
     case "new-event":
-      eventModal();
+      eventModal({}, { manual: true });
       break;
     case "edit-event":
-      eventModal(state.workspace.events.find((e) => e.id === id));
+      eventModal(state.workspace.events.find((e) => e.id === id), { manual: true });
       break;
     case "event-detail":
       eventDetail(id);
@@ -722,7 +707,24 @@ async function action(name, id, element) {
       await scheduleTask(id);
       break;
     case "apply-plan":
-      await api(`/api/plans/${id}/apply`, "POST");
+      try {
+        await api(`/api/plans/${id}/apply`, "POST");
+      } catch (error) {
+        if (!["PLAN_STALE", "PLAN_EXPIRED"].includes(error.code)) throw error;
+        const request = state.plan?.id === id ? state.plan.request : null;
+        await load(false);
+        modal("Cần xem lại lịch", error.message, <>
+          <div className="form-error" />
+          <div className="form-actions">
+            {button("Đóng", "close-modal", "ghost")}
+            {request ? <form data-form="regenerate-plan">
+              <button type="submit" className="btn primary">Tạo đề xuất mới</button>
+              <div className="form-error" />
+            </form> : button("Mở tùy chọn lập lịch", "generate-plan", "primary")}
+          </div>
+        </>);
+        break;
+      }
       await refreshAfter("Đã áp dụng kế hoạch.");
       if (
         state.plan?.id === id &&
@@ -731,6 +733,11 @@ async function action(name, id, element) {
         completeGuideStep(2);
       navigation("today");
       break;
+    case "session-outcome": {
+      const session = state.workspace.sessions.find((item) => item.id === id);
+      if (session) openSessionOutcome(session, () => load(false));
+      break;
+    }
     case "session-detail":
       sessionDetail(id);
       break;
@@ -985,6 +992,12 @@ async function action(name, id, element) {
 async function formAction(form, data, nextAction = null) {
   const id = form.dataset.id;
   switch (form.dataset.form) {
+    case "regenerate-plan": {
+      const request = state.plan.request;
+      const start = new Date(Math.max(Date.parse(request.start), Date.now())).toISOString();
+      planModal(await api(request.isReschedule ? "/api/plans/reschedule" : "/api/plans", "POST", { ...request, start }));
+      break;
+    }
     case "admin-lock": {
       const reason = String(data.get("reason") || "").trim();
       if (!reason) throw new Error("Vui lòng nhập lý do khóa tài khoản.");
@@ -1030,7 +1043,7 @@ async function formAction(form, data, nextAction = null) {
       }
       if (!id) completeGuideStep(0);
       await refreshAfter("Đã lưu công việc.");
-      if (!id && data.has("scheduleAfterSave")) {
+      if (!id && nextAction === "preview") {
         try {
           await scheduleTask(saved.id, "NEW_TASK");
         } catch (error) {
@@ -1061,18 +1074,11 @@ async function formAction(form, data, nextAction = null) {
       openDetail(id);
       break;
     case "capture": {
-      const result = await api("/api/tasks/capture", "POST", {
-        text: String(data.get("text")),
-        useAi: data.has("useAi"),
-      });
-      modal(
-        "Kiểm tra công việc gợi ý",
-        `Nguồn: ${["OpenAI", "Gemini", "VertexAI"].includes(result.source) ? result.source : "quy tắc tiếng Việt/Anh"}`,
-        <>
-          <div className="info section-gap">{lines(result.notes)}</div>
-          {taskForm(result.task)}
-        </>,
-      );
+      const content = String(data.get("text")).trim();
+      if (!content) throw new Error("Nhập nội dung công việc.");
+      const note = await api("/api/notes", "POST", { title: content.split("\n")[0].slice(0, 120), content });
+      closeModal();
+      openInboxNote(note.id);
       break;
     }
     case "breakdown": {
@@ -1159,7 +1165,7 @@ async function formAction(form, data, nextAction = null) {
         throw new Error(
           "Không thể tạo lịch trong quá khứ. Hãy chọn giờ bắt đầu sau thời điểm hiện tại.",
         );
-      await api(`/api/time/events${id ? `/${id}` : ""}`, id ? "PUT" : "POST", {
+      const input = {
         name: String(data.get("name")),
         start,
         end: toUtc(String(data.get("end"))),
@@ -1167,7 +1173,16 @@ async function formAction(form, data, nextAction = null) {
         eventType: String(data.get("eventType") || "OTHER"),
         repeatWeeks: Number(data.get("repeatWeeks") || 1),
         isUrgent: data.get("isUrgent") === "on",
-      });
+      };
+      try {
+        await api(`/api/time/events${id ? `/${id}` : ""}`, id ? "PUT" : "POST", input);
+      } catch (error) {
+        if (id || input.repeatWeeks !== 1 || error.code !== "SESSION_OVERLAP") throw error;
+        modal("Sự kiện trùng phiên làm việc", error.message,
+          <EventConflictReview input={input} onBack={() => eventModal(input, { manual: true })}
+            onSaved={() => refreshAfter("Đã lưu sự kiện và lịch làm việc.")} />);
+        return;
+      }
       await refreshAfter();
       break;
     }
@@ -1182,6 +1197,7 @@ async function formAction(form, data, nextAction = null) {
             useCapacityFactor: data.get("useCapacityFactor") === "on",
             useEstimateBias: data.get("useEstimateBias") === "on",
             affectedTaskIds: state.affected?.length ? state.affected : null,
+            strict: true,
           },
         ),
       );
@@ -1299,7 +1315,7 @@ export async function onSubmit(event) {
         formAction(
           form,
           data,
-          event.nativeEvent?.submitter?.dataset.nextAction,
+          event.nativeEvent?.submitter?.dataset.nextAction ?? event.submitter?.dataset.nextAction,
         ),
       );
   } catch {

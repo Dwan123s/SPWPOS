@@ -86,7 +86,12 @@ beforeEach(() => {
         if (url.startsWith("/api/sessions/")) currentWorkspace.sessions = currentWorkspace.sessions.filter((s) => s.id !== id);
         else currentWorkspace.events = currentWorkspace.events.filter((e) => e.id !== id);
       }
-      if (url === "/api/notes") data = [];
+      if (url === "/api/notes") data = options.method === "POST"
+        ? { ...body, id: "captured-note", version: "note-v1" } : [];
+      if (url === "/api/intelligence/workload") {
+        const kind = currentWorkspace.availability.length === 0 ? "SETUP" : currentWorkspace.tasks.length ? "PLAN" : "CAPTURE";
+        data = { next: { kind, reason: "Kiểm tra bước tiếp theo." }, days: [], tasks: [] };
+      }
       if (url === "/api/notes/agent")
         data = { aiAvailable: true, provider: "Gemini" };
       if (url === "/api/agent/turns") data = [];
@@ -931,22 +936,14 @@ it("creates a task and retains filters while updating the React result list", as
   await user.click(screen.getByRole("button", { name: "Thêm công việc" }));
   const name = screen.getByLabelText("Tên công việc");
   await user.type(name, "Kiểm tra React workflow");
-  await user.click(
-    screen.getByRole("button", { name: "Tạo công việc", exact: true }),
-  );
+  fireEvent.change(screen.getByLabelText("Deadline"), { target: { value: "2026-11-16T17:00" } });
+  await user.click(screen.getByRole("button", { name: "Lưu công việc", exact: true }));
   await screen.findByText("Kiểm tra React workflow");
   const request = calls.find((c) => c.url === "/api/tasks");
   expect(request.body.name).toBe("Kiểm tra React workflow");
   expect(request.body.splittable).toBe(true);
   expect(request.body.priority).toBe(2);
-  await waitFor(() =>
-    expect(calls.some((c) => c.url === `/api/plans/${plan.id}/apply`)).toBe(
-      true,
-    ),
-  );
-  expect(
-    calls.find((c) => c.url === "/api/plans").body.affectedTaskIds,
-  ).toEqual(["created-task"]);
+  expect(calls.some((c) => c.url === "/api/plans")).toBe(false);
 });
 
 it("submits the version captured when opening the task editor", async () => {
@@ -1080,7 +1077,8 @@ it.each(["existing", "new"])("requires confirmation before applying urgent displ
   if (kind === "new") {
     await user.click(screen.getByRole("button", { name: "Thêm công việc" }));
     await user.type(screen.getByLabelText("Tên công việc"), "Báo cáo khẩn");
-    await user.click(screen.getByRole("button", { name: "Tạo công việc", exact: true }));
+    fireEvent.change(screen.getByLabelText("Deadline"), { target: { value: "2026-11-16T17:00" } });
+    await user.click(screen.getByRole("button", { name: "Lưu và xem lịch đề xuất" }));
   } else {
     await user.click(screen.getByRole("button", { name: `Xếp lịch công việc ${currentWorkspace.tasks[1].name}` }));
   }
@@ -1106,7 +1104,7 @@ it("previews deadline protection and waits for confirmation before applying a ne
   await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/apply"))).toHaveLength(1));
 });
 
-it("keeps the created task when automatic scheduling fails", async () => {
+it("keeps the created task when preview generation fails", async () => {
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   await navigate("tasks", "Công việc");
@@ -1116,9 +1114,8 @@ it("keeps the created task when automatic scheduling fails", async () => {
     screen.getByLabelText("Tên công việc"),
     "Saved despite planning failure",
   );
-  await userEvent.click(
-    screen.getByRole("button", { name: "Tạo công việc", exact: true }),
-  );
+  fireEvent.change(screen.getByLabelText("Deadline"), { target: { value: "2026-11-16T17:00" } });
+  await userEvent.click(screen.getByRole("button", { name: "Lưu và xem lịch đề xuất" }));
   await screen.findByText(/Công việc đã lưu. Chưa xếp được lịch/);
   expect(
     screen.getByRole("button", { name: "Saved despite planning failure" }),
@@ -1258,7 +1255,7 @@ it.each(["", "#today"])("opens Today at %s for a completely new workspace withou
   expect(location.hash).toBe(hash);
   expect(state.route).toBe("today");
   expect(screen.queryByRole("alert")).toBeNull();
-  expect(screen.getAllByRole("button", { name: "Gửi thời gian biểu cho NORA", exact: true }).length).toBeGreaterThan(0);
+  expect(await screen.findByRole("button", { name: "Thiết lập giờ làm", exact: true })).toBeTruthy();
   expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
   expect(calls.some((call) => call.url === "/api/time/availability" && call.options.method === "PUT")).toBe(false);
   expect(calls.filter((call) =>
@@ -1297,15 +1294,8 @@ it("guides an empty daily schedule to input before offering planning", async () 
   currentWorkspace.sessions = [];
   currentWorkspace.events = [];
   mount();
-  const schedule = within(
-    await screen.findByRole("region", { name: "Lịch hôm nay", exact: true }),
-  );
-  await userEvent
-    .setup()
-    .click(
-      schedule.getByRole("button", { name: "Giao việc cho NORA", exact: true }),
-    );
-  await screen.findByRole("heading", { level: 1, name: "NORA · Trợ lý AI" });
+  await userEvent.click(await screen.findByRole("button", { name: "Ghi việc trước", exact: true }));
+  await screen.findByRole("heading", { name: "Ghi việc trước" });
   expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
 });
 
@@ -1338,7 +1328,8 @@ it("manually creates a calendar event from a selected day and keeps the form on 
   state.calendarView = "week";
   mount();
   await navigate("calendar", "Lịch làm việc");
-  const add = screen.getAllByRole("button", { name: /^Thêm lịch ngày/ })[2];
+  const add = screen.getAllByRole("button", { name: /^Thêm lịch ngày/ }).find((entry) =>
+    Date.parse(entry.getAttribute("aria-label").replace("Thêm lịch ngày ", "") + "T09:00") > Date.now() + 86400000);
   const date = add.getAttribute("aria-label").replace("Thêm lịch ngày ", "");
   await userEvent.setup().click(add);
   const dialog = within(screen.getByRole("dialog"));
@@ -1362,7 +1353,7 @@ it("manually creates a calendar event from a selected day and keeps the form on 
   const request = calls.find((call) => call.url === "/api/time/events");
   expect(request.body).toMatchObject({ name: "Lịch nhập thủ công", start: expect.any(String), end: expect.any(String), repeatWeeks: 1 });
   expect(new Date(request.body.end) - new Date(request.body.start)).toBe(3600000);
-  expect(calls.some((call) => call.url.startsWith("/api/agent/") && call.url !== "/api/agent/reminders")).toBe(false);
+  expect(calls.some((call) => call.url.startsWith("/api/agent/") && call.options.method !== "GET")).toBe(false);
 });
 
 it("shows apply only for real proposals and keeps simulations read-only", async () => {
@@ -1374,7 +1365,7 @@ it("shows apply only for real proposals and keeps simulations read-only", async 
   expect(screen.queryByRole("button", { name: "Lưu lịch này" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Bỏ đề xuất" })).toBeNull();
 });
-it("reviews a captured task with safe text notes before saving", async () => {
+it("saves a captured draft as a note without creating a task or schedule", async () => {
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   await navigate("tasks", "Công việc");
@@ -1384,20 +1375,10 @@ it("reviews a captured task with safe text notes before saving", async () => {
     screen.getByLabelText("Mô tả bằng câu tự nhiên"),
     "Chuẩn bị báo cáo React",
   );
-  await user.click(screen.getByRole("button", { name: /Tạo gợi ý/ }));
-  await screen.findByRole("heading", { name: "Kiểm tra công việc gợi ý" });
-  expect(document.querySelector("#modal .info").textContent).toContain(
-    "<script>untrusted note</script>",
-  );
-  expect(document.querySelector("#modal script")).toBeNull();
-  expect(screen.getByLabelText("Tên công việc").value).toBe(
-    "Chuẩn bị báo cáo React",
-  );
-  expect(calls.some((c) => c.url === "/api/tasks")).toBe(false);
-  await user.click(
-    screen.getByRole("button", { name: "Tạo công việc", exact: true }),
-  );
-  await screen.findByText("Chuẩn bị báo cáo React");
+  await user.click(screen.getByRole("button", { name: "Lưu nháp" }));
+  await waitFor(() => expect(location.hash).toBe("#notes"));
+  expect(calls.find(c => c.url === "/api/notes" && c.options.method === "POST").body.content).toBe("Chuẩn bị báo cáo React");
+  expect(calls.some(c => c.url === "/api/tasks" || c.url === "/api/plans")).toBe(false);
 });
 it("opens and closes the mobile drawer with inert content and restored focus", async () => {
   window.matchMedia = vi.fn((query) => ({
@@ -1423,15 +1404,8 @@ it("guides users to hours before generating a plan without changing saved tasks"
   currentWorkspace.exceptions = [];
   mount();
   await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
-  await userEvent
-    .setup()
-    .click(
-      within(document.querySelector(".page-header .actions")).getByRole(
-        "button",
-        { name: "Xác nhận giờ rảnh với NORA", exact: true },
-      ),
-    );
-  await screen.findByRole("heading", { level: 1, name: "NORA · Trợ lý AI" });
+  await userEvent.click(await screen.findByRole("button", { name: "Thiết lập giờ làm", exact: true }));
+  await screen.findByRole("heading", { level: 1, name: "Giờ rảnh" });
   expect(calls.some((c) => c.url === "/api/plans")).toBe(false);
   expect(currentWorkspace.tasks).toHaveLength(6);
 });

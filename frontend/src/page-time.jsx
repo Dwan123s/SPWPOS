@@ -2,8 +2,7 @@ import { SessionTimer } from "./react-ui.jsx";
 import { Select, nodeList } from "./react-ui.jsx";
 import { availabilityEditor } from "./interactive.jsx";
 import { StartSessionButton } from "./session-start.jsx";
-import { secretaryMode } from "./agent-handoff.js";
-import { SecretaryTime } from "./secretary-overview.jsx";
+import { askNora } from "./agent-handoff.js";
 import {
   state,
   button,
@@ -20,7 +19,6 @@ import {
   timeValue,
 } from "./ui.jsx";
 export function timePage({ onWorkspaceChanged } = {}) {
-  if (secretaryMode()) return <SecretaryTime onWorkspaceChanged={onWorkspaceChanged} />;
   const w = state.workspace,
     p = w.preference;
   return (
@@ -36,6 +34,7 @@ export function timePage({ onWorkspaceChanged } = {}) {
               </p>
             </div>
           </div>
+          {state.noraAvailable && <button type="button" className="btn ghost" onClick={() => askNora("Giúp tôi xác nhận giờ có thể làm việc.")}>Nhờ NORA</button>}
           <form data-form="availability">
             <p className="reason">
               Giờ được nhập theo múi giờ {p.timeZoneId}. Sau khi lưu, bấm biểu

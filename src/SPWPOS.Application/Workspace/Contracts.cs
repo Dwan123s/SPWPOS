@@ -36,6 +36,7 @@ public sealed record EventInput([Required, StringLength(200)] string Name, DateT
     [StringLength(1000)] string Description = "", [RegularExpression("^(MEETING|CLASS|APPOINTMENT|WORK|OTHER)$")] string EventType = "OTHER",
     [Range(1, 12)] int RepeatWeeks = 1, bool? IsUrgent = null);
 public sealed record EventView(Guid Id, string Name, DateTimeOffset Start, DateTimeOffset End, string Description = "", string EventType = "OTHER", bool IsUrgent = false);
+public sealed record EventReplanPreview(Guid? Id, EventView Event, ProposedSession[] Before, ProposedSession[] After, PlanWarning[] Warnings);
 public sealed record PreferenceInput([Required, StringLength(100)] string TimeZoneId,
     [Range(5, 480)] int MinimumSessionMinutes, [Range(5, 480)] int MaximumSessionMinutes,
     [Range(0, 120)] int BreakMinutes, [Range(0, 1439)] int PreferredStartMinute,
@@ -53,7 +54,7 @@ public sealed record DurationInput([Range(0, 10080)] int ActualMinutes);
 public sealed record PlanInput(DateTimeOffset Start, [Range(1, 30)] int HorizonDays = 7,
     [MaxLength(500)] Guid[]? AffectedTaskIds = null, bool IsReschedule = false,
     [RegularExpression("^(MANUAL|NEW_TASK|TASK_CHANGED|EARLY_COMPLETION|SESSION_MISSED|DEADLINE_CHANGED|AVAILABILITY_CHANGED)$")] string TriggerEvent = "MANUAL",
-    bool UseCapacityFactor = true, bool UseEstimateBias = true)
+    bool UseCapacityFactor = true, bool UseEstimateBias = true, bool Strict = false, bool PreserveExisting = false)
 {
     // Server-resolved calendar boundaries; never accepted from a public JSON request.
     [System.Text.Json.Serialization.JsonIgnore]
@@ -62,6 +63,8 @@ public sealed record PlanInput(DateTimeOffset Start, [Range(1, 30)] int HorizonD
     public int UrgentDisplacementDays { get; init; } = 2;
     [System.Text.Json.Serialization.JsonIgnore]
     public bool AllowDeadlineRescue { get; init; } = true;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool RestrictAffectedTasks { get; init; }
 }
 public sealed record PlanWarning(Guid TaskId, string TaskName, string Code, string Message, int UnscheduledMinutes);
 public sealed record ProposedSession(Guid Id, Guid TaskId, DateTimeOffset Start, DateTimeOffset End, string ReasonCode, bool Preserved);
@@ -69,7 +72,7 @@ public sealed record PlanView(Guid Id, Guid Revision, DateTimeOffset Start, Date
     ProposedSession[] Sessions, PlanWarning[] Warnings, string[] Explanations, bool IsApplied,
     string Status = "PROPOSED", string Kind = "INITIAL", Guid? PreviousPlanId = null, DateTimeOffset? AppliedAt = null,
     bool UseEstimateBias = true, NotePlanContext? NoteContext = null, bool HasUrgentReplan = false, bool HasDeadlineProtection = false,
-    bool IsOptimization = false, string? PriorityPolicy = null)
+    bool IsOptimization = false, string? PriorityPolicy = null, bool Strict = false, PlanInput? Request = null)
 {
     public bool RequiresConfirmation => HasUrgentReplan || HasDeadlineProtection || IsOptimization;
 }
@@ -112,6 +115,10 @@ public interface IWorkspaceService
     Task<SessionView[]> GetCatchUpAsync(Guid userId, CancellationToken ct);
     Task<CatchUpResult> CatchUpAsync(Guid userId, Guid sessionId, CatchUpInput input, CancellationToken ct);
     Task<WorkTimeReview[]> GetWorkTimeReviewsAsync(Guid userId, CancellationToken ct);
+    Task<SessionOutcomeResult> RecordSessionOutcomeAsync(Guid userId, Guid sessionId, SessionOutcomeInput input, CancellationToken ct);
+    Task<EventReplanPreview> PreviewEventReplanAsync(Guid userId, EventInput input, CancellationToken ct);
+    Task<WorkloadView> GetWorkloadAsync(Guid userId, CancellationToken ct);
+    Task<Guid> ConfirmEventReplanAsync(Guid userId, Guid id, CancellationToken ct);
     Task<ExtraTimePreview> PreviewExtraTimeAsync(Guid userId, Guid sessionId, ExtraTimeInput input, CancellationToken ct);
     Task<WorkTimeResult> ConfirmExtraTimeAsync(Guid userId, Guid proposalId, ExtraTimeConfirm input, CancellationToken ct);
     Task<WorkTimeResult> FinishWorkTaskAsync(Guid userId, Guid sessionId, CancellationToken ct);

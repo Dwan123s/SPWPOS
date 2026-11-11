@@ -23,6 +23,28 @@ public sealed class TeamBriefApiTests
                 Enumerable.Range(1, context.MemberCount).Select(i => new TeamBriefTask("Task API " + i, "Tóm tắt", ["Yêu cầu"], ["Báo cáo"], ["Đủ dữ liệu"], [], [], 60, context.Now.AddDays(2), "hạn sau hai ngày")).ToArray(), []) }));
         }
     }
+    [Fact]
+    public async Task Manual_team_draft_accepts_thirty_days_without_calling_ai()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = new ApiFactory();
+        using var client = await factory.ClientAsync();
+        var tokens = await AuthFlowTests.RegisterLoginAsync(factory, client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Access);
+        var response = await client.PostAsJsonAsync("/api/teams", new { name = "Manual drafts" }, ct);
+        response.EnsureSuccessStatusCode();
+        using var team = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        var teamId = team.RootElement.GetProperty("data").GetProperty("id").GetGuid();
+        var now = factory.Clock.GetUtcNow();
+        var input = new { name = "Report", description = "Review notes", estimatedMinutes = 90,
+            deadline = now.AddDays(30), priority = 2, splittable = true };
+        var path = $"/api/teams/{teamId}/drafts/manual";
+        var preview = await client.PostAsJsonAsync(path, input, ct);
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(path, input with { deadline = now.AddDays(30).AddSeconds(1) }, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(path, input with { deadline = now.AddMinutes(5) }, ct)).StatusCode);
+    }
+
     [Fact] public async Task Upload_larger_than_standard_request_limit_is_accepted_only_for_briefs_and_confirm_is_idempotent()
     {
         var ct = TestContext.Current.CancellationToken; await using var factory = new Factory(); using var client = await factory.ClientAsync();

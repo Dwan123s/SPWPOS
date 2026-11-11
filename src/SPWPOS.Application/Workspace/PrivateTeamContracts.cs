@@ -30,6 +30,8 @@ public sealed record TeamActivityView(Guid ActorId, Guid? TaskId, string Kind, D
 public sealed record TeamDetailView(TeamView Team, TeamMemberView[] Members, SharedTaskView[] Tasks, TeamActivityView[] Activity, TeamJoinRequestView[]? JoinRequests = null);
 public sealed record TeamInviteView(Guid Id, string Code, DateTimeOffset ExpiresAt);
 public sealed record TeamInvitePreview(string TeamName, int MemberCount, DateTimeOffset ExpiresAt, bool AlreadyMember, string? RequestStatus = null);
+public sealed record ManualTeamTaskInput(string Name, string? Description, int EstimatedMinutes,
+    DateTimeOffset Deadline, int Priority = 2, bool Splittable = true);
 public sealed record TeamTaskDraft(Guid ProposalId, string Reply, string Question, SharedTaskView? Task);
 public sealed record PrivateClaimSession(Guid Id, string TaskName, DateTimeOffset Start, DateTimeOffset End, bool Preserved);
 public sealed record PrivateClaimOption(int Index, string Label, PrivateClaimSession[] After, PrivateClaimSession[] Before, string[] Explanations);
@@ -65,6 +67,7 @@ public interface IPrivateTeamService
     Task<MyTeamJoinRequestView[]> ListMyTeamJoinRequestsAsync(Guid uid, CancellationToken ct);
     Task ReviewTeamJoinRequestAsync(Guid uid, Guid teamId, Guid memberId, TeamJoinReviewInput input, CancellationToken ct);
     Task RemoveTeamMemberAsync(Guid uid, Guid teamId, Guid memberId, Guid version, CancellationToken ct);
+    Task<TeamTaskDraft> DraftManualTeamTaskAsync(Guid uid, Guid teamId, ManualTeamTaskInput input, CancellationToken ct);
     Task<TeamTaskDraft> DraftTeamTaskAsync(Guid uid, Guid teamId, TeamTextInput input, CancellationToken ct);
     Task<Guid> ConfirmTeamTaskDraftAsync(Guid uid, Guid teamId, Guid proposalId, CancellationToken ct, TeamTaskRecipientInput? recipient = null);
     Task ChangeTeamTaskRecipientAsync(Guid uid, Guid taskId, TeamTaskRecipientChangeInput input, CancellationToken ct);

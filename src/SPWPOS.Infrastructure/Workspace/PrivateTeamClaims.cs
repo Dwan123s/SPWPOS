@@ -16,9 +16,14 @@ public sealed partial class WorkspaceService
             "TASK_UNAVAILABLE", "Công việc đã được nhận hoặc không có yêu cầu thay đổi.", 409);
         Require(change || shared.DesignatedUserId == null || shared.DesignatedUserId == uid, "TASK_DESIGNATED", "Task này được chỉ định cho thành viên khác.", 403);
         var state = await State(uid, ct);
-        Require(state.Events.Length > 0, "TIMETABLE_REQUIRED", "Gửi và xác nhận thời gian biểu trước khi nhận việc.", 409);
         var data = change ? JsonSerializer.Deserialize<SharedTaskView>(shared.PendingChangeJson!)! : SharedDto(shared);
-        Require(data.Deadline > Now.AddMinutes(5) && data.Deadline <= Now.AddDays(30), "TEAM_DEADLINE_RANGE", "Chỉ lập lịch nhận việc có deadline trong 30 ngày tới.", 409);
+        if (!TeamDeadlineInRange(data.Deadline) && !change)
+        {
+            var message = data.Deadline > Now.AddDays(30)
+                ? $"Có thể nhận việc từ {data.Deadline.UtcDateTime.AddDays(-30):yyyy-MM-dd HH:mm} UTC hoặc nhờ trưởng nhóm đổi hạn."
+                : "Hạn chót đã quá gần hoặc đã qua. Hãy nhờ trưởng nhóm đổi hạn.";
+            return new(Guid.Empty, taskId, Now, [], [], true, message);
+        }
         var task = new WorkTask { UserId = uid, Name = data.Name, Description = data.Description, EstimatedMinutes = data.EstimatedMinutes, Deadline = data.Deadline,
             Priority = data.Priority, Splittable = data.Splittable, IsHardDeadline = true, CreationSource = "TEAM", CreatedAt = Now, UpdatedAt = Now,
             MinimumSessionMinutes = state.Preference.MinimumSessionMinutes };
@@ -32,10 +37,10 @@ public sealed partial class WorkspaceService
         }
         var candidate = state with { Tasks = state.Tasks.Where(x => x.Id != task.Id).Append(task).ToArray() };
         var start = Now.AddMinutes(5);
-        if (state.Policy == null && state.Availability.Length == 0 && !state.Exceptions.Any(x => x.IsAvailable))
-            return new(Guid.Empty, taskId, Now, [], [], !change, "Bạn đã có thời gian biểu cố định, nhưng chưa xác nhận giờ có thể làm việc. NORA cần khung sinh hoạt được bạn chấp nhận để phân biệt khoảng chưa có lịch với giờ thực sự có thể làm việc.",
+        if (!HasWorkHours(state))
+            return new(Guid.Empty, taskId, Now, [], [], !change, "Chưa xác nhận giờ có thể làm việc. Mở Giờ rảnh để thiết lập rồi thử lại.",
                 new("WORK_HOURS_NOT_CONFIRMED", task.EstimatedMinutes, 0, 0, 0, 0,
-                    ["Chưa dùng preset hoặc tự coi khoảng ngoài giờ học là giờ làm việc.", "Xem đề xuất giờ sinh hoạt bên dưới, xác nhận một lần rồi NORA sẽ tính lại task này."], true));
+                    ["Chưa dùng preset hoặc tự coi khoảng ngoài giờ học là giờ làm việc.", "Lưu giờ có thể làm trong Giờ rảnh rồi mở lại đề xuất nhận việc."], true));
         // Include displaced work all the way to its own deadline, within the supported horizon.
         var end = state.Tasks.Where(x => x.Status is WorkTaskStatus.Todo or WorkTaskStatus.InProgress).Select(x => x.Deadline).Append(task.Deadline).Max();
         if (end > start.AddDays(30)) end = start.AddDays(30);

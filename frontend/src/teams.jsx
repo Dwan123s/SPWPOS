@@ -19,7 +19,6 @@ import {
   parseTeamInvite,
   teamInviteLink,
 } from "./team-invite-link.js";
-import { AvailabilityPolicyCard } from "./availability-policy.jsx";
 import { SessionList } from "./team-session-list.jsx";
 import { TeamScheduleCompare } from "./team-schedule-compare.jsx";
 export { SessionList } from "./team-session-list.jsx";
@@ -878,6 +877,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
               : undefined
           }
           onClose={() => setComposerOpen(false)}
+          onManualDraft={(input) => run(async () => setDraft(await post(`${detail.team.id}/drafts/manual`, input)))}
           onDraft={() =>
             run(async () =>
               setDraft(
@@ -1201,14 +1201,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
                 }
               />
               {claim.failure?.needsAvailability && (
-                <AvailabilityPolicyCard
-                  embedded
-                  autoPreview
-                  onWorkspaceChanged={async () => {
-                    await changed();
-                    await openClaim(claimRequest.task, claimRequest.change);
-                  }}
-                />
+                <a className="btn secondary" href="#time" onClick={cancelClaim}>Mở Giờ rảnh</a>
               )}
               {claim.canUndo !== false &&
                 !claim.failure?.needsAvailability &&

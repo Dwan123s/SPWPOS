@@ -29,7 +29,7 @@ public sealed partial class PlanningEngine
             var newest = state.Tasks.Where(task => requested.Contains(task.Id) && task.Priority == 4).Select(task => task.Id).ToHashSet();
             if (newest.Count > 0) baseline = new([], [], RequestedUrgentTaskIds: newest);
         }
-        if (input.AffectedTaskIds is null || input.AffectedTaskIds.Length == 0)
+        if (input.RestrictAffectedTasks || input.AffectedTaskIds is null || input.AffectedTaskIds.Length == 0)
             return GenerateUrgent(state, input, now, baseline);
         var start = input.Start > now ? input.Start : now;
         var end = input.WindowEnd ?? start.AddDays(input.HorizonDays);

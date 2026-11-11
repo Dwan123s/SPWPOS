@@ -145,7 +145,8 @@ public sealed partial class PlanningEngine
         var start = input.Start < now ? now : input.Start; var end = input.WindowEnd ?? start.AddDays(input.HorizonDays);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         var factor = input.UseCapacityFactor ? Capacity(state, now).Factor : 1;
-        var affected = input.AffectedTaskIds is null ? null : AffectedClosure(state, input.AffectedTaskIds);
+        var affected = input.AffectedTaskIds is null ? null : input.RestrictAffectedTasks
+            ? input.AffectedTaskIds.ToHashSet() : AffectedClosure(state, input.AffectedTaskIds);
         var preserve = state.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused ||
             x.Status == WorkSessionStatus.Scheduled && x.End > now && (x.Start < start || x.Start >= end || x.IsLocked ||
                 urgency?.RetainedSessionIds.Contains(x.Id) == true || affected is not null && !affected.Contains(x.TaskId))).ToArray();

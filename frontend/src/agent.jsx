@@ -1493,7 +1493,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           )}
           {error && !confirmDeleteCurrent && (
             <p className="form-error" role="alert">
-              {error}
+              <span>{error}</span> <a href="#time">Chỉnh giờ làm</a> · <a href="#tasks">Thêm công việc</a> · <a href="#calendar">Mở lịch</a>
               {!capabilities && (
                 <button
                   type="button"

@@ -26,39 +26,35 @@ export function workflowSteps(workspace, now = Date.now()) {
   );
   return [
     {
-      title: "Gửi thời gian biểu",
-      description:
-        "Gửi lịch học, lịch làm hoặc lịch cố định để NORA phân tích các giờ bận trước.",
-      done: !!workspace?.events?.length || hasTime || hasPlan,
-      route: "agent",
-      label: "Gửi thời gian biểu cho NORA",
+      title: "Thêm sự kiện cố định",
+      description: "Thêm lịch học, lịch làm hoặc các sự kiện đã có.",
+      done: true,
+      route: "calendar",
+      label: "Thêm sự kiện cố định",
       symbol: "calendar",
     },
     {
       title: "Xác nhận giờ có thể làm việc",
-      description:
-        "Nói giờ sinh hoạt, ngủ/nghỉ và giờ có thể làm việc; NORA cấu hình quanh lịch cố định.",
+      description: "Chọn giờ có thể làm việc trong tuần.",
       done: hasTime,
-      route: "agent",
-      label: "Xác nhận giờ rảnh với NORA",
+      route: "time",
+      label: "Thiết lập giờ làm",
       symbol: "clock",
     },
     {
-      title: "Giao việc cho NORA",
-      description:
-        "Cho biết bài tập hoặc công việc, thời lượng, deadline và mức độ gấp để NORA tìm chỗ trong lịch.",
+      title: "Thêm công việc",
+      description: "Lưu tên, thời lượng và hạn chót của công việc.",
       done: hasTasks,
-      route: "agent",
-      label: "Giao việc cho NORA",
+      route: "tasks",
+      label: "Thêm công việc",
       symbol: "edit",
     },
     {
       title: "Sắp xếp công việc",
-      description:
-        "NORA xếp việc vào giờ rảnh đã xác nhận, ưu tiên việc gấp và giữ lịch cố định.",
+      description: "Xem trước các phiên theo giờ rảnh rồi xác nhận.",
       done: hasPlan,
-      route: "agent",
-      label: "Nhờ NORA sắp xếp",
+      route: "calendar",
+      label: "Xem lịch đề xuất",
       symbol: "calendar",
     },
     {

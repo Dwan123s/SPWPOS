@@ -14,7 +14,32 @@ public sealed partial class WorkspaceService
         if (input.AffectedTaskIds is not null) Require(input.AffectedTaskIds.All(id => state.Tasks.Any(t => t.Id == id)), "NOT_FOUND", "Công việc không thuộc tài khoản.", 404);
         // Leave time for review; an immediate start would already be in the past at Apply.
         var earliestStart = Now.AddMinutes(5);
-        var plan = engine.Generate(state, input with { Start = input.Start < earliestStart ? earliestStart : input.Start }, Now);
+        var candidate = input.PreserveExisting ? state with
+        {
+            Sessions = state.Sessions.Select(session =>
+            {
+                if (session.Status != WorkSessionStatus.Scheduled || session.IsLocked) return session;
+                var task = state.Tasks.FirstOrDefault(t => t.Id == session.TaskId);
+                var inScope = input.AffectedTaskIds is null || input.AffectedTaskIds.Contains(session.TaskId);
+                return !inScope || task != null && ValidWorkReservation(state, task, session) ? CloneLocked(session) : session;
+            }).ToArray()
+        } : state;
+        var plan = engine.Generate(candidate, input with
+        {
+            Start = input.Start < earliestStart ? earliestStart : input.Start,
+            AllowDeadlineRescue = !input.PreserveExisting && input.AllowDeadlineRescue,
+            RestrictAffectedTasks = input.PreserveExisting
+        }, Now) with { Strict = input.Strict, Request = input.Strict ? input : null };
+        if (plan.Strict)
+        {
+            var scope = input.AffectedTaskIds?.ToHashSet();
+            var late = plan.Sessions.Where(s => s.Preserved && (scope == null || scope.Contains(s.TaskId)))
+                .Select(s => new { Session = s, Task = state.Tasks.FirstOrDefault(t => t.Id == s.TaskId) })
+                .Where(x => x.Task != null && x.Session.End > x.Task.Deadline)
+                .DistinctBy(x => x.Task!.Id)
+                .Select(x => new PlanWarning(x.Task!.Id, x.Task.Name, "DEADLINE_CONFLICT", "Phiên đang giữ kết thúc sau hạn chót.", 0));
+            plan = plan with { Warnings = plan.Warnings.Concat(late).ToArray() };
+        }
         var proposal = new PlanProposal { UserId = uid, CreatedAt = Now, ExpiresAt = Now.AddMinutes(30), Revision = state.Preference.Revision };
         proposal.PreviousPlanId = await Mine<PlanProposal>(uid).Where(x => x.Status == "APPLIED").OrderByDescending(x => x.AppliedAt).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
         proposal.Kind = input.IsReschedule || input.AffectedTaskIds is not null || proposal.PreviousPlanId is not null ? "RESCHEDULE" : "INITIAL";
@@ -63,6 +88,7 @@ public sealed partial class WorkspaceService
     }, ct);
     private async Task ApplyPlanCoreAsync(Guid uid, PlanProposal proposal, PlanView plan, PlanningState state, CancellationToken ct)
     {
+        Require(!plan.Strict || !HasPlanShortfall(plan), "PLAN_INFEASIBLE", "Chưa thể xếp đủ thời gian trước hạn. Lịch đã lưu không thay đổi.", 409);
         Require(plan.PriorityPolicy == null || plan.PriorityPolicy == (state.EisenhowerScheduling ? "eisenhower-v1" : "legacy"),
             "PLAN_STALE", "Chính sách ưu tiên đã thay đổi. Hãy xem phương án mới.", 409);
         Require(!plan.HasDeadlineProtection || !plan.Warnings.Any(x => x.UnscheduledMinutes > 0 || x.Code == "SOFT_DEADLINE_EXCEEDED"),
@@ -89,6 +115,8 @@ public sealed partial class WorkspaceService
         foreach (var previous in await Mine<PlanProposal>(uid).Where(x => x.Id != id && x.Status == "APPLIED").ToArrayAsync(ct)) previous.Status = "SUPERSEDED";
         await AddNotification(uid, "SCHEDULE_CHANGE", "Kế hoạch đã cập nhật", $"Đã áp dụng {plan.Sessions.Count(x => !x.Preserved)} phiên mới. {plan.Warnings.Length} công việc có cảnh báo.", "plan:" + id, null, ct, planId: id);
     }
+    private static bool HasPlanShortfall(PlanView plan) =>
+        plan.Warnings.Any(w => w.UnscheduledMinutes > 0 || w.Code is "SOFT_DEADLINE_EXCEEDED" or "DEADLINE_CONFLICT");
     private void ValidateSession(PlanningState state, Guid taskId, DateTimeOffset start, DateTimeOffset end,
         IEnumerable<ProposedSession> occupied, Guid excludeId, bool dependenciesMustBeCompleted, bool useEstimateBias = true, bool suggestAlternatives = true)
     {

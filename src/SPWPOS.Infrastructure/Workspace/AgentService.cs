@@ -97,6 +97,17 @@ public sealed partial class WorkspaceService
         input = input with { Text = CalendarKindPrompt(input) };
         try
         {
+            if (input.Image is null && input.CalendarKind == "Auto" &&
+                ChatMatch(input.Text, @"^\s*(?:nora[,!:\s]+)?(?:hom nay (?:minh |toi )?nen lam gi|what should i (?:do|work on) today)[?!.\s]*$").Success)
+            {
+                var workload = await GetWorkloadAsync(uid, ct);
+                return await Mutate(uid, async () =>
+                {
+                    var turn = await Find<AgentTurn>(uid, turnId, ct);
+                    return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text,
+                        workload.Next.Reason, "ANSWERED", "", null, [], [], turn.CreatedAt));
+                }, ct, false);
+            }
             // Shared by all model calls for this turn, including clarification
             // rechecks and review explanations. Calendar writes still use ct.
             using var aiBudget = CancellationTokenSource.CreateLinkedTokenSource(ct);

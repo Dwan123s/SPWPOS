@@ -10,6 +10,8 @@ public sealed class SessionsController(IWorkspaceService service) : WorkspaceCon
 {
     [HttpGet("needs-review")] public async Task<IActionResult> CatchUp(CancellationToken ct) => Data(await service.GetCatchUpAsync(UserId, ct));
     [HttpGet("time-review")] public async Task<IActionResult> TimeReviews(CancellationToken ct) => Data(await service.GetWorkTimeReviewsAsync(UserId, ct));
+    [HttpPost("{id:guid}/outcome")] public async Task<IActionResult> Outcome(Guid id, SessionOutcomeInput input, CancellationToken ct) =>
+        Data(await service.RecordSessionOutcomeAsync(UserId, id, input, ct));
     [HttpPost("{id:guid}/extra-time/preview")] public async Task<IActionResult> ExtraTime(Guid id, ExtraTimeInput input, CancellationToken ct) => Data(await service.PreviewExtraTimeAsync(UserId,id,input,ct));
     [HttpPost("extra-time/{id:guid}/confirm")] public async Task<IActionResult> ConfirmExtra(Guid id, ExtraTimeConfirm input, CancellationToken ct) => Data(await service.ConfirmExtraTimeAsync(UserId,id,input,ct));
     [HttpPost("{id:guid}/finish-task")] public async Task<IActionResult> FinishTask(Guid id, CancellationToken ct) => Data(await service.FinishWorkTaskAsync(UserId,id,ct));

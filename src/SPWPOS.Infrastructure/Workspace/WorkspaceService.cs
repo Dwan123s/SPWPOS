@@ -24,10 +24,10 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     {
         var preference = db.WorkPreferences.Local.SingleOrDefault(x => x.UserId == uid) ?? await Mine<WorkPreference>(uid).SingleOrDefaultAsync(ct);
         if (preference is not null) return preference;
-        preference = new() { UserId = uid }; db.WorkPreferences.Add(preference); return preference;
+        preference = new() { UserId = uid, Revision = Guid.Empty }; db.WorkPreferences.Add(preference); return preference;
     }
     private async Task<T> Mutate<T>(Guid uid, Func<Task<T>> action, CancellationToken ct, bool revision = true,
-        System.Data.IsolationLevel isolation = System.Data.IsolationLevel.ReadCommitted)
+        System.Data.IsolationLevel isolation = System.Data.IsolationLevel.ReadCommitted, bool repairTimeConflicts = true)
     {
         var email = await db.Users.AsNoTracking().Where(x => x.Id == uid).Select(x => x.NormalizedEmail).SingleOrDefaultAsync(ct);
         Require(email is not null, "UNAUTHORIZED", "Tài khoản không khả dụng.", 401);
@@ -70,7 +70,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         { if (entry.State == EntityState.Added) entry.Entity.CreatedAt = Now; entry.Entity.UpdatedAt = Now; }
         await db.SaveChangesAsync(ct);
         if (revision && tasksChanged) await UpdateContainerProgressAsync(uid, ct);
-        if (revision && timeChanged)
+        if (revision && timeChanged && repairTimeConflicts)
             await RescheduleTimeConflictsAsync(uid, ct);
         if (revision) { await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, preference.PlanningHorizonDays), ct); await db.SaveChangesAsync(ct); }
         await tx.CommitAsync(ct); return result;

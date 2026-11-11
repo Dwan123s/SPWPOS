@@ -181,7 +181,9 @@ export function sessionDetail(id) {
       ) : (
         ""
       )}
-      {s.status === "Completed" && !secretaryMode() ? (
+      {Date.parse(s.end) <= Date.now() && ["Scheduled", "NeedsReview", "Running", "Paused", "Completed", "Missed"].includes(s.status) &&
+        button("Ghi kết quả phiên", "session-outcome", "secondary", id)}
+      {s.status === "Completed" ? (
         <form data-form="actual-duration" data-id={id}>
           {field(
             "Sửa thời gian thực tế (phút)",
@@ -229,17 +231,12 @@ export function eventDetail(id) {
     {event.description && <p className="info" style={{ whiteSpace: "pre-wrap" }}>{event.description}</p>}
     <div className="form-actions">
       {button("Xóa lịch", "delete-event", "danger", event.id, "trash")}
-      {button(secretaryMode() ? "Điều chỉnh với NORA" : "Chỉnh sửa lịch", "edit-event", "secondary", event.id, "edit")}
+      {button("Chỉnh sửa lịch", "edit-event", "secondary", event.id, "edit")}
       {button("Đóng", "close-modal", "ghost")}
     </div>
   </>);
 }
-export function eventModal(event = {}, { manual = false } = {}) {
-  if (secretaryMode() && !manual) {
-    askNora(event.id ? `Tôi muốn điều chỉnh lịch cố định “${event.name}” (mã ${event.id}). Hỏi tôi thay đổi cần thực hiện.`
-      : "Tôi có một lịch bận mới. Hỏi tôi nội dung và thời gian, rồi cập nhật quanh thời gian biểu cố định.");
-    return;
-  }
+export function eventModal(event = {}, { manual = true } = {}) {
   const start = event.start || new Date(Date.now() + 3600000).toISOString(),
     end = event.end || new Date(Date.now() + 7200000).toISOString();
   if (!event.id && Date.parse(start) <= Date.now()) {
@@ -322,6 +319,7 @@ export function eventModal(event = {}, { manual = false } = {}) {
         <button type="submit" className="btn primary">
           Lưu sự kiện
         </button>
+        {state.noraAvailable && !event.id && <button type="button" className="btn ghost" onClick={() => askNora("Giúp tôi thêm một sự kiện cố định.")}>Nhờ NORA</button>}
       </div>
     </form>,
   );
@@ -429,12 +427,18 @@ export function availabilityRow(
 }
 export function planModal(plan, simulation = false) {
   state.plan = plan;
-  const confirmMove = plan.hasUrgentReplan && !plan.isApplied;
+  const blocked = plan.strict && plan.warnings.some((w) => w.unscheduledMinutes > 0 || ["SOFT_DEADLINE_EXCEEDED", "DEADLINE_CONFLICT"].includes(w.code));
+  const confirmMove = plan.hasUrgentReplan && !plan.isApplied && !blocked;
   const movedTaskIds = new Set(
     plan.sessions.filter((s) => !s.preserved &&
       ["URGENT_NEAR_DEADLINE_MOVE", "URGENT_FLEXIBLE_MOVE"].includes(s.reasonCode))
       .map((s) => s.taskId),
   );
+  const kept = new Set(plan.sessions.filter((s) => s.preserved).map((s) => s.id));
+  const previous = (state.workspace.sessions || []).filter((s) =>
+    s.status === "Scheduled" && new Date(s.start) >= new Date(plan.start) &&
+    new Date(s.start) < new Date(plan.end) && !kept.has(s.id));
+  if (plan.strict) for (const row of previous) movedTaskIds.add(row.taskId);
   const windowText = (s) => `${dateFmt(s.start)} · ${timeFmt(s.start)}–${timeFmt(s.end)}`;
   modal(
     plan.isApplied ? "Lịch đã được lưu" : "Xem trước lịch",
@@ -444,6 +448,7 @@ export function planModal(plan, simulation = false) {
         <div role="status" className="info plan-save-status">
           {plan.isApplied
             ? "Lịch này đã được lưu. Mở Lịch làm việc để bắt đầu."
+            : blocked ? "Chưa thể xếp đủ thời gian trước hạn. Lịch hiện tại được giữ nguyên."
             : confirmMove
               ? "Đề xuất dời lịch để ưu tiên việc khẩn. Lịch hiện tại chưa thay đổi. Kiểm tra giờ cũ và giờ mới rồi bấm Xác nhận dời lịch. Hạn chót giữ nguyên."
             : plan.hasDeadlineProtection
@@ -451,20 +456,17 @@ export function planModal(plan, simulation = false) {
             : "Đây là lịch xem trước, chưa thay đổi lịch hiện tại. Bấm Lưu lịch này để đưa các khoảng làm việc vào lịch."}
         </div>
       )}
-      {confirmMove && movedTaskIds.size > 0 && (
+      {(confirmMove || plan.strict && !plan.isApplied) && movedTaskIds.size > 0 && (
         <section aria-label="Các công việc được đề xuất dời lịch">
           <h3>Đề xuất dời lịch</h3>
           {nodeList([...movedTaskIds].map((taskId) => {
             const task = state.workspace.tasks.find((t) => t.id === taskId);
-            const kept = new Set(plan.sessions.filter((s) => s.preserved).map((s) => s.id));
-            const before = (state.workspace.sessions || []).filter((s) => s.taskId === taskId &&
-              s.status === "Scheduled" && new Date(s.start) >= new Date(plan.start) &&
-              new Date(s.start) < new Date(plan.end) && !kept.has(s.id));
+            const before = previous.filter((s) => s.taskId === taskId);
             const after = plan.sessions.filter((s) => s.taskId === taskId && !s.preserved);
             return <div className="info spaced">
               <strong>{task?.name || "Công việc"}</strong>
               <p>Giờ cũ: {before.map(windowText).join("; ") || "Xem lịch đã lưu"}</p>
-              <p>Giờ mới: {after.map(windowText).join("; ")}</p>
+              <p>Giờ mới: {after.map(windowText).join("; ") || "—"}</p>
               {task?.deadline && <p>Hạn chót giữ nguyên: {dateFmt(task.deadline)} · {timeFmt(task.deadline)}</p>}
             </div>;
           }))}
@@ -544,7 +546,7 @@ export function planModal(plan, simulation = false) {
         ) : (
           ""
         )}
-        {!simulation && !plan.isApplied && plan.status !== "DISCARDED"
+        {!simulation && !blocked && !plan.isApplied && plan.status !== "DISCARDED"
           ? button(confirmMove ? "Xác nhận dời lịch" : plan.hasDeadlineProtection ? "Xác nhận kế hoạch" : "Lưu lịch này", "apply-plan", "primary", plan.id, "check")
           : ""}
         {!simulation && plan.isApplied

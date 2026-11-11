@@ -16,6 +16,9 @@ public sealed record ExtraTimeSlot(Guid Id, DateTimeOffset Start, DateTimeOffset
 public sealed record ExtraTimePreview(Guid Id, Guid Revision, Guid SessionId, string TaskName, int Minutes, ExtraTimeSlot[] Slots, string Message, bool Feasible);
 public sealed record ExtraTimeConfirm(Guid Revision);
 public sealed record WorkTimeResult(string Message, Guid[] SessionIds);
+public sealed record SessionOutcomeInput([Required] string Outcome,
+    [Range(0, 10080)] int? ActualMinutes = null, [Range(1, 43200)] int? RemainingMinutes = null);
+public sealed record SessionOutcomeResult(Guid SessionId, Guid TaskId, string Outcome, long ActualSeconds, int? RemainingMinutes);
 public sealed record AdminMetrics(int Users, int ActiveUsersToday, int CompletedSessions, long? InputTokens, long? OutputTokens,
     long FailedJobs, long ProcessMemoryBytes, double ProcessCpuMilliseconds, DateTimeOffset AsOf);
 public sealed record DependencyHealth(bool Configured, bool? Reachable, double? LastObservedLatencyMilliseconds, string Detail);

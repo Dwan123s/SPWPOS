@@ -22,6 +22,8 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
     [HttpPost("{id:guid}/join-requests/{memberId:guid}/review")] public async Task<IActionResult> ReviewJoin(Guid id, Guid memberId, TeamJoinReviewInput input, CancellationToken ct)
     { await service.ReviewTeamJoinRequestAsync(UserId, id, memberId, input, ct); return Done(); }
     [HttpPost("{id:guid}/members/{memberId:guid}/remove")] public async Task<IActionResult> Remove(Guid id, Guid memberId, TeamVersionInput input, CancellationToken ct) { await service.RemoveTeamMemberAsync(UserId, id, memberId, input.Version, ct); return Done(); }
+    [HttpPost("{id:guid}/drafts/manual")] public async Task<IActionResult> ManualDraft(Guid id, ManualTeamTaskInput input, CancellationToken ct) =>
+        Data(await service.DraftManualTeamTaskAsync(UserId, id, input, ct));
     [HttpPost("{id:guid}/drafts")] public async Task<IActionResult> Draft(Guid id, TeamTextInput input, CancellationToken ct) => Data(await service.DraftTeamTaskAsync(UserId, id, input, ct));
     [HttpPost("{id:guid}/drafts/{proposalId:guid}/confirm")] public async Task<IActionResult> ConfirmDraft(Guid id, Guid proposalId,
         [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] TeamTaskRecipientInput? input, CancellationToken ct)

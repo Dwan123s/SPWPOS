@@ -141,7 +141,8 @@ public sealed partial class WorkspaceService
             (string.IsNullOrWhiteSpace(task.DeadlineEvidence) || !text.Contains(task.DeadlineEvidence, StringComparison.OrdinalIgnoreCase)))
             return null;
         if (minutes is not (>= 1 and <= 43200) || deadline is null || deadline <= Now || string.IsNullOrWhiteSpace(task.Name)) return null;
-        Require(task.Name.Length <= 200 && deadline <= Now.AddDays(365), "INVALID_TEAM_TASK", "Task cần tên ngắn và deadline trong một năm tới.");
+        Require(task.Name.Length <= 200, "INVALID_TEAM_TASK", "Tên công việc tối đa 200 ký tự.");
+        if (current is null || current.Deadline != deadline) ValidateTeamDeadline(deadline.Value);
         return new(current?.Id ?? Guid.NewGuid(), task.Name.Trim(), current?.Description ?? text, minutes.Value, deadline.Value, Math.Clamp(task.Priority ?? current?.Priority ?? 2, 1, 4), task.Splittable ?? current?.Splittable ?? true, current?.AssigneeId, current?.Progress ?? 0, current?.Status ?? "Open", current?.Version ?? Guid.NewGuid(), false,
             Importance: current?.Importance ?? SuggestedImportance(task.Importance, text));
     }
@@ -152,7 +153,28 @@ public sealed partial class WorkspaceService
         await db.Entry(member).ReloadAsync(ct);
         member = await TeamMember(uid, teamId, ct, true);
         if (task is null) return new(Guid.Empty, "Chưa lưu công việc.", "Hãy nêu tên việc và hạn chót; NORA sẽ đề xuất thời lượng để bạn xác nhận.", null);
-        var row = new PrivatePlanningProposal { UserId = uid, Kind = "TEAM_DRAFT", ExpiresAt = Now.AddMinutes(20), PayloadJson = JsonSerializer.Serialize(new TeamDraftPayload(teamId, member.Version, task)) };
+        return await StoreTeamDraft(uid, teamId, member.Version, task, ct);
+    }
+
+    private bool TeamDeadlineInRange(DateTimeOffset deadline) => deadline > Now.AddMinutes(5) && deadline <= Now.AddDays(30);
+    private void ValidateTeamDeadline(DateTimeOffset deadline) =>
+        Require(TeamDeadlineInRange(deadline), "TEAM_DEADLINE_RANGE", "Hạn chót phải sau ít nhất 5 phút và trong 30 ngày tới.", 409);
+
+    public async Task<TeamTaskDraft> DraftManualTeamTaskAsync(Guid uid, Guid teamId, ManualTeamTaskInput input, CancellationToken ct)
+    {
+        var member = await TeamMember(uid, teamId, ct, true);
+        Require(!string.IsNullOrWhiteSpace(input.Name) && input.Name.Trim().Length <= 200 && (input.Description is null or { Length: <= 4000 }) &&
+            input.EstimatedMinutes is >= 1 and <= 43200 && input.Priority is >= 1 and <= 4,
+            "INVALID_TEAM_TASK", "Kiểm tra tên, mô tả, thời lượng và mức ưu tiên.");
+        ValidateTeamDeadline(input.Deadline);
+        return await StoreTeamDraft(uid, teamId, member.Version, new(Guid.NewGuid(), input.Name.Trim(),
+            input.Description?.Trim() ?? "", input.EstimatedMinutes, input.Deadline, input.Priority, input.Splittable,
+            null, 0, "Open", Guid.NewGuid(), false), ct);
+    }
+
+    private async Task<TeamTaskDraft> StoreTeamDraft(Guid uid, Guid teamId, Guid version, SharedTaskView task, CancellationToken ct)
+    {
+        var row = new PrivatePlanningProposal { UserId = uid, Kind = "TEAM_DRAFT", ExpiresAt = Now.AddMinutes(20), PayloadJson = JsonSerializer.Serialize(new TeamDraftPayload(teamId, version, task)) };
         db.PrivatePlanningProposals.Add(row); await db.SaveChangesAsync(ct);
         return new(row.Id, "Bản nháp và thời lượng đề xuất. Chỉ tạo task chung sau khi bạn xác nhận.", "", task);
     }
@@ -173,11 +195,13 @@ public sealed partial class WorkspaceService
             await TeamMember(uid, teamId, ct, true);
             var existing = await SharedTask(uid, t.Id, ct);
             Require(existing.Version == t.Version && existing.Status is not ("Completed" or "PendingReview"), "TASK_STALE", "Task đã thay đổi, hãy tạo lại đề xuất.", 409);
+            if (existing.Deadline != t.Deadline) ValidateTeamDeadline(t.Deadline);
             if (existing.AssigneeId != null) existing.PendingChangeJson = JsonSerializer.Serialize(t);
             else { existing.Name = t.Name; existing.Description = t.Description; existing.EstimatedMinutes = t.EstimatedMinutes; existing.Deadline = t.Deadline; existing.Priority = t.Priority; existing.Splittable = t.Splittable; }
             existing.Version = Guid.NewGuid(); TeamLog(uid, teamId, t.Id, "TASK_CHANGE_PROPOSED");
         }
         else {
+            ValidateTeamDeadline(t.Deadline);
             await ValidateDesignatedMember(teamId, recipient?.UserId, ct);
             var created = new TeamTask { Id = t.Id, TeamId = teamId, Name = t.Name, Description = t.Description, EstimatedMinutes = t.EstimatedMinutes, Deadline = t.Deadline, Priority = t.Priority, Splittable = t.Splittable, DesignatedUserId = recipient?.UserId };
             WriteImportance(created, t.Importance, Now, "Leader"); db.TeamTasks.Add(created); await NotifyDesignatedMember(created, ct);

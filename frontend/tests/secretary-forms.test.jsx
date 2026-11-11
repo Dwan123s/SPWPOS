@@ -29,37 +29,27 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-it("shows the real timetable and confirmed hours without availability or preference forms", () => {
+it("keeps manual working hours available independently of NORA", () => {
+  state.noraAvailable = false;
   render(timePage());
-  expect(
-    screen.getByRole("heading", { name: "Thời gian biểu của bạn" }),
-  ).toBeTruthy();
-  expect(document.querySelector("input[type='number'], input[type='time'], select, form[data-form='availability']")).toBeNull();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Báo thay đổi với NORA" }),
-  );
-  expect(location.hash).toBe("#agent");
-  expect(takeAgentDraft()).toContain("thời gian biểu");
+  expect(document.querySelector("form[data-form='availability']")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Lưu lịch rảnh" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Nhờ NORA" })).toBeNull();
 });
 
-it("routes new and edited work, events and exceptions to chat instead of parameter forms", () => {
-  for (const action of [
-    () => openTask(),
-    () => openTask(state.workspace.tasks[0]),
-    () => captureModal(),
-    () => eventModal(),
-    () => eventModal(state.workspace.events[0]),
-    () => exceptionModal(),
-  ]) {
-    action();
-    expect(location.hash).toBe("#agent");
-    expect(takeAgentDraft().length).toBeGreaterThan(10);
-    expect(
-      document.querySelector(
-        "form[data-form='task'], form[data-form='event'], form[data-form='exception']",
-      ),
-    ).toBeNull();
-  }
+it("opens manual task and event forms in secretary mode and offers NORA separately", () => {
+  state.noraAvailable = true;
+  render(<App initialize={false} />);
+  act(() => openTask());
+  expect(screen.getByRole("button", { name: "Lưu công việc" })).toBeTruthy();
+  expect(document.querySelector("input[name='deadline']").value).toBe("");
+  expect(screen.getByRole("button", { name: "Nhờ NORA" })).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Tên công việc"), { target: { value: "Five-hour report" } });
+  fireEvent.click(screen.getByRole("button", { name: "Lưu nháp" }));
+  expect(screen.getByRole("textbox").value).toBe("Five-hour report");
+  act(() => eventModal());
+  expect(screen.getByRole("button", { name: "Lưu sự kiện" })).toBeTruthy();
+  expect(location.hash).not.toBe("#agent");
 });
 
 it("lets users finish work without entering percentages or dependencies", () => {
@@ -75,14 +65,10 @@ it("lets users finish work without entering percentages or dependencies", () => 
   ).toBeTruthy();
 });
 
-it("keeps session tracking while removing manual time and duration editors", () => {
+it("keeps the session result action available in secretary mode", () => {
   render(<App initialize={false} />);
   act(() => sessionDetail(state.workspace.sessions[0].id));
-  expect(
-    document.querySelector(
-      "form[data-form='session-edit'], form[data-form='session-split'], form[data-form='actual-duration']",
-    ),
-  ).toBeNull();
+  expect(screen.getByRole("button", { name: "Ghi kết quả phiên" })).toBeTruthy();
 });
 
 it("replaces the scenario parameter form with an unsent conversation request", () => {

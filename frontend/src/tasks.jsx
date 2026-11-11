@@ -196,8 +196,7 @@ export function filterTasks() {
   setSlot("task-result-count", `${tasks.length} công việc`);
 }
 export function taskForm(task = {}, parentId = null) {
-  const deadline =
-    task.deadline || new Date(Date.now() + 86400000 * 2).toISOString();
+  const deadline = task.deadline;
   return (
     <form data-form="task" data-id={task.id || ""}>
       <input type="hidden" name="version" defaultValue={task.version || ""} />
@@ -220,7 +219,7 @@ export function taskForm(task = {}, parentId = null) {
           "Deadline",
           "deadline",
           "datetime-local",
-          localInput(deadline),
+          deadline ? localInput(deadline) : "",
           "required",
         )}
         {field(
@@ -338,38 +337,30 @@ export function taskForm(task = {}, parentId = null) {
           </label>
         </div>
       </details>
-      {!task.id && (
-        <label className="checkbox spaced">
-          <input
-            type="checkbox"
-            name="scheduleAfterSave"
-            defaultChecked={
-              !!state.workspace.availability?.length ||
-              state.workspace.exceptions?.some((item) => item.isAvailable)
-            }
-          />
-          Tự xếp vào giờ rảnh sau khi tạo
-        </label>
-      )}
       {task.id && <Slot id="task-conflict" />}
       <div className="form-error" />
       <div className="form-actions">
         {button("Hủy", "close-modal", "ghost")}
         <button type="submit" className="btn primary">
-          {task.id ? "Lưu thay đổi" : "Tạo công việc"}
+          {task.id ? "Lưu thay đổi" : "Lưu công việc"}
         </button>
+        {!task.id && <button type="submit" className="btn secondary" data-next-action="preview">Lưu và xem lịch đề xuất</button>}
+        {!task.id && <button type="button" className="btn ghost" onClick={(event) => {
+          const form = new FormData(event.currentTarget.form);
+          captureModal([form.get("name"), form.get("description")].filter(Boolean).join("\n"));
+        }}>Lưu nháp</button>}
+        {state.noraAvailable && <button type="button" className="btn ghost" onClick={() => askNoraForTask(task, parentId)}>Nhờ NORA</button>}
       </div>
     </form>
   );
 }
-export function openTask(task = {}, parentId = null) {
-  if (secretaryMode()) {
+export function askNoraForTask(task = {}, parentId = null) {
     askNora(task.id
       ? `Tôi muốn cập nhật công việc “${task.name}” (mã ${task.id}). Hỏi tôi điều cần thay đổi rồi kiểm tra và cập nhật lịch.`
       : parentId ? `Tôi muốn bổ sung việc liên quan đến “${taskById(parentId)?.name || parentId}”. Hỏi tôi nội dung rồi đề xuất cách sắp xếp.`
       : "Tôi có công việc mới. Hỏi tôi nội dung và hạn chót; nếu thiếu thời lượng, đề xuất ước lượng để tôi xác nhận trong chat, rồi tự xếp lịch.");
-    return;
-  }
+}
+export function openTask(task = {}, parentId = null) {
   setSlot("task-conflict", null);
   modal(
     task.id ? "Chỉnh sửa công việc" : "Thêm công việc",
@@ -574,11 +565,10 @@ export function openDetail(id, afterSession = false) {
     </>,
   );
 }
-export function captureModal() {
-  if (secretaryMode()) { askNora("Tôi muốn giao một việc cho bạn. Hỏi tôi nội dung rồi giúp tôi sắp xếp, không cần điền biểu mẫu."); return; }
+export function captureModal(text = "") {
   modal(
-    "Ghi nhanh công việc",
-    "Bạn kiểm tra gợi ý trước khi lưu.",
+    "Ghi việc trước",
+    "Bản nháp được lưu trong Ghi chú.",
     <form data-form="capture">
       <label className="field">
         Mô tả bằng câu tự nhiên
@@ -587,19 +577,12 @@ export function captureModal() {
           required={true}
           maxLength="2000"
           placeholder="Làm báo cáo SWP trước thứ Sáu, khoảng 3 tiếng"
-          defaultValue={[]}
+          defaultValue={text}
         />
-      </label>
-      <label className="checkbox spaced">
-        <input type="checkbox" name="useAi" />
-        Cho phép gửi nội dung này đến AI nếu đã cấu hình
       </label>
       <div className="form-error" />
       <div className="form-actions">
-        <button className="btn primary" type="submit">
-          {icon("spark")}
-          {" Tạo gợi ý"}
-        </button>
+        <button className="btn primary" type="submit">Lưu nháp</button>
       </div>
     </form>,
   );

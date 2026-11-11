@@ -18,10 +18,12 @@ import {
   loadLabel,
 } from "./ui.jsx";
 import { AnalyticsHistory, WorkspacePerformance } from "./analytics.jsx";
-export function insightsPage() {
+import { WorkloadWeek } from "./workload.jsx";
+export function insightsPage({ onWorkspaceChanged } = {}) {
   if (!state.insights)
     return (
       <>
+        <WorkloadWeek onWorkspaceChanged={onWorkspaceChanged} />
         {state.workspace.features?.includes("history-v2") && (
           <AnalyticsHistory />
         )}
@@ -37,6 +39,7 @@ export function insightsPage() {
   const i = state.insights;
   return (
     <>
+      <WorkloadWeek onWorkspaceChanged={onWorkspaceChanged} />
       <div className="stats-grid">
         {stat(
           "Workload còn lại",

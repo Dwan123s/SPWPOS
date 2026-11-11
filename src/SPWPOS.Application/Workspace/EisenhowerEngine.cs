@@ -58,7 +58,8 @@ public sealed partial class PlanningEngine
                 : outside ? "Deadline nằm ngoài phạm vi đánh giá 30 ngày."
                 : atRisk ? "Quỹ thời gian hoặc phương án hiện tại chưa đáp ứng đầy đủ công việc trước hạn."
                 : reasons.Contains("LOW_BUFFER") ? "Quỹ thời gian trước hạn còn ít dự phòng cho các việc đang cạnh tranh."
-                : urgency == "Urgent" ? "Deadline trong 24 giờ tới."
+                : reasons.Contains("DUE_WITHIN_24H") ? "Deadline trong 24 giờ tới."
+                : manualUrgency && urgency == "Urgent" ? "Bạn chọn ưu tiên khẩn cấp."
                 : "Còn quỹ thời gian và dự phòng trước hạn; nên chủ động sắp xếp sớm.";
             if (importance == "Unknown") explanation += " Chưa đủ căn cứ xác định mức quan trọng.";
             if (manualUrgency) explanation += " Độ khẩn cấp do bạn chọn; cảnh báo deadline và thiếu giờ vẫn được giữ.";

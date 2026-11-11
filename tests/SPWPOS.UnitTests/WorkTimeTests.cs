@@ -30,7 +30,7 @@ public sealed class WorkTimeTests
         h.Clock.Advance(TimeSpan.FromMinutes(121));await Work(h,s=>s.EnsureStartedNotificationsAsync(x.User,Ct));await Work(h,s=>s.EnsureStartedNotificationsAsync(x.User,Ct));
         var source=await h.DbAsync(db=>db.WorkSessions.SingleAsync(s=>s.Id==x.Source.Id,Ct));Assert.Equal(WorkSessionStatus.Paused,source.Status);Assert.Equal(7200,source.ActualSeconds);Assert.Null(source.SegmentStartedAt);
         Assert.Equal(WorkTaskStatus.InProgress,(await h.DbAsync(db=>db.WorkTasks.SingleAsync(t=>t.Id==x.Task.Id,Ct))).Status);
-        var notification=await h.DbAsync(db=>db.InAppNotifications.SingleAsync(n=>n.Kind=="SESSION_REVIEW",Ct));Assert.True(notification.TelegramPending);Assert.Contains("thêm thời gian",notification.Message);
+        var notification=await h.DbAsync(db=>db.InAppNotifications.SingleAsync(n=>n.Kind=="SESSION_REVIEW",Ct));Assert.True(notification.TelegramPending);Assert.Contains("ghi kết quả",notification.Message);
         Assert.Single(await Work(h,s=>s.GetWorkTimeReviewsAsync(x.User,Ct)));
     }
     [Fact] public async Task Extra_time_is_a_separate_confirmed_budget_preserving_estimate_deadline_and_other_sessions() {
@@ -44,6 +44,26 @@ public sealed class WorkTimeTests
         Assert.Empty(await Work(h,s=>s.GetWorkTimeReviewsAsync(x.User,Ct)));
         var snapshot=await Work(h,s=>s.GetAsync(x.User,Ct));Assert.Equal(75,snapshot.Tasks.Single(t=>t.Id==x.Task.Id).RemainingMinutes);
     }
+    [Fact]
+    public async Task Latest_outcome_budget_wins_over_legacy_extension_and_same_clock_outcomes()
+    {
+        await using var h = await ServiceHarness.CreateAsync();
+        var x = await Setup(h);
+        h.Clock.Advance(TimeSpan.FromMinutes(121));
+        var extension = await Work(h, s => s.PreviewExtraTimeAsync(x.User, x.Source.Id, new(30), Ct));
+        await Work(h, s => s.ConfirmExtraTimeAsync(x.User, extension.Id, new(extension.Revision), Ct));
+        foreach (var remaining in new[] { 90, 30 })
+        {
+            var ended = new WorkSession { UserId = x.User, TaskId = x.Task.Id,
+                Start = h.Clock.GetUtcNow().AddMinutes(-30), End = h.Clock.GetUtcNow(),
+                Status = WorkSessionStatus.NeedsReview };
+            await h.DbAsync(async db => { db.WorkSessions.Add(ended); await db.SaveChangesAsync(Ct); });
+            await Work(h, s => s.RecordSessionOutcomeAsync(x.User, ended.Id, new("PARTIAL", 15, remaining), Ct));
+            var workspace = await Work(h, s => s.GetAsync(x.User, Ct));
+            Assert.Equal(remaining, workspace.Tasks.Single(t => t.Id == x.Task.Id).RemainingMinutes);
+        }
+    }
+
     [Theory][InlineData("calendar")][InlineData("time")][InlineData("task")]
     public async Task Confirmation_rejects_stale_or_elapsed_proposals(string change) {
         await using var h=await ServiceHarness.CreateAsync();var x=await Setup(h);h.Clock.Advance(TimeSpan.FromMinutes(121));

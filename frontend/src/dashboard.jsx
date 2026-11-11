@@ -9,8 +9,7 @@ import {
   riskLabels,
 } from "./ui.jsx";
 import { dashboardModel } from "./dashboard-model.js";
-import { nextWorkflowStep, workflowSteps } from "./workflow.js";
-import { WorkTimeReviewCard } from "./work-time-review.jsx";
+import { TodayWorkload } from "./workload.jsx";
 import { ScheduledFocus } from "./scheduled-focus.jsx";
 import { UpcomingFocus } from "./focus-timer.jsx";
 import { EisenhowerFocus } from "./eisenhower.jsx";
@@ -47,7 +46,6 @@ function ToolButton({
 export { CapacityRibbon } from "./capacity-ribbon.jsx";
 function DayRunway({ model, now }) {
   const [view, setView] = useState("agenda");
-  const next = nextWorkflowStep(state.workspace);
   const preference = state.workspace.preference;
   const first = Math.min(
     preference.preferredStartMinute ?? 480,
@@ -191,14 +189,7 @@ function DayRunway({ model, now }) {
               <div className="daily-agenda-empty">
                 <span>{icon("calendar")}</span>
                 <h3>Hôm nay còn trống</h3>
-                <p>{next.description}</p>
-                {button(
-                  next.label,
-                  next.action || "nav",
-                  "small secondary",
-                  next.route || "",
-                  next.symbol,
-                )}
+                <p>Chưa có sự kiện hoặc phiên làm việc hôm nay.</p>
               </div>
             )}
           </div>
@@ -575,15 +566,13 @@ function LiveIntelligence() {
 export function todayPage({ onWorkspaceChanged } = {}) {
   const model = dashboardModel(state.workspace, state.insights);
   const insights = state.insights;
-  const next = nextWorkflowStep(state.workspace);
-  const readyToPlan = workflowSteps(state.workspace)
-    .slice(0, 3)
-    .every((step) => step.done);
   return (
     <>
-      <WorkTimeReviewCard onWorkspaceChanged={onWorkspaceChanged} />
-      <EisenhowerFocus />
-      <div className="planning-dashboard">
+      <TodayWorkload onWorkspaceChanged={onWorkspaceChanged} />
+      <details className="today-overview" open>
+        <summary>Công việc, lịch và phân tích</summary>
+        <EisenhowerFocus />
+        <div className="planning-dashboard">
         <section
           className="console-column backlog-column"
           aria-label="Danh sách công việc"
@@ -711,13 +700,7 @@ export function todayPage({ onWorkspaceChanged } = {}) {
             <div>
               <h2>Lịch hôm nay & tập trung</h2>
             </div>
-            <ToolButton
-              label={readyToPlan ? "Xem lịch đề xuất" : next.label}
-              action={readyToPlan ? "generate-plan" : next.action || "nav"}
-              id={readyToPlan ? "" : next.route || ""}
-              symbol={readyToPlan ? "calendar" : next.symbol}
-              text={readyToPlan ? "Lịch đề xuất" : next.title || next.label}
-            />
+            <ToolButton label="Mở lịch làm việc" id="calendar" symbol="calendar" text="Mở lịch" />
           </div>
           <ScheduledFocus
             workspace={state.workspace}
@@ -749,7 +732,8 @@ export function todayPage({ onWorkspaceChanged } = {}) {
           </div>
           <LiveIntelligence />
         </aside>
-      </div>
+        </div>
+      </details>
     </>
   );
 }

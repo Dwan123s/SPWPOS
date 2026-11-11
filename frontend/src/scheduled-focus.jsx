@@ -115,13 +115,7 @@ export function ScheduledFocus({ workspace, onWorkspaceChanged }) {
                   "calendar",
                   "calendar",
                 )
-              : button(
-                  workflow.label,
-                  workflow.action || "nav",
-                  "small primary",
-                  workflow.route || "",
-                  workflow.symbol,
-                )}
+              : null}
         </div>
       </div>
     </section>

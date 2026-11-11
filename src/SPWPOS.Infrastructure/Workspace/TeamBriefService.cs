@@ -54,7 +54,7 @@ public sealed partial class WorkspaceService
                 task.AcceptanceCriteria is { Length: > 0 } && ValidItems(task.Requirements, 20, 500) && ValidItems(task.Deliverables, 15, 500) &&
                 ValidItems(task.AcceptanceCriteria, 15, 500) && ValidItems(task.Notes, 15, 500) && ValidItems(task.SourceReferences, 10, 300),
                 "TEAM_BRIEF_INCOMPLETE", "Có task chưa đủ nội dung, đầu ra hoặc tiêu chí hoàn thành. Hãy yêu cầu NORA bổ sung.", 503);
-            var validDeadline = task.Deadline > Now && task.Deadline <= Now.AddDays(365) && !string.IsNullOrWhiteSpace(task.DeadlineEvidence) &&
+            var validDeadline = task.Deadline is { } deadline && TeamDeadlineInRange(deadline) && !string.IsNullOrWhiteSpace(task.DeadlineEvidence) &&
                 (document?.PdfData != null || BriefSourceQuote(task.DeadlineEvidence, source));
             if (!validDeadline) deadlineQuestions.Add(task.Deadline <= Now
                 ? $"Hạn của “{task.Name}” đã qua. Bạn cho mình hạn chót mới, gồm ngày và giờ nhé?"
@@ -126,6 +126,7 @@ public sealed partial class WorkspaceService
             return new TeamBriefConfirmView(payload.Tasks.Select(x => x.Id).ToArray());
         }
         Require(row.ExpiresAt > Now && payload.Tasks.All(x => x.Deadline > Now), "PROPOSAL_EXPIRED", "Bản chia việc đã hết hạn. Hãy phân tích lại.", 409);
+        foreach (var task in payload.Tasks) ValidateTeamDeadline(task.Deadline);
         Require(payload.Members.SequenceEqual(await BriefMembers(teamId, ct)), "TEAM_MEMBERS_CHANGED", "Thành viên nhóm đã thay đổi. Hãy chia việc lại theo số thành viên mới.", 409);
         Require(await db.TeamTasks.CountAsync(x => x.TeamId == teamId && x.Status != "Completed", ct) + payload.Tasks.Length <= 500,
             "TEAM_TASK_LIMIT", "Nhóm đang có quá nhiều task. Hãy hoàn thành hoặc xử lý công việc cũ trước.");

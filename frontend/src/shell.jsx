@@ -10,7 +10,6 @@ import {
   WorkspaceMotionControl,
 } from "./workspace-motion.jsx";
 import { $, state, icon, button, userAvatar, dateFmt, modal } from "./ui.jsx";
-import { nextWorkflowStep } from "./workflow.js";
 import { adminRoutes, isAdminRoute } from "./admin-navigation.js";
 import {
   NotificationBell,
@@ -62,7 +61,6 @@ export function MenuLabelsControl() {
 }
 export function workspaceShell(routes, title, description, body) {
   const p = state.workspace.profile || {};
-  const next = nextWorkflowStep(state.workspace);
   const nav = (keys) =>
     nodeList(
       keys
@@ -90,13 +88,7 @@ export function workspaceShell(routes, title, description, body) {
         {button("Thêm công việc", "new-task", "primary", "", "plus")}
       </>
     ) : state.route === "today" ? (
-      button(
-        next.label,
-        next.action || "nav",
-        "primary",
-        next.route || "",
-        next.symbol,
-      )
+      button("Thêm sự kiện", "new-event", "secondary", "", "calendar")
     ) : (
       ""
     );

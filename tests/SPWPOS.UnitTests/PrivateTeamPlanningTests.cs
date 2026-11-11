@@ -45,6 +45,21 @@ public sealed partial class PrivateTeamPlanningTests
         await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.GetTeamAsync(Other, Team, Ct)));
         await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ConfirmTeamClaimAsync(Leader, preview.Id, new(), Ct)));
     }
+    [Fact]
+    public async Task Claim_is_feasible_with_work_hours_and_no_fixed_events()
+    {
+        await using var h = await Setup();
+        await h.DbAsync(async db =>
+        {
+            db.FixedEvents.RemoveRange(await db.FixedEvents.Where(e => e.UserId == Member).ToArrayAsync(Ct));
+            await db.SaveChangesAsync(Ct);
+        });
+        var preview = await Use(h, service => service.PreviewTeamClaimAsync(Member, TaskId, Ct));
+        Assert.NotEmpty(preview.Options);
+        await Use(h, service => service.ConfirmTeamClaimAsync(Member, preview.Id, new(), Ct));
+        Assert.Equal(1, await h.DbAsync(db => db.TeamTaskAssignments.CountAsync(Ct)));
+    }
+
     [Fact] public async Task Missing_work_hours_is_an_onboarding_step_not_a_capacity_failure()
     {
         await using var h = await Setup(hours:false);
