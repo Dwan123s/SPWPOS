@@ -112,8 +112,10 @@ it("handles a review link while the groups screen is already mounted and shows a
     await screen.findByRole("button", { name: "Duyệt Ngọc" }),
   ).toBeTruthy();
   expect(screen.queryByRole("alert")).toBeNull();
-  expect(document.activeElement).toBe(
-    screen.getByRole("region", { name: "Duyệt yêu cầu tham gia" }),
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("region", { name: "Duyệt yêu cầu tham gia" }),
+    ),
   );
 });
 
