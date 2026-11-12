@@ -305,7 +305,7 @@ it("shows optimization comparisons inside NORA and applies only after confirmati
   expect(within(card).getByText(/Giờ mới:/)).toBeTruthy();
   expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Xác nhận kế hoạch" }));
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
 });
 
@@ -391,7 +391,7 @@ it("keeps an urgent displacement pending with automatic save enabled until the u
   ).toBeNull();
   expect(within(card).getByText(/Giờ mới:/)).toBeTruthy();
   fireEvent.click(confirm);
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
   expect(changed).toHaveBeenCalledOnce();
 });
@@ -410,7 +410,7 @@ it("shows deadline protection as a plan that needs confirmation even when automa
   expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
   expect(changed).not.toHaveBeenCalled();
   fireEvent.click(confirm);
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
 });
 
@@ -450,7 +450,7 @@ it("shows the old and proposed shopping hours beside an urgent meeting before co
   expect(shopping.textContent).toContain("18:00");
   expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
   fireEvent.click(confirm);
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
 });
 
@@ -693,7 +693,7 @@ it("recovers a saved request from history after the stream connection fails", as
   await screen.findByText(result.reply);
   expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.queryByText("Kết nối bị gián đoạn")).toBeNull();
-  expect(screen.getAllByText("Đã lưu lịch").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Lịch đã lưu").length).toBeGreaterThan(0);
 });
 
 it.each([true, false])(
@@ -759,7 +759,7 @@ it.each([true, false])(
     expect(
       screen.getAllByText(/Chưa lưu|chưa được lưu/).length,
     ).toBeGreaterThan(0);
-    expect(screen.queryByText("Đã lưu lịch")).toBeNull();
+    expect(screen.queryByText("Lịch đã lưu")).toBeNull();
     await waitFor(() => expect(screen.getAllByText(conflict)).toHaveLength(1));
     if (historyAvailable) expect(screen.queryByRole("alert")).toBeNull();
     else expect(screen.getByRole("alert").textContent).toContain(conflict);
@@ -770,7 +770,7 @@ it("sends a clear request, shows actual schedule in the account timezone and per
   render(<AgentPage onWorkspaceChanged={changed} />);
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   const conversation = screen.getByLabelText("Lịch sử hội thoại");
   expect(within(conversation).getByText(/14:00.*16:00/)).toBeTruthy();
   expect(changed).toHaveBeenCalledOnce();
@@ -876,7 +876,7 @@ it("preview mode leaves the workspace unchanged until explicit apply", async () 
     false,
   );
   fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   expect(changed).toHaveBeenCalledOnce();
 });
 it("retry preserves the text and idempotency key after a transport failure", async () => {
@@ -889,7 +889,7 @@ it("retry preserves the text and idempotency key after a transport failure", asy
   const first = calls.find((call) => call.method === "POST").body;
   failSend = false;
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   expect(calls.filter((call) => call.method === "POST")[1].body.requestId).toBe(
     first.requestId,
   );
@@ -939,7 +939,7 @@ it("Enter sends while Shift Enter and composing input do not submit", async () =
   fireEvent.keyDown(field, { key: "Enter", keyCode: 229 });
   expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
   fireEvent.keyDown(field, { key: "Enter" });
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
 });
 it("NORA motion can be paused and the preference survives a new visit", async () => {
@@ -1010,13 +1010,13 @@ it("shows a real partial reply and walking state, and Stop preserves the idempot
   expect(
     view.container.querySelector(".nora-walk-track.is-active"),
   ).toBeTruthy();
-  expect(screen.queryAllByText("Đã lưu lịch")).toHaveLength(0);
+  expect(screen.queryAllByText("Lịch đã lưu")).toHaveLength(0);
   fireEvent.click(screen.getByRole("button", { name: "Dừng", exact: true }));
   await screen.findByRole("alert");
   expect(view.container.querySelector(".nora-walk-track.is-active")).toBeNull();
   expect(screen.getByLabelText("Yêu cầu của bạn").value).toBe("Xếp báo cáo");
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
-  await screen.findAllByText("Đã lưu lịch");
+  await screen.findAllByText("Lịch đã lưu");
   expect(calls.filter((call) => call.method === "POST")[1].body.requestId).toBe(
     firstBody.requestId,
   );

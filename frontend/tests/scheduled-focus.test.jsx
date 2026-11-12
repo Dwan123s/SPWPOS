@@ -131,7 +131,7 @@ it("counts fixed calendar events on today's schedule and highlights their active
   const schedule = within(
     screen.getByRole("region", { name: "Lịch hôm nay", exact: true }),
   );
-  expect(schedule.getByText("1 lịch")).toBeTruthy();
+  expect(schedule.getAllByRole("button", { name: /PRN212 - SE20B02/ })).toHaveLength(1);
   const title = schedule.getByText("PRN212 - SE20B02");
   expect(
     title.closest(".daily-agenda-row").classList.contains("is-active"),

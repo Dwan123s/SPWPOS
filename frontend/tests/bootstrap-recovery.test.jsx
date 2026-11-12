@@ -54,7 +54,7 @@ it("keeps a server failure distinct from signed-out state and retries successful
   unavailable = false;
   fireEvent.click(screen.getByRole("button", { name: "Thử kết nối lại" }));
   expect(
-    await screen.findByRole("heading", { name: /Một ngày có chủ đích/ }),
+    await screen.findByRole("heading", { name: /^Hôm nay$/ }),
   ).toBeTruthy();
 });
 

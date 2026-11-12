@@ -564,10 +564,10 @@ it("shows the server's password reuse error after clicking reset and keeps the f
 
 it("blocks reuse in the account password form before calling the API", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   await navigate("settings", "Cài đặt");
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Bảo mật" }));
+  await user.click(await screen.findByRole("button", { name: /^Bảo mật/ }));
   expect(screen.getByRole("list", { name: "Yêu cầu mật khẩu" })).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Mật khẩu hiện tại"), {
     target: { value: "Abcdef1!" },
@@ -706,10 +706,10 @@ it("sets a first password for a Google account from Security and returns to logi
     return regularFetch(url, options);
   });
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   await navigate("settings", "Cài đặt");
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Bảo mật" }));
+  await user.click(screen.getByRole("button", { name: /^Bảo mật/ }));
   await screen.findByRole("heading", {
     name: "Thiết lập đăng nhập bằng mật khẩu",
   });
@@ -741,7 +741,7 @@ it("sets a first password for a Google account from Security and returns to logi
 });
 it("navigates all workspace screens and renders the admin data", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   expect(document.querySelector(".console-sync")).toBeNull();
   expect(screen.queryByText("Đã tải dữ liệu")).toBeNull();
   for (const [route, title] of Object.entries({
@@ -795,7 +795,7 @@ it.each(["admin-users", "admin-revenue", "admin-system"])("blocks non-admin dire
   sessionRoles = [];
   window.history.replaceState(null, "", `/#${route}`);
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   expect(screen.queryByLabelText("Quản trị viên", { selector: "section" })).toBeNull();
   expect(calls.some((c) => c.url.startsWith("/api/admin/"))).toBe(false);
 });
@@ -1460,7 +1460,7 @@ it("deletes a scheduled calendar slot without deleting its task and keeps it whe
 it("removes an avatar while preserving unsaved profile fields before save", async () => {
   currentWorkspace.profile.avatarUrl = "data:image/png;base64,AAA";
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   await navigate("settings", "Cài đặt");
   const user = userEvent.setup();
   await user.clear(screen.getByLabelText("Tên", { exact: true }));
@@ -1478,7 +1478,7 @@ it("removes an avatar while preserving unsaved profile fields before save", asyn
 });
 it("saves a fixed work shift with the WORK category from the calendar form", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   const start = new Date(Date.now() + 86400000);
   const end = new Date(start.getTime() + 4 * 3600000);
   act(() =>
@@ -1516,12 +1516,12 @@ it.each(["", "#today"])("opens Today at %s for a completely new workspace withou
   currentWorkspace.features = ["secretary-v1"];
   window.history.replaceState(null, "", `/${hash}`);
   mount();
-  await screen.findByRole("heading", { level: 1, name: /^Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { level: 1, name: /^Hôm nay$/ });
   await screen.findByRole("region", { name: "Lịch hôm nay", exact: true });
   expect(location.hash).toBe(hash);
   expect(state.route).toBe("today");
   expect(screen.queryByRole("alert")).toBeNull();
-  expect(await screen.findByRole("button", { name: "Thiết lập giờ làm", exact: true })).toBeTruthy();
+  expect(await within(await screen.findByRole("region", { name: "Bước tiếp theo" })).findByRole("button", { name: "Thiết lập giờ làm", exact: true })).toBeTruthy();
   expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
   expect(calls.some((call) => call.url === "/api/time/availability" && call.options.method === "PUT")).toBe(false);
   expect(calls.filter((call) =>
@@ -1535,7 +1535,7 @@ it("keeps Notes accessible even before a new workspace uploads a timetable", asy
   currentWorkspace.availability = []; currentWorkspace.exceptions = [];
   currentWorkspace.features = ["secretary-v1"];
   mount();
-  await screen.findByRole("heading", { level: 1, name: /^Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { level: 1, name: /^Hôm nay$/ });
   await navigate("notes", "Nhập việc");
   await screen.findByLabelText("Nội dung ghi chú");
   expect(location.hash).toBe("#notes");
@@ -1549,7 +1549,7 @@ it("returns from NORA to Today through navigation before uploading a timetable",
   mount();
   await screen.findByRole("heading", { level: 1, name: "NORA · Trợ lý AI" });
   await userEvent.setup().click(screen.getByRole("button", { name: "Hôm nay", exact: true }));
-  await screen.findByRole("heading", { level: 1, name: /^Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { level: 1, name: /^Hôm nay$/ });
   await screen.findByRole("region", { name: "Lịch hôm nay", exact: true });
   expect(location.hash).toBe("#today");
   expect(state.route).toBe("today");
@@ -1582,7 +1582,7 @@ it("returns to today's work after explicitly saving a proposed schedule", async 
   );
   await screen.findByRole("heading", {
     level: 1,
-    name: /Một ngày có chủ đích/,
+    name: /^Hôm nay$/,
   });
   expect(location.hash).toBe("#today");
   expect(calls.filter((call) => call.url.endsWith("/apply"))).toHaveLength(1);
@@ -1624,7 +1624,7 @@ it("manually creates a calendar event from a selected day and keeps the form on 
 
 it("shows apply only for real proposals and keeps simulations read-only", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   act(() => planModal(plan));
   expect(screen.getByRole("button", { name: "Lưu lịch này" })).toBeTruthy();
   act(() => planModal(plan, true));
@@ -1653,7 +1653,7 @@ it("opens and closes the mobile drawer with inert content and restored focus", a
     removeEventListener() {},
   }));
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   const user = userEvent.setup();
   expect(document.querySelector(".sidebar").inert).toBe(true);
   const button = screen.getByRole("button", { name: "Mở menu" });
@@ -1732,7 +1732,7 @@ it("finishing a session asks for progress and completes the whole task only on e
     return original(url, options);
   });
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  await screen.findByRole("heading", { name: /^Hôm nay$/ });
   const user = userEvent.setup();
   // The focus panel follows calendar time automatically. Explicit execution
   // adjustments remain available inside the session's details.
@@ -1756,7 +1756,7 @@ it("finishing a session asks for progress and completes the whole task only on e
 });
 
 it("routes shared profile links and received friend invitations inside the workspace", async () => {
-  mount(); await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
+  mount(); await screen.findByRole("heading", { name: /^Hôm nay$/ });
   const publicId = "22222222-2222-2222-2222-222222222222";
   await navigate(`profile/${publicId}`, "Trang cá nhân");
   await screen.findByRole("heading", { name: "Người bạn trong nhóm" });

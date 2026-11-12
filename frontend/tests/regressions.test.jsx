@@ -66,9 +66,10 @@ describe("React view regressions", () => {
     };
     state.calendarStart = "2026-10-07";
     const html = renderToStaticMarkup(calendarPage());
-    expect(state.calendarStart).toBe("2026-10-05");
+    expect(state.calendarStart).toBe("2026-10-07");
     const calendar = document.createElement("div");
     calendar.innerHTML = html;
+    expect(calendar.querySelector(".week-day strong").textContent).toBe("05");
     expect(
       calendar.querySelectorAll('[data-action="event-detail"][data-id="event"]'),
     ).toHaveLength(1);
