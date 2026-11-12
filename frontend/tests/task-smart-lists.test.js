@@ -31,6 +31,7 @@ it("uses the account day, includes overdue and scheduled work, and excludes fini
   const view = smartTaskLists(workspace, Date.parse("2026-11-03T18:00:00Z"));
   expect(view.today).toBe("2026-11-04");
   expect(view.plannedDays.get("planned")).toBe("2026-11-04");
+  expect(view.todayTasks.map((item) => item.id)).toEqual(["planned", "today"]);
   expect(view.todayGroups[0].key).toBe("overdue");
   expect(ids(view.todayGroups)).toEqual(["overdue", "today", "planned"]);
   expect(ids(view.weekGroups)).toContain("tomorrow");

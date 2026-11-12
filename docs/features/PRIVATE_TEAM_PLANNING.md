@@ -1,8 +1,8 @@
 # Nhóm đồ án và lịch cá nhân
 
-Luồng nghiệp vụ: leader tạo task chung; member bấm **Nhận task · NORA xếp lịch**. Popup mở ngay để phân tích nội dung công việc, thời lượng đã xác nhận, deadline và lịch của chính member đó. Member xem phương án rồi xác nhận để nhận task và cập nhật lịch. Hai task cùng deadline có thể dẫn tới hai lịch hoàn toàn khác nhau cho hai tài khoản.
+Trưởng nhóm chọn **Đăng việc mới**. Thành viên bấm **Xem lịch trước khi nhận** trên việc phù hợp. NORA dùng thời lượng, hạn chót và lịch riêng của chính thành viên để tìm phương án. Thành viên chọn **Xác nhận nhận việc** để nhận việc và lưu các phiên đã xem.
 
-Trong bản nháp tạo task, leader chọn **Người nhận task**: mặc định **Cả nhóm · Tự nhận task**, hoặc chọn một thành viên cụ thể (kể cả leader). Với bản chia việc từ file, chọn riêng cho từng task. Lựa chọn chỉ được lưu khi xác nhận tạo; model không tự gán người nhận. `DesignatedUserId` chỉ là người được phép nhận, khác `AssigneeId` là người đã xác nhận nhận việc. Task vẫn `Open` và không chạm lịch cá nhân cho tới khi người được chỉ định xác nhận phương án NORA.
+Trong bản nháp, **Người nhận task** mặc định là **Cả nhóm · Tự nhận việc**. Trưởng nhóm cũng có thể chỉ định một tài khoản thành viên, kể cả tài khoản của mình. Với bản chia việc từ file, chọn riêng cho từng gói. `DesignatedUserId` ghi người có quyền nhận, còn `AssigneeId` ghi người đã xác nhận nhận việc. Việc vẫn ở trạng thái `Open` đến khi thành viên xác nhận phương án.
 
 Backend kiểm tra membership/tài khoản hoạt động tại lúc giao và chặn người khác ở cả preview lẫn confirm nhận task; quyền leader không bỏ qua giới hạn này. Người được chỉ định nhận notification hệ thống (và hàng đợi Telegram theo thiết lập hiện tại), không nhân đôi khi retry. Task được giao đích danh hiện trong **Việc của tôi** kể cả trước khi nhận. Leader có thể đổi/bỏ chỉ định trong popup khi task chưa được nhận; thay đổi version vô hiệu hóa phương án cũ. Nếu đã nhận, phải trả việc trước. Hoàn tác/trả việc giữ chỉ định, để người khác không tự lấy task. Thành viên có task chỉ định còn chờ nhận cần leader đổi/bỏ chỉ định trước khi rời nhóm.
 
@@ -10,6 +10,7 @@ Backend kiểm tra membership/tài khoản hoạt động tại lúc giao và ch
 
 - Nhóm chỉ trả task chung, người nhận, tiến độ được xác nhận, thành viên và hoạt động chung. Một task có một người nhận tại một thời điểm.
 - `WorkTask`, `WorkSession`, ảnh thời khóa biểu và đề xuất nhận việc thuộc tài khoản cá nhân. Leader không được xem lịch riêng của thành viên.
+- **Tiến độ → Workload → Nhóm** chỉ dùng công việc và tiến độ chung. Bộ lọc thành viên dùng người được chỉ định hoặc đã nhận. Dữ liệu nhóm không có giờ rảnh, giờ bận, phiên riêng hay ước tính khả năng nhận việc.
 - Chỉ leader được tạo bản nháp và phát hành task bằng hội thoại; API kiểm tra lại quyền khi xác nhận. Thành viên không có nút giao task. NORA đề xuất thời lượng nếu thiếu; phải xác nhận trước khi phát hành task. Deadline mới cần dẫn chứng từ yêu cầu người dùng.
 - Leader quản lý thành viên, mã mời và yêu cầu đổi deadline/thời lượng. Yêu cầu của task đã nhận chỉ có hiệu lực khi người nhận xem lịch riêng và xác nhận.
 
@@ -63,7 +64,7 @@ Các giờ rảnh đã lưu được giữ nguyên trong nguồn dữ liệu. B�
 
 ## Nhận việc và thay đổi lịch
 
-Preview chạy ngoài transaction; chỉ lưu metadata đề xuất riêng, không nhận task hay thay lịch. NORA diễn giải các phương án đã được bộ lập lịch kiểm tra. Nếu AI không phản hồi, kết quả kiểm tra xác định vẫn dùng được; không tự bịa chỗ trống.
+Xem trước chỉ lưu đề xuất riêng. Thành viên thấy các phương án ngay khi bộ lập lịch tính xong và có thể xác nhận trong lúc NORA soạn giải thích. Yêu cầu giải thích riêng chỉ gửi số phiên, tổng số phút và thông tin phương án có dời việc khác hay không. Nếu NORA không phản hồi, popup vẫn giữ phần tóm tắt do bộ lập lịch tạo.
 
 Nếu đã gửi thời khóa biểu nhưng chưa xác nhận giờ có thể làm việc, popup hướng dẫn xem và chấp nhận chính sách sinh hoạt ngay tại chỗ rồi tự tính lại task. Không gán tình huống thiếu cấu hình thành thiếu quỹ thời gian. Khi không xếp được, phản hồi riêng nêu số phút công việc cần, khoảng trống/quỹ xếp được trước hạn và các ràng buộc cụ thể như phiên tối đa, nghỉ, phiên khóa hay yêu cầu làm liên tục; không chỉ trả một cảnh báo chung chung.
 
@@ -97,4 +98,4 @@ API `POST /api/teams/{teamId}/briefs/{proposalId}/edit` nhận `{ revision, task
 - `PrivateTeamLiveTests`: opt-in AI thật, chỉ dùng tài khoản/lịch giả trong SQLite bộ nhớ.
 - Frontend: popup mở ngay, xác nhận/hủy/stale, trả việc, chat/retry và Notes regression. Nguồn `frontend/src/notes.jsx` giữ nguyên.
 
-Migration `PrivateTeamPlanning`, `TeamSharedChat`, `TeamCompletionReview`, `TeamCompletionAttachments`, `TeamTaskSourceDocuments` và `TeamTaskDesignatedRecipients` bổ sung bảng/token/link tài liệu/người được chỉ định; không chuyển hoặc xóa dữ liệu Notes/lịch cũ. Cần backup và áp dụng migration trước khi chạy API mới. Phạm vi lập lịch nhận việc hiện tại là deadline trong 30 ngày tới; chưa hỗ trợ nhiều người cùng nhận một task.
+Migration `PrivateTeamPlanning`, `TeamSharedChat`, `TeamCompletionReview`, `TeamCompletionAttachments`, `TeamTaskSourceDocuments` và `TeamTaskDesignatedRecipients` bổ sung bảng/token/link tài liệu/người được chỉ định. Công việc có thể được đăng trước hơn 30 ngày. Thành viên có thể xem phương án và nhận việc khi hạn chót còn tối đa 30 ngày.

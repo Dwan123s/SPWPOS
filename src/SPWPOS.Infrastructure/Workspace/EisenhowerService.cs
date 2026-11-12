@@ -12,7 +12,7 @@ public sealed partial class WorkspaceService
     private static bool SameTaskContract(WorkTask a, WorkTask b) => a.Name == b.Name && a.Description == b.Description && a.Deadline == b.Deadline &&
         a.EstimatedMinutes == b.EstimatedMinutes && a.Priority == b.Priority && a.Splittable == b.Splittable && a.MinimumSessionMinutes == b.MinimumSessionMinutes &&
         a.TaskType == b.TaskType && a.IsHardDeadline == b.IsHardDeadline && a.WorkWindowStart == b.WorkWindowStart && a.WorkWindowEnd == b.WorkWindowEnd &&
-        a.CategoryId == b.CategoryId && a.ParentId == b.ParentId;
+        a.CategoryId == b.CategoryId && a.ParentId == b.ParentId && a.InheritsProjectDeadline == b.InheritsProjectDeadline;
     private static ImportanceView ImportanceDto(ITaskImportance task) => task is WorkTask w && w.ImportanceLevel == "Unknown" && w.InheritedImportance is { } level
         ? new(level, "Leader", w.InheritedImportanceReason ?? "", null, true)
         : new(task.ImportanceLevel, task.ImportanceSource, task.ImportanceReason, task.ImportanceConfidence, task.ImportanceConfirmedAt != null);

@@ -91,7 +91,7 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
         <CalendarTimeTag phase={phase} />
         <span className="block-meta">
           {icon("lock")}
-          Sự kiện cố định
+          Lịch bận
         </span>
       </button>
     );
@@ -115,7 +115,7 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
       <span className="block-meta">
         {minutes(Math.round((new Date(s.end) - new Date(s.start)) / 60000))}
         {" · "}
-        {statusLabels[s.status] || s.status}
+        {s.status === "Scheduled" ? "Phiên đã xếp" : statusLabels[s.status] || s.status}
       </span>
     </button>
   );
@@ -318,7 +318,7 @@ function calendarMarkup(
           </div>
           <span>
             {sessions.length}
-            {" phiên · "}
+            {" phiên đã xếp · "}
             {minutes(
               sessions
                 .filter((s) => !["Skipped", "Missed"].includes(s.status))

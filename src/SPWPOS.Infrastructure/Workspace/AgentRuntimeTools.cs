@@ -83,11 +83,11 @@ public sealed partial class WorkspaceService
     }
 
     private async Task<RuntimeCandidate> SimulateRuntimeAsync(Guid uid, AgentIntent intent, PlanningState state,
-        AgentTurnInput input, string source, bool timetable, string strategy, CancellationToken ct)
+        AgentTurnInput input, string source, bool timetable, string strategy, CancellationToken ct, bool configureTimetableHours)
     {
         Require(strategy is "keep_existing" or "replan_flexible", "INVALID_STRATEGY", "Chọn chiến lược được hỗ trợ.");
         Require(strategy != "replan_flexible" || RuntimeReplanAllowed(source), "REPLAN_NOT_AUTHORIZED", "Bạn cần cho phép đề xuất dời phiên linh hoạt trước.");
-        var (changes, candidate, affected, summary, notices) = await BuildAgentChangesAsync(uid, intent, state, source, ct, source, timetable);
+        var (changes, candidate, affected, summary, notices) = await BuildAgentChangesAsync(uid, intent, state, source, ct, source, timetable, configureTimetableHours);
         var start = intent.OptimizationQuery is { } scope && scope.Start > Now.AddMinutes(5) ? scope.Start : Now.AddMinutes(5);
         var end = intent.OptimizationQuery?.End;
         // A local collision repair already releases precisely authorized work in

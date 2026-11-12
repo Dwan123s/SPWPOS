@@ -31,17 +31,19 @@ public sealed partial class WorkspaceService
         Require(weekStart.Year is >= 2000 and <= 2100 && weekStart.DayOfWeek == DayOfWeek.Monday,
             "VALIDATION_ERROR", "Chọn ngày thứ Hai bắt đầu tuần.");
         var state = await State(uid, ct);
+        return new(Enumerable.Range(0, 7).SelectMany(offset => EffectiveDayHours(state, weekStart.AddDays(offset))).ToArray(),
+            state.Preference.Revision);
+    }
+
+    private AvailabilityInput[] EffectiveDayHours(PlanningState state, DateOnly date)
+    {
         var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
-        var slots = Enumerable.Range(0, 7).SelectMany(offset =>
-        {
-            var date = weekStart.AddDays(offset);
-            var start = PlanningEngine.At(date, 0, zone);
-            var end = PlanningEngine.At(date.AddDays(1), 0, zone);
-            int LocalMinute(DateTimeOffset time) => (int)TimeZoneInfo.ConvertTime(time, zone).TimeOfDay.TotalMinutes;
-            return engine.FreeSlots(state, start, end).Select(slot =>
-                new AvailabilityInput((int)date.DayOfWeek, LocalMinute(slot.Start), slot.End == end ? 1440 : LocalMinute(slot.End)));
-        }).Where(slot => slot.StartMinute < slot.EndMinute).ToArray();
-        return new(slots);
+        var start = PlanningEngine.At(date, 0, zone);
+        var end = PlanningEngine.At(date.AddDays(1), 0, zone);
+        int Minute(DateTimeOffset time) => time == end ? 1440 : (int)TimeZoneInfo.ConvertTime(time, zone).TimeOfDay.TotalMinutes;
+        return engine.FreeSlots(state, start, end)
+            .Select(slot => new AvailabilityInput((int)date.DayOfWeek, Minute(slot.Start), Minute(slot.End)))
+            .Where(slot => slot.StartMinute < slot.EndMinute).ToArray();
     }
 
     public Task SetAvailabilityForWeekAsync(Guid uid, DateOnly weekStart, DatedWeekInput? input, CancellationToken ct) => Mutate(uid, async () =>
@@ -50,14 +52,32 @@ public sealed partial class WorkspaceService
             "VALIDATION_ERROR", "Chọn ngày thứ Hai bắt đầu tuần.");
         var weekEnd = weekStart.AddDays(7);
         var state = await State(uid, ct);
-        var previous = state.Exceptions.Where(x => x.Date >= weekStart && x.Date < weekEnd && x.IsAvailable && x.OverridesWeeklyAvailability).ToArray();
+        Require(input?.Revision is null || input.Revision == state.Preference.Revision, "AVAILABILITY_STALE",
+            "Lịch đã thay đổi. Tải lại khung giờ tuần này trước khi lưu.", 409);
+        var previous = state.Exceptions.Where(x => x.Date >= weekStart && x.Date < weekEnd &&
+            (x.IsWeekEdit || x.IsAvailable && x.OverridesWeeklyAvailability)).ToArray();
+        var removed = new List<AvailabilityException>();
         var replacement = new List<AvailabilityException>();
-        if (input is not null)
+        if (input is null) removed.AddRange(previous);
+        else
         {
             ValidateAvailabilitySlots(input.Slots);
             for (var date = weekStart; date < weekEnd; date = date.AddDays(1))
             {
-                var slots = input.Slots.Where(x => x.DayOfWeek == (int)date.DayOfWeek).ToArray();
+                var slots = input.Slots.Where(x => x.DayOfWeek == (int)date.DayOfWeek).OrderBy(x => x.StartMinute).ToArray();
+                var edits = previous.Where(x => x.Date == date).ToArray();
+                if (state.Policy?.ForDate(date)?.UseTimetableHours == true)
+                {
+                    var current = EffectiveDayHours(state, date);
+                    if (current.SequenceEqual(slots)) continue;
+                    if (edits.All(x => x.IsWeekEdit))
+                    {
+                        removed.AddRange(edits);
+                        replacement.AddRange(TimetableWeekEdits(uid, date, current, slots, edits));
+                        continue;
+                    }
+                }
+                removed.AddRange(edits);
                 // An empty override closes this day without creating a busy event.
                 if (slots.Length == 0)
                     replacement.Add(new() { UserId = uid, Date = date, IsAvailable = true, OverridesWeeklyAvailability = true });
@@ -70,10 +90,30 @@ public sealed partial class WorkspaceService
             }
         }
 
-        ValidateProtectedSessions(state with { Exceptions = state.Exceptions.Except(previous).Concat(replacement).ToArray() });
-        db.AvailabilityExceptions.RemoveRange(previous);
+        if (removed.Count == 0 && replacement.Count == 0) return;
+        ValidateProtectedSessions(state with { Exceptions = state.Exceptions.Except(removed).Concat(replacement).ToArray() });
+        db.AvailabilityExceptions.RemoveRange(removed);
         db.AvailabilityExceptions.AddRange(replacement);
     }, ct);
+
+    private static IEnumerable<AvailabilityException> TimetableWeekEdits(Guid uid, DateOnly date,
+        AvailabilityInput[] current, AvailabilityInput[] requested, AvailabilityException[] previous)
+    {
+        var origin = DateTimeOffset.UnixEpoch;
+        TimeSlot Slot(int start, int end) => new(origin.AddMinutes(start), origin.AddMinutes(end));
+        var before = PlanningEngine.Merge(current.Select(x => Slot(x.StartMinute, x.EndMinute))).ToArray();
+        var after = PlanningEngine.Merge(requested.Select(x => Slot(x.StartMinute, x.EndMinute))).ToArray();
+        var added = after.SelectMany(x => PlanningEngine.Subtract(x, before)).ToArray();
+        var removed = after.Length == 0 ? [Slot(0, 1440)] : before.SelectMany(x => PlanningEngine.Subtract(x, after)).ToArray();
+        foreach (var available in new[] { true, false })
+        {
+            var existing = previous.Where(x => x.IsAvailable == available).Select(x => Slot(x.StartMinute, x.EndMinute));
+            var combined = PlanningEngine.Merge(existing.Concat(available ? added : removed));
+            foreach (var slot in combined.SelectMany(x => PlanningEngine.Subtract(x, available ? removed : added)))
+                yield return new() { UserId = uid, Date = date, IsWeekEdit = true, IsAvailable = available,
+                    StartMinute = (int)(slot.Start - origin).TotalMinutes, EndMinute = (int)(slot.End - origin).TotalMinutes };
+        }
+    }
     public Task<Guid> SaveExceptionAsync(Guid uid, Guid? id, ExceptionInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
         Window(input.StartMinute, input.EndMinute); Require(input.Date.Year is >= 2000 and <= 2100, "VALIDATION_ERROR", "Ngày không hợp lệ.");

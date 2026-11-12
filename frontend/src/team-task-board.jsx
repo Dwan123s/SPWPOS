@@ -168,8 +168,8 @@ export function TaskBoard({
           <h3>Công việc đầu tiên đang chờ bạn</h3>
           <p>
             {detail.team.role === "Leader"
-              ? "Mô tả việc cần làm và hạn chót. NORA sẽ soạn task để bạn xác nhận trước khi giao cho nhóm."
-              : "Trưởng nhóm sẽ giao công việc tại đây. Bạn có thể nhận task và để NORA sắp xếp theo lịch riêng."}
+              ? "Nêu công việc và hạn chót, sau đó chọn mở cho cả nhóm hoặc chỉ định một người."
+              : "Khi có việc phù hợp, bạn có thể xem phương án NORA xếp trên lịch riêng trước khi nhận."}
           </p>
           {detail.team.role === "Leader" && (
             <button className="btn primary" disabled={busy} onClick={onCompose}>
@@ -353,9 +353,9 @@ function TaskRow({
                 className="btn primary"
                 disabled={busy}
                 onClick={() => onClaim(task)}
-                aria-label="Nhận task · NORA xếp lịch"
+                aria-label="Xem lịch trước khi nhận"
               >
-                {icon("spark")} Nhận task
+                {icon("spark")} Xem lịch trước khi nhận
               </button>
             )}
           {mine && task.status === "Assigned" && (

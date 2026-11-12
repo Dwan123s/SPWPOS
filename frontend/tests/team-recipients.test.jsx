@@ -41,12 +41,12 @@ it("only the designated person sees claim actions and the task appears in their 
   };
   const { rerender } = render(<TaskBoard detail={detail} uid="me" />);
   expect(
-    screen.queryByRole("button", { name: "Nhận task · NORA xếp lịch" }),
+    screen.queryByRole("button", { name: "Xem lịch trước khi nhận" }),
   ).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: task.name }));
   const popup = screen.getByRole("dialog", { name: task.name });
   expect(
-    within(popup).queryByRole("button", { name: "Nhận task · NORA xếp lịch" }),
+    within(popup).queryByRole("button", { name: "Xem lịch trước khi nhận" }),
   ).toBeNull();
   expect(
     within(popup).getByText(/Task được giao đích danh cho Bình/),
@@ -56,7 +56,7 @@ it("only the designated person sees claim actions and the task appears in their 
   expect(screen.queryByRole("article")).toBeNull();
   rerender(<TaskBoard detail={detail} uid="other" />);
   expect(
-    screen.getByRole("button", { name: "Nhận task · NORA xếp lịch" }),
+    screen.getByRole("button", { name: "Xem lịch trước khi nhận" }),
   ).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Việc của tôi" }));
   expect(screen.getByRole("article", { name: task.name })).toBeTruthy();
@@ -95,7 +95,7 @@ it("sends a named recipient only after confirming a single AI task draft", async
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Đăng việc mới" }));
   fireEvent.change(
     screen.getByRole("textbox", { name: "Mô tả công việc và hạn chót" }),
     { target: { value: "Proposal hạn thứ Tư" } },
@@ -138,7 +138,7 @@ it("can select different recipients for separate tasks from a file brief, retain
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Đăng việc mới" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Chia việc cho cả nhóm" }),
   );
@@ -212,7 +212,7 @@ it("keeps all work packages visible while the leader clarifies a common deadline
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Đăng việc mới" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Chia việc cho cả nhóm" }),
   );
@@ -290,7 +290,7 @@ async function openEditableBrief({ pending = false } = {}) {
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Đăng việc mới" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Chia việc cho cả nhóm" }),
   );

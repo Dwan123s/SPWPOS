@@ -1,0 +1,25 @@
+ĐỀ BÀI DEMO — THEO DÕI NHIỆT ĐỘ PHÒNG BẰNG ESP32
+
+Hạn chót của cả project: hết ngày 19/11/2026, giờ Việt Nam.
+
+Sinh viên cần trình bày một bản demo đọc nhiệt độ phòng, lưu dữ liệu và hiển thị kết quả. Chia project thành bốn công việc theo thứ tự dưới đây. Các việc con dùng chung hạn chót của project.
+
+1. Kiểm tra cảm biến và ESP32 — 45 phút
+   - Kiểm tra kết nối và nguồn.
+   - Đọc thử ba giá trị nhiệt độ.
+   - Ghi lại các lỗi kết nối nếu có.
+
+2. Ghi dữ liệu nhiệt độ — 60 phút
+   - Ghi thời điểm đo.
+   - Thu ít nhất 20 mẫu.
+   - Xuất dữ liệu thành CSV.
+
+3. Dựng dashboard — 90 phút
+   - Hiện biểu đồ nhiệt độ theo thời gian.
+   - Hiện giá trị mới nhất.
+   - Thử trạng thái chưa có dữ liệu.
+
+4. Chuẩn bị slide và tập demo — 45 phút
+   - Chuẩn bị 5 slide.
+   - Tập demo trong 5 phút.
+   - Chuẩn bị ảnh chụp dự phòng.

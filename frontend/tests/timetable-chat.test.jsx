@@ -276,7 +276,7 @@ it("reads and schedules an image-only submission with automatic save in one Send
   expect(imageCalls[0].body.mimeType).toBe("image/png");
   expect(sent[0].autoApply).toBe(true);
   expect(sent[0].text).toBe(
-    "Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.",
+    "Nhập thời khóa biểu trong ảnh và cập nhật giờ làm việc.",
   );
   expect(sent[0].image.data).toBeTruthy();
   expect(sent[0].text).not.toContain("Chỉ xem trước");

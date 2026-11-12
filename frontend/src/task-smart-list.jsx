@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { state, icon, statusLabels } from "./ui.jsx";
+import { state, dateFmt, icon, statusLabels } from "./ui.jsx";
 import { api } from "./api.js";
 import { taskColumns, taskRows } from "./tasks.jsx";
 import { TaskInbox } from "./task-inbox.jsx";
@@ -27,6 +27,42 @@ const emptyFilters = {
   from: "",
   to: "",
 };
+
+function TodayTaskPane({ model }) {
+  return (
+    <aside className="task-today-pane" aria-label="Việc hôm nay">
+      <header>
+        <button type="button" className="btn ghost small" data-action="new-task"
+          aria-label="Mở biểu mẫu công việc từ Hôm nay" aria-haspopup="dialog">
+          {icon("plus")}
+        </button>
+        <h2>Hôm nay <small>{dateFmt(`${model.today}T12:00:00Z`, { timeZone: "UTC" })}</small></h2>
+        <button type="button" className="btn ghost small" data-action="nav" data-id="today"
+          aria-label="Mở trang Hôm nay">
+          {icon("calendar")}
+        </button>
+      </header>
+      {model.todayTasks.length ? (
+        <ul className="task-today-list">
+          {model.todayTasks.map((task) => (
+            <li key={task.id}>
+              {task.isTeamTask ? <span className="task-today-team" title="Công việc nhóm">{icon("users")}</span> : (
+                <button type="button" className="task-complete-toggle" role="checkbox" aria-checked={false}
+                  aria-label={`Đánh dấu xong ${task.name} trong Hôm nay`}
+                  data-action="toggle-task-completion" data-id={task.id} />
+              )}
+              <button type="button" className="task-today-title" data-action="task-detail" data-id={task.id}
+                aria-label={`Xem ${task.name} trong Hôm nay`}>
+                {task.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : <p>Chưa có việc được xếp hoặc đến hạn hôm nay.</p>}
+    </aside>
+  );
+}
+
 export function TaskSmartList({ onShowMatrix }) {
   const [scope, setScope] = useState(() =>
     lists[state.taskScope] ? state.taskScope : "personal",
@@ -137,6 +173,7 @@ export function TaskSmartList({ onShowMatrix }) {
   );
   return (
     <div className="task-smart-layout">
+      <TodayTaskPane model={model} />
       <nav className="task-smart-nav" aria-label="Danh sách thông minh">
         <button type="button" className={`task-smart-nav-item${scope === "personal" ? " is-active" : ""}`}
           aria-pressed={scope === "personal"} onClick={() => choose("personal")}>

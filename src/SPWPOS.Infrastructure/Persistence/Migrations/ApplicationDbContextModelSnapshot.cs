@@ -599,6 +599,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsWeekEdit")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Note")
                         .IsRequired()
                         .HasMaxLength(300)
@@ -3146,6 +3149,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(12)
                         .HasColumnType("nvarchar(12)")
                         .HasDefaultValue("Unknown");
+
+                    b.Property<bool>("InheritsProjectDeadline")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");

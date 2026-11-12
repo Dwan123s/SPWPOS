@@ -9,6 +9,23 @@ public sealed partial class WorkspaceService
     private static bool TimetableFollowup(string text) => IsTimetableRequest(text) || ChatMatch(text,
         @"\b(?:\d+\s*tuan|tuan (?:toi|sau|nay)|tiep tuc xu ly)\b").Success;
 
+    private static bool SimpleTimetableUpload(string text) => ChatMatch(text.Trim(),
+        @"^nhap thoi khoa bieu(?: trong anh)?(?:, tu phan tich chi tiet lich ban va cac khoang ranh tung ngay| va cap nhat gio lam viec)?[.!]?$").Success
+        || ChatMatch(text.Trim(), @"^toi muon gui anh thoi khoa bieu\. hay doc gio hoc va luu cac buoi hoc thanh lich co dinh sau khi du thong tin\. sau do, thiet lap gio lam viec theo thoi khoa bieu cho cac tuan da nhap, dua vao lich hoc, ca lam va lich ban da luu\.$").Success;
+
+    private static bool SimpleTimetableFollowup(string text) => TimetableFollowup(text) || ChatMatch(text.Trim(),
+        @"^(?:(?:bat dau )?(?:tu )?(?:ngay )?(?:\d{1,2}[/-]\d{1,2}(?:[/-]\d{4})?|\d{4}-\d{2}-\d{2})|ngay mai|hom nay|ngay kia)[.!]?$").Success;
+
+    private static string TimetableImportReply(AgentChangeSet changes, bool applied)
+    {
+        var count = changes.Events.Count(x => x.EventType is "CLASS" or "WORK");
+        var result = applied ? $"Đã lưu {count} buổi từ thời khóa biểu." : $"Đã đọc {count} buổi từ thời khóa biểu.";
+        if (count == 0) result = "Các buổi trong ảnh đã có trong lịch.";
+        return result + (applied
+            ? " Xem các khung đã cập nhật ở Lịch → Giờ làm việc → Theo từng tuần."
+            : " Lưu thay đổi để cập nhật Lịch và Giờ làm việc.");
+    }
+
     // Use the same calendar arithmetic as the planner, after proposed session
     // movements. The model must not invent gaps or subtract busy time twice.
     private string TimetableAnalysis(PlanningState state, FixedEvent[] classes, PlanView? plan, bool applied)

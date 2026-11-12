@@ -17,7 +17,7 @@ public sealed partial class WorkspaceService
             input.Tasks.Select(t=>t.Id).Distinct().Count() == original.Length && input.Tasks.All(t=>original.Any(o=>o.Id==t.Id)),
             "INVALID_DRAFT_TASKS", "Chỉ chỉnh sửa các gói việc trong bản nháp hiện tại; không thêm, bỏ hoặc thay mã task.");
         Require(input.Tasks.All(t => !string.IsNullOrWhiteSpace(t.Name) && t.Name.Length <= 200 && !string.IsNullOrWhiteSpace(t.Description) && t.Description.Length <= 4000 &&
-            t.EstimatedMinutes is >= 1 and <= 43200 && (t.Deadline == null || TeamDeadlineInRange(t.Deadline.Value))),
+            t.EstimatedMinutes is >= 1 and <= 43200 && (t.Deadline == null || ValidTeamDeadline(t.Deadline.Value))),
             "VALIDATION_ERROR", "Tên, nội dung, thời lượng hoặc hạn chót chưa hợp lệ. Hạn chót cần ở tương lai.");
         Require(input.Tasks.Select(t=>t.Name.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count()==input.Tasks.Length,
             "VALIDATION_ERROR", "Mỗi gói việc cần có tên khác nhau.");

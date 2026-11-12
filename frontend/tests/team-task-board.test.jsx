@@ -166,7 +166,7 @@ it("hands off task claiming from the popup and keeps failed progress updates vis
   fireEvent.click(screen.getByRole("button", { name: task.name }));
   fireEvent.click(
     within(screen.getByRole("dialog")).getByRole("button", {
-      name: "Nhận task · NORA xếp lịch",
+      name: "Xem lịch trước khi nhận",
     }),
   );
   expect(onClaim).toHaveBeenCalledWith(task);
@@ -197,7 +197,7 @@ it("preserves direct claim and leader review actions on their exact task with bu
     board([open, review], { onClaim, onReviewCompletion }),
   );
   fireEvent.click(
-    screen.getByRole("button", { name: "Nhận task · NORA xếp lịch" }),
+    screen.getByRole("button", { name: "Xem lịch trước khi nhận" }),
   );
   fireEvent.click(screen.getByRole("button", { name: "Kiểm tra & duyệt" }));
   expect(onClaim).toHaveBeenCalledWith(open);
@@ -207,7 +207,7 @@ it("preserves direct claim and leader review actions on their exact task with bu
     screen.getByRole("button", { name: "Kiểm tra & duyệt" }).disabled,
   ).toBe(true);
   expect(
-    screen.getByRole("button", { name: "Nhận task · NORA xếp lịch" }).disabled,
+    screen.getByRole("button", { name: "Xem lịch trước khi nhận" }).disabled,
   ).toBe(true);
 });
 

@@ -3,6 +3,8 @@ import { icon } from "./ui.jsx";
 import "./styles/timetable-image.css";
 
 export const TIMETABLE_IMAGE_MAX_COUNT = 2;
+export const TIMETABLE_IMPORT_REQUEST =
+  "Nhập thời khóa biểu trong ảnh và cập nhật giờ làm việc.";
 export const timetableImagePayload = (attachment, preview = false) => {
   if (!attachment) return null;
   const parts = (attachment.images || [attachment]).map((part) => ({

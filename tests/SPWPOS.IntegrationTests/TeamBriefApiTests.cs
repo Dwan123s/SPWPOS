@@ -24,7 +24,7 @@ public sealed class TeamBriefApiTests
         }
     }
     [Fact]
-    public async Task Manual_team_draft_accepts_thirty_days_without_calling_ai()
+    public async Task Manual_team_draft_accepts_a_deadline_beyond_thirty_days_without_calling_ai()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var factory = new ApiFactory();
@@ -37,11 +37,10 @@ public sealed class TeamBriefApiTests
         var teamId = team.RootElement.GetProperty("data").GetProperty("id").GetGuid();
         var now = factory.Clock.GetUtcNow();
         var input = new { name = "Report", description = "Review notes", estimatedMinutes = 90,
-            deadline = now.AddDays(30), priority = 2, splittable = true };
+            deadline = now.AddDays(45), priority = 2, splittable = true };
         var path = $"/api/teams/{teamId}/drafts/manual";
         var preview = await client.PostAsJsonAsync(path, input, ct);
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(path, input with { deadline = now.AddDays(30).AddSeconds(1) }, ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(path, input with { deadline = now.AddMinutes(5) }, ct)).StatusCode);
     }
 

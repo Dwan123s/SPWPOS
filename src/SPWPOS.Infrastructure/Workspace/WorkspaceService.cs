@@ -129,9 +129,9 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
                 (int)sessionsByTask[t.Id].Where(s => s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).Sum(s => (s.End - s.Start).TotalMinutes),
                 t.Priority, t.TaskType, t.CanSplit, t.MinimumSessionMinutes, t.CategoryId, t.ParentId, t.Status.ToString(), t.Progress, t.CreatedAt, t.CompletedAt,
                 dependenciesByTask[t.Id].Select(d => d.PredecessorId).ToArray(), t.IsHardDeadline, t.CreationSource, t.WorkWindowStart, t.WorkWindowEnd, t.Version, ImportanceDto(t), t.RequiresContinuousSession,
-                IsTeamTask: t.InheritedImportance is not null, Checklist: ReadTaskChecklist(t))).ToArray(),
+                IsTeamTask: t.InheritedImportance is not null, Checklist: ReadTaskChecklist(t), InheritsProjectDeadline: t.InheritsProjectDeadline)).ToArray(),
             state.Availability.Select(x => new AvailabilityInput(x.DayOfWeek, x.StartMinute, x.EndMinute)).ToArray(),
-            state.Exceptions.Select(x => new ExceptionView(x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note, x.OverridesWeeklyAvailability)).ToArray(),
+            state.Exceptions.Select(x => new ExceptionView(x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note, x.OverridesWeeklyAvailability, x.IsWeekEdit)).ToArray(),
             state.Events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),
             state.Sessions.Where(s => tasksById.ContainsKey(s.TaskId)).Select(s => new SessionView(s.Id, s.TaskId, tasksById[s.TaskId].Name,
                 s.Start, s.End, s.Status.ToString(), s.IsLocked, (int)((s.ActualSeconds + (s.SegmentStartedAt is { } at ? Math.Max(0, (Now - at).TotalSeconds) : 0)) / 60),
@@ -167,7 +167,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     {
         UserId = uid, Name = input.Name.Trim(), Description = input.Description ?? "", Deadline = input.Deadline,
         EstimatedMinutes = input.EstimatedMinutes ?? 0, Priority = input.Priority, TaskType = NormalizeTaskType(input.TaskType), Splittable = ActivityContinuity.CanSplit(input.Name, input.TaskType, input.Splittable),
-        IsHardDeadline = input.IsHardDeadline, CreationSource = input.CreationSource,
+        IsHardDeadline = input.IsHardDeadline, CreationSource = input.CreationSource, InheritsProjectDeadline = input.InheritsProjectDeadline == true,
         MinimumSessionMinutes = input.MinimumSessionMinutes, CategoryId = input.CategoryId, ParentId = input.ParentId, CreatedAt = now, UpdatedAt = now
     };
     private static string NormalizeTaskType(string type) => type.Trim().ToUpperInvariant() switch

@@ -59,7 +59,6 @@ public interface IPrivateTeamService
 {
     Task<TeamView[]> ListTeamsAsync(Guid uid, CancellationToken ct);
     Task<TeamWorkloadView> GetTeamWorkloadAsync(Guid uid, Guid teamId, int week, CancellationToken ct);
-    Task<TeamWorkloadCandidate[]> GetTeamWorkloadCandidatesAsync(Guid uid, Guid teamId, Guid taskId, CancellationToken ct);
     Task<TeamChatPage> GetTeamChatAsync(Guid uid, Guid teamId, long? after, long? before, CancellationToken ct);
     Task<TeamChatMessageView> SendTeamChatAsync(Guid uid, Guid teamId, TeamChatInput input, CancellationToken ct);
     Task<Guid> CreateTeamAsync(Guid uid, TeamNameInput input, CancellationToken ct);
@@ -79,6 +78,7 @@ public interface IPrivateTeamService
     Task<TeamBriefDraft> EditTeamBriefDraftAsync(Guid uid, Guid teamId, Guid proposalId, TeamDraftEditInput input, CancellationToken ct);
     Task<TeamBriefConfirmView> ConfirmTeamBriefAsync(Guid uid, Guid teamId, Guid proposalId, CancellationToken ct, TeamBriefConfirmInput? input = null);
     Task<PrivateClaimView> PreviewTeamClaimAsync(Guid uid, Guid taskId, CancellationToken ct, bool allowExtendedDisplacement = false);
+    Task<string?> ExplainTeamClaimAsync(Guid uid, Guid proposalId, CancellationToken ct);
     Task ConfirmTeamClaimAsync(Guid uid, Guid proposalId, ClaimConfirmInput input, CancellationToken ct);
     Task CancelTeamClaimAsync(Guid uid, Guid proposalId, CancellationToken ct);
     Task UndoTeamClaimAsync(Guid uid, Guid proposalId, CancellationToken ct);

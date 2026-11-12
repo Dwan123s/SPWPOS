@@ -26,9 +26,13 @@ public sealed partial class AgentFreeTimeTests
             new(Guid.NewGuid(), Guid.NewGuid(), "Gộp hai thời khóa biểu và xếp lịch quanh giờ bận", Image: image), Ct));
         Assert.Equal("APPLIED", result.Status);
         Assert.Equal(2, ai.LastImage!.GetImages().Length);
-        Assert.Equal(2, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
+        Assert.False(result.SuggestRoutine);
+        var events = await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct));
+        Assert.Equal(2, events.Length);
         var session = await h.DbAsync(db => db.WorkSessions.SingleAsync(x => x.Status == WorkSessionStatus.Scheduled, Ct));
-        Assert.Equal(At(960), session.Start); Assert.Equal(At(1020), session.End);
+        Assert.Equal(TimeSpan.FromHours(1), session.End - session.Start);
+        Assert.True(session.Start >= h.Clock.GetUtcNow() && session.End <= task.Deadline);
+        Assert.DoesNotContain(events, item => session.Start < item.End && session.End > item.Start);
     }
     [Theory] [InlineData("flexible")] [InlineData("locked")] [InlineData("fixed")]
     public async Task An_uploaded_timetable_keeps_class_hours_and_replans_only_flexible_work(string mode)

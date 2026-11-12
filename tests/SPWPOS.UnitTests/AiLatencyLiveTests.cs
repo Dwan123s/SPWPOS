@@ -14,6 +14,39 @@ namespace SPWPOS.UnitTests;
 public sealed class AiLatencyLiveTests
 {
     public static bool Enabled => Environment.GetEnvironmentVariable("PLANORA_LIVE_LATENCY_TESTS") == "1";
+
+    [Fact(SkipUnless = nameof(Enabled), Skip = "Opt-in real-provider latency checks.")]
+    public async Task Simple_timetable_upload_reads_and_saves_all_eight_classes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var root = Environment.GetEnvironmentVariable("PLANORA_REPOSITORY_ROOT")!;
+        var config = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, "src/SPWPOS.Api/appsettings.json"))
+            .AddUserSecrets("SPWPOS-Authentication-Development").Build();
+        using var http = new HttpClient();
+        var interpreter = new TaskInterpreter(http, config, NullLogger<TaskInterpreter>.Instance);
+        await using var h = await ServiceHarness.CreateAsync(s => {
+            s.AddSingleton<ITaskInterpreter>(interpreter);
+            s.Configure<NoraAgentOptions>(x => x.Mode = "Agent");
+        });
+        h.Clock.Advance(DateTimeOffset.Parse("2026-11-01T06:00:00Z") - h.Clock.GetUtcNow());
+        var user = await h.RegisterAsync();
+        await using var scope = h.Provider.CreateAsyncScope();
+        var work = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
+        await work.SetPreferenceAsync(user.Id, new("Asia/Ho_Chi_Minh", 25, 180, 0, 480, 1320, MaximumDailyMinutes: 480), ct);
+        var agent = scope.ServiceProvider.GetRequiredService<IPlanningAgentService>();
+        var bytes = await File.ReadAllBytesAsync(Path.Combine(root, "tests/SPWPOS.UnitTests/Fixtures/ai-latency-timetable.png"), ct);
+        var watch = Stopwatch.StartNew();
+        var result = await agent.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(),
+            "Nhập thời khóa biểu trong ảnh và cập nhật giờ làm việc.",
+            Image: new("fictional-week.png", "image/png", Convert.ToBase64String(bytes)), CalendarKind: "Event"), ct);
+        Console.WriteLine($"TIMETABLE IMPORT elapsed={watch.ElapsedMilliseconds}ms; status={result.Status}; events={result.Changes.Count(x => x.Kind == "EVENT")}");
+        Assert.Equal("APPLIED", result.Status);
+        Assert.Equal(8, await h.DbAsync(db => db.FixedEvents.CountAsync(ct)));
+        var hours = await work.GetEffectiveAvailabilityForWeekAsync(user.Id, new(2026, 11, 2), ct);
+        Assert.NotEmpty(hours.Slots);
+        Assert.Contains(result.Changes, change => change.Kind == "AVAILABILITY");
+    }
+
     [Fact(SkipUnless = nameof(Enabled), Skip = "Opt-in real-provider latency checks.")]
     public async Task Fast_model_preserves_validation_and_reads_timetable_in_a_bounded_number_of_calls()
     {

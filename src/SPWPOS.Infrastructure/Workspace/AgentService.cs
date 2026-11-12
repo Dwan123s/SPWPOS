@@ -9,7 +9,8 @@ public sealed partial class WorkspaceService
 {
     private static readonly JsonSerializerOptions AgentJson = new(JsonSerializerDefaults.Web);
     private sealed record AgentChangeSet(WeeklyAvailability[]? Weekly, AvailabilityException[] Exceptions, FixedEvent[] Events, WorkTask[] Tasks, Guid[]? RemovedExceptionIds = null,
-        Guid[]? UrgentEventIds = null, Guid[]? ClippedTimetableEventIds = null, bool AnalyzeTimetable = false, AvailabilityPolicy? Policy = null);
+        Guid[]? UrgentEventIds = null, Guid[]? ClippedTimetableEventIds = null, bool AnalyzeTimetable = false, AvailabilityPolicy? Policy = null,
+        bool SimpleTimetableImport = false);
     private sealed record AgentUndo(WeeklyAvailability[]? Weekly, Guid[] ExceptionIds, Guid[] EventIds,
         AvailabilityException[] OriginalExceptions, FixedEvent[] OriginalEvents,
         WorkTask[] OriginalTasks, Guid[] NewTaskIds, WorkSession[] OriginalSessions, Guid[] NewSessionIds, Guid? PlanId,
@@ -128,26 +129,46 @@ public sealed partial class WorkspaceService
                 x.Status == "FAILED" ? "Yêu cầu thất bại; chưa lưu thay đổi từ yêu cầu này. Kiểm tra dữ liệu hiện tại trước khi trả lời."
                     : TurnView(x).Reply + " " + TurnView(x).Outcome + " " + TurnView(x).Question, x.Status)).ToArray();
             var latest = historyRows.FirstOrDefault();
-            var visionImage = input.Image ?? historyRows.TakeWhile(row => row.Status is "NEEDS_INPUT" or "BLOCKED" or "FAILED")
-                .Select(StoredAgentImage).FirstOrDefault(image => image?.Data is { Length: > 0 });
+            AgentTurn? imageSource = null;
+            var visionImage = input.Image;
             // A brief calendar lookup between clarification replies does not
             // discard an uploaded timetable from this conversation.
-            if (visionImage is null && TimetableFollowup(input.Text))
-                visionImage = historyRows.Where(row => row.Status is "NEEDS_INPUT" or "BLOCKED" or "FAILED")
-                    .Select(StoredAgentImage).FirstOrDefault(image => image?.Data is { Length: > 0 });
+            if (visionImage is null)
+            {
+                bool PendingImage(AgentTurn row) => row.Status is "NEEDS_INPUT" or "BLOCKED" or "FAILED";
+                var imageRows = TimetableFollowup(input.Text) ? historyRows.Where(PendingImage) : historyRows.TakeWhile(PendingImage);
+                foreach (var row in imageRows)
+                {
+                    if (StoredAgentImage(row) is not { Data.Length: > 0 } stored) continue;
+                    (imageSource, visionImage) = (row, stored);
+                    break;
+                }
+            }
+            var simpleImport = visionImage is not null && input.CalendarKind != "WorkSession" &&
+                (input.Image is not null ? SimpleTimetableUpload(reserved.Turn.Text) :
+                    imageSource?.Status == "NEEDS_INPUT" && SimpleTimetableUpload(imageSource.Text) && SimpleTimetableFollowup(reserved.Turn.Text));
             var pending = latest?.Status is "NEEDS_INPUT" or "BLOCKED" && latest.CommandJson.Length > 0
                 ? JsonSerializer.Deserialize<AgentIntent>(latest.CommandJson, AgentJson)?.Pending : null;
             pending = ConfirmDurationProposal(pending, input.Text);
-            var activeTaskTypes = await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).Select(x => x.Code).OrderBy(x => x).ToArrayAsync(ct);
-            var nativeAgent = noraOptions?.Value.Mode == "Agent" && interpreter is INoraAgentModel { AgentAvailable: true };
-            var (context, contextNotices) = nativeAgent ? ("", Array.Empty<string>())
+            var activeTaskTypes = simpleImport ? [] : await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).Select(x => x.Code).OrderBy(x => x).ToArrayAsync(ct);
+            var nativeAgent = !simpleImport && noraOptions?.Value.Mode == "Agent" && interpreter is INoraAgentModel { AgentAvailable: true };
+            var (context, contextNotices) = nativeAgent || simpleImport ? ("", Array.Empty<string>())
                 : BuildAgentContext(await AgentCalendarStateAsync(uid, state, ct), input.Text, activeTaskTypes, pending);
-            await Phase("UNDERSTANDING", "Đang hiểu yêu cầu và soạn phản hồi");
+            if (simpleImport) await Phase("READING_IMAGE", "Đang đọc ngày và giờ trong ảnh");
+            else await Phase("UNDERSTANDING", "Đang hiểu yêu cầu và soạn phản hồi");
             var agent = (IPlanningAgentInterpreter)interpreter;
             RuntimeExecution? runtime = null;
             string? scheduleReviewReply = null;
             AgentIntent intent;
-            if (nativeAgent)
+            if (simpleImport)
+            {
+                var request = imageSource is null ? reserved.Turn.Text : imageSource.Text + "\n" +
+                    string.Join("\n", historyRows.TakeWhile(row => row.Id != imageSource.Id).Reverse()
+                        .Where(row => row.Status == "NEEDS_INPUT").Select(row => row.Text).Append(reserved.Turn.Text));
+                intent = await RunJob(uid, "AI_REQUEST", () => agent.InterpretTimetableAsync(request, state.Preference.TimeZoneId,
+                    Now, visionImage!, aiBudget.Token), aiBudget.Token);
+            }
+            else if (nativeAgent)
             {
                 runtime = await RunNoraAgentAsync(uid, turnId, input, state, history, pending, activeTaskTypes, visionImage, publish, ct);
                 intent = runtime.Intent;
@@ -201,7 +222,7 @@ public sealed partial class WorkspaceService
                     return await PrepareNoraReminderAsync(uid, turn, intent, current.Preference, runtime?.View, ct);
                 var currentTaskTypes = intent.Tasks.Length == 0 ? [] : await db.TaskTypes.AsNoTracking().Where(x => x.IsActive).Select(x => x.Code).ToArrayAsync(ct);
                 var interpreted = intent;
-                if (runtime is null)
+                if (runtime is null && !simpleImport)
                 {
                     intent = NormalizeAgentCategories(intent, current, currentTaskTypes, input.Text);
                     intent = ConstrainEventReplanning(intent, input.Text, current);
@@ -238,9 +259,11 @@ public sealed partial class WorkspaceService
                 if (timetableContext) current = await AgentCalendarStateAsync(uid, current, ct);
                 var selected = runtime?.Candidate;
                 var (changes, candidate, affected, summary, timetableNotices) = selected is null
-                    ? await BuildAgentChangesAsync(uid, intent, current, input.Text, ct, eventRequest, timetableContext)
+                    ? await BuildAgentChangesAsync(uid, intent, current, input.Text, ct, eventRequest, timetableContext,
+                        configureTimetableHours: visionImage is not null)
                     : (selected.Changes, selected.State, selected.Affected, selected.Summary, selected.Notices);
-                var hasChanges = changes.Weekly is not null || changes.Exceptions.Length > 0 || changes.Events.Length > 0 || changes.Tasks.Length > 0;
+                if (simpleImport) changes = changes with { SimpleTimetableImport = true };
+                var hasChanges = changes.Weekly is not null || changes.Policy is not null || changes.Exceptions.Length > 0 || changes.Events.Length > 0 || changes.Tasks.Length > 0;
                 var planInput = new PlanInput(intent.OptimizationQuery is { } scope && scope.Start > Now.AddMinutes(5) ? scope.Start : Now.AddMinutes(5),
                     intent.HorizonDays, affected, true, "AVAILABILITY_CHANGED", UseCapacityFactor: input.UseCapacityFactor, UseEstimateBias: input.UseEstimateBias)
                     { WindowEnd = intent.OptimizationQuery?.End, AllowDeadlineRescue = DeadlineRescueAllowed(input.Text) };
@@ -305,7 +328,9 @@ public sealed partial class WorkspaceService
                     : affected.Length > 0 || intent.Events.Length > 0 || intent.Tasks.Length > 0 || intent.Exceptions.Length > 0 || intent.ReplaceWeeklyAvailability
                         ? "Lịch hiện tại đã đúng với yêu cầu; không có thay đổi cần lưu."
                         : scheduleReviewReply ?? ScopedReadOnlyReply(intent, input.Text, current, history, contextNotices);
-                if (!blocked && changes.AnalyzeTimetable)
+                if (!blocked && simpleImport && hasChanges)
+                    replyMessage = TimetableImportReply(changes, applied: false);
+                else if (!blocked && changes.AnalyzeTimetable)
                     replyMessage = TimetableAnalysis(candidate, changes.Events, plan,
                         applied: false);
                 return SaveTurn(turn, new(turn.Id, turn.ConversationId, turn.RequestId, turn.Text,
@@ -379,7 +404,7 @@ public sealed partial class WorkspaceService
             "AGENT_INVALID_INTENT", "Yêu cầu cần làm rõ không được kèm thay đổi dữ liệu.", 503);
     }
 
-    private async Task<(AgentChangeSet Changes, PlanningState State, Guid[] Affected, AgentChangeView[] Summary, string[] TimetableNotices)> BuildAgentChangesAsync(Guid uid, AgentIntent intent, PlanningState state, string request, CancellationToken ct, string? eventRequest = null, bool timetableContext = false)
+    private async Task<(AgentChangeSet Changes, PlanningState State, Guid[] Affected, AgentChangeView[] Summary, string[] TimetableNotices)> BuildAgentChangesAsync(Guid uid, AgentIntent intent, PlanningState state, string request, CancellationToken ct, string? eventRequest = null, bool timetableContext = false, bool configureTimetableHours = false)
     {
         var summary = new List<AgentChangeView>();
         WeeklyAvailability[]? weekly = null;
@@ -431,6 +456,9 @@ public sealed partial class WorkspaceService
             summary.Add(new("EXCEPTION", "Thay thế khung rảnh cũ", $"{previous.Date:yyyy-MM-dd} {previous.StartMinute / 60:00}:{previous.StartMinute % 60:00}–{previous.EndMinute / 60:00}:{previous.EndMinute % 60:00}", "Chỉ sử dụng khung giờ mới trong ngày này."));
         }
         var events = new List<FixedEvent>(); var editedEventIds = new HashSet<Guid>();
+        var setupTimetableHours = timetableContext && (configureTimetableHours ||
+            ChatMatch(eventRequest ?? request, @"\bthiet lap gio lam viec theo thoi khoa bieu\b").Success);
+        var missingTimetableWeeks = new HashSet<DateOnly>();
         var cutoff = Now; var skippedClasses = 0; var clippedClasses = new HashSet<Guid>();
         foreach (var item in intent.Events)
         {
@@ -457,7 +485,16 @@ public sealed partial class WorkspaceService
                 if (RequestedUrgentEvent(occurrence, eventRequest ?? request)) occurrence.IsUrgent = true;
             if (item.ExistingId is null && occurrences.All(occurrence => state.Events.Any(x => x.Name == occurrence.Name &&
                 (x.Start == occurrence.Start || clippedClasses.Contains(occurrence.Id) && x.Start <= occurrence.Start) &&
-                x.End == occurrence.End && x.Description == occurrence.Description && x.EventType == occurrence.EventType && IsUrgentEvent(x) == occurrence.IsUrgent))) continue;
+                x.End == occurrence.End && x.Description == occurrence.Description && x.EventType == occurrence.EventType && IsUrgentEvent(x) == occurrence.IsUrgent)))
+            {
+                if (setupTimetableHours && item.EventType is "CLASS" or "WORK")
+                    foreach (var occurrence in occurrences)
+                    {
+                        var week = RoutineWeekStart(LocalDate(occurrence.Start, state.Preference));
+                        if (state.Policy?.ForDate(week)?.UseTimetableHours != true) missingTimetableWeeks.Add(week);
+                    }
+                continue;
+            }
             if (item.ExistingId is { } occurrenceId) occurrences[0].Id = occurrenceId;
             if (original is not null && original.Name == occurrences[0].Name && original.Start == occurrences[0].Start && original.End == occurrences[0].End && original.Description == occurrences[0].Description && original.EventType == occurrences[0].EventType && IsUrgentEvent(original) == occurrences[0].IsUrgent) continue;
             events.AddRange(occurrences);
@@ -492,7 +529,11 @@ public sealed partial class WorkspaceService
                 if (!string.IsNullOrWhiteSpace(item.TaskType)) task.TaskType = item.TaskType;
                 task.Priority = item.Priority ?? task.Priority; task.Splittable = item.Splittable ?? task.Splittable;
                 task.WorkWindowStart = item.WorkWindowStart ?? task.WorkWindowStart; task.WorkWindowEnd = item.WorkWindowEnd ?? task.WorkWindowEnd;
-                if (item.Deadline is not null) task.IsHardDeadline = !item.DeadlineFromWorkWindow;
+                if (item.Deadline is not null)
+                {
+                    task.IsHardDeadline = !item.DeadlineFromWorkWindow;
+                    if (task.Deadline != original.Deadline) task.InheritsProjectDeadline = false;
+                }
                 if (task.Deadline == original.Deadline && task.EstimatedMinutes == original.EstimatedMinutes && task.Priority == original.Priority &&
                     task.Splittable == original.Splittable && task.IsHardDeadline == original.IsHardDeadline && task.WorkWindowStart == original.WorkWindowStart && task.WorkWindowEnd == original.WorkWindowEnd && task.TaskType == original.TaskType && item.Importance == null) continue;
                 task.UpdatedAt = Now;
@@ -522,26 +563,60 @@ public sealed partial class WorkspaceService
             Require(await db.TaskTypes.AnyAsync(x => x.Code == task.TaskType && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không hợp lệ.");
             taskChanges.Add(task); affected.Add(task.Id);
         }
+        if (taskChanges.Count > 0)
+        {
+            var changed = taskChanges.ToDictionary(x => x.Id);
+            var saved = state.Tasks.ToDictionary(x => x.Id);
+            foreach (var child in state.Tasks.Where(x => x.ParentId.HasValue && ActiveWork(x)))
+            {
+                var childChanged = changed.TryGetValue(child.Id, out var edit);
+                var parentChanged = changed.TryGetValue(child.ParentId!.Value, out var parent);
+                if (!childChanged && !parentChanged) continue;
+                edit ??= child;
+                parent ??= saved[child.ParentId.Value];
+                if (!edit.InheritsProjectDeadline)
+                {
+                    Require(parent.Deadline is null || edit.Deadline is null || edit.Deadline <= parent.Deadline,
+                        "SUBTASK_DEADLINE", "Hạn riêng của việc con không được sau hạn project.");
+                    continue;
+                }
+                if (edit.Deadline == parent.Deadline && edit.IsHardDeadline == parent.IsHardDeadline) continue;
+                Require(edit.WorkWindowStart is null || parent.Deadline > edit.WorkWindowStart,
+                    "TASK_WORK_WINDOW", $"Hạn project mới phải sau thời điểm bắt đầu của “{edit.Name}”.", 409);
+                if (!childChanged)
+                {
+                    edit = Copy(child);
+                    taskChanges.Add(edit);
+                }
+                edit.Deadline = parent.Deadline;
+                edit.IsHardDeadline = parent.IsHardDeadline;
+                edit.UpdatedAt = Now;
+                if (edit.HasPlanningDetails) affected.Add(edit.Id);
+                summary.RemoveAll(change => change.Kind == "TASK" && change.TaskId == edit.Id);
+                summary.Add(new("TASK", edit.Name, AgentTaskSummary(child, state.Preference), AgentTaskSummary(edit, state.Preference), edit.Id));
+            }
+        }
         Require(state.Tasks.Count(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled) + taskChanges.Count(x => !state.Tasks.Any(t => t.Id == x.Id)) <= 500,
             "TASK_LIMIT", "Tối đa 500 công việc đang hoạt động.");
         var candidate = state with { Availability = weekly ?? state.Availability, Exceptions = state.Exceptions.Where(x => !exceptions.Any(e => e.Id == x.Id) && !removedExceptions.Any(e => e.Id == x.Id)).Concat(exceptions).ToArray(),
             Events = state.Events.Where(x => !events.Any(e => e.Id == x.Id)).Concat(events).ToArray(), Tasks = state.Tasks.Where(x => !taskChanges.Any(t => t.Id == x.Id)).Concat(taskChanges).ToArray() };
         AvailabilityPolicy? timetablePolicy = null;
-        if (timetableContext && ChatMatch(eventRequest ?? request, @"\bthiet lap gio lam viec theo thoi khoa bieu\b").Success)
+        if (setupTimetableHours)
         {
-            var weeks = events.Where(item => item.EventType is "CLASS" or "WORK" && !state.Events.Any(saved => saved.Id == item.Id))
-                .Select(item => RoutineWeekStart(LocalDate(item.Start, state.Preference))).Distinct().Order();
+            var weeks = events.Where(item => (item.EventType is "CLASS" or "WORK")
+                    && !state.Events.Any(saved => saved.Id == item.Id))
+                .Select(item => RoutineWeekStart(LocalDate(item.Start, state.Preference))).Union(missingTimetableWeeks).Order();
             foreach (var week in weeks)
             {
                 timetablePolicy = ProposeTimetableRoutine(candidate, week, useTimetableHours: true);
                 timetablePolicy.ConfirmedAt = Now;
                 candidate = candidate with { Policy = timetablePolicy };
-                summary.Add(new("AVAILABILITY", "Giờ làm việc theo thời khóa biểu", "", $"Tuần {week:dd/MM}–{week.AddDays(6):dd/MM}"));
+                summary.Add(new("AVAILABILITY", "Giờ làm việc theo thời khóa biểu", "", $"Tuần {week:dd/MM}–{week.AddDays(6):dd/MM}", WeekStart: week));
             }
         }
         Require(!candidate.Tasks.Any(t => affected.Contains(t.Id) && !t.HasPlanningDetails),
             "TASK_PLANNING_DETAILS_REQUIRED", "Bổ sung hạn chót và thời gian dự kiến trước khi xếp lịch.", 409);
-        if (weekly is null && exceptions.Count == 0 && removedExceptions.Length == 0 && events.Count == 0 && taskChanges.Count == 0 && affected.Count == 0 && !intent.Reschedule)
+        if (weekly is null && timetablePolicy is null && exceptions.Count == 0 && removedExceptions.Length == 0 && events.Count == 0 && taskChanges.Count == 0 && affected.Count == 0 && !intent.Reschedule)
             return (new(null, [], [], []), candidate, [], [], TimetableCutoffNotices(skippedClasses, clippedClasses.Count));
         ValidateProtectedSessions(candidate);
         foreach (var session in candidate.Sessions.Where(x => x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && x.IsLocked))
@@ -601,7 +676,7 @@ public sealed partial class WorkspaceService
         foreach (var task in changes.Tasks)
         {
             Require(await db.TaskTypes.AnyAsync(x => x.Code == task.TaskType && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không còn hoạt động; hãy tạo lại bản xem trước.", 409);
-            Require((task.Deadline > Now || view.Plan == null && state.Tasks.Any(original => original.Id == task.Id && SameTaskContract(original, task))) && (task.WorkWindowStart is null && task.WorkWindowEnd is null || task.WorkWindowStart is not null && task.WorkWindowEnd > task.WorkWindowStart && task.Deadline > task.WorkWindowStart),
+            Require((task.Deadline > Now || view.Plan == null && state.Tasks.Any(original => original.Id == task.Id && SameTaskContract(original, task))) && (task.WorkWindowStart is null && task.WorkWindowEnd is null || task.WorkWindowStart is not null && (task.WorkWindowEnd > task.WorkWindowStart || task.InheritsProjectDeadline && task.WorkWindowEnd is null) && task.Deadline > task.WorkWindowStart),
                 "TASK_WORK_WINDOW", "Deadline hoặc khung giờ thực hiện trong bản xem trước không còn hợp lệ.", 409);
         }
         var applicationTime = Now;
@@ -690,7 +765,7 @@ public sealed partial class WorkspaceService
             view = view with { Run = appliedRun with { Status = "APPLIED" } };
         }
         return SaveTurn(turn, view with { Status = "APPLIED", SuggestRoutine = timetableAnalysis && changes.Policy is null,
-            Reply = timetableAnalysis
+            Reply = changes.SimpleTimetableImport ? TimetableImportReply(changes, applied: true) : timetableAnalysis
                 ? TimetableAnalysis(candidate, changes.Events, plan,
                     applied: true)
                 : plan?.IsOptimization == true ? "Đã lưu phương án tối ưu bạn vừa xác nhận. Bạn có thể xem lịch mới bên dưới hoặc hoàn tác nếu muốn quay lại lịch cũ."

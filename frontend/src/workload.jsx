@@ -19,6 +19,7 @@ import {
 } from "./workload-data.js";
 import { TeamWorkload } from "./workload-team.jsx";
 import { calendarDayBounds } from "./nora-schedule.js";
+import { nextDay } from "./dashboard-model.js";
 import "./workload.css";
 
 const isPersonalWorkload = (value) =>
@@ -42,6 +43,9 @@ const statusText = {
   FULL: "Đã đầy",
 };
 const timeText = (value) => (value == null ? "—" : minutes(value));
+const workloadDate = (date) => dateFmt(`${date}T12:00:00Z`, { timeZone: "UTC" });
+const loadPercent = (seconds, workingMinutes) =>
+  workingMinutes > 0 ? Math.min(100, (seconds / 60 / workingMinutes) * 100) : 0;
 const windowText = (row) =>
   `${dateFmt(row.start)} · ${timeFmt(row.start)}–${timeFmt(row.end)}`;
 async function previewRecovery(taskId, triggerEvent = "SESSION_MISSED") {
@@ -242,6 +246,8 @@ export function TodayWorkload({ onWorkspaceChanged }) {
         )}
         {next.kind === "CAPTURE" &&
           button("Ghi việc trước", "capture", "primary")}
+        {next.kind === "INBOX" &&
+          button("Mở công việc", "open-task-list", "primary", "all")}
         {next.kind === "PLAN" &&
           button("Xem lịch đề xuất", "generate-plan", "primary")}
         {next.kind === "OPEN_CALENDAR" &&
@@ -282,7 +288,7 @@ export function TodayWorkload({ onWorkspaceChanged }) {
   );
 }
 
-function TeamWorkloadPicker({ week, renderToolbar, showHours, showWeekends }) {
+function TeamWorkloadPicker({ week, renderToolbar }) {
   const { value, error, retry } = useWorkloadRequest(
     "/api/teams",
     Array.isArray,
@@ -308,7 +314,7 @@ function TeamWorkloadPicker({ week, renderToolbar, showHours, showWeekends }) {
       )}
       {value && !selected && (
         <p className="workload-message">
-          Bảng điều phối công suất dành cho trưởng nhóm.{" "}
+          Báo cáo công việc nhóm dành cho trưởng nhóm.{" "}
           {button("Mở Nhóm", "nav", "ghost small", "teams")}
         </p>
       )}
@@ -317,11 +323,10 @@ function TeamWorkloadPicker({ week, renderToolbar, showHours, showWeekends }) {
           key={selected.id}
           teamId={selected.id}
           week={week}
-          showHours={showHours}
-          showWeekends={showWeekends}
-          renderToolbar={(range, personFilter) =>
+          renderToolbar={(start, end, personFilter) =>
             renderToolbar(
-              range,
+              start,
+              end,
               <>
                 <label className="workload-team-picker">
                   <select
@@ -351,7 +356,7 @@ export function WorkloadWeek({ onWorkspaceChanged }) {
   const [week, setWeek] = useState(0);
   const [showHours, setShowHours] = useState(true);
   const [showWeekends, setShowWeekends] = useState(true);
-  const renderToolbar = (range, filters) => (
+  const renderToolbar = (start, end, filters) => (
     <header className="workload-toolbar">
       <h2 className="workload-visually-hidden">Tải công việc trong tuần</h2>
       <div
@@ -388,7 +393,7 @@ export function WorkloadWeek({ onWorkspaceChanged }) {
           type="button"
           aria-label="Tuần trước"
           disabled={week <= -4}
-          onClick={() => setWeek(week - 1)}
+          onClick={() => setWeek((current) => Math.max(-4, current - 1))}
         >
           ‹
         </button>
@@ -397,13 +402,23 @@ export function WorkloadWeek({ onWorkspaceChanged }) {
           type="button"
           aria-label="Tuần sau"
           disabled={week >= 3}
-          onClick={() => setWeek(week + 1)}
+          onClick={() => setWeek((current) => Math.min(3, current + 1))}
         >
           ›
         </button>
-        {range && <span className="workload-range">{range}</span>}
+        {start && end && (
+          <label className="workload-range" title={`${start} – ${end}`}>
+            <span>{workloadDate(start)} – {workloadDate(end)}</span>{icon("chevron")}
+            <select aria-label="Chuyển đến tuần" value={week} onChange={(event) => setWeek(Number(event.target.value))}>
+              {Array.from({ length: 8 }, (_, index) => index - 4).map((offset) => {
+                const monday = nextDay(start, (offset - week) * 7);
+                return <option key={offset} value={offset}>{workloadDate(monday)} – {workloadDate(nextDay(monday, 6))}{offset === 0 ? " · Tuần này" : ""}</option>;
+              })}
+            </select>
+          </label>
+        )}
       </div>
-      <div className="workload-capacity-filters">
+      {scope === "personal" && <div className="workload-capacity-filters">
         <label>
           Hiện số giờ
           <input
@@ -420,7 +435,7 @@ export function WorkloadWeek({ onWorkspaceChanged }) {
             onChange={(event) => setShowWeekends(event.target.checked)}
           />
         </label>
-      </div>
+      </div>}
     </header>
   );
   const viewOptions = { week, showHours, showWeekends, renderToolbar };
@@ -438,10 +453,13 @@ export function WorkloadWeek({ onWorkspaceChanged }) {
   );
 }
 
-function WorkloadGroupCell({ group, day, cell, showHours, showName }) {
+function WorkloadGroupCell({ group, day, cell, showHours, showName, today }) {
   const popupId = useId();
   const date = workloadDayLabel.format(new Date(day.date));
   const duration = cell && timeText(Math.round(cell.seconds / 60));
+  const fill = loadPercent(cell?.seconds ?? 0, day.workingMinutes);
+  const close = () => document.getElementById(popupId)?.hidePopover?.();
+  const canAdd = group.inbox && day.date >= today;
   return (
     <>
       <button
@@ -449,7 +467,7 @@ function WorkloadGroupCell({ group, day, cell, showHours, showName }) {
         className="workload-group-slot"
         data-inbox={group.inbox || undefined}
         popoverTarget={popupId}
-        aria-label={`${group.name}, ${date}${duration ? `, ${duration} dự kiến` : ""}`}
+        aria-label={`${group.name}, ${date}${showHours && duration ? `, ${duration} dự kiến` : ""}`}
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           const popup = document.getElementById(popupId);
@@ -458,34 +476,43 @@ function WorkloadGroupCell({ group, day, cell, showHours, showName }) {
           popup.style.top = `${Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - 296))}px`;
         }}
       >
-        <span className="workload-group-hours">{showHours && duration}</span>
+        <span className="workload-group-load">
+          {fill > 0 && <span className="workload-group-bar" style={{ width: `${fill}%` }} aria-hidden="true" />}
+          <span className="workload-group-hours">{showHours && duration}</span>
+        </span>
         {showName && <span className="workload-group-name">{group.name}</span>}
       </button>
       <div id={popupId} popover="auto" className="workload-group-popup"
         role="group" aria-label={`${group.name} · ${date}`}>
         <header><strong>{group.name}</strong><span>{date}</span></header>
         <ul>
-          {Array.from(cell?.tasks ?? [], ([id, task]) => (
-            <li key={id}>
-              <button type="button" data-action="task-detail" data-id={id}
-                onClick={() => document.getElementById(popupId).hidePopover()}>
-                {icon(task.status === "Completed" ? "check" : "tasks")}
-                <span>{task.name}<small className="workload-group-times">{task.times.join(" · ")}</small></span>
-                <small>{timeText(Math.round(task.seconds / 60))}</small>
-              </button>
-            </li>
-          ))}
+          {Array.from(cell?.tasks ?? [], ([id, task]) => {
+            const complete = task.status === "Completed";
+            return (
+              <li key={id} className="workload-popup-task">
+                {task.canComplete ? (
+                  <button type="button" className="task-complete-toggle workload-popup-check" role="checkbox"
+                    aria-checked={complete} aria-label={`${complete ? "Mở lại" : "Hoàn thành"} ${task.name}`}
+                    data-action="toggle-task-completion" data-id={id}>{complete && icon("check")}</button>
+                ) : <span className="workload-popup-task-icon" aria-hidden="true">{icon(complete ? "check" : "tasks")}</span>}
+                <button type="button" className="workload-popup-title" data-action="task-detail" data-id={id} onClick={close}>
+                  <span>{task.name}<small className="workload-group-times">{task.times.join(" · ")}</small></span>
+                  <small>{timeText(Math.round(task.seconds / 60))}</small>
+                </button>
+              </li>
+            );
+          })}
         </ul>
         {!cell && <p>Chưa có công việc được xếp trong ngày này.</p>}
-        {group.inbox && (
+        {canAdd && (
           <button type="button" className="btn secondary small" data-action="new-task"
-            onClick={() => document.getElementById(popupId).hidePopover()}>
+            data-start-date={day.date} onClick={close}>
             {icon("plus")} Thêm công việc vào Inbox
           </button>
         )}
         {group.projectId && (
           <button type="button" className="btn secondary small" data-action="task-detail" data-id={group.projectId}
-            onClick={() => document.getElementById(popupId).hidePopover()}>
+            onClick={close}>
             Xem project
           </button>
         )}
@@ -504,6 +531,8 @@ function PersonalWorkload({
   const { value, error, retry } = useWorkload(week);
   const following = useWorkload(value && week < 3 ? week + 1 : null);
   const [selection, setSelection] = useState(null);
+  const [showBands, setShowBands] = useState(true);
+  const bandsId = useId();
   function toggleSelection(date) {
     setSelection((current) => current === date ? null : date);
   }
@@ -526,7 +555,8 @@ function PersonalWorkload({
     (day) => showWeekends || isWorkloadWeekday(day),
   );
   const today = dayKey(value.asOf || Date.now());
-  const groups = new Map([["inbox", { name: "Inbox", inbox: true, days: new Map() }]]);
+  const name = state.workspace.profile?.displayName?.trim() || "Tôi";
+  const groups = new Map();
   const tasksById = new Map(state.workspace.tasks.map((task) => [task.id, task]));
   const projectIds = new Set(state.workspace.tasks.map((task) => task.parentId).filter(Boolean));
   for (const day of days) {
@@ -558,17 +588,27 @@ function PersonalWorkload({
         ? (Math.min(end, bounds[1]) - Math.max(start, bounds[0])) / 1000
         : Math.min((end - start) / 1000, day.plannedSeconds);
       const duration = Math.max(0, seconds);
-      const entry = cell.tasks.get(id) ?? { name: session.name, seconds: 0, status: task?.status, times: [] };
+      const entry = cell.tasks.get(id) ?? {
+        name: session.name, seconds: 0, status: task?.status, times: [],
+        canComplete: Boolean(task && !isTeam && !projectIds.has(id) && task.status !== "Cancelled"),
+      };
       entry.seconds += duration;
-      entry.times.push(`${timeFmt(Math.max(start, bounds?.[0] ?? start))}–${timeFmt(Math.min(end, bounds?.[1] ?? end))}`);
+      const dayEnd = bounds && end >= bounds[1] ? "24:00" : timeFmt(end);
+      entry.times.push(`${timeFmt(Math.max(start, bounds?.[0] ?? start))}–${dayEnd}`);
       cell.tasks.set(id, entry);
       cell.seconds += duration;
       group.days.set(day.date, cell);
     }
   }
+  const personLabel = (
+    <>
+      <span className="workload-person-avatar" aria-hidden="true">{Array.from(name)[0].toLocaleUpperCase("vi")}</span>
+      <span>Cá nhân</span>
+    </>
+  );
   return (
     <>
-      {renderToolbar(`${value.start} – ${nextWeek?.end ?? value.end}`)}
+      {renderToolbar(value.start, nextWeek?.end ?? value.end)}
       {error && (
         <p className="warning" role="status">
           Số liệu chưa được làm mới: {error}{" "}
@@ -595,7 +635,7 @@ function PersonalWorkload({
         tabIndex={0}
         aria-label="Lịch công việc theo ngày"
       >
-        <table className="workload-table workload-matrix">
+        <table className="workload-table workload-matrix workload-personal-matrix" style={{ "--workload-days": days.length }}>
           <thead>
             <tr>
               <th scope="col">Tên</th>
@@ -612,16 +652,21 @@ function PersonalWorkload({
           </thead>
           <tbody>
             <tr className="workload-total-row">
-              <th scope="row">Cá nhân</th>
+              <th scope="row">
+                {groups.size > 0 ? (
+                  <button type="button" className="workload-person-label workload-person-toggle" aria-expanded={showBands}
+                    aria-controls={bandsId} onClick={() => setShowBands((shown) => !shown)}>
+                    {personLabel}
+                    {icon("chevron")}
+                  </button>
+                ) : <span className="workload-person-label">{personLabel}</span>}
+              </th>
               {days.map((day) => {
                 const plannedMinutes = day.plannedSeconds / 60;
                 const room = day.schedulableMinutes;
-                const full = day.status === "FULL" || day.status === "SHORTFALL";
                 const capacity = room > 0 ? `Trống ${timeText(room)}` : statusText[day.status];
-                const fill =
-                  day.workingMinutes > 0
-                    ? Math.min(100, (100 * plannedMinutes) / day.workingMinutes)
-                    : 100;
+                const fill = loadPercent(day.plannedSeconds, day.workingMinutes);
+                const visibleCapacity = showHours || !(room > 0) ? capacity : "Còn chỗ";
                 return (
                   <td
                     key={day.date}
@@ -630,33 +675,37 @@ function PersonalWorkload({
                     <button
                       type="button"
                       className="workload-matrix-day"
-                      data-load={full ? "full" : undefined}
-                      aria-label={`${workloadDayLabel.format(new Date(day.date))}, ${timeText(plannedMinutes)} dự kiến, ${capacity}`}
+                      data-load={day.status === "SHORTFALL" ? "shortfall" : undefined}
+                      aria-label={`${workloadDayLabel.format(new Date(day.date))}${showHours ? `, ${timeText(plannedMinutes)} dự kiến` : ""}, ${visibleCapacity}`}
                       aria-expanded={
                         selection === day.date
                       }
                       onClick={() => toggleSelection(day.date)}
                     >
-                      {plannedMinutes > 0 && (
-                        <span
-                          className="workload-matrix-bar"
-                          style={{ width: `${fill}%` }}
-                        />
-                      )}
+                      <span className="workload-matrix-track" aria-hidden="true">
+                        {fill > 0 && <span className="workload-matrix-bar" style={{ width: `${fill}%` }} />}
+                      </span>
                       {showHours &&
                         plannedMinutes > 0 &&
                         <strong>{timeText(Math.round(plannedMinutes))}</strong>}
-                      {day.status !== "PAST" && (
-                        <small>{showHours || !(room > 0) ? capacity : "Còn chỗ"}</small>
-                      )}
                     </button>
                   </td>
                 );
               })}
             </tr>
+          </tbody>
+          <tbody id={bandsId} hidden={groups.size > 0 && !showBands}>
+            {groups.size === 0 && (
+              <tr className="workload-empty-row" aria-hidden="true">
+                <td />
+                {days.map(({ date }) => (
+                  <td key={date} data-today={date === today || undefined} />
+                ))}
+              </tr>
+            )}
             {Array.from(groups, ([id, group]) => {
-              const first = group.days.keys().next().value ?? days[0]?.date;
-              const last = Array.from(group.days.keys()).at(-1) ?? days.at(-1)?.date;
+              const first = group.days.keys().next().value;
+              const last = Array.from(group.days.keys()).at(-1);
               return (
               <tr key={id} className="workload-group-row">
                 <th scope="row"><span className="workload-visually-hidden">{group.name}</span></th>
@@ -670,7 +719,7 @@ function PersonalWorkload({
                       data-band={inRange ? group.inbox ? "inbox" : "project" : undefined}
                     >
                       {inRange && (
-                        <WorkloadGroupCell group={group} day={day} cell={cell} showHours={showHours} showName={day.date === first} />
+                        <WorkloadGroupCell group={group} day={day} cell={cell} showHours={showHours} showName={day.date === first} today={today} />
                       )}
                     </td>
                   );
@@ -685,6 +734,18 @@ function PersonalWorkload({
         <p className="workload-message">
           {value.next.reason}{" "}
           {button("Thiết lập giờ làm", "nav", "secondary small", "time")}
+        </p>
+      )}
+      {week === 0 && value.tasksMissingPlanningDetails > 0 && (
+        <p className="workload-message">
+          <strong>Thiếu thông tin xếp lịch</strong> · {value.tasksMissingPlanningDetails} việc cần hạn chót hoặc thời lượng.{" "}
+          {button("Mở công việc", "open-task-list", "secondary small", "all")}
+        </p>
+      )}
+      {week === 0 && value.tasksAwaitingSchedule > 0 && (
+        <p className="workload-message">
+          <strong>Đủ thông tin, chưa xếp đủ thời gian</strong> · {value.tasksAwaitingSchedule} việc.{" "}
+          {button("Xem lịch đề xuất", "generate-plan", "secondary small")}
         </p>
       )}
       <div
@@ -733,7 +794,7 @@ function PersonalWorkload({
                   </dl>
                 ) : (
                   <dl>
-                    <dt>Giờ làm</dt>
+                    <dt>Giờ có thể làm</dt>
                     <dd>{timeText(day.workingMinutes)}</dd>
                     <dt>Đã giữ chỗ</dt>
                     <dd>{timeText(day.reservedMinutes)}</dd>
@@ -744,7 +805,7 @@ function PersonalWorkload({
               </div>
               <details open={active}>
                 <summary>
-                  Phiên làm việc ({sessions.length})
+                  Phiên đã xếp ({sessions.length})
                 </summary>
                   <p>
                     Dự kiến {timeText(day.plannedSeconds / 60)} · Thực làm{" "}

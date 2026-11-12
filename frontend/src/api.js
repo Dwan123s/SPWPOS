@@ -23,13 +23,16 @@ export async function api(
   method = "GET",
   body = undefined,
   retry = true,
+  signal = undefined,
 ) {
+  signal?.throwIfAborted();
   const cooldownKey = `${method}:${path.split("?")[0]}`;
   const cooldown = requestCooldowns.get(cooldownKey);
   if (cooldown?.until > Date.now()) throw cooldownError(cooldown);
   requestCooldowns.delete(cooldownKey);
   const response = await fetch(path, {
     method,
+    ...(signal && { signal }),
     credentials: "same-origin",
     headers: {
       "X-SPWPOS": "1",
@@ -63,7 +66,7 @@ export async function api(
       }
       throw error;
     }
-    return api(path, method, body, false);
+    return api(path, method, body, false, signal);
   }
   let json;
   try {

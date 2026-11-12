@@ -12,10 +12,6 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> Workload(Guid id, CancellationToken ct, [FromQuery] int week = 0) =>
         Data(await service.GetTeamWorkloadAsync(UserId, id, week, ct));
-    [HttpGet("{id:guid}/workload/{taskId:guid}/candidates")]
-    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> WorkloadCandidates(Guid id, Guid taskId, CancellationToken ct) =>
-        Data(await service.GetTeamWorkloadCandidatesAsync(UserId, id, taskId, ct));
     [HttpGet("{id:guid}/messages")] public async Task<IActionResult> Messages(Guid id, [FromQuery] long? after, [FromQuery] long? before, CancellationToken ct) => Data(await service.GetTeamChatAsync(UserId, id, after, before, ct));
     [HttpPost("{id:guid}/messages")] public async Task<IActionResult> SendMessage(Guid id, TeamChatInput input, CancellationToken ct) => Data(await service.SendTeamChatAsync(UserId, id, input, ct));
     [HttpPost("{id:guid}/invites")] public async Task<IActionResult> Invite(Guid id, CancellationToken ct) => Data(await service.CreateTeamInviteAsync(UserId, id, ct));
@@ -45,6 +41,9 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
     [HttpPost("tasks/{id:guid}/recipient")] public async Task<IActionResult> Recipient(Guid id, TeamTaskRecipientChangeInput input, CancellationToken ct)
     { await service.ChangeTeamTaskRecipientAsync(UserId, id, input, ct); return Done(); }
     [HttpPost("tasks/{id:guid}/preview")] public async Task<IActionResult> Preview(Guid id, CancellationToken ct, [FromQuery] bool extend = false) => Data(await service.PreviewTeamClaimAsync(UserId, id, ct, extend));
+    [HttpPost("claims/{id:guid}/explanation")]
+    public async Task<IActionResult> ClaimExplanation(Guid id, CancellationToken ct) =>
+        Data(new { explanation = await service.ExplainTeamClaimAsync(UserId, id, ct) });
     [HttpPost("claims/{id:guid}/confirm")] public async Task<IActionResult> Claim(Guid id, ClaimConfirmInput input, CancellationToken ct) { await service.ConfirmTeamClaimAsync(UserId, id, input, ct); return Done(); }
     [HttpPost("claims/{id:guid}/cancel")] public async Task<IActionResult> Cancel(Guid id, CancellationToken ct) { await service.CancelTeamClaimAsync(UserId, id, ct); return Done(); }
     [HttpPost("claims/{id:guid}/undo")] public async Task<IActionResult> Undo(Guid id, CancellationToken ct) { await service.UndoTeamClaimAsync(UserId, id, ct); return Done(); }

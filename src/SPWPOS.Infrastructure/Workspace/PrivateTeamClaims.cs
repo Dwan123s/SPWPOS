@@ -26,12 +26,12 @@ public sealed partial class WorkspaceService
         Require(change || shared.DesignatedUserId == null || shared.DesignatedUserId == uid, "TASK_DESIGNATED", "Task này được chỉ định cho thành viên khác.", 403);
         var state = await State(uid, ct);
         var data = change ? JsonSerializer.Deserialize<SharedTaskView>(shared.PendingChangeJson!)! : SharedDto(shared);
-        if (!TeamDeadlineInRange(data.Deadline) && !change)
+        if (!TeamDeadlineInRange(data.Deadline))
         {
             var message = data.Deadline > Now.AddDays(30)
-                ? $"Có thể nhận việc từ {data.Deadline.UtcDateTime.AddDays(-30):yyyy-MM-dd HH:mm} UTC hoặc nhờ trưởng nhóm đổi hạn."
+                ? $"Bạn có thể {(change ? "xem phương án đổi lịch" : "nhận việc")} từ {TimeZoneInfo.ConvertTime(data.Deadline.AddDays(-30), PlanningEngine.Zone(state.Preference.TimeZoneId)):HH:mm dd/MM/yyyy}, khi còn 30 ngày trước hạn."
                 : "Hạn chót đã quá gần hoặc đã qua. Hãy nhờ trưởng nhóm đổi hạn.";
-            return new(Guid.Empty, taskId, Now, [], [], true, message);
+            return new(Guid.Empty, taskId, Now, [], [message], !change);
         }
         var task = NewTeamClaimTask(uid, data, shared, state, Now);
         if (change)
@@ -46,9 +46,9 @@ public sealed partial class WorkspaceService
         var candidate = state with { Tasks = state.Tasks.Where(x => x.Id != task.Id).Append(task).ToArray() };
         var start = Now.AddMinutes(5);
         if (!HasWorkHours(state))
-            return new(Guid.Empty, taskId, Now, [], [], !change, "Chưa xác nhận giờ có thể làm việc. Mở Giờ rảnh để thiết lập rồi thử lại.",
+            return new(Guid.Empty, taskId, Now, [], [], !change, "Chưa xác nhận giờ có thể làm việc. Mở Giờ làm việc để thiết lập rồi thử lại.",
                 new("WORK_HOURS_NOT_CONFIRMED", task.EstimatedMinutes, 0, 0, 0, 0,
-                    ["Chưa dùng preset hoặc tự coi khoảng ngoài giờ học là giờ làm việc.", "Lưu giờ có thể làm trong Giờ rảnh rồi mở lại đề xuất nhận việc."], true));
+                    ["Lưu giờ có thể làm rồi mở lại đề xuất nhận việc."], true));
         // Include displaced work all the way to its own deadline, within the supported horizon.
         var end = state.Tasks.Where(x => x.Status is WorkTaskStatus.Todo or WorkTaskStatus.InProgress).Select(x => x.Deadline).Append(task.Deadline).Max();
         if (end > start.AddDays(30)) end = start.AddDays(30);
@@ -71,7 +71,8 @@ public sealed partial class WorkspaceService
         plans = plans.OrderBy(p => state.Sessions.Where(x => x.TaskId != task.Id && x.Status == WorkSessionStatus.Scheduled && x.Start >= start && x.Start < end && !p.Sessions.Any(s => s.Id == x.Id && s.Preserved)).Sum(x => (x.End - x.Start).TotalMinutes))
             .ThenBy(p => p.Sessions.Count(x => !x.Preserved)).Take(3).ToList();
         var before = state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && x.Start >= start && x.Start < end).Select(CloneSession).ToArray();
-        var analysis = await ExplainPrivateClaim(uid, task, candidate, plans.ToArray(), ct);
+        var firstOption = plans[0].Sessions.Count(x => x.TaskId == task.Id);
+        var analysis = $"Có {plans.Count} phương án trước hạn. Phương án đầu tiên gồm {firstOption} phiên cho việc này. Bạn có thể xem giờ và các thay đổi trước khi xác nhận.";
         var proposal = new TeamClaimProposal { UserId = uid, TeamTaskId = taskId, TeamTaskVersion = shared.Version, MembershipVersion = member.Version,
             Revision = state.Preference.Revision, ExpiresAt = Now.AddMinutes(15), PayloadJson = JsonSerializer.Serialize(new ClaimPayload(task, plans.ToArray(), before, change, analysis)) };
         db.TeamClaimProposals.Add(proposal); await db.SaveChangesAsync(ct);
@@ -132,27 +133,46 @@ public sealed partial class WorkspaceService
             plan.Sessions.Any(x => !x.Preserved && x.TaskId != payload.Task.Id) ? "Dời phiên linh hoạt, giữ deadline" : "Xếp vào khoảng còn trống",
             PrivateSessions(candidate, plan.Sessions), PrivateSessions(state, payload.Before.Select(x => new ProposedSession(x.Id, x.TaskId, x.Start, x.End, x.ReasonCode, true))), plan.Explanations)).ToArray(), [], !payload.IsChange, payload.Analysis);
     }
-    private async Task<string> ExplainPrivateClaim(Guid uid, WorkTask task, PlanningState state, PlanView[] plans, CancellationToken ct)
+
+    public async Task<string?> ExplainTeamClaimAsync(Guid uid, Guid proposalId, CancellationToken ct)
     {
-        var first = plans[0]; var sessions = first.Sessions.Where(x => x.TaskId == task.Id).ToArray();
-        var remaining = engine.Remaining(task, [new("All", 0, 1, false)]);
-        var fallback = $"Công việc cần {task.EstimatedMinutes} phút, còn {remaining} phút theo tiến độ bạn xác nhận. " +
-            $"NORA đã đối chiếu lịch riêng của bạn và tìm được {plans.Length} phương án, với {sessions.Length} phiên cho công việc mới trong phương án đầu tiên. " +
-            "Các phiên này nằm trước deadline, giữ lịch cố định và phiên được bảo vệ. Xem giờ cụ thể bên dưới rồi xác nhận; lịch chưa thay đổi.";
-        if (interpreter is not IPlanningAgentInterpreter model || !model.Capabilities.AiAvailable) return fallback;
-        var context = JsonSerializer.Serialize(new { mode = "TEAM_CLAIM_REVIEW", sharedTask = new { task.Name, task.Description, task.EstimatedMinutes, task.Deadline, task.Priority, task.Progress },
-            verified = new { fixedCommitments = state.Events.Count(x => x.Start < first.End && x.End > first.Start), maximumSessionMinutes = state.Preference.MaximumSessionMinutes,
-                alternatives = plans.Select(p => new { sessions = PrivateSessions(state, p.Sessions), p.Explanations }) } });
+        var proposal = await Find<TeamClaimProposal>(uid, proposalId, ct);
+        var shared = await SharedTask(uid, proposal.TeamTaskId, ct);
+        var member = await TeamMember(uid, shared.TeamId, ct);
+        var revision = await Mine<WorkPreference>(uid).Select(x => x.Revision).SingleOrDefaultAsync(ct);
+        Require(proposal.Status == "Proposed" && proposal.ExpiresAt > Now && proposal.TeamTaskVersion == shared.Version &&
+            proposal.MembershipVersion == member.Version && proposal.Revision == revision,
+            "CLAIM_STALE", "Công việc hoặc lịch đã thay đổi. Hãy xem phương án mới.", 409);
+        if (interpreter is not IPlanningAgentInterpreter model || !model.Capabilities.AiAvailable) return null;
+
+        var payload = JsonSerializer.Deserialize<ClaimPayload>(proposal.PayloadJson)!;
+        var context = JsonSerializer.Serialize(new
+        {
+            mode = "TEAM_CLAIM_REVIEW",
+            options = payload.Plans.Select((plan, index) => new
+            {
+                number = index + 1,
+                plannedSessions = plan.Sessions.Count(session => session.TaskId == payload.Task.Id),
+                plannedMinutes = (int)plan.Sessions.Where(session => session.TaskId == payload.Task.Id)
+                    .Sum(session => (session.End - session.Start).TotalMinutes),
+                movesOtherWork = plan.Sessions.Any(session => session.TaskId != payload.Task.Id && !session.Preserved)
+            })
+        });
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(12));
         try
         {
-            var reply = await RunJob(uid, "AI_REQUEST", () => model.InterpretAsync("Phân tích công việc và giải thích phương án xếp lịch dành riêng cho tôi từ kết quả đã kiểm chứng. Chưa lưu hoặc nhận việc.", context, [], state.Preference.TimeZoneId, Now, ct), ct);
-            if (!HasAgentActions(reply) && reply.Question.Length == 0 && reply.Reply.Length is >= 80 and <= 1800 &&
-                !ChatMatch(reply.Reply, @"\b(?:da|vua) (?:tu dong )?(?:luu|doi lich|cap nhat|ap dung|nhan task)\b").Success)
-                return reply.Reply;
+            var result = await RunJob(uid, "AI_REQUEST", () => model.InterpretAsync(
+                "Giải thích ngắn cách so sánh các phương án xếp lịch đã tính.", context, [], "UTC", Now, timeout.Token), timeout.Token);
+            var reply = result.Reply?.Trim();
+            return !HasAgentActions(result) && result.Question.Length == 0 && reply is { Length: > 0 and <= 600 }
+                && result.FreeTimeQuery is null && result.ScheduleReviewQuery is null && result.OptimizationQuery is null
+                && !ChatMatch(reply, @"\b(?:da|vua) (?:tu dong )?(?:luu|doi lich|cap nhat|ap dung|nhan (?:viec|task))\b").Success ? reply : null;
         }
-        catch (AuthException) { /* The verified schedule remains usable if provider advice is unavailable. */ }
-        return fallback;
+        catch (AuthException) { return null; }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return null; }
     }
+
     public Task ConfirmTeamClaimAsync(Guid uid, Guid proposalId, ClaimConfirmInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
         var row = await Find<TeamClaimProposal>(uid, proposalId, ct); var shared = await SharedTask(uid, row.TeamTaskId, ct); var member = await TeamMember(uid, shared.TeamId, ct);

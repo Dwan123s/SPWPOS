@@ -4,7 +4,7 @@ import { App } from "../src/App.jsx";
 import { timePage } from "../src/page-time.jsx";
 import { scenarioPage } from "../src/page-scenario.jsx";
 import { NotesPage } from "../src/notes.jsx";
-import { openTask, captureModal, openDetail } from "../src/tasks.jsx";
+import { openTask, captureModal, openDetail, taskForm, taskInput } from "../src/tasks.jsx";
 import { eventModal, exceptionModal, sessionDetail } from "../src/calendar.jsx";
 import { takeAgentDraft } from "../src/agent-handoff.js";
 import { dayKey, state } from "../src/ui.jsx";
@@ -14,6 +14,7 @@ import { workspace, resetFixtures } from "./fixtures.js";
 beforeEach(() => {
   resetFixtures();
   state.workspace = workspace();
+  state.workHoursWeek = null;
   state.workspace.features = [
     ...(state.workspace.features || []),
     "secretary-v1",
@@ -35,6 +36,22 @@ it("keeps manual working hours available independently of NORA", () => {
   expect(document.querySelector("form[data-form='availability']")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Lưu giờ làm việc", exact: true })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Gửi thời khóa biểu" })).toBeNull();
+});
+
+it("uses the selected project's deadline for a new child and allows a separate deadline", () => {
+  const project = { id: "project", name: "Dự án", deadline: "2026-11-25T09:00:00Z", isHardDeadline: true };
+  const next = { id: "second-project", name: "Dự án khác", deadline: "2026-11-26T10:00:00Z", isHardDeadline: true };
+  state.workspace.tasks = [project, next];
+  const { container } = render(taskForm({}, project.id));
+  const input = () => taskInput(new FormData(container.querySelector("form")));
+  expect(input()).toMatchObject({ parentId: project.id, deadline: project.deadline, inheritsProjectDeadline: true });
+
+  fireEvent.click(screen.getByRole("button", { name: "Tùy chọn" }));
+  fireEvent.change(screen.getByLabelText("Công việc cha"), { target: { value: next.id } });
+  expect(input()).toMatchObject({ parentId: next.id, deadline: next.deadline, inheritsProjectDeadline: true });
+  fireEvent.click(screen.getByRole("button", { name: "Một việc" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Dùng hạn chót của dự án" }));
+  expect(input()).toMatchObject({ parentId: next.id, deadline: null, inheritsProjectDeadline: false });
 });
 
 it("shows separate gaps from saved timetable events in the availability page", async () => {
@@ -75,7 +92,7 @@ it("shows separate gaps from saved timetable events in the availability page", a
   )).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Gửi thời khóa biểu" }));
   expect(location.hash).toBe("#agent");
-  expect(takeAgentDraft()).toContain("gửi ảnh thời khóa biểu");
+  expect(takeAgentDraft()).toBe("Nhập thời khóa biểu trong ảnh và cập nhật giờ làm việc.");
 });
 
 it("opens the working-hours table on the applied timetable week", async () => {
@@ -99,6 +116,21 @@ it("opens the working-hours table on the applied timetable week", async () => {
   expect(screen.getByLabelText("Bắt đầu Thứ hai").value).toBe("09:00");
 });
 
+it("opens the specific timetable week selected in NORA", async () => {
+  const week = "2099-01-12";
+  state.workHoursWeek = week;
+  state.workspace.availabilityPolicy = { confirmed: true, timetableWeeks: ["2099-01-05", week] };
+  const request = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+    ok: true, status: 200,
+    json: async () => ({ data: { slots: [], revision: "week-revision" } }),
+  });
+  render(timePage());
+  expect(screen.getByLabelText("Chọn ngày trong tuần").value).toBe(week);
+  await screen.findByRole("button", { name: "Lưu giờ làm việc tuần này" });
+  expect(request.mock.calls[0][0]).toBe(`/api/time/availability/weeks/${week}`);
+  expect(document.querySelector("input[name=weekRevision]").value).toBe("week-revision");
+});
+
 it("opens task and event forms without a NORA action in the create-task form", () => {
   state.noraAvailable = true;
   render(<App initialize={false} />);
@@ -112,6 +144,14 @@ it("opens task and event forms without a NORA action in the create-task form", (
   act(() => eventModal());
   expect(screen.getByRole("button", { name: "Lưu sự kiện" })).toBeTruthy();
   expect(location.hash).not.toBe("#agent");
+});
+
+it("opens the Inbox task form with the date passed by Workload", () => {
+  const startDate = dayKey(Date.now() + 86400000);
+  render(<App initialize={false} />);
+  act(() => openTask({ startDate }));
+  expect(screen.getByLabelText("Ngày bắt đầu").value).toBe(startDate);
+  expect(screen.getByLabelText("Hạn chót (tùy chọn)").value).toBe("");
 });
 
 it("autofills an explicit start and duration without using the deadline field", () => {

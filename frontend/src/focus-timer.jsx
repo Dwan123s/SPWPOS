@@ -205,7 +205,7 @@ export function UpcomingFocus({ workspace }) {
               <span className="focus-upcoming-name">
                 <strong>{item.title}</strong>
                 <small>
-                  {item.kind === "event" ? "Lịch cố định" : "Phiên làm việc"} ·{" "}
+                  {item.kind === "event" ? "Lịch bận" : "Phiên đã xếp"} ·{" "}
                   {Math.round(
                     (Date.parse(item.end) - Date.parse(item.start)) / 60000,
                   )}{" "}

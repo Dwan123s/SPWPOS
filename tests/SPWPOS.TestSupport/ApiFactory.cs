@@ -13,7 +13,7 @@ namespace SPWPOS.TestSupport;
 
 public class ApiFactory : WebApplicationFactory<Program>
 {
-    private readonly SqliteConnection connection = new("Data Source=:memory:");
+    private readonly SqliteConnection? sqliteAnchor;
     private readonly string? sqlConnection;
     private readonly string? sqlDatabase;
     private bool sqlDatabaseCreated;
@@ -22,7 +22,17 @@ public class ApiFactory : WebApplicationFactory<Program>
     public TestEmailService Email { get; } = new();
     public ApiFactory(bool useSqlServer = false)
     {
-        if (!useSqlServer) connection.Open();
+        if (!useSqlServer)
+        {
+            // Keep the named database alive while each request or worker opens
+            // its own connection and transaction.
+            sqliteAnchor = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = Guid.NewGuid().ToString("N"), Mode = SqliteOpenMode.Memory,
+                Cache = SqliteCacheMode.Shared, Pooling = false
+            }.ToString());
+            sqliteAnchor.Open();
+        }
         else
         {
             var source = Environment.GetEnvironmentVariable("SPWPOS_TEST_SQLSERVER") ?? throw new InvalidOperationException("SPWPOS_TEST_SQLSERVER is required.");
@@ -46,8 +56,8 @@ public class ApiFactory : WebApplicationFactory<Program>
         });
         builder.ConfigureServices(services =>
         {
-            if (sqlConnection is null) TestInfrastructure.ReplacePersistence(services, connection);
-            else TestInfrastructure.ReplaceSqlServerPersistence(services, sqlConnection);
+            if (sqliteAnchor is not null) TestInfrastructure.ReplacePersistence(services, sqliteAnchor.ConnectionString);
+            else if (sqlConnection is not null) TestInfrastructure.ReplaceSqlServerPersistence(services, sqlConnection);
             TestInfrastructure.ReplaceSecurityDependencies(services, Clock, Email);
         });
     }
@@ -62,12 +72,14 @@ public class ApiFactory : WebApplicationFactory<Program>
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { DeleteTestDatabase(); connection.Dispose(); }
         base.Dispose(disposing);
+        if (disposing) { DeleteTestDatabase(); sqliteAnchor?.Dispose(); }
     }
     public override async ValueTask DisposeAsync()
     {
-        DeleteTestDatabase(); await base.DisposeAsync().ConfigureAwait(false); await connection.DisposeAsync().ConfigureAwait(false);
+        await base.DisposeAsync().ConfigureAwait(false);
+        DeleteTestDatabase();
+        if (sqliteAnchor is not null) await sqliteAnchor.DisposeAsync().ConfigureAwait(false);
     }
     private void DeleteTestDatabase()
     {

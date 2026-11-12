@@ -75,7 +75,9 @@ public sealed partial class PrivateTeamPlanningTests
         var reopened = await Current(h); Assert.Equal("Assigned", reopened.Status); Assert.Equal(75, reopened.Progress); Assert.Equal(reject.Note, reopened.CompletionReviewNote);
         var personal = await h.DbAsync(db => db.WorkTasks.SingleAsync(Ct)); Assert.Equal(WorkTaskStatus.InProgress, personal.Status); Assert.Equal(75, personal.Progress); Assert.Null(personal.CompletedAt);
         Assert.NotEqual(revision, await h.DbAsync(db => db.WorkPreferences.Where(x => x.UserId == Member).Select(x => x.Revision).SingleAsync(Ct)));
-        Assert.Equal(1, await h.DbAsync(db => db.InAppNotifications.CountAsync(x => x.Kind == "TEAM_COMPLETION_REJECTED", Ct)));
+        var notification = await h.DbAsync(db => db.InAppNotifications.SingleAsync(x => x.Kind == "TEAM_COMPLETION_REJECTED", Ct));
+        Assert.Equal(Member, notification.UserId);
+        Assert.Equal(personal.Id, notification.TaskId);
         await Use(h, s => s.UpdateTeamProgressAsync(Member, TaskId, new(reopened.Version, 100), Ct));
         Assert.NotEqual(pending.CompletionRequestId, (await Current(h)).CompletionRequestId);
         await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ReviewTeamCompletionAsync(Leader, TaskId, reject with { Approved = true }, Ct)));

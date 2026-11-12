@@ -22,6 +22,7 @@ public sealed class WorkTask : OwnedRecord, ITaskImportance
     public Guid? CategoryId { get; set; }
     public Guid? ParentId { get; set; }
     public DateTimeOffset? Deadline { get; set; }
+    public bool InheritsProjectDeadline { get; set; }
     public DateTimeOffset? WorkWindowStart { get; set; }
     public DateTimeOffset? WorkWindowEnd { get; set; }
     public int Priority { get; set; } = 2;

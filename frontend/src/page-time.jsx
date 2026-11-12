@@ -5,6 +5,7 @@ import { WorkHoursEditor } from "./work-hours.jsx";
 import { AvailabilityPolicyCard } from "./availability-policy.jsx";
 import { availabilityWindows, nextDay } from "./dashboard-model.js";
 import { askNora } from "./agent-handoff.js";
+import { TIMETABLE_IMPORT_REQUEST } from "./timetable-image.jsx";
 import {
   state,
   button,
@@ -18,14 +19,14 @@ const mondayOf = (date) =>
   nextDay(date, -((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7));
 const displayDate = (date) => dateFmt(`${date}T12:00:00Z`, { timeZone: "UTC" });
 
-function WorkHoursCard({ workspace: w, onWorkspaceChanged }) {
+function WorkHoursCard({ workspace: w, onWorkspaceChanged, selectedWeek }) {
   const currentWeek = mondayOf(dayKey(Date.now()));
   const timetableWeeks = w.availabilityPolicy?.timetableWeeks ?? [];
   const timetableWeek = timetableWeeks.find((week) => week >= currentWeek);
-  const [scope, setScope] = useState(timetableWeek ? "week" : "recurring");
+  const [scope, setScope] = useState(selectedWeek || timetableWeek ? "week" : "recurring");
   const byWeek = scope === "week";
   const byTimetable = scope === "timetable";
-  const [weekStart, setWeekStart] = useState(timetableWeek || currentWeek);
+  const [weekStart, setWeekStart] = useState(selectedWeek || timetableWeek || currentWeek);
   const [effective, setEffective] = useState(null);
   const [retry, setRetry] = useState(0);
   const usesTimetable = byWeek && timetableWeeks.includes(weekStart);
@@ -36,8 +37,8 @@ function WorkHoursCard({ workspace: w, onWorkspaceChanged }) {
     if (!effectiveKey) return;
     let live = true;
     api(`/api/time/availability/weeks/${weekStart}`)
-      .then(({ slots }) => {
-        if (live) setEffective({ key: effectiveKey, slots });
+      .then(({ slots, revision }) => {
+        if (live) setEffective({ key: effectiveKey, slots, revision });
       })
       .catch((error) => {
         if (live) setEffective({ key: effectiveKey, error: error.message });
@@ -59,8 +60,7 @@ function WorkHoursCard({ workspace: w, onWorkspaceChanged }) {
       (item) =>
         item.date >= weekStart &&
         item.date <= weekEnd &&
-        item.isAvailable &&
-        item.overridesWeeklyAvailability,
+        (item.isWeekEdit || (item.isAvailable && item.overridesWeeklyAvailability)),
     );
   const slots = usesTimetable
     ? weekResult?.slots
@@ -82,21 +82,16 @@ function WorkHoursCard({ workspace: w, onWorkspaceChanged }) {
     <section className="card work-hours-card">
       <div className="card-header">
         <div>
-          <h2>Khung giờ làm việc của tôi</h2>
+          <h2>Giờ có thể làm</h2>
           <p>
-            Xem giờ rảnh quanh lịch học và ca làm đã lưu, hoặc nhập các khung
-            bạn có thể làm việc.
+            Đặt các khung bạn có thể làm việc quanh lịch học, ca làm và các lịch bận khác.
           </p>
         </div>
         {state.noraAvailable && (
           <button
             type="button"
             className="btn secondary small"
-            onClick={() =>
-              askNora(
-                "Tôi muốn gửi ảnh thời khóa biểu. Hãy đọc giờ học và lưu các buổi học thành lịch cố định sau khi đủ thông tin. Sau đó, thiết lập giờ làm việc theo thời khóa biểu cho các tuần đã nhập, dựa vào lịch học, ca làm và lịch bận đã lưu.",
-              )
-            }
+            onClick={() => askNora(TIMETABLE_IMPORT_REQUEST)}
           >
             Gửi thời khóa biểu
           </button>
@@ -105,7 +100,7 @@ function WorkHoursCard({ workspace: w, onWorkspaceChanged }) {
       <div
         className="work-hours-scope"
         role="group"
-        aria-label="Phạm vi giờ làm việc"
+        aria-label="Phạm vi giờ có thể làm"
       >
         <button
           type="button"
@@ -194,6 +189,9 @@ function WorkHoursCard({ workspace: w, onWorkspaceChanged }) {
               {byWeek && (
                 <input type="hidden" name="weekStart" value={weekStart} />
               )}
+              {usesTimetable && weekResult?.revision && (
+                <input type="hidden" name="weekRevision" value={weekResult.revision} />
+              )}
               <WorkHoursEditor
                 key={JSON.stringify([hasOverrides, slots])}
                 slots={slots}
@@ -261,7 +259,8 @@ export function timePage({ onWorkspaceChanged } = {}) {
   return (
     <div className="equal-columns">
       <div className="stack">
-        <WorkHoursCard workspace={w} onWorkspaceChanged={onWorkspaceChanged} />
+        <WorkHoursCard key={state.workHoursWeek || "default"} workspace={w}
+          selectedWeek={state.workHoursWeek} onWorkspaceChanged={onWorkspaceChanged} />
         <section className="card">
           <div className="card-header">
             <div>
@@ -272,7 +271,7 @@ export function timePage({ onWorkspaceChanged } = {}) {
           </div>
           {nodeList(
             w.exceptions
-              .filter((e) => e.startMinute < e.endMinute)
+              .filter((e) => !e.isWeekEdit && e.startMinute < e.endMinute)
               .map((e) => (
                 <div className="list-line">
                   <div>
@@ -304,7 +303,7 @@ export function timePage({ onWorkspaceChanged } = {}) {
         </section>
         <section className="card">
           <div className="card-header">
-            <h2>Sự kiện cố định</h2>
+            <h2>Lịch bận</h2>
             {button("Thêm", "new-event", "small secondary", "", "plus")}
           </div>
           {nodeList(

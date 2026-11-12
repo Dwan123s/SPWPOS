@@ -475,6 +475,12 @@ async function action(name, id, element) {
         navigation("calendar");
       }
       break;
+    case "work-hours-week":
+      if (/^\d{4}-\d{2}-\d{2}$/.test(id) && Number.isFinite(Date.parse(id))) {
+        state.workHoursWeek = id;
+        navigation("time");
+      }
+      break;
     case "open-task-list":
       state.taskScope = id;
       navigation("tasks");
@@ -530,7 +536,7 @@ async function action(name, id, element) {
       );
       break;
     case "new-task":
-      openTask();
+      openTask({ startDate: element?.dataset.startDate });
       break;
     case "subtask":
       openTask({}, id);
@@ -1273,6 +1279,7 @@ async function formAction(form, data, nextAction = null) {
         throw new Error("Bạn có thể lưu tối đa 28 khoảng giờ làm việc thường lệ.");
       await api(url, "PUT", {
         slots,
+        ...(data.get("weekRevision") ? { revision: data.get("weekRevision") } : {}),
       });
       if (slots.length) completeGuideStep(1);
       await refreshAfter(weekStart ? "Đã lưu giờ làm việc cho tuần đã chọn." : "Đã lưu giờ làm việc.");

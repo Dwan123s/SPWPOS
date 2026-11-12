@@ -71,11 +71,12 @@ public sealed partial class WorkspaceService
         var closed = await Mine<SessionExecution>(uid).AsNoTracking().Where(e => e.EndedAt >= weekStart && e.EndedAt < weekEnd)
             .Select(e => new { e.SessionId, e.EndedAt, e.ActualSeconds }).ToArrayAsync(ct);
         var executions = closed.ToDictionary(e => e.SessionId);
-        var active = state.Tasks.Where(t => t.HasPlanningDetails && ActiveWork(t)).ToArray();
+        var parentIds = state.Tasks.Where(t => t.ParentId != null).Select(t => t.ParentId!.Value).ToHashSet();
+        var active = state.Tasks.Where(t => t.HasPlanningDetails && ActiveWork(t) && !parentIds.Contains(t.Id)).ToArray();
+        var missingDetails = state.Tasks.Count(t => !t.HasPlanningDetails && ActiveWork(t) && !parentIds.Contains(t.Id));
         var checkedPlan = hasHours && active.Length > 0 ? ForecastWorkload(state, now) : null;
         var warnings = (checkedPlan?.Warnings ?? []).ToLookup(w => w.TaskId);
         var conflicts = TimeConflictTaskIds(state).ToHashSet();
-        var parentIds = state.Tasks.Where(t => t.ParentId != null).Select(t => t.ParentId!.Value).ToHashSet();
         var work = state.Tasks.Where(t => t.HasPlanningDetails && !t.IsDeleted && !parentIds.Contains(t.Id) && t.Status != WorkTaskStatus.Cancelled)
             .Select(t =>
             {
@@ -135,6 +136,7 @@ public sealed partial class WorkspaceService
         var next = review != null ? new WorkloadAction("REVIEW", $"Ghi nhận kết quả: {tasks[review.TaskId].Name}.", review.TaskId, review.Id) :
             nextSession != null ? new("SESSION", $"Phiên tiếp theo: {tasks[nextSession.TaskId].Name}.", nextSession.TaskId, nextSession.Id) :
             risk != null ? new("RISK", $"{risk.Name}: {risk.Reason ?? "Đã quá hạn."}", risk.Id) :
+            active.Length == 0 && missingDetails > 0 ? new("INBOX", $"Có {missingDetails} việc chưa đủ thông tin để xếp lịch. Bạn có thể hoàn thành trong Công việc hoặc bổ sung hạn và thời lượng.") :
             !hasHours ? new("SETUP", "Xác nhận giờ làm để tìm chỗ cho công việc.") :
             active.Length == 0 ? new("CAPTURE", "Ghi việc bạn muốn làm trước.") :
             work.All(t => t.UnscheduledMinutes == 0) ? new("OPEN_CALENDAR", "Các công việc đã có thời gian. Mở lịch để xem phiên tiếp theo.") :
@@ -145,6 +147,7 @@ public sealed partial class WorkspaceService
             .Append(Midnight(today.AddDays(1))).Min();
         if (snapshot is not null) await snapshot.CommitAsync(ct);
         return new(now, refresh, state.Preference.Revision, zone.Id, first, last, days, weekTasks,
-            weekTasks.Count(t => t.Status == "Completed" && (t.TeamStatus is null or "Completed")), next);
+            weekTasks.Count(t => t.Status == "Completed" && (t.TeamStatus is null or "Completed")), next, missingDetails,
+            work.Count(t => t.UnscheduledMinutes > 0 && t.Status is "Todo" or "InProgress"));
     }
 }

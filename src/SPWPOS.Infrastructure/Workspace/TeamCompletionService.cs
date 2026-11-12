@@ -90,6 +90,6 @@ public sealed partial class WorkspaceService
         else
             await AddNotification(member.UserId, "TEAM_COMPLETION_REJECTED", "Task nhóm cần bổ sung",
                 $"Trưởng nhóm {leaderName} yêu cầu bổ sung “{task.Name}”." + (task.CompletionReviewNote is { } note ? " " + note : " Hãy trao đổi trong chat nhóm và gửi duyệt lại khi xong."),
-                $"team-rejected:{input.RequestId}", null, ct);
+                $"team-rejected:{input.RequestId}", assignment.WorkTaskId, ct);
     }, ct, false);
 }

@@ -38,6 +38,7 @@ import {
 import { useVoiceInput } from "./voice-input.js";
 import {
   useTimetableImage,
+  TIMETABLE_IMPORT_REQUEST,
   timetableImagePayload,
   TimetableImageButton,
   TimetableImagePreview,
@@ -547,9 +548,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
     streamAbort.current = controller;
     streamState.current = {
       requestId: crypto.randomUUID(),
-      text:
-        draftText ||
-        "Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.",
+      text: draftText || TIMETABLE_IMPORT_REQUEST,
       image: withImage ? timetableImagePayload(image.attachment, true) : null,
       reply: "",
       phases: withImage
@@ -572,9 +571,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
         : null;
       controller.signal.throwIfAborted();
       if (!mounted.current) return;
-      const messageText =
-        draftText ||
-        "Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.";
+      const messageText = draftText || TIMETABLE_IMPORT_REQUEST;
       if (messageText.length > 2000)
         throw new Error(
           "Yêu cầu kèm thời khóa biểu vượt 2000 ký tự. Bạn rút gọn lời nhắn hoặc chia thời khóa biểu thành từng phần nhé.",

@@ -8,14 +8,11 @@ public sealed record WorkloadTask(Guid Id, string Name, int Estimate, int Remain
     int? ShortfallMinutes, DateTimeOffset Deadline, bool Overdue, string Status, string? TeamStatus, string? Reason, string DeadlineAssessment, int ChecklistDone, int ChecklistTotal);
 public sealed record WorkloadAction(string Kind, string Reason, Guid? TaskId = null, Guid? SessionId = null);
 public sealed record WorkloadView(DateTimeOffset AsOf, DateTimeOffset RefreshAt, Guid Revision, string TimeZoneId,
-    DateOnly Start, DateOnly End, WorkloadDay[] Days, WorkloadTask[] Tasks, int CompletedTasks, WorkloadAction Next);
+    DateOnly Start, DateOnly End, WorkloadDay[] Days, WorkloadTask[] Tasks, int CompletedTasks, WorkloadAction Next,
+    int TasksMissingPlanningDetails = 0, int TasksAwaitingSchedule = 0);
 
-public sealed record TeamWorkloadDay(DateOnly Date, int? WorkingMinutes, int? BusyMinutes, int? ReservedMinutes,
-    int? SchedulableMinutes, long? RecordedActualSeconds);
-public sealed record TeamWorkloadMember(Guid UserId, string Name, string TimeZoneId, TeamWorkloadDay[] Days);
+public sealed record TeamWorkloadMember(Guid UserId, string Name);
 public sealed record TeamWorkloadTask(Guid Id, string Name, Guid Version, string Status, Guid? AssigneeId,
-    Guid? DesignatedUserId, DateTimeOffset Deadline, int RemainingMinutes, int? UnscheduledMinutes, int? ShortfallMinutes,
-    string Risk);
+    Guid? DesignatedUserId, DateTimeOffset Deadline, int EstimatedMinutes, int Progress, string Risk);
 public sealed record TeamWorkloadView(DateTimeOffset AsOf, DateTimeOffset RefreshAt, DateOnly Start, DateOnly End,
     TeamWorkloadMember[] Members, TeamWorkloadTask[] Tasks);
-public sealed record TeamWorkloadCandidate(Guid UserId, string Status, int? SchedulableMinutes);

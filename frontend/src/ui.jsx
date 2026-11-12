@@ -13,6 +13,7 @@ export const state = {
   route: "today",
   loadedAt: 0,
   calendarStart: null,
+  workHoursWeek: null,
   plan: null,
   scenario: null,
   authEmail: "",
@@ -44,6 +45,7 @@ const paths = {
   panelToggle: "M9 6l-6 6 6 6 M3 12h18 M13 6h8 M13 18h8",
   collapse: "M20 4l-6 6 M14 4v6h6 M4 20l6-6 M4 14h6v6",
   arrow: "M5 12h14 M13 6l6 6-6 6",
+  chevron: "M6 9l6 6 6-6",
   close: "M6 6l12 12 M18 6L6 18",
   alertCircle: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v6 M12 16h.01",
   check: "M5 12l4 4L19 6",
@@ -127,7 +129,7 @@ export const reasons = {
   AUTO_HEAL: "Phiên bù tự động, giữ nguyên các lịch khác",
 };
 export const zone = () =>
-  state.workspace?.preference.timeZoneId || "Asia/Ho_Chi_Minh";
+  state.workspace?.preference?.timeZoneId || "Asia/Ho_Chi_Minh";
 export const dateFmt = (value, options = {}) =>
   new Intl.DateTimeFormat("vi-VN", {
     timeZone: zone(),

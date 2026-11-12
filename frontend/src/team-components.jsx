@@ -402,7 +402,7 @@ export function TeamHeader({
           )}
           {team.role === "Leader" && (
             <button className="btn primary" disabled={busy} onClick={onCompose}>
-              {icon("plus")} Giao việc mới
+              {icon("plus")} Đăng việc mới
             </button>
           )}
         </div>

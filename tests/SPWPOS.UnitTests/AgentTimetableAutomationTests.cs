@@ -13,6 +13,33 @@ public sealed partial class AgentFreeTimeTests
             new("Lập trình", At(840), At(960), EventType: "CLASS")] } };
 
     [Fact]
+    public async Task Editing_one_timetable_gap_does_not_freeze_busy_hours_on_the_same_day()
+    {
+        await using var h = await Harness(AutomaticTimetable());
+        var user = await h.RegisterAsync();
+        Assert.Equal("APPLIED", (await Send(h, user.Id, "Nhập thời khóa biểu ngày mai và thiết lập giờ làm việc theo thời khóa biểu.")).Status);
+        var weekday = (int)Day.DayOfWeek;
+        var week = Day.AddDays(-((weekday + 6) % 7));
+        await using var scope = h.Provider.CreateAsyncScope();
+        var work = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
+        var hours = await work.GetEffectiveAvailabilityForWeekAsync(user.Id, week, Ct);
+        await work.SetAvailabilityForWeekAsync(user.Id, week, hours, Ct);
+        Assert.Empty(await h.DbAsync(db => db.AvailabilityExceptions.ToArrayAsync(Ct)));
+        var evening = hours.Slots.First(x => x.DayOfWeek == weekday && x.StartMinute >= 1110 && x.EndMinute - x.StartMinute > 30);
+        var edited = hours.Slots.Select(x => x == evening ? x with { EndMinute = x.EndMinute - 30 } : x).ToArray();
+        await work.SetAvailabilityForWeekAsync(user.Id, week, hours with { Slots = edited }, Ct);
+        var change = Assert.Single(await h.DbAsync(db => db.AvailabilityExceptions.ToArrayAsync(Ct)));
+        Assert.True(change.IsWeekEdit);
+        Assert.False(change.IsAvailable);
+        Assert.Equal(evening.EndMinute - 30, change.StartMinute);
+        var lesson = Assert.Single((await work.GetAsync(user.Id, Ct)).Events, x => x.Name == "Toán");
+        await work.DeleteEventAsync(user.Id, lesson.Id, Ct);
+        var updated = (await work.GetEffectiveAvailabilityForWeekAsync(user.Id, week, Ct)).Slots;
+        Assert.Contains(updated, x => x.DayOfWeek == weekday && x.StartMinute <= 540 && x.EndMinute > 540);
+        Assert.DoesNotContain(updated, x => x.DayOfWeek == weekday && x.EndMinute > evening.EndMinute - 30 && x.StartMinute < evening.EndMinute);
+    }
+
+    [Fact]
     public async Task Timetable_setup_replaces_regular_hours_for_its_week_and_can_be_undone()
     {
         await using var h = await Harness(AutomaticTimetable());
@@ -47,6 +74,31 @@ public sealed partial class AgentFreeTimeTests
     }
 
     [Fact]
+    public async Task Uploading_an_existing_timetable_configures_hours_without_duplicating_classes()
+    {
+        await using var h = await Harness(AutomaticTimetable());
+        var user = await h.RegisterAsync();
+        const string request = "Nhập thời khóa biểu ngày mai.";
+        Assert.Equal("APPLIED", (await Send(h, user.Id, request)).Status);
+        Assert.Empty(await h.DbAsync(db => db.AvailabilityPolicies.ToArrayAsync(Ct)));
+
+        var input = new AgentTurnInput(Guid.NewGuid(), Guid.NewGuid(), request, false,
+            Image: new("Lịch.png", "image/png", "iVBORw0KGgo="));
+        var preview = await UseAgent(h, s => s.SendAgentTurnAsync(user.Id, input, Ct));
+        Assert.Equal("PREVIEW", preview.Status);
+        Assert.Empty(await h.DbAsync(db => db.AvailabilityPolicies.ToArrayAsync(Ct)));
+
+        var saved = await UseAgent(h, s => s.ApplyAgentTurnAsync(user.Id, preview.Id, Ct));
+        Assert.Equal("APPLIED", saved.Status);
+        Assert.Single(await h.DbAsync(db => db.AvailabilityPolicies.ToArrayAsync(Ct)));
+        Assert.Equal(2, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
+
+        var repeated = await UseAgent(h, s => s.SendAgentTurnAsync(user.Id,
+            input with { RequestId = Guid.NewGuid() }, Ct));
+        Assert.Equal("ANSWERED", repeated.Status);
+    }
+
+    [Fact]
     public async Task A_week_reply_after_a_read_only_lookup_keeps_the_same_conversations_uploaded_timetable()
     {
         var ai = new AgentAiTestDouble { Response = _ => AgentAiTestDouble.Empty() with { Question = "Áp dụng thời khóa biểu cho tuần nào?" } };
@@ -59,12 +111,15 @@ public sealed partial class AgentFreeTimeTests
         ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Toán", At(480), At(600), EventType: "CLASS")] };
         var saved = await UseAgent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "Áp dụng trong 1 tuần, bắt đầu ngày mai."), Ct));
         Assert.Equal("APPLIED", saved.Status); Assert.Equal(callsBefore + 1, ai.ImageCalls);
-        Assert.True(saved.SuggestRoutine);
+        Assert.False(saved.SuggestRoutine);
         await using var scope = h.Provider.CreateAsyncScope();
-        var preview = await scope.ServiceProvider.GetRequiredService<IPrivateTeamService>().PreviewAvailabilityPolicyAsync(user.Id, Ct, saved.Id);
+        var workspace = scope.ServiceProvider.GetRequiredService<IWorkspaceService>();
         var expectedMonday = Day.AddDays(-(((int)Day.DayOfWeek + 6) % 7));
-        Assert.Equal(expectedMonday, preview.WeekStart); Assert.Equal(expectedMonday.AddDays(6), preview.WeekEnd);
-        Assert.Equal(7, preview.Days!.Length);
+        Assert.Equal(expectedMonday, Assert.Single((await workspace.GetAsync(user.Id, Ct)).AvailabilityPolicy!.TimetableWeeks!));
+        var hours = (await workspace.GetEffectiveAvailabilityForWeekAsync(user.Id, expectedMonday, Ct)).Slots
+            .Where(slot => slot.DayOfWeek == (int)Day.DayOfWeek).ToArray();
+        Assert.NotEmpty(hours);
+        Assert.DoesNotContain(hours, slot => slot.StartMinute < 600 && slot.EndMinute > 480);
         Assert.Equal(image.Data, ai.LastImage!.Data);
         Assert.Empty(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(Ct)));
     }

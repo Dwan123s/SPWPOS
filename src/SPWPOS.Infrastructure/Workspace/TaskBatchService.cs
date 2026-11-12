@@ -73,7 +73,8 @@ public sealed partial class WorkspaceService
             Require(input.ProjectDeadline is null || deadline <= input.ProjectDeadline,
                 "TASK_BATCH_DEADLINE", "Hạn riêng của việc phải trước hoặc cùng hạn project.");
             var task = new TaskInput(item.Name, item.Description, deadline, item.EstimatedMinutes,
-                ParentId: project.Id, CreationSource: "NATURAL_LANGUAGE", IsHardDeadline: deadline.HasValue);
+                ParentId: project.Id, CreationSource: "NATURAL_LANGUAGE", IsHardDeadline: deadline.HasValue,
+                InheritsProjectDeadline: item.Deadline is null);
             ValidTask(task, requirePlanningDetails: false);
             var child = NewTask(uid, task, now);
             child.ChecklistJson = JsonSerializer.Serialize(ValidateTaskChecklist(item.Checklist ?? []), AgentJson);

@@ -156,9 +156,10 @@ public sealed partial class WorkspaceService
         return await StoreTeamDraft(uid, teamId, member.Version, task, ct);
     }
 
-    private bool TeamDeadlineInRange(DateTimeOffset deadline) => deadline > Now.AddMinutes(5) && deadline <= Now.AddDays(30);
+    private bool TeamDeadlineInRange(DateTimeOffset deadline) => ValidTeamDeadline(deadline) && deadline <= Now.AddDays(30);
+    private bool ValidTeamDeadline(DateTimeOffset deadline) => deadline > Now.AddMinutes(5);
     private void ValidateTeamDeadline(DateTimeOffset deadline) =>
-        Require(TeamDeadlineInRange(deadline), "TEAM_DEADLINE_RANGE", "Hạn chót phải sau ít nhất 5 phút và trong 30 ngày tới.", 409);
+        Require(ValidTeamDeadline(deadline), "TEAM_DEADLINE_RANGE", "Hạn chót phải cách hiện tại hơn 5 phút.", 409);
 
     public async Task<TeamTaskDraft> DraftManualTeamTaskAsync(Guid uid, Guid teamId, ManualTeamTaskInput input, CancellationToken ct)
     {

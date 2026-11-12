@@ -9,7 +9,7 @@ const types = {
   friend: { label: "Kết bạn", glyph: "users", tone: "blue" },
   deadline: { label: "Hạn chót", glyph: "clock", tone: "amber" },
   session: { label: "Phiên làm việc", glyph: "calendar", tone: "blue" },
-  event: { label: "Lịch hẹn", glyph: "calendar", tone: "blue" },
+  event: { label: "Sự kiện", glyph: "calendar", tone: "blue" },
   warning: { label: "Cảnh báo lịch", glyph: "alertCircle", tone: "coral" },
   schedule: { label: "Thay đổi lịch", glyph: "refresh", tone: "teal" },
   team: { label: "Công việc nhóm", glyph: "users", tone: "teal" },
@@ -22,6 +22,7 @@ function notificationType(kind) {
       TEAM_COMPLETION_REQUEST: "team",
       TEAM_TASK_COMPLETED: "team",
       TEAM_COMPLETION_REJECTED: "team",
+      TEAM_TASK_DESIGNATED: "team",
       TEAM_JOIN_REQUEST: "team",
       FRIEND_REQUEST: "friend",
       FRIEND_ACCEPTED: "friend",
@@ -412,6 +413,8 @@ function NotificationItem({ item, task }) {
           ? { label: "Phản hồi NORA", route: "today" }
           : type === "reminder"
             ? { label: "Mở NORA", route: "agent" }
+            : item.kind === "TEAM_COMPLETION_REJECTED" && task
+              ? { label: "Mở việc cần bổ sung", taskId: task.id }
             : type === "team"
               ? { label: "Mở công việc nhóm", route: "teams" }
               : type === "session" || type === "event" || type === "schedule"

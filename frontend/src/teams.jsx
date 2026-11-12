@@ -50,6 +50,22 @@ export function PrivateClaimPreview({
   onDiscuss,
   onAdjust,
 }) {
+  const proposalId = claim.options.length && state.noraAvailable ? claim.id : null;
+  const [review, setReview] = useState(null);
+  useEffect(() => {
+    if (!proposalId) return;
+    const request = new AbortController();
+    api(`/api/teams/claims/${proposalId}/explanation`, "POST", undefined, true, request.signal)
+      .then((result) => {
+        if (!request.signal.aborted) setReview({ proposalId, text: result?.explanation });
+      })
+      .catch(() => {
+        if (!request.signal.aborted) setReview({ proposalId });
+      });
+    return () => request.abort();
+  }, [proposalId]);
+  const currentReview = review?.proposalId === proposalId ? review : null;
+
   return (
     <section className="team-claim-content" aria-label="Phương án riêng tư">
       <div className="team-claim-privacy">
@@ -63,7 +79,7 @@ export function PrivateClaimPreview({
         <div className="team-claim-analysis">
           <span>{icon("spark")}</span>
           <div>
-            <h3>Phân tích từ NORA</h3>
+            <h3>Kết quả xếp lịch</h3>
             <p>{claim.analysis}</p>
           </div>
         </div>
@@ -73,6 +89,16 @@ export function PrivateClaimPreview({
           {w}
         </p>
       ))}
+      {proposalId && !currentReview && <p role="status">NORA đang chuẩn bị giải thích…</p>}
+      {currentReview?.text && (
+        <div className="team-claim-analysis" role="status">
+          <span>{icon("spark")}</span>
+          <div>
+            <h3>Giải thích của NORA</h3>
+            <p>{currentReview.text}</p>
+          </div>
+        </div>
+      )}
       {claim.failure && (
         <section className="team-claim-failure">
           <h3>
@@ -157,7 +183,7 @@ export function PrivateClaimPreview({
             disabled={busy}
             onClick={() => onConfirm(o.index)}
           >
-            {icon("check")} Xác nhận phương án {o.index + 1}
+            {icon("check")} {claim.canUndo === false ? "Xác nhận đổi lịch" : "Xác nhận nhận việc"} · Phương án {o.index + 1}
           </button>
         </section>
       ))}
@@ -1132,7 +1158,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
       )}
       {claimOpen && (
         <TeamDialog
-          title="NORA · Nhận task và xếp lịch riêng"
+          title={claimRequest?.change ? "Xem lịch cho yêu cầu mới" : "Xem lịch trước khi nhận việc"}
           className="team-claim-dialog"
           subtitle={claimRequest?.task.name}
           busy={busy}

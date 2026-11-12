@@ -50,6 +50,7 @@ const proposal = {
 beforeEach(() => {
   vi.resetAllMocks();
   state.workspace = workspace();
+  state.noraAvailable = false;
 });
 function routes(extra = {}) {
   api.mockImplementation(async (path, method = "GET") => {
@@ -61,6 +62,27 @@ function routes(extra = {}) {
     return {};
   });
 }
+
+it("shows private options and enables confirmation while NORA prepares its explanation", async () => {
+  state.noraAvailable = true;
+  let explain;
+  let signal;
+  api.mockImplementation((path, _method, _body, _retry, requestSignal) => {
+    signal = requestSignal;
+    return new Promise((resolve) => { explain = resolve; });
+  });
+  const onConfirm = vi.fn();
+  const { unmount } = render(<PrivateClaimPreview claim={proposal} onConfirm={onConfirm} />);
+  expect(await screen.findByText("NORA đang chuẩn bị giải thích…")).toBeTruthy();
+  expect(api.mock.calls[0][0]).toBe("/api/teams/claims/proposal/explanation");
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận nhận việc · Phương án 1" }));
+  expect(onConfirm).toHaveBeenCalledWith(0);
+
+  explain({ explanation: "Phương án này dùng một phiên và giữ các phiên khác." });
+  expect(await screen.findByText("Giải thích của NORA")).toBeTruthy();
+  unmount();
+  expect(signal.aborted).toBe(true);
+});
 it("filters the team directory by role and unaccented name, and keeps the filters on return", async () => {
   const leader = { id: "project", name: "Đồ án phần mềm", role: "Leader" };
   routes({
@@ -139,9 +161,9 @@ it("members cannot create tasks and viewing a private proposal never claims auto
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
   fireEvent.click(
-    await screen.findByRole("button", { name: "Nhận task · NORA xếp lịch" }),
+    await screen.findByRole("button", { name: "Xem lịch trước khi nhận" }),
   );
-  expect(screen.queryByRole("button", { name: "Giao việc mới" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Đăng việc mới" })).toBeNull();
   expect(
     await screen.findByRole("region", { name: "Phương án riêng tư" }),
   ).toBeTruthy();
@@ -161,11 +183,11 @@ it("only the explicit confirmation applies the selected plan and offers undo", a
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
   fireEvent.click(
     await screen.findByRole("button", {
-      name: "Nhận task · NORA xếp lịch",
+      name: "Xem lịch trước khi nhận",
     }),
   );
   fireEvent.click(
-    await screen.findByRole("button", { name: "Xác nhận phương án 1" }),
+    await screen.findByRole("button", { name: "Xác nhận nhận việc · Phương án 1" }),
   );
   expect(
     await screen.findByRole("button", { name: "Hoàn tác nhận việc" }),
@@ -271,7 +293,7 @@ it("a member sees pending approval without leader controls or task creation", as
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
   expect(await screen.findByText("Chờ trưởng nhóm xác nhận")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Kiểm tra & duyệt" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Giao việc mới" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Đăng việc mới" })).toBeNull();
   expect(
     screen.queryByRole("button", { name: "Báo hoàn thành · Gửi duyệt" }),
   ).toBeNull();
@@ -286,11 +308,11 @@ it("a stale confirmation leaves the private proposal visible and shows a useful 
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
   fireEvent.click(
     await screen.findByRole("button", {
-      name: "Nhận task · NORA xếp lịch",
+      name: "Xem lịch trước khi nhận",
     }),
   );
   fireEvent.click(
-    await screen.findByRole("button", { name: "Xác nhận phương án 1" }),
+    await screen.findByRole("button", { name: "Xác nhận nhận việc · Phương án 1" }),
   );
   expect(await screen.findByRole("alert")).toHaveProperty(
     "textContent",
@@ -478,7 +500,7 @@ it("does not render a confirmation button for infeasible private options", () =>
   );
   expect(screen.getByRole("status").textContent).toContain("deadline");
   expect(
-    screen.queryByRole("button", { name: /Xác nhận phương án/ }),
+    screen.queryByRole("button", { name: /Xác nhận nhận việc/ }),
   ).toBeNull();
 });
 it("explains real blocking constraints instead of a generic insufficient-capacity message", () => {
@@ -555,7 +577,7 @@ it("directs a member to working hours without automatically claiming", async () 
   render(<TeamsPage onWorkspaceChanged={vi.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
   fireEvent.click(
-    await screen.findByRole("button", { name: "Nhận task · NORA xếp lịch" }),
+    await screen.findByRole("button", { name: "Xem lịch trước khi nhận" }),
   );
   expect(
     await screen.findByText("Còn một bước: xác nhận giờ có thể làm việc"),
@@ -582,19 +604,19 @@ it("opens the NORA popup immediately while the personal schedule is being analyz
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
   fireEvent.click(
-    await screen.findByRole("button", { name: "Nhận task · NORA xếp lịch" }),
+    await screen.findByRole("button", { name: "Xem lịch trước khi nhận" }),
   );
   expect(
     await screen.findByRole("dialog", {
-      name: "NORA · Nhận task và xếp lịch riêng",
+      name: "Xem lịch trước khi nhận việc",
     }),
   ).toBeTruthy();
   expect(screen.getByText(/NORA đang phân tích công việc/)).toBeTruthy();
   expect(
-    screen.queryByRole("button", { name: "Xác nhận phương án 1" }),
+    screen.queryByRole("button", { name: "Xác nhận nhận việc · Phương án 1" }),
   ).toBeNull();
   finish(proposal);
   expect(
-    await screen.findByRole("button", { name: "Xác nhận phương án 1" }),
+    await screen.findByRole("button", { name: "Xác nhận nhận việc · Phương án 1" }),
   ).toBeTruthy();
 });

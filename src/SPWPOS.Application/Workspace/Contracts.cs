@@ -13,14 +13,14 @@ public sealed record TaskInput(
     [Range(5, 480)] int MinimumSessionMinutes = 25,
     Guid? CategoryId = null, Guid? ParentId = null, bool IsHardDeadline = false,
     [RegularExpression("^(MANUAL|NATURAL_LANGUAGE|AI_BREAKDOWN)$")] string CreationSource = "MANUAL",
-    Guid? Version = null, DateTimeOffset? WorkWindowStart = null, DateOnly? StartDate = null);
+    Guid? Version = null, DateTimeOffset? WorkWindowStart = null, DateOnly? StartDate = null, bool? InheritsProjectDeadline = null);
 public sealed record TaskView(Guid Id, string Name, string Description, DateTimeOffset? Deadline, int EstimatedMinutes,
     int AdjustedMinutes, int RemainingMinutes, int ActualMinutes, int PlannedMinutes, int Priority, string TaskType,
     bool Splittable, int MinimumSessionMinutes, Guid? CategoryId, Guid? ParentId, string Status, int Progress,
     DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, Guid[] Dependencies, bool IsHardDeadline = false, string CreationSource = "MANUAL",
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default,
     ImportanceView? Importance = null, bool RequiresContinuousSession = false, bool IsTeamTask = false,
-    TaskChecklistItem[]? Checklist = null);
+    TaskChecklistItem[]? Checklist = null, bool InheritsProjectDeadline = false);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
 public sealed record CategoryView(Guid Id, string Name, string Color);
@@ -30,10 +30,10 @@ public sealed record ProfileInput([Required, StringLength(100)] string FirstName
 public sealed record ProfileView(Guid Id, string Email, string FirstName, string LastName, string DisplayName = "", string Bio = "", string AvatarUrl = "");
 public sealed record AvailabilityInput([Range(0, 6)] int DayOfWeek, [Range(0, 1439)] int StartMinute, [Range(1, 1440)] int EndMinute);
 public sealed record WeeklyInput([Required, MaxLength(28)] AvailabilityInput[] Slots);
-public sealed record DatedWeekInput([Required, MaxLength(7 * 1440)] AvailabilityInput[] Slots);
+public sealed record DatedWeekInput([Required, MaxLength(7 * 1440)] AvailabilityInput[] Slots, Guid? Revision = null);
 public sealed record ExceptionInput(DateOnly Date, [Range(0, 1439)] int StartMinute,
     [Range(1, 1440)] int EndMinute, bool IsAvailable, [StringLength(300)] string Note = "");
-public sealed record ExceptionView(Guid Id, DateOnly Date, int StartMinute, int EndMinute, bool IsAvailable, string Note, bool OverridesWeeklyAvailability = false);
+public sealed record ExceptionView(Guid Id, DateOnly Date, int StartMinute, int EndMinute, bool IsAvailable, string Note, bool OverridesWeeklyAvailability = false, bool IsWeekEdit = false);
 public sealed record EventInput([Required, StringLength(200)] string Name, DateTimeOffset Start, DateTimeOffset End,
     [StringLength(1000)] string Description = "", [RegularExpression("^(MEETING|CLASS|APPOINTMENT|WORK|OTHER)$")] string EventType = "OTHER",
     [Range(1, 12)] int RepeatWeeks = 1, bool? IsUrgent = null);

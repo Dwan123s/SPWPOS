@@ -54,7 +54,7 @@ public sealed partial class WorkspaceService
                 task.AcceptanceCriteria is { Length: > 0 } && ValidItems(task.Requirements, 20, 500) && ValidItems(task.Deliverables, 15, 500) &&
                 ValidItems(task.AcceptanceCriteria, 15, 500) && ValidItems(task.Notes, 15, 500) && ValidItems(task.SourceReferences, 10, 300),
                 "TEAM_BRIEF_INCOMPLETE", "Có task chưa đủ nội dung, đầu ra hoặc tiêu chí hoàn thành. Hãy yêu cầu NORA bổ sung.", 503);
-            var validDeadline = task.Deadline is { } deadline && TeamDeadlineInRange(deadline) && !string.IsNullOrWhiteSpace(task.DeadlineEvidence) &&
+            var validDeadline = task.Deadline is { } deadline && ValidTeamDeadline(deadline) && !string.IsNullOrWhiteSpace(task.DeadlineEvidence) &&
                 (document?.PdfData != null || BriefSourceQuote(task.DeadlineEvidence, source));
             if (!validDeadline) deadlineQuestions.Add(task.Deadline <= Now
                 ? $"Hạn của “{task.Name}” đã qua. Bạn cho mình hạn chót mới, gồm ngày và giờ nhé?"

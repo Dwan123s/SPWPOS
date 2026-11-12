@@ -239,7 +239,7 @@ export function TeamTaskDetail({
                 disabled={busy}
                 onClick={() => handoff(onClaim, task)}
               >
-                {icon("spark")} Nhận task · NORA xếp lịch
+                {icon("spark")} Xem lịch trước khi nhận
               </button>
             )}
           {mine && task.status === "Assigned" && (

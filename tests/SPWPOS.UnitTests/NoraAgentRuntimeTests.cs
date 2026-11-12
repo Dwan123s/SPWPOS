@@ -30,6 +30,8 @@ public sealed partial class NoraAgentRuntimeTests
         public bool AgentAvailable => true;
         public bool SupportsRequestUnderstanding { get; set; }
         public int Calls { get; private set; }
+        public int TimetableCalls { get; private set; }
+        public Func<string, AgentIntent>? ReadTimetable { get; set; }
         public string DraftText { get; set; } = Draft;
         public Func<NoraModelRequest, int, Task<NoraModelReply>>? Decision { get; set; }
         public async Task<NoraModelReply> NextAgentStepAsync(NoraModelRequest request, CancellationToken ct)
@@ -49,6 +51,11 @@ public sealed partial class NoraAgentRuntimeTests
             };
         }
         public Task<AgentIntent> InterpretAsync(string text, string contextJson, AgentMessage[] history, string timeZoneId, DateTimeOffset now, CancellationToken ct) => throw new InvalidOperationException("Legacy workflow must not run in Agent mode");
+        public Task<AgentIntent> InterpretTimetableAsync(string text, string timeZoneId, DateTimeOffset now, AgentImage image, CancellationToken ct)
+        {
+            TimetableCalls++;
+            return Task.FromResult(ReadTimetable!(text));
+        }
         public Task<NoteAnalysis> AnalyzeNoteAsync(string text, bool useAi, string zone, DateTimeOffset now, CancellationToken ct) => throw new NotSupportedException();
         public Task<TaskSuggestion> CaptureAsync(CaptureInput input, string zone, DateTimeOffset now, CancellationToken ct) => throw new NotSupportedException();
         public Task<BreakdownView> BreakdownAsync(TaskInput input, bool useAi, CancellationToken ct) => throw new NotSupportedException();
@@ -89,7 +96,31 @@ public sealed partial class NoraAgentRuntimeTests
         Assert.False(await h.DbAsync(db => db.FixedEvents.AnyAsync(Ct)));
     }
 
-    [Fact] public async Task Timetable_agent_saves_fixed_hours_and_proposes_a_routine_for_review()
+    [Theory]
+    [InlineData("Nhập thời khóa biểu trong ảnh và cập nhật giờ làm việc.")]
+    [InlineData("Nhập thời khóa biểu trong ảnh, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.")]
+    public async Task A_simple_upload_reads_once_and_saves_work_hours_without_calling_the_agent(string request)
+    {
+        var model = new Model { ReadTimetable = _ => new("", "", false, [], [],
+            [new("Toán", DateTimeOffset.Parse("2026-11-01T08:00:00+07:00"),
+                DateTimeOffset.Parse("2026-11-01T10:00:00+07:00"), EventType: "CLASS")],
+            [], [], false, 30, ResultKind: "MUTATION") };
+        await using var h = await Harness(model);
+        var user = await h.RegisterAsync();
+        var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), request,
+            Image: new("Lịch.png", "image/png", "iVBORw0KGgo="), CalendarKind: "Event"), Ct));
+        Assert.Equal("APPLIED", turn.Status);
+        Assert.Contains("Giờ làm việc → Theo từng tuần", turn.Reply);
+        Assert.Equal(1, model.TimetableCalls);
+        Assert.Equal(0, model.Calls);
+        Assert.Single(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
+        Assert.Single(await h.DbAsync(db => db.AvailabilityPolicies.ToArrayAsync(Ct)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Timetable_agent_configures_work_hours_automatically_for_an_uploaded_timetable(bool withImage)
     {
         var node = System.Text.Json.Nodes.JsonNode.Parse(Draft)!;
         node["tasks"] = new System.Text.Json.Nodes.JsonArray();
@@ -99,15 +130,22 @@ public sealed partial class NoraAgentRuntimeTests
             """);
         var model = new Model { DraftText = node.ToJsonString() };
         await using var h = await Harness(model); var user = await h.RegisterAsync();
+        var image = withImage ? new AgentImage("Lịch.png", "image/png", "iVBORw0KGgo=") : null;
         var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id,
-            new(Guid.NewGuid(), Guid.NewGuid(), "Nhập thời gian biểu ngày mai: Toán 08:00–10:00, chỉ một lần."), Ct));
+            new(Guid.NewGuid(), Guid.NewGuid(), "Nhập thời gian biểu ngày mai: Toán 08:00–10:00, chỉ một lần.", Image: image), Ct));
         Assert.Equal("APPLIED", turn.Status); Assert.Equal("APPLIED", turn.Run!.Status);
         Assert.DoesNotContain("mặc định", turn.Reply);
-        Assert.Contains("Giờ rảnh đề xuất:", turn.Reply); Assert.True(turn.SuggestRoutine);
-        Assert.Contains("bữa trưa/tối 30 phút", turn.Reply);
-        Assert.Equal(0, await h.DbAsync(db => db.AvailabilityPolicies.CountAsync(Ct)));
+        Assert.Equal(!withImage, turn.SuggestRoutine);
+        if (withImage) Assert.Contains("Giờ làm việc theo thời khóa biểu đã được tính", turn.Reply);
+        else
+        {
+            Assert.Contains("Giờ rảnh đề xuất:", turn.Reply);
+            Assert.Contains("bữa trưa/tối 30 phút", turn.Reply);
+        }
+        Assert.Equal(withImage ? 1 : 0, await h.DbAsync(db => db.AvailabilityPolicies.CountAsync(Ct)));
         Assert.Equal(0, await h.DbAsync(db => db.WeeklyAvailability.CountAsync(Ct)));
         await Agent(h, s => s.UndoAgentTurnAsync(user.Id, turn.Id, Ct));
+        Assert.Empty(await h.DbAsync(db => db.AvailabilityPolicies.ToArrayAsync(Ct)));
         Assert.Empty(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(Ct)));
         Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
     }

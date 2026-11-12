@@ -21,7 +21,7 @@ export function TeamRecipientSelect({
         disabled={busy}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">Cả nhóm · Tự nhận task</option>
+        <option value="">Cả nhóm · Tự nhận việc</option>
         {value && !members.some((member) => member.userId === value) && (
           <option value={value} disabled>
             Thành viên không còn trong nhóm · Chọn lại
@@ -36,8 +36,8 @@ export function TeamRecipientSelect({
       </select>
       <small>
         {value
-          ? "Chỉ người được chọn mới có thể nhận task. NORA sẽ xếp theo lịch cá nhân của họ."
-          : "Thành viên có thể tự nhận task và để NORA xếp theo lịch riêng."}
+          ? "Chỉ tài khoản được chọn mới có thể nhận việc. NORA xem lịch riêng khi người đó mở phương án."
+          : "Thành viên tự chọn việc và xem phương án trên lịch riêng trước khi nhận."}
       </small>
     </div>
   );

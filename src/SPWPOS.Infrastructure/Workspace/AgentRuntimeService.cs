@@ -236,7 +236,7 @@ public sealed partial class WorkspaceService
                         Require(simulations <= simulationLimit, "SIMULATION_LIMIT", "Đã đạt giới hạn thử lịch của lượt này.");
                         await Calendar(new(Now, Now.AddDays(31)), token);
                         var candidate = await SimulateRuntimeAsync(uid, lastDraft, Copy(state), input, source,
-                            image is not null || IsTimetableRequest(source), "keep_existing", token);
+                            image is not null || IsTimetableRequest(source), "keep_existing", token, configureTimetableHours: image is not null);
                         candidates[candidate.Id] = candidate;
                         if (candidate.Feasible) return new("TERMINAL", new NoraTerminal("PROPOSAL", AgentExplanation(lastDraft.Reply), CandidateId: candidate.Id));
                         var draftId = Guid.NewGuid().ToString("N"); drafts[draftId] = lastDraft;
@@ -268,7 +268,7 @@ public sealed partial class WorkspaceService
                     // history cap must never hide reservations from a simulation.
                     await Calendar(new(Now, Now.AddDays(31)), token);
                     var candidate = await SimulateRuntimeAsync(uid, draft, Copy(state), input, source,
-                        image is not null || IsTimetableRequest(source), args.GetProperty("strategy").GetString()!, token);
+                        image is not null || IsTimetableRequest(source), args.GetProperty("strategy").GetString()!, token, configureTimetableHours: image is not null);
                     candidates[candidate.Id] = candidate;
                     if ((call.Name == "propose_changes" || singleCallStep && understanding?.Intent == "Mutation") && candidate.Feasible)
                         return new("TERMINAL", new NoraTerminal("PROPOSAL", AgentExplanation(draft.Reply), CandidateId: candidate.Id));

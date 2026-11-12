@@ -126,13 +126,14 @@ it("updates on refocus and clears its ticker when leaving the page", () => {
   unmount();
   expect(vi.getTimerCount()).toBe(0);
 });
-it("counts fixed calendar events on today's schedule and highlights their active slot", () => {
+it("identifies fixed calendar events on today's schedule and highlights their active slot", () => {
   render(todayPage());
   const schedule = within(
     screen.getByRole("region", { name: "Lịch hôm nay", exact: true }),
   );
   expect(schedule.getAllByRole("button", { name: /PRN212 - SE20B02/ })).toHaveLength(1);
   const title = schedule.getByText("PRN212 - SE20B02");
+  expect(within(title.closest(".daily-agenda-row")).getByText("Lịch bận")).toBeTruthy();
   expect(
     title.closest(".daily-agenda-row").classList.contains("is-active"),
   ).toBe(true);

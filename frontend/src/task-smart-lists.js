@@ -32,6 +32,7 @@ export function smartTaskLists(workspace, now = Date.now()) {
     lastDay = addCalendarDays(today, 6);
   const sessions = new Map();
   const plannedDays = new Map();
+  const todayStarts = new Map();
   for (const session of workspace.sessions || []) {
     if (!activeStatuses.has(session.status)) continue;
     const start = dayOf(session.start),
@@ -39,6 +40,10 @@ export function smartTaskLists(workspace, now = Date.now()) {
     if (!start || !end) continue;
     if (!sessions.has(session.taskId)) sessions.set(session.taskId, []);
     sessions.get(session.taskId).push({ start, end });
+    if (start <= today && end >= today) {
+      const time = Date.parse(session.start);
+      todayStarts.set(session.taskId, Math.min(time, todayStarts.get(session.taskId) ?? time));
+    }
     if (Date.parse(session.end) > now && session.status !== "NeedsReview") {
       const date = start < today ? today : start;
       const previous = plannedDays.get(session.taskId);
@@ -58,6 +63,16 @@ export function smartTaskLists(workspace, now = Date.now()) {
     return candidates.sort()[0] || null;
   }
   const tasks = workspace.tasks || [];
+  const projectIds = new Set(tasks.map((task) => task.parentId).filter(Boolean));
+  const todayTasks = tasks.filter((task) =>
+    activeTask(task) && !projectIds.has(task.id) &&
+    (todayStarts.has(task.id) || dayOf(task.deadline) === today),
+  ).sort((a, b) =>
+    (todayStarts.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+    (todayStarts.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
+    (Date.parse(a.deadline) || 0) - (Date.parse(b.deadline) || 0) ||
+    b.priority - a.priority,
+  );
   function groups(endDay) {
     const grouped = new Map();
     for (const task of tasks.filter(activeTask)) {
@@ -81,6 +96,7 @@ export function smartTaskLists(workspace, now = Date.now()) {
   }
   return {
     today,
+    todayTasks,
     lastDay,
     todayGroups: groups(today),
     weekGroups: groups(lastDay),

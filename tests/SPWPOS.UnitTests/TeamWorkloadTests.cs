@@ -1,16 +1,16 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SPWPOS.Application.Authentication;
-using SPWPOS.Domain.Entities;
+using SPWPOS.TestSupport;
 
 namespace SPWPOS.UnitTests;
 
 public sealed partial class PrivateTeamPlanningTests
 {
     [Theory]
-    [InlineData(false, "NEEDS_REPLAN")]
-    [InlineData(true, "FITS")]
-    public async Task Equal_capacity_candidates_are_distinguished_by_continuous_time(bool splittable, string fragmentedStatus)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Each_member_preview_distinguishes_continuous_and_fragmented_hours(bool splittable)
     {
         await using var h = await Setup(hours: false);
         h.Clock.Advance(TimeSpan.FromDays(1));
@@ -25,72 +25,89 @@ public sealed partial class PrivateTeamPlanningTests
             await db.SaveChangesAsync(Ct);
         });
 
-        var candidates = await Use(h, s => s.GetTeamWorkloadCandidatesAsync(Leader, Team, TaskId, Ct));
-        Assert.Equal(2, candidates.Length);
-        Assert.All(candidates, candidate => Assert.Equal(120, candidate.SchedulableMinutes));
-        Assert.Equal("FITS", candidates.Single(candidate => candidate.UserId == Leader).Status);
-        Assert.Equal(fragmentedStatus, candidates.Single(candidate => candidate.UserId == Member).Status);
-        if (!splittable) Assert.Equal(Leader, candidates[0].UserId);
+        var continuous = await Use(h, s => s.PreviewTeamClaimAsync(Leader, TaskId, Ct));
+        var fragmented = await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct));
+        Assert.NotEmpty(continuous.Options);
+        Assert.Equal(splittable, fragmented.Options.Length > 0);
+        if (!splittable) Assert.Equal(120, fragmented.Failure?.FreeMinutes);
         Assert.False(await h.DbAsync(db => db.WorkSessions.AnyAsync(Ct)));
     }
 
     [Fact]
-    public async Task Team_workload_is_leader_only_and_counts_private_busy_time_without_returning_details()
-    {
-        await using var h = await Setup();
-        h.Clock.Advance(TimeSpan.FromDays(1));
-        await h.DbAsync(async db =>
-        {
-            db.FixedEvents.Add(new() { UserId = Member, Name = "Private appointment", Start = Tomorrow, End = Tomorrow.AddHours(3) });
-            db.WorkTasks.Add(new() { UserId = Member, Name = "Private task", EstimatedMinutes = 60, Deadline = Tomorrow.AddHours(3) });
-            await db.SaveChangesAsync(Ct);
-        });
-
-        var denied = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.GetTeamWorkloadAsync(Member, Team, 0, Ct)));
-        Assert.Equal("TEAM_FORBIDDEN", denied.Code);
-        await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.GetTeamWorkloadCandidatesAsync(Other, Team, TaskId, Ct)));
-        var workload = await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct));
-        Assert.Equal(new DateOnly(2026, 11, 2), workload.Start);
-        Assert.Equal(2, workload.Members.Length);
-        var day = workload.Members.Single(m => m.UserId == Member).Days[0];
-        Assert.Equal(180, day.WorkingMinutes);
-        Assert.Equal(180, day.BusyMinutes);
-        Assert.Equal(0, day.SchedulableMinutes);
-        Assert.Equal("UNASSIGNED", Assert.Single(workload.Tasks).Risk);
-        var json = JsonSerializer.Serialize(workload);
-        Assert.DoesNotContain("Private appointment", json);
-        Assert.DoesNotContain("Private task", json);
-        Assert.DoesNotContain("PRIVATE_CLASS", json);
-        Assert.Empty((await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 1, Ct))).Tasks);
-
-        var candidates = await Use(h, s => s.GetTeamWorkloadCandidatesAsync(Leader, Team, TaskId, Ct));
-        Assert.Equal(Leader, candidates[0].UserId);
-        Assert.Equal("FITS", candidates[0].Status);
-        Assert.Equal("NEEDS_REPLAN", candidates.Single(c => c.UserId == Member).Status);
-        Assert.False(await h.DbAsync(db => db.TeamClaimProposals.AnyAsync(Ct)));
-        Assert.False(await h.DbAsync(db => db.WorkSessions.AnyAsync(Ct)));
-    }
-
-    [Fact]
-    public async Task Team_workload_distinguishes_forecast_shortfall_from_overdue()
+    public async Task Team_report_is_leader_only_and_contains_shared_task_progress_without_personal_capacity()
     {
         await using var h = await Setup();
         h.Clock.Advance(TimeSpan.FromDays(1));
         var claim = await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct));
         await Use(h, s => s.ConfirmTeamClaimAsync(Member, claim.Id, new(), Ct));
-        Assert.Equal("ON_TRACK", Assert.Single((await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct))).Tasks).Risk);
+        var denied = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.GetTeamWorkloadAsync(Member, Team, 0, Ct)));
+        Assert.Equal("TEAM_FORBIDDEN", denied.Code);
+
+        var initial = await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct));
+        Assert.Equal(new DateOnly(2026, 11, 2), initial.Start);
+        Assert.Equal(2, initial.Members.Length);
+        var task = Assert.Single(initial.Tasks);
+        Assert.Equal(Member, task.AssigneeId);
+        Assert.Equal("ASSIGNED", task.Risk);
 
         await h.DbAsync(async db =>
         {
-            db.FixedEvents.Add(new FixedEvent { UserId = Member, Name = "Private blocker", Start = Tomorrow, End = Tomorrow.AddHours(3) });
+            db.FixedEvents.Add(new() { UserId = Member, Name = "Private blocker", Start = Tomorrow, End = Tomorrow.AddHours(3) });
+            db.WorkTasks.Add(new() { UserId = Member, Name = "Private task", EstimatedMinutes = 60, Deadline = Tomorrow.AddHours(3) });
             await db.SaveChangesAsync(Ct);
         });
-        var behind = Assert.Single((await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct))).Tasks);
-        Assert.Equal("BEHIND", behind.Risk);
-        Assert.Equal(60, behind.ShortfallMinutes);
+        var after = await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct));
+        var json = JsonSerializer.Serialize(after);
+        Assert.Equal(JsonSerializer.Serialize(initial), json);
+        foreach (var field in new[] { "Days", "TimeZoneId", "WorkingMinutes", "BusyMinutes", "SchedulableMinutes", "ShortfallMinutes", "Private blocker", "Private task" })
+            Assert.DoesNotContain("\"" + field + "\"", json);
+        Assert.Empty((await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 1, Ct))).Tasks);
+
         h.Clock.Advance(TimeSpan.FromHours(16));
-        var overdue = Assert.Single((await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct))).Tasks);
-        Assert.Equal("OVERDUE", overdue.Risk);
-        Assert.Null(overdue.ShortfallMinutes);
+        Assert.Equal("OVERDUE", Assert.Single((await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct))).Tasks).Risk);
+    }
+
+    [Fact]
+    public async Task Distant_work_can_be_posted_and_claim_preview_never_calls_the_model()
+    {
+        var aiCalls = 0;
+        await using var h = await Setup(new AgentAiTestDouble
+        {
+            Response = _ => { aiCalls++; throw new InvalidOperationException("Claim preview should be local."); }
+        });
+        var deadline = Tomorrow.AddDays(40);
+        var draft = await Use(h, s => s.DraftManualTeamTaskAsync(Leader, Team, new("Báo cáo", "Yêu cầu", 60, deadline), Ct));
+        var id = await Use(h, s => s.ConfirmTeamTaskDraftAsync(Leader, Team, draft.ProposalId, Ct));
+        var distant = await Use(h, s => s.PreviewTeamClaimAsync(Member, id, Ct));
+        Assert.Empty(distant.Options);
+        Assert.NotEmpty(distant.Warnings);
+        Assert.NotEmpty((await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct))).Options);
+        Assert.Equal(0, aiCalls);
+        Assert.False(await h.DbAsync(db => db.WorkSessions.AnyAsync(Ct)));
+    }
+
+    [Fact]
+    public async Task Claim_explanation_uses_verified_totals_and_requires_the_proposal_owner()
+    {
+        const string explanation = "Phương án dùng một phiên và giữ các phiên khác.";
+        var ai = new AgentAiTestDouble { Response = _ => AgentAiTestDouble.Empty() with { Reply = explanation } };
+        await using var h = await Setup(ai);
+        var proposal = await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct));
+        Assert.NotEmpty(proposal.Options);
+        Assert.Equal(0, ai.Calls);
+        var denied = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ExplainTeamClaimAsync(Leader, proposal.Id, Ct)));
+        Assert.Equal("NOT_FOUND", denied.Code);
+        Assert.Equal(explanation, await Use(h, s => s.ExplainTeamClaimAsync(Member, proposal.Id, Ct)));
+        Assert.Equal(1, ai.Calls);
+        using var document = JsonDocument.Parse(ai.Context);
+        var option = document.RootElement.GetProperty("options")[0];
+        Assert.Equal(60, option.GetProperty("plannedMinutes").GetInt32());
+        Assert.False(option.TryGetProperty("start", out _));
+        Assert.False(option.TryGetProperty("taskName", out _));
+        Assert.False(await h.DbAsync(db => db.WorkSessions.AnyAsync(Ct)));
+        await Use(h, s => s.ConfirmTeamClaimAsync(Member, proposal.Id, new(), Ct));
+        var stale = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ExplainTeamClaimAsync(Member, proposal.Id, Ct)));
+        Assert.Equal("CLAIM_STALE", stale.Code);
+        Assert.Equal(1, ai.Calls);
     }
 }

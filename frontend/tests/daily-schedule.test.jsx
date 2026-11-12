@@ -47,6 +47,18 @@ it("shows the full short-session title, time and duration with a working detail 
   ).toBeTruthy();
 });
 
+it("shows a centered add-task action and a date filter in the empty deadlines card", () => {
+  state.workspace.tasks.forEach((task) => { task.deadline = null; });
+  render(todayPage());
+  const section = screen.getByRole("region", { name: "Công việc sắp đến hạn" });
+  const card = within(section);
+  expect(card.getByText("Không có việc nào sắp đến hạn.")).toBeTruthy();
+  expect(card.getByRole("button", { name: "Thêm công việc" }).dataset.action).toBe("new-task");
+  expect(card.queryByRole("button", { name: "Xem tất cả công việc" })).toBeNull();
+  fireEvent.change(card.getByRole("combobox", { name: "Khoảng thời gian đến hạn" }), { target: { value: "day" } });
+  expect(card.getByRole("heading", { name: "Đến hạn hôm nay hoặc quá hạn" })).toBeTruthy();
+});
+
 it("shows the completed session with its task deadline and opens the summary from the date", () => {
   state.workspace.sessions[0].status = "Completed";
   state.workspace.tasks[0].deadline = "2026-11-11T15:00:00+07:00";

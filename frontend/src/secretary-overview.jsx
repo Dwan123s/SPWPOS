@@ -58,7 +58,7 @@ export function SecretaryTime({ onWorkspaceChanged }) {
         )}
       </section>
       <section className="card">
-        <h2>Giờ có thể làm việc đã xác nhận</h2>
+        <h2>Giờ có thể làm</h2>
         {(w.availability || []).length ? (
           w.availability.map((slot, i) => (
             <p key={i}>

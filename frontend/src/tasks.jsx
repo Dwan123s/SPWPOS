@@ -263,7 +263,7 @@ function TaskDescription({ task }) {
   );
 }
 
-function TaskPlanningFields({ task, parentId }) {
+function TaskPlanningFields({ task, parentId, onParentChange }) {
   return (
     <>
       <label className="field">
@@ -304,7 +304,7 @@ function TaskPlanningFields({ task, parentId }) {
       )}
       <label className="field wide">
         Công việc cha
-        <Select name="parentId" defaultValue={task.parentId || parentId || ""}>
+        <Select name="parentId" value={parentId || ""} onChange={(event) => onParentChange(event.target.value)}>
           <option value="">Công việc độc lập</option>
           {state.workspace.tasks
             .filter((item) => !item.parentId && item.id !== task.id)
@@ -343,9 +343,12 @@ function CreateTaskForm({ task, parentId }) {
   const [section, setSection] = useState("main");
   const [complete, setComplete] = useState(false);
   const [title, setTitle] = useState(task.name || "");
-  const [manualStart, setManualStart] = useState(null);
+  const [manualStart, setManualStart] = useState(task.startDate ?? null);
   const [manualEstimate, setManualEstimate] = useState(task.estimatedMinutes || null);
   const [manualDeadline, setManualDeadline] = useState(task.deadline ? dayKey(task.deadline) : null);
+  const [selectedParent, setSelectedParent] = useState(parentId);
+  const [inheritsDeadline, setInheritsDeadline] = useState(Boolean(parentId));
+  const projectDeadline = selectedParent ? taskById(selectedParent)?.deadline : null;
   const [analysis, setAnalysis] = useState(null);
   const pendingAnalysis = useRef(Promise.resolve());
   const text = title.trim();
@@ -477,20 +480,34 @@ function CreateTaskForm({ task, parentId }) {
                 name="deadline"
                 type="date"
                 min={today}
-                value={suggestedDeadline}
+                value={inheritsDeadline ? "" : suggestedDeadline}
+                disabled={inheritsDeadline}
                 onChange={(event) => setManualDeadline(event.target.value)}
                 aria-label="Hạn chót (tùy chọn)"
               />
-              {!suggestedDeadline && <span aria-hidden="true">Bất kỳ ngày nào</span>}
+              {inheritsDeadline ? (
+                <span>{projectDeadline ? dateFmt(projectDeadline) : "Dự án chưa có hạn chót"}</span>
+              ) : !suggestedDeadline && <span aria-hidden="true">Bất kỳ ngày nào</span>}
             </div>
           </label>
-          {pastDeadline && <small role="status">Hạn chót đã qua.</small>}
+          {selectedParent && (
+            <label className="checkbox">
+              <input type="hidden" name="projectDeadlineOption" value="true" />
+              <input type="checkbox" name="inheritsProjectDeadline" checked={inheritsDeadline}
+                onChange={(event) => setInheritsDeadline(event.target.checked)} />
+              Dùng hạn chót của dự án
+            </label>
+          )}
+          {!inheritsDeadline && pastDeadline && <small role="status">Hạn chót đã qua.</small>}
           <TaskDescription task={task} />
           <TaskPriority task={task} />
         </div>
         <div className="task-create-panel" data-task-create-panel="options" hidden={section !== "options"}>
           <div className="form-grid">
-            <TaskPlanningFields task={task} parentId={parentId} />
+            <TaskPlanningFields task={task} parentId={selectedParent} onParentChange={(value) => {
+              setSelectedParent(value);
+              setInheritsDeadline(Boolean(value));
+            }} />
           </div>
         </div>
         <div className="task-create-tools">
@@ -522,9 +539,37 @@ function CreateTaskForm({ task, parentId }) {
   );
 }
 
+function TaskDeadlineField({ task, parentId, inherits, setInherits }) {
+  const projectDeadline = inherits ? taskById(parentId)?.deadline : null;
+  return (
+    <div>
+      <label className="field">
+        Hạn chót (tùy chọn)
+        <input type="datetime-local" name="deadline"
+          defaultValue={task.deadline ? localInput(task.deadline) : ""}
+          disabled={inherits} />
+      </label>
+      {inherits && <small>{projectDeadline ? dateFmt(projectDeadline) : "Dự án chưa có hạn chót"}</small>}
+      {parentId && (
+        <label className="checkbox">
+          <input type="hidden" name="projectDeadlineOption" value="true" />
+          <input type="checkbox" name="inheritsProjectDeadline" checked={inherits}
+            onChange={(event) => setInherits(event.target.checked)} />
+          Dùng hạn chót của dự án
+        </label>
+      )}
+    </div>
+  );
+}
+
 export function taskForm(task = {}, parentId = null) {
-  if (!task.id) return <CreateTaskForm task={task} parentId={parentId} />;
-  const deadline = task.deadline;
+  if (!task.id) return <CreateTaskForm key={parentId ?? task.startDate} task={task} parentId={parentId} />;
+  return <EditTaskForm key={task.id} task={task} />;
+}
+
+function EditTaskForm({ task }) {
+  const [parentId, setParentId] = useState(task.parentId);
+  const [inheritsDeadline, setInheritsDeadline] = useState(Boolean(task.inheritsProjectDeadline));
   return (
     <form data-form="task" data-id={task.id || ""}>
       <input type="hidden" name="version" defaultValue={task.version || ""} />
@@ -543,12 +588,7 @@ export function taskForm(task = {}, parentId = null) {
             'required maxlength="200" placeholder="Ví dụ: Hoàn thiện báo cáo dự án"',
           )}
         </div>
-        {field(
-          "Hạn chót (tùy chọn)",
-          "deadline",
-          "datetime-local",
-          deadline ? localInput(deadline) : "",
-        )}
+        <TaskDeadlineField task={task} parentId={parentId} inherits={inheritsDeadline} setInherits={setInheritsDeadline} />
         {field(
           "Thời gian dự kiến (phút, tùy chọn)",
           "estimatedMinutes",
@@ -566,7 +606,10 @@ export function taskForm(task = {}, parentId = null) {
         <summary>Tùy chọn thêm · mô tả, loại việc, cách chia thời gian</summary>
         <div className="form-grid">
           <TaskDescription task={task} />
-          <TaskPlanningFields task={task} parentId={parentId} />
+          <TaskPlanningFields task={task} parentId={parentId} onParentChange={(value) => {
+            setParentId(value);
+            if (!value) setInheritsDeadline(false);
+          }} />
         </div>
       </details>
       <Slot id="task-conflict" />
@@ -602,17 +645,22 @@ export function taskInput(data) {
   const deadline = data.get("deadline");
   const estimate = data.get("estimatedMinutes");
   const startDate = data.get("startDate");
+  const parentId = data.get("parentId") || null;
+  const inheritsProjectDeadline = data.has("inheritsProjectDeadline");
+  const parent = inheritsProjectDeadline && parentId ? taskById(parentId) : null;
   return {
     name: String(data.get("name")),
     description: String(data.get("description") || ""),
-    deadline: deadline ? toUtc(String(deadline).includes("T") ? String(deadline) : `${deadline}T23:59`) : null,
+    deadline: inheritsProjectDeadline ? parent?.deadline || null
+      : deadline ? toUtc(String(deadline).includes("T") ? String(deadline) : `${deadline}T23:59`) : null,
     ...(startDate ? { startDate: String(startDate) } : {}),
     estimatedMinutes: estimate ? Number(estimate) : null,
     priority: Number(data.get("priority")),
     categoryId: data.get("categoryId") || null,
-    parentId: data.get("parentId") || null,
+    parentId,
+    ...(data.has("projectDeadlineOption") ? { inheritsProjectDeadline } : {}),
     taskType: String(data.get("taskType") || "OTHER"),
-    isHardDeadline: Boolean(deadline) && data.has("isHardDeadline"),
+    isHardDeadline: inheritsProjectDeadline ? Boolean(parent?.isHardDeadline) : Boolean(deadline) && data.has("isHardDeadline"),
     creationSource: String(data.get("creationSource") || "MANUAL"),
     splittable: data.has("splittable"),
     minimumSessionMinutes: Number(data.get("minimumSessionMinutes") || 25),
@@ -842,7 +890,7 @@ export function openDetail(id, afterSession = false) {
       <div className="form-actions">
         {button("Xóa công việc", "delete-task", "danger small", id, "trash")}
         {button(
-          "Lập lại lịch liên quan",
+          t.isTeamTask ? "Xem lịch cho phần còn lại" : "Lập lại lịch liên quan",
           "replan-task",
           "secondary small",
           id,

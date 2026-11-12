@@ -70,11 +70,19 @@ public static class TestInfrastructure
         ["AiSettings:Enabled"] = "false",
         ["Firebase:Enabled"] = "false"
     };
-    public static void ReplacePersistence(IServiceCollection services, SqliteConnection connection)
+    public static void ReplacePersistence(IServiceCollection services, SqliteConnection connection) =>
+        ReplaceSqlitePersistence(services, options => options.UseSqlite(connection));
+    public static void ReplacePersistence(IServiceCollection services, string connectionString) =>
+        ReplaceSqlitePersistence(services, options => options.UseSqlite(connectionString));
+    private static void ReplaceSqlitePersistence(IServiceCollection services, Action<DbContextOptionsBuilder> configure)
     {
         services.RemoveAll<ApplicationDbContext>();
         services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
-        services.AddDbContext<ApplicationDbContext>(o => o.UseSqlite(connection).ReplaceService<IModelCustomizer, SqliteTestModelCustomizer>());
+        services.AddDbContext<ApplicationDbContext>(options =>
+        {
+            configure(options);
+            options.ReplaceService<IModelCustomizer, SqliteTestModelCustomizer>();
+        });
     }
     public static void ReplaceSqlServerPersistence(IServiceCollection services, string connection)
     {

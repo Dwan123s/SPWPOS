@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SPWPOS.Application.Workspace;
@@ -177,7 +178,18 @@ public sealed class WorkTimeApiTests
             db.WorkTasks.Add(task);db.WorkSessions.Add(source);await db.SaveChangesAsync(ct);
         }
         var reviews=await client.GetAsync("/api/sessions/time-review",ct);reviews.EnsureSuccessStatusCode();Assert.Contains(source.Id.ToString(),await reviews.Content.ReadAsStringAsync(ct));
-        var response=await client.PostAsJsonAsync($"/api/sessions/{source.Id}/extra-time/preview",new ExtraTimeInput(30),ct);response.EnsureSuccessStatusCode();
+        HttpResponseMessage response;
+        await using (var background = f.Services.CreateAsyncScope())
+        {
+            // Model a concurrent scope with an open transaction. It has not
+            // acquired any SQLite locks, so it should not interfere with the API.
+            var backgroundDb = background.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await backgroundDb.Database.OpenConnectionAsync(ct);
+            var connection = (SqliteConnection)backgroundDb.Database.GetDbConnection();
+            await using var transaction = connection.BeginTransaction(deferred: true);
+            response = await client.PostAsJsonAsync($"/api/sessions/{source.Id}/extra-time/preview", new ExtraTimeInput(30), ct);
+        }
+        response.EnsureSuccessStatusCode();
         using var doc=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));var preview=doc.RootElement.GetProperty("data");Assert.True(preview.GetProperty("feasible").GetBoolean());
         var id=preview.GetProperty("id").GetGuid();var revision=preview.GetProperty("revision").GetGuid();
         await using(var scope=f.Services.CreateAsyncScope())Assert.Equal(1,await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().WorkSessions.CountAsync(ct));

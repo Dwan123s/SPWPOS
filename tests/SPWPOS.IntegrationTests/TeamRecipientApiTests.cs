@@ -39,6 +39,13 @@ public sealed class TeamRecipientApiTests
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(named, new TeamTaskRecipientInput(), ct)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/teams/{teamId}/drafts/{openDraft}/confirm", null, ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync($"/api/teams/tasks/{singleId}/preview", null, ct)).StatusCode);
+        using var report = await client.GetAsync($"/api/teams/{teamId}/workload", ct);
+        Assert.Equal(HttpStatusCode.OK, report.StatusCode);
+        var json = await report.Content.ReadAsStringAsync(ct);
+        Assert.Contains("designatedUserId", json);
+        Assert.DoesNotContain("schedulableMinutes", json);
+        Assert.DoesNotContain("workingMinutes", json);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/teams/{teamId}/workload/{singleId}/candidates", ct)).StatusCode);
         Guid version;
         await using (var scope = factory.Services.CreateAsyncScope())
         {

@@ -21,6 +21,7 @@ import { workspace, resetFixtures } from "./fixtures.js";
 vi.mock("../src/api.js", () => ({ api: vi.fn() }));
 
 const view = () => ({
+  asOf: "2026-11-11T03:00:00Z",
   start: "2026-11-09",
   end: "2026-11-15",
   completedTasks: 0,
@@ -100,6 +101,21 @@ it("offers setup and capture with AI disabled and creates no proposal on opening
   expect(screen.queryByRole("region", { name: "Bước tiếp theo" })).toBeNull();
 });
 
+it("shows unplanned Inbox items separately from scheduled workload", async () => {
+  api.mockResolvedValue({
+    ...view(),
+    tasksMissingPlanningDetails: 2,
+    tasksAwaitingSchedule: 1,
+    next: { kind: "INBOX", reason: "Có 2 việc chưa đủ thông tin để xếp lịch." },
+  });
+  render(<WorkloadWeek />);
+  expect(await screen.findByText("Thiếu thông tin xếp lịch")).toBeTruthy();
+  expect(screen.getByText("Đủ thông tin, chưa xếp đủ thời gian")).toBeTruthy();
+  const open = screen.getByRole("button", { name: "Mở công việc" });
+  expect(open.dataset.action).toBe("open-task-list");
+  expect(screen.queryByRole("button", { name: "Ghi việc trước" })).toBeNull();
+});
+
 it("discards an older response after a newer workspace refresh", async () => {
   let finishOld;
   api.mockImplementationOnce(
@@ -131,7 +147,7 @@ it("shows missing actual separately from a recorded zero and uses day details", 
   });
   api.mockResolvedValue(data);
   render(<WorkloadWeek />);
-  await screen.findByRole("heading", { name: "Tải công việc trong tuần" });
+  await screen.findByRole("table");
   for (const [date, expected] of [["11/11", "—"], ["12/11", "0p"]]) {
     fireEvent.click(screen.getByRole("button", { name: new RegExp(`${date}.*dự kiến`) }));
     const label = document.querySelector(".workload-day:not([hidden]) dt:last-of-type");
@@ -155,13 +171,15 @@ it("shows the following week and moves the workload window", async () => {
     return current;
   });
   render(<WorkloadWeek />);
-  await screen.findByText("2026-11-09 – 2026-11-22");
+  await screen.findByTitle("2026-11-09 – 2026-11-22");
   expect(screen.getByRole("columnheader", { name: /21\/11/ })).toBeTruthy();
   fireEvent.click(screen.getByRole("checkbox", { name: "Hiện cuối tuần" }));
   expect(screen.queryByRole("columnheader", { name: /21\/11/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
-  await screen.findByText("2026-11-16 – 2026-11-29");
+  await screen.findByTitle("2026-11-16 – 2026-11-29");
   expect(api).toHaveBeenCalledWith("/api/intelligence/workload?week=2");
+  fireEvent.change(screen.getByRole("combobox", { name: "Chuyển đến tuần" }), { target: { value: "0" } });
+  await screen.findByTitle("2026-11-09 – 2026-11-22");
 });
 
 it("groups child tasks under their project and standalone tasks under Inbox", async () => {
@@ -186,140 +204,86 @@ it("groups child tasks under their project and standalone tasks under Inbox", as
   expect(cell.querySelector(".workload-group-name").textContent).toBe(project);
   const popup = document.getElementById(cell.getAttribute("popovertarget"));
   expect(popup.getAttribute("popover")).toBe("auto");
-  expect(popup.querySelector('[data-id="task-0"]').textContent).toMatch(/^Viết đề cương.*30p$/);
-  expect(popup.querySelector('[data-id="task-1"]').textContent).toMatch(/^Rà soát tài liệu.*30p$/);
+  expect(popup.querySelector('[data-action="task-detail"][data-id="task-0"]').textContent).toMatch(/^Viết đề cương.*30p$/);
+  expect(popup.querySelector('[data-action="task-detail"][data-id="task-1"]').textContent).toMatch(/^Rà soát tài liệu.*30p$/);
+  expect(popup.querySelector('[data-action="toggle-task-completion"][data-id="task-0"]')).toBeTruthy();
   expect(popup.querySelector('[data-id="task-2"]')).toBeNull();
   const inbox = screen.getByRole("button", { name: /^Inbox,/ });
   const inboxPopup = document.getElementById(inbox.getAttribute("popovertarget"));
-  expect(inboxPopup.querySelector('[data-id="task-2"]').textContent).toMatch(/^Kiểm tra email.*30p$/);
-  expect(inboxPopup.querySelector('[data-action="new-task"]')).toBeTruthy();
+  expect(inboxPopup.querySelector('[data-action="task-detail"][data-id="task-2"]').textContent).toMatch(/^Kiểm tra email.*30p$/);
+  expect(inboxPopup.querySelector('[data-action="new-task"]').dataset.startDate).toBe("2026-11-11");
+  const person = screen.getByRole("button", { name: "Cá nhân", expanded: true });
+  fireEvent.click(person);
+  expect(screen.queryByRole("button", { name: /^Inbox,/ })).toBeNull();
+  fireEvent.click(person);
+  expect(screen.getByRole("button", { name: /^Inbox,/ })).toBeTruthy();
 });
 
-it("compares team capacity and only changes the recipient after confirmation", async () => {
+it("adds the Inbox band only after a task is scheduled in the visible dates", async () => {
+  const empty = view();
+  empty.days.push({ ...empty.days[0], date: "2026-11-12" });
+  api.mockResolvedValue(empty);
+  render(<WorkloadWeek />);
+  const matrix = await screen.findByRole("table");
+  const blankRow = matrix.querySelector(".workload-empty-row");
+  expect(blankRow.cells).toHaveLength(3);
+  expect(blankRow.textContent).toBe("");
+  expect(matrix.querySelector(".workload-group-row")).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Inbox,/ })).toBeNull();
+
+  const planned = {
+    ...empty,
+    days: [{
+      ...empty.days[0],
+      plannedSeconds: 1800,
+      sessions: [{ id: "check-mail", taskId: "task-0", name: "Kiểm tra email",
+        start: "2026-11-11T09:00:00Z", end: "2026-11-11T09:30:00Z" }],
+    }, empty.days[1]],
+  };
+  api.mockResolvedValue(planned);
+  act(() => window.dispatchEvent(new Event("workspace-updated")));
+  const inbox = await screen.findByRole("button", { name: /^Inbox,/ });
+  expect(matrix.querySelector(".workload-empty-row")).toBeNull();
+  expect(inbox.closest("td").dataset.band).toBe("inbox");
+  expect(inbox.closest("td").nextElementSibling.childElementCount).toBe(0);
+  const popup = document.getElementById(inbox.getAttribute("popovertarget"));
+  expect(popup.querySelector('[data-action="new-task"]').dataset.startDate).toBe("2026-11-11");
+});
+
+it("shows shared work and recipients without private capacity or a recipient picker", async () => {
   const team = {
     start: "2026-11-09",
     end: "2026-11-15",
-    members: [
-      {
-        userId: "an",
-        name: "An",
-        timeZoneId: "Asia/Ho_Chi_Minh",
-        days: [
-          {
-            date: "2026-11-11",
-            workingMinutes: 480,
-            busyMinutes: 60,
-            reservedMinutes: 180,
-            schedulableMinutes: 240,
-            recordedActualSeconds: 0,
-          },
-        ],
-      },
-    ],
+    members: [{ userId: "an", name: "An" }, { userId: "binh", name: "Bình" }],
     tasks: [
-      {
-        id: "report",
-        name: "Báo cáo nhóm",
-        status: "Open",
-        risk: "UNASSIGNED",
-        deadline: "2026-11-12T10:00:00Z",
-        remainingMinutes: 60,
-        version: "v1",
-      },
-      {
-        id: "launch",
-        name: "Chạy thử",
-        status: "Assigned",
-        risk: "BEHIND",
-        deadline: "2026-11-13T10:00:00Z",
-        remainingMinutes: 90,
-        shortfallMinutes: 30,
-        assigneeId: "an",
-      },
+      { id: "report", name: "Báo cáo nhóm", status: "Open", risk: "UNASSIGNED",
+        deadline: "2026-11-12T10:00:00Z", estimatedMinutes: 60, progress: 0 },
+      { id: "launch", name: "Chạy thử", status: "Assigned", risk: "ASSIGNED",
+        deadline: "2026-11-13T10:00:00Z", estimatedMinutes: 90, progress: 50, assigneeId: "an" },
+      { id: "review", name: "Rà soát nhóm", status: "Open", risk: "WAITING",
+        deadline: "2026-11-14T10:00:00Z", estimatedMinutes: 30, progress: 0, designatedUserId: "an" },
     ],
   };
-  const wednesday = team.members[0].days[0];
-  team.members[0].days.push({ ...wednesday, date: "2026-11-14" });
-  team.members.push({
-    userId: "binh",
-    name: "Bình",
-    timeZoneId: "UTC",
-    days: team.members[0].days,
-  });
-  api.mockImplementation(async (path, method, body) => {
+  api.mockImplementation(async (path) => {
     if (path === "/api/intelligence/workload") return view();
-    if (path === "/api/teams")
-      return [{ id: "swp", name: "SWP", role: "Leader" }];
+    if (path === "/api/teams") return [{ id: "swp", name: "SWP", role: "Leader" }];
     if (path === "/api/teams/swp/workload?week=0") return team;
-    if (path === "/api/teams/swp/workload?week=1") {
-      return {
-        ...team,
-        start: "2026-11-16",
-        end: "2026-11-22",
-        members: [
-          { ...team.members[1], days: [{ ...wednesday, date: "2026-11-18" }] },
-        ],
-      };
-    }
-    if (path === "/api/teams/swp/workload/report/candidates")
-      return [{ userId: "an", status: "FITS", schedulableMinutes: 240 }];
-    if (path === "/api/teams/tasks/report/recipient" && method === "POST") {
-      team.tasks[0] = {
-        ...team.tasks[0],
-        designatedUserId: body.userId,
-        risk: "WAITING",
-      };
-      return {};
-    }
     throw new Error("Unexpected API call");
   });
-  render(
-    <>
-      <App initialize={false} />
-      <WorkloadWeek />
-    </>,
-  );
+  render(<><App initialize={false} /><WorkloadWeek /></>);
   fireEvent.click(screen.getByRole("button", { name: "Nhóm", exact: true }));
-  fireEvent.click(await screen.findByText("Điều phối công việc nhóm"));
   await screen.findByText("Báo cáo nhóm");
-  await screen.findByRole("columnheader", { name: /18\/11/ });
-  fireEvent.click(screen.getByRole("checkbox", { name: "Hiện cuối tuần" }));
-  expect(screen.queryByRole("columnheader", { name: /14\/11/ })).toBeNull();
-  fireEvent.change(screen.getByLabelText("Lọc theo thành viên"), {
-    target: { value: "an" },
-  });
-  expect(screen.queryByRole("rowheader", { name: "Bình" })).toBeNull();
+  expect(screen.getByText("50%")).toBeTruthy();
+  expect(screen.getByText("Chờ người được chỉ định nhận")).toBeTruthy();
+  expect(screen.queryByRole("checkbox", { name: "Hiện số giờ" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Chọn người nhận" })).toBeNull();
+  fireEvent.change(screen.getByLabelText("Lọc theo thành viên"), { target: { value: "an" } });
   expect(screen.queryByText("Báo cáo nhóm")).toBeNull();
-  fireEvent.change(screen.getByLabelText("Lọc theo thành viên"), {
-    target: { value: "" },
-  });
-  fireEvent.click(screen.getByRole("checkbox", { name: "Hiện số giờ" }));
-  expect(screen.getByRole("button", { name: /^An,/ }).textContent).toContain(
-    "Còn chỗ",
-  );
-  fireEvent.click(screen.getByRole("button", { name: /^An,/ }));
-  expect(screen.getByText("Thực làm cho nhóm")).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Lọc tình trạng công việc nhóm"), {
-    target: { value: "risk" },
-  });
-  expect(screen.queryByText("Báo cáo nhóm")).toBeNull();
-  expect(screen.getByText("Dự kiến trễ")).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Lọc tình trạng công việc nhóm"), {
-    target: { value: "all" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Chọn người nhận" }));
-  fireEvent.click(await screen.findByRole("radio", { name: /^An/ }));
-  expect(api.mock.calls.some(([, method]) => method === "POST")).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "Xác nhận người nhận" }));
-  await screen.findByRole("button", { name: "Đổi người nhận" });
-  expect(api).toHaveBeenCalledWith(
-    "/api/teams/tasks/report/recipient",
-    "POST",
-    {
-      version: "v1",
-      userId: "an",
-    },
-  );
+  expect(screen.getByText("Rà soát nhóm")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Lọc tình trạng công việc nhóm"), { target: { value: "Assigned" } });
+  expect(screen.queryByText("Rà soát nhóm")).toBeNull();
+  expect(screen.getByText("Chạy thử")).toBeTruthy();
+  expect(api.mock.calls.some(([url]) => url.endsWith("/candidates"))).toBe(false);
 });
 
 it("previews a conflicting event only on request and confirms only on a second action", async () => {

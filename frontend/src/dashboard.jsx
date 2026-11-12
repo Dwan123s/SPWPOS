@@ -76,9 +76,9 @@ function DaySummary({ summary, hasAvailability, now, progress }) {
         />
       </summary>
       <div className="home-day-summary-panel">
-        <section aria-label="Giờ làm việc">
+        <section aria-label="Giờ có thể làm">
           <header>
-            <strong>Giờ làm việc</strong>
+            <strong>Giờ có thể làm</strong>
             <strong>{minutes(work)}</strong>
           </header>
           <progress
@@ -91,9 +91,9 @@ function DaySummary({ summary, hasAvailability, now, progress }) {
             <span>{minutes(work - elapsed)} còn lại</span>
           </div>
         </section>
-        <section aria-label="Công việc đã xếp lịch">
+        <section aria-label="Phiên đã xếp">
           <header>
-            <strong>Việc đã xếp lịch</strong>
+            <strong>Phiên đã xếp</strong>
             <strong>{minutes(planned)}</strong>
           </header>
           <progress
@@ -264,8 +264,8 @@ function DayRunway({ model, now }) {
                           {item.isLocked
                             ? "Đã khóa lịch"
                             : item.kind === "session"
-                              ? "Tự động theo lịch · Mở để xem chi tiết"
-                              : "Sự kiện cố định"}
+                              ? "Phiên đã xếp"
+                              : "Lịch bận"}
                         </span>
                         {icon("arrow")}
                       </div>
@@ -392,7 +392,7 @@ function DayRunway({ model, now }) {
               </span>
               <span>
                 <i className="legend-blue" />
-                Phiên làm việc
+                Phiên đã xếp
               </span>
               <span>
                 <i className="legend-rest" />
@@ -603,7 +603,7 @@ function Deadlines({ model }) {
                   <strong>{item.name}</strong>
                   <small>
                     {calendarMode
-                      ? `${item.ongoing ? "Đang diễn ra · Kết thúc" : item.kind === "event" ? "Lịch hẹn" : "Phiên làm việc"} ${timeFmt(at)}`
+                      ? `${item.ongoing ? "Đang diễn ra · Kết thúc" : item.kind === "event" ? "Lịch bận" : "Phiên đã xếp"} ${timeFmt(at)}`
                       : `${timeFmt(at)} · ${minutes(item.remainingMinutes)} còn lại`}
                   </small>
                 </span>
@@ -772,19 +772,24 @@ function HomeDeadlines({ model, sessions }) {
   }
   return (
     <section
-      className="card home-panel"
+      className="card home-panel home-deadlines"
       aria-labelledby="home-deadlines-heading"
     >
       <header className="home-panel-heading">
-        <h2 id="home-deadlines-heading">Công việc sắp đến hạn</h2>
-        <select
-          aria-label="Khoảng thời gian đến hạn"
-          value={range}
-          onChange={(event) => setRange(event.target.value)}
-        >
-          <option value="week">7 ngày tới</option>
-          <option value="day">Hôm nay</option>
-        </select>
+        <div className="home-deadlines-filter">
+          <h2 id="home-deadlines-heading">
+            {range === "day" ? "Đến hạn hôm nay hoặc quá hạn" : "Công việc sắp đến hạn"}
+          </h2>
+          {icon("chevron")}
+          <select
+            aria-label="Khoảng thời gian đến hạn"
+            value={range}
+            onChange={(event) => setRange(event.target.value)}
+          >
+            <option value="week">7 ngày tới</option>
+            <option value="day">Hôm nay và quá hạn</option>
+          </select>
+        </div>
       </header>
       {tasks.length ? (
         <div
@@ -862,14 +867,17 @@ function HomeDeadlines({ model, sessions }) {
           </table>
         </div>
       ) : (
-        <div className="home-empty">
-          <p>Không có việc đến hạn trong khoảng này.</p>
+        <div className="home-empty home-deadlines-empty">
+          <p>{range === "day" ? "Không có việc đến hạn hôm nay hoặc quá hạn." : "Không có việc nào sắp đến hạn."}</p>
+          {button("Thêm công việc", "new-task", "secondary small")}
         </div>
       )}
-      <div className="home-panel-footer">
-        {button("Thêm công việc", "new-task", "ghost small", "", "plus")}
-        {button("Xem tất cả công việc", "open-task-list", "ghost small", "all")}
-      </div>
+      {tasks.length > 0 && (
+        <div className="home-panel-footer">
+          {button("Thêm công việc", "new-task", "ghost small", "", "plus")}
+          {button("Xem tất cả công việc", "open-task-list", "ghost small", "all")}
+        </div>
+      )}
     </section>
   );
 }
