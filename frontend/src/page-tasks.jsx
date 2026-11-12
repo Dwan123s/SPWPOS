@@ -2,10 +2,10 @@ import { useState } from "react";
 import { icon } from "./ui.jsx";
 import { EisenhowerMatrix, eisenhowerEnabled } from "./eisenhower.jsx";
 import { TaskSmartList } from "./task-smart-list.jsx";
-export function tasksPage() {
-  return <TasksWorkspace />;
+export function tasksPage({ onWorkspaceChanged } = {}) {
+  return <TasksWorkspace onWorkspaceChanged={onWorkspaceChanged} />;
 }
-function TasksWorkspace() {
+function TasksWorkspace({ onWorkspaceChanged }) {
   const [view, setView] = useState("list");
   const matrix = view === "matrix" && eisenhowerEnabled();
   return (
@@ -21,7 +21,7 @@ function TasksWorkspace() {
         </div>
       )}
       <div hidden={matrix}>
-        <TaskSmartList onShowMatrix={eisenhowerEnabled() ? () => setView("matrix") : undefined} />
+        <TaskSmartList onWorkspaceChanged={onWorkspaceChanged} onShowMatrix={eisenhowerEnabled() ? () => setView("matrix") : undefined} />
       </div>
       {matrix && <EisenhowerMatrix />}
     </>

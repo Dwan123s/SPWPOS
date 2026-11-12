@@ -1,5 +1,6 @@
 import { TaskEisenhowerDetail } from "./eisenhower.jsx";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Select, Slot, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
 import {
@@ -18,12 +19,18 @@ import {
   modal,
   empty,
   dayKey,
+  toast,
 } from "./ui.jsx";
 import { api } from "./api.js";
 import { askNora, secretaryMode } from "./agent-handoff.js";
 import { TaskBatchForm } from "./task-batch.jsx";
 import { Checklist } from "./eisenhower-board.jsx";
+import { TeamChecklist } from "./team-task-checklist.jsx";
+import { TaskDeadlinePicker, TaskEstimateEditor, TaskTablePopup } from "./task-table-popup.jsx";
+import { useOutsideDismiss } from "./popup-dismissal.jsx";
+import { sessionStartIssue } from "./session-start.jsx";
 import "./task-create.css";
+import "./task-detail-drawer.css";
 export const taskById = (id) => state.workspace.tasks.find((t) => t.id === id);
 export const hasPlanningDetails = (task) => Boolean(task?.deadline && task.estimatedMinutes > 0);
 export const taskColumns = {
@@ -37,10 +44,16 @@ const taskSources = {
   NATURAL_LANGUAGE: "Nhập tự nhiên",
   AI_BREAKDOWN: "Việc con",
 };
+const taskPopupTitles = {
+  actions: "Thao tác công việc",
+  deadline: "Chọn hạn chót",
+  estimate: "Chỉnh thời lượng dự kiến",
+};
 export function taskRows(tasks, plannedDays, options = {}) {
   return <TaskList tasks={tasks} plannedDays={plannedDays} {...options} />;
 }
-function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addTask, emptyMessage }) {
+function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addTask, emptyMessage,
+  selectedId, onSelect, toolbarHost, onWorkspaceChanged }) {
   const signature = tasks.map((task) => task.id).join(",");
   const [paging, setPaging] = useState({ signature, page: 0 });
   const page = paging.signature === signature ? paging.page : 0;
@@ -48,8 +61,67 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
   const visible = tasks.slice(page * 12, (page + 1) * 12);
   const includes = (column) => columns.includes(column);
   const columnCount = columns.length + 2;
+  const [localSelected, setLocalSelected] = useState(null);
+  const [popup, setPopup] = useState(null);
+  const selectedRow = useRef(null);
+  const selectionToolbar = useRef(null);
+  const popupRoot = useRef(null);
+  const selected = visible.find((task) => task.id === (onSelect ? selectedId : localSelected));
+  const selectTask = onSelect || setLocalSelected;
+  const today = dayKey(Date.now());
+  function showPopup(event, task, kind) {
+    selectTask(task.id);
+    const anchor = event.currentTarget;
+    setPopup((current) => current?.task.id === task.id && current.kind === kind ? null : { kind, anchor, task });
+  }
+  function closePopup(restoreFocus = true) {
+    if (restoreFocus && popup?.anchor.isConnected) popup.anchor.focus({ preventScroll: true });
+    setPopup(null);
+  }
+  function clearSelection() {
+    selectTask(null);
+    closePopup(false);
+  }
+  useOutsideDismiss([selectedRow, selectionToolbar, popupRoot], clearSelection, Boolean(selected));
+  const popupTask = popup && popup.task.id === selected?.id ? popup.task : null;
+  async function saveTaskChanges(task, changes, label) {
+    await api(`/api/tasks/${task.id}`, "PUT", {
+      name: task.name, description: task.description ?? "", deadline: task.deadline ?? null,
+      estimatedMinutes: task.estimatedMinutes || null, priority: task.priority || 2,
+      categoryId: task.categoryId || null, parentId: task.parentId || null,
+      taskType: task.taskType || "OTHER", isHardDeadline: Boolean(task.deadline && task.isHardDeadline),
+      creationSource: task.creationSource || "MANUAL", splittable: task.splittable ?? true,
+      minimumSessionMinutes: task.minimumSessionMinutes || 25, version: task.version,
+      inheritsProjectDeadline: task.inheritsProjectDeadline,
+      ...changes,
+    });
+    try {
+      await onWorkspaceChanged();
+      toast(label, "success");
+    } catch {
+      toast("Đã lưu thay đổi. Hãy tải lại để xem bản mới.", "error");
+    }
+  }
+  function saveDeadline(task, day) {
+    if ((task.deadline ? dayKey(task.deadline) : null) === day) return;
+    const deadline = day ? toUtc(`${day}T${task.deadline ? localInput(task.deadline).slice(11, 16) : "23:59"}`) : null;
+    return saveTaskChanges(task, { deadline, isHardDeadline: Boolean(deadline && task.isHardDeadline) },
+      day ? "Đã cập nhật hạn chót." : "Đã bỏ hạn chót.");
+  }
   return (
     <div className="work-task-board">
+      {selected && toolbarHost && createPortal(
+        <div ref={selectionToolbar} className="task-selection-toolbar" role="group" aria-label="Thao tác với công việc đã chọn">
+          <TaskSelectionActions task={selected} />
+          <button type="button" className="task-table-icon task-selection-clear" aria-label="Bỏ chọn công việc"
+            title="Bỏ chọn công việc" onClick={() => {
+              selectedRow.current?.querySelector(".title-button")?.focus({ preventScroll: true });
+              clearSelection();
+            }}>
+            {icon("close")}
+          </button>
+        </div>, toolbarHost,
+      )}
       <div className="work-task-table-scroll">
         <table className="work-task-table">
           <thead>
@@ -74,8 +146,16 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
               const active = !completed && task.status !== "Cancelled";
               const canSchedule = hasPlanningDetails(task);
               const planned = plannedDays?.get(task.id);
+              const estimate = task.estimatedMinutes > 0 ? minutes(task.estimatedMinutes) : "";
               return (
-                <tr key={task.id} className={completed ? "is-completed" : undefined}>
+                <tr key={task.id} className={[completed && "is-completed", selected?.id === task.id && "is-selected"].filter(Boolean).join(" ")}
+                  ref={selected?.id === task.id ? selectedRow : null}
+                  onClick={(event) => {
+                    if (!event.target.closest("button, a, input")) {
+                      selectTask(task.id);
+                      closePopup(false);
+                    }
+                  }}>
                   <td className="work-task-check-cell">
                     {!task.isTeamTask && task.status !== "Cancelled" ? (
                       <button
@@ -95,10 +175,23 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
                   </td>
                   <td className="work-task-name-cell">
                     <div className="work-task-name-row">
-                      <button type="button" className="title-button" data-action="task-detail" data-id={task.id} title={task.name}>
+                      <button type="button" className="title-button" title={task.name}
+                        aria-pressed={selected?.id === task.id}
+                        onClick={() => {
+                          if (selected?.id === task.id) openDetail(task.id);
+                          else { selectTask(task.id); closePopup(false); }
+                        }}>
                         {task.parentId ? "↳ " : ""}{task.name}
                       </button>
                       <div className="task-row-actions">
+                        {selected?.id === task.id && (
+                          <button type="button" className="task-table-icon" aria-label={`Thao tác cho ${task.name}`}
+                            title="Thao tác khác" aria-haspopup="dialog" aria-expanded={popup?.kind === "actions" && popup.task.id === task.id}
+                            onClick={(event) => showPopup(event, task, "actions")}>
+                            <span aria-hidden="true">•••</span>
+                          </button>
+                        )}
+                        {selected?.id !== task.id && <>
                         {active && (
                           <button
                             type="button"
@@ -111,7 +204,7 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
                             {icon(canSchedule ? "calendar" : "edit")}
                           </button>
                         )}
-                        <button
+                        {!task.isTeamTask && <button
                           type="button"
                           className="btn ghost icon-only task-delete-button"
                           data-action="delete-task"
@@ -120,7 +213,8 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
                           title={`Xóa công việc ${task.name}`}
                         >
                           {icon("trash")}
-                        </button>
+                        </button>}
+                        </>}
                       </div>
                     </div>
                   </td>
@@ -134,17 +228,31 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
                         data-id={planned}
                         aria-label={`Mở lịch dự kiến của ${task.name}`}
                       >
-                        {dateFmt(`${planned}T12:00:00Z`, { timeZone: "UTC" })}
+                        {planned === today ? "Hôm nay" : dateFmt(`${planned}T12:00:00Z`, { timeZone: "UTC" })}
                       </button>
                     ) : null}
                   </td>}
-                  {includes("estimate") && <td className="work-task-estimate-cell">{task.estimatedMinutes > 0 ? minutes(task.estimatedMinutes) : ""}</td>}
+                  {includes("estimate") && <td className="work-task-estimate-cell">
+                    {task.isTeamTask ? estimate : (
+                      <button type="button" className="work-task-estimate-button"
+                        data-action={onWorkspaceChanged ? undefined : "edit-task"} data-id={task.id}
+                        onClick={onWorkspaceChanged ? (event) => showPopup(event, task, "estimate") : undefined}
+                        aria-haspopup="dialog" aria-expanded={popup?.kind === "estimate" && popup.task.id === task.id}
+                        aria-label={`${estimate ? "Sửa" : "Thêm"} thời lượng cho ${task.name}`}
+                        title={estimate ? "Sửa thời lượng dự kiến" : "Thêm thời lượng dự kiến"}>
+                        {estimate || <span className="work-task-add-date" aria-hidden="true">{icon("plus")}</span>}
+                      </button>
+                    )}
+                  </td>}
                   {includes("deadline") && <td className="work-task-deadline-cell">
-                    {task.isTeamTask ? (task.deadline ? dateFmt(task.deadline) : "") : (
-                      <button type="button" className="work-task-date-button" data-action="edit-task" data-id={task.id}
+                    {task.isTeamTask ? <TaskDeadlineLabel task={task} today={today} /> : (
+                      <button type="button" className="work-task-date-button"
+                        data-action={!onWorkspaceChanged || task.inheritsProjectDeadline ? "edit-task" : undefined} data-id={task.id}
+                        onClick={onWorkspaceChanged && !task.inheritsProjectDeadline ? (event) => showPopup(event, task, "deadline") : undefined}
+                        aria-haspopup="dialog" aria-expanded={popup?.kind === "deadline" && popup.task.id === task.id}
                         aria-label={`${task.deadline ? "Sửa" : "Thêm"} hạn chót cho ${task.name}`}
                         title={task.deadline ? `${dateFmt(task.deadline)} · ${timeFmt(task.deadline)}` : "Thêm hạn chót"}>
-                        {task.deadline ? <time dateTime={task.deadline}>{dateFmt(task.deadline)}</time> : <span className="work-task-add-date" aria-hidden="true">{icon("plus")}</span>}
+                        {task.deadline ? <TaskDeadlineLabel task={task} today={today} /> : <span className="work-task-add-date" aria-hidden="true">{icon("plus")}</span>}
                       </button>
                     )}
                   </td>}
@@ -165,6 +273,16 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
           </tbody>
         </table>
       </div>
+      {popupTask && (
+        <TaskTablePopup key={`${popup.kind}:${popupTask.id}`} ref={popupRoot} anchor={popup.anchor}
+          kind={popup.kind} title={taskPopupTitles[popup.kind]} onClose={closePopup}>
+          {popup.kind === "deadline" && <TaskDeadlinePicker deadline={popupTask.deadline}
+            onSave={(day) => saveDeadline(popupTask, day)} onClose={closePopup} />}
+          {popup.kind === "estimate" && <TaskEstimateEditor task={popupTask}
+            onSave={(changes) => saveTaskChanges(popupTask, changes, "Đã lưu thời lượng và cách chia phiên.")} onClose={closePopup} />}
+          {popup.kind === "actions" && <TaskSelectionActions task={popupTask} menu onAction={() => closePopup(false)} />}
+        </TaskTablePopup>
+      )}
       {addTask}
       {pages > 1 && (
         <nav className="task-pagination" aria-label="Phân trang công việc">
@@ -183,6 +301,57 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
       )}
     </div>
   );
+}
+
+function TaskDeadlineLabel({ task, today }) {
+  if (!task.deadline) return null;
+  const deadline = Date.parse(task.deadline);
+  const now = Date.now();
+  const remaining = task.remainingMinutes ?? task.estimatedMinutes;
+  const scheduledMinutes = (state.workspace.sessions || []).filter((session) =>
+    session.taskId === task.id && ["Scheduled", "Running", "Paused"].includes(session.status) &&
+    Date.parse(session.end) > now && Date.parse(session.end) <= deadline
+  ).reduce((total, session) => total + (Date.parse(session.end) - Math.max(now, Date.parse(session.start))) / 60000, 0);
+  const status = task.status === "Completed" ? "Đã hoàn thành"
+    : task.status === "Cancelled" ? ""
+    : deadline < now ? "Quá hạn"
+    : remaining > 0 && Math.floor(scheduledMinutes) >= remaining ? "Đúng tiến độ" : "";
+  return (
+    <time dateTime={task.deadline} className="task-deadline-chip"
+      data-status={status === "Quá hạn" ? "late" : status ? "on-track" : undefined}
+      title={status || undefined}>
+      {dayKey(task.deadline) === today ? "Hôm nay" : dateFmt(task.deadline)}
+    </time>
+  );
+}
+
+function TaskSelectionActions({ task, menu = false, onAction }) {
+  const active = !["Completed", "Cancelled"].includes(task.status);
+  const session = (state.workspace.sessions || []).filter((item) => item.taskId === task.id &&
+    ["Scheduled", "Running", "Paused", "NeedsReview"].includes(item.status))
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))[0];
+  const actions = [
+    ["tasks", "Mở chi tiết", "task-detail"],
+    ...(!task.isTeamTask ? [["edit", "Chỉnh sửa công việc", "edit-task"]] : []),
+    ...(active && hasPlanningDetails(task) ? [["refresh", "Xem lịch đề xuất", "schedule-task"]] : []),
+    ...(session ? [session.status === "NeedsReview"
+      ? ["clock", "Ghi kết quả phiên", "session-outcome", session.id]
+      : session.status === "Scheduled" && !sessionStartIssue(session, state.workspace)
+        ? ["play", "Bắt đầu phiên", "session-start", session.id]
+        : ["play", "Mở phiên làm việc", "session-detail", session.id]] : []),
+    ...(!task.isTeamTask && task.status !== "Cancelled"
+      ? [["check", task.status === "Completed" ? "Mở lại công việc" : "Đánh dấu hoàn thành", "toggle-task-completion"]] : []),
+    ["copy", "Tạo bản sao", "duplicate-task"],
+    ["link", "Sao chép liên kết", "copy-task-link"],
+    ...(!task.isTeamTask ? [["trash", "Xóa công việc đã chọn", "delete-task"]] : []),
+  ];
+  return actions.map(([glyph, label, action, id = task.id]) => (
+    <button type="button" key={action} className={menu ? "task-table-menu-item" : "task-table-icon"}
+      data-action={action} data-id={id} aria-label={label} title={label} onClick={onAction}>
+      {icon(glyph)}
+      {menu && <span>{label}</span>}
+    </button>
+  ));
 }
 export const scopes = {
   all: ["Tất cả", () => true],
@@ -668,10 +837,11 @@ export function taskInput(data) {
   };
 }
 function TaskChecklistForm({ task }) {
-  const [items, setItems] = useState(task.checklist || []);
+  const [items, setItems] = useState((task.isTeamTask ? task.teamChecklist : task.checklist) || []);
   return (
     <form className="task-detail-checklist" data-form="task-checklist" data-id={task.id}>
-      <Checklist items={items} onChange={setItems} />
+      {task.isTeamTask ? <TeamChecklist items={items} onToggle={(id, completed) => setItems((previous) =>
+        previous.map((item) => item.id === id ? { ...item, completed } : item))} /> : <Checklist items={items} onChange={setItems} />}
       <input type="hidden" name="version" value={task.version} />
       <input type="hidden" name="items" value={JSON.stringify(items.filter((item) => item.text.trim()))} />
       <div className="form-error" role="alert" />
@@ -728,166 +898,400 @@ export function openDetail(id, afterSession = false) {
   const children = state.workspace.tasks.filter((x) => x.parentId === id);
   const parent = t.parentId ? taskById(t.parentId) : null;
   const deps = t.dependencies.map(taskById).filter(Boolean);
+  const canToggle =
+    !t.isTeamTask && !children.length && t.status !== "Cancelled";
+  const completed = t.status === "Completed";
   modal(
     t.name,
     afterSession
       ? "Lượt làm vừa kết thúc. Cập nhật phần công việc bạn đã hoàn thành."
-      : "Chi tiết công việc",
-    <>
-      {parent && button(`Về ${parent.name}`, "task-detail", "small ghost", parent.id)}
-      {afterSession && (
-        <div className="info post-session-help section-gap">
-          <h3>Bạn đã làm xong cả công việc chưa?</h3>
-          <p>
-            Xong phiên chỉ kết thúc lượt làm và dừng đồng hồ. Nếu còn việc, cập
-            nhật tiến độ bên dưới để tiếp tục vào lần sau.
-          </p>
-          {!["Completed", "Cancelled"].includes(t.status) &&
-            button(
-              "Đã hoàn thành cả công việc",
-              "task-finish",
-              "primary small",
-              id,
-              "check",
-            )}
-        </div>
-      )}
-      <div className="actions">
-        {badge(
-          statusLabels[t.status],
-          t.status === "Completed" ? "green" : "purple",
-        )}
-        {badge(typeLabels[t.taskType] || t.taskType)}
-        {badge(`Ưu tiên ${t.priority}`)}
-        {t.deadline && badge(t.isHardDeadline ? "Deadline cứng" : "Deadline mềm")}
-      </div>
-      {hasPlanningDetails(t) && (
-        <TaskEisenhowerDetail task={t} onChanged={async () => { state.workspace = await api("/api/workspace"); openDetail(id); }} />
-      )}
-      <dl className="detail-list">
-        {t.workWindowStart && (
-          <div>
-            <dt>Khung giờ thực hiện</dt>
-            <dd>
-              {dateFmt(t.workWindowStart)}
-              {t.workWindowEnd && ` · ${timeFmt(t.workWindowStart)} → ${dateFmt(t.workWindowEnd)} · ${timeFmt(t.workWindowEnd)}`}
-            </dd>
-          </div>
-        )}
-        <div>
-          <dt>{children.length ? "Hạn chót project" : "Hạn chót"}</dt>
-          <dd>
-            {t.deadline ? `${dateFmt(t.deadline)} · ${timeFmt(t.deadline)}` : "Chưa có hạn"}
-          </dd>
-        </div>
-        <div>
-          <dt>Thời gian dự kiến / điều chỉnh</dt>
-          <dd>
-            {t.estimatedMinutes > 0 ? `${minutes(t.estimatedMinutes)} / ${minutes(t.adjustedMinutes)}` : "Chưa ước lượng"}
-          </dd>
-        </div>
-        <div>
-          <dt>Đã thực hiện / đang lên lịch</dt>
-          <dd>
-            {minutes(t.actualMinutes)}
-            {" / "}
-            {minutes(t.plannedMinutes)}
-          </dd>
-        </div>
-        <div>
-          <dt>Tiến độ</dt>
-          <dd>{t.progress}%</dd>
-        </div>
-      </dl>
-      {t.description ? (
-        <p className="detail-description">{t.description}</p>
-      ) : (
-        ""
-      )}
-      {!t.isTeamTask && t.version && !children.length && (
-        <details className="task-detail-steps" open={!!t.checklist?.length}>
-          <summary>Các bước thực hiện</summary>
-          <TaskChecklistForm key={`${id}:${t.version}`} task={t} />
-        </details>
-      )}
-      {secretaryMode() ? <div className="form-actions">
-        {!["Completed", "Cancelled"].includes(t.status) && button("Đã hoàn thành công việc", "task-finish", "primary small", id, "check")}
-      </div> : <form data-form="task-progress" data-id={id}>
-        <div className="form-grid">
-          {field(
-            "Tiến độ (%)",
-            "progress",
-            "number",
-            t.progress,
-            'min="0" max="100" required',
-          )}
-          <label className="field">
-            Trạng thái
-            <Select name="status">
-              {nodeList(
-                ["Todo", "InProgress", "Completed", "Cancelled"].map((key) => (
-                  <option value={key} selected={key === t.status}>
-                    {statusLabels[key]}
-                  </option>
-                )),
-              )}
-            </Select>
-          </label>
-        </div>
-        <div className="form-error" />
-        <div className="form-actions">
-          <button type="submit" className="btn secondary">
-            Cập nhật tiến độ
+      : "",
+    <TaskDetailDrawer
+      task={t}
+      parent={parent}
+      childrenTasks={children}
+      deps={deps}
+      afterSession={afterSession}
+    />,
+    {
+      placement: "right",
+      context:
+        parent?.name ||
+        (t.isTeamTask ? "Công việc nhóm" : children.length ? "Dự án" : "Inbox"),
+      leading: canToggle ? (
+        <button
+          type="button"
+          className="task-complete-toggle"
+          role="checkbox"
+          aria-checked={completed}
+          aria-label={
+            completed ? "Mở lại công việc" : "Đánh dấu công việc hoàn thành"
+          }
+          data-action="toggle-task-completion"
+          data-id={id}
+          data-keep-task-detail="true"
+        >
+          {completed && icon("check")}
+        </button>
+      ) : undefined,
+    },
+  );
+}
+
+function TaskDetailDrawer({
+  task: t,
+  parent,
+  childrenTasks: children,
+  deps,
+  afterSession,
+}) {
+  const id = t.id;
+  const sessions = state.workspace.sessions
+    .filter(
+      (session) => session.taskId === id && session.status !== "Cancelled",
+    )
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  const planned = sessions.find(
+    (session) =>
+      ["Scheduled", "Running", "Paused"].includes(session.status) &&
+      Date.parse(session.end) > Date.now(),
+  );
+  const [tab, setTab] = useState("details");
+  const scroll = useRef(null);
+  useEffect(() => {
+    scroll.current.scrollTop = 0;
+  }, [tab]);
+  const tabs = [
+    ["details", "Chi tiết"],
+    ["children", "Việc con"],
+    ["sessions", "Phiên đã xếp"],
+  ];
+  const today = dayKey(Date.now());
+  return (
+    <div className="task-detail-drawer">
+      <nav
+        role="tablist"
+        aria-label="Thông tin công việc"
+        className="task-drawer-tabs"
+        onKeyDown={(event) => {
+          const index = tabs.findIndex(([key]) => key === tab);
+          const keys = {
+            ArrowRight: (index + 1) % tabs.length,
+            ArrowLeft: (index + tabs.length - 1) % tabs.length,
+            Home: 0,
+            End: tabs.length - 1,
+          };
+          if (keys[event.key] == null) return;
+          event.preventDefault();
+          setTab(tabs[keys[event.key]][0]);
+          event.currentTarget
+            .querySelectorAll("[role=tab]")
+            [keys[event.key]].focus();
+        }}
+      >
+        {tabs.map(([key, label]) => (
+          <button
+            type="button"
+            role="tab"
+            id={`task-drawer-tab-${key}`}
+            aria-controls={`task-drawer-panel-${key}`}
+            key={key}
+            aria-selected={tab === key}
+            tabIndex={tab === key ? 0 : -1}
+            onClick={() => setTab(key)}
+          >
+            {label}
           </button>
-        </div>
-      </form>}
-      <div className="spaced">
-        <h3>Công việc con</h3>
-        {children.length ? (
-          <ProjectTaskList children={children} projectId={id} />
-        ) : (
-          <p className="muted">
-            <small>Chưa có công việc con.</small>
-          </p>
-        )}
-        <div className="actions">
-          {button("Thêm việc con", "subtask", "small secondary", id, "plus")}
-          {hasPlanningDetails(t) && button("Gợi ý chia nhỏ", "breakdown", "small ghost", id, "spark")}
-        </div>
-      </div>
-      <div className="spaced">
-        <h3>Phải hoàn thành trước</h3>
-        {nodeList(
-          deps.map((d) => (
-            <div className="list-line">
-              <span>{d.name}</span>
-              {button(
-                "Bỏ phụ thuộc",
-                "remove-dependency",
-                "small ghost",
-                `${id}|${d.id}`,
-                "close",
-              )}
+        ))}
+      </nav>
+      <div className="task-drawer-scroll" ref={scroll}>
+        <section
+          role="tabpanel"
+          id="task-drawer-panel-details"
+          aria-labelledby="task-drawer-tab-details"
+          hidden={tab !== "details"}
+        >
+          {parent &&
+            button(
+              `Về ${parent.name}`,
+              "task-detail",
+              "small ghost",
+              parent.id,
+            )}
+          {afterSession && (
+            <div className="info post-session-help section-gap">
+              <h3>Bạn đã làm xong cả công việc chưa?</h3>
+              <p>
+                Xong phiên chỉ kết thúc lượt làm và dừng đồng hồ. Nếu còn việc,
+                cập nhật tiến độ bên dưới để tiếp tục vào lần sau.
+              </p>
+              {!["Completed", "Cancelled"].includes(t.status) &&
+                button(
+                  "Đã hoàn thành cả công việc",
+                  "task-finish",
+                  "primary small",
+                  id,
+                  "check",
+                )}
             </div>
-          )),
-        )}
-        {!secretaryMode() && <form data-form="dependency" data-id={id}>
-          <div className="actions">
-            <Select name="predecessor" className="filter">
-              {nodeList(
-                state.workspace.tasks
-                  .filter((x) => x.id !== id && !t.dependencies.includes(x.id))
-                  .map((x) => <option value={x.id}>{x.name}</option>),
-              )}
-            </Select>
-            <button type="submit" className="btn small secondary">
-              Thêm phụ thuộc
-            </button>
+          )}
+          <dl className="task-drawer-facts">
+            <div>
+              {icon("tasks")}
+              <dt>Mô tả</dt>
+              <dd className="task-drawer-description">
+                {t.description || "Chưa có mô tả"}
+              </dd>
+            </div>
+            <div>
+              {icon("flag")}
+              <dt>Ưu tiên</dt>
+              <dd>{["", "Thấp", "Vừa", "Cao", "Khẩn"][t.priority] || "Vừa"}</dd>
+            </div>
+            <div>
+              {icon("users")}
+              <dt>Người thực hiện</dt>
+              <dd>Bạn</dd>
+            </div>
+          </dl>
+          <div className="actions task-drawer-badges">
+            {badge(
+              statusLabels[t.status],
+              t.status === "Completed" ? "green" : "purple",
+            )}
+            {badge(typeLabels[t.taskType] || t.taskType)}
+            {t.deadline &&
+              badge(t.isHardDeadline ? "Deadline cứng" : "Deadline mềm")}
           </div>
-          <div className="form-error" />
-        </form>}
+          <h3 className="task-drawer-section-title">Xếp lịch</h3>
+          <dl className="task-drawer-facts">
+            <div>
+              {icon("calendar")}
+              <dt>Dự kiến</dt>
+              <dd>
+                {planned
+                  ? `${dayKey(planned.start) === today ? "Hôm nay" : dateFmt(planned.start)} · ${timeFmt(planned.start)}`
+                  : "Chưa xếp phiên"}
+              </dd>
+            </div>
+            {t.workWindowStart && (
+              <div>
+                {icon("today")}
+                <dt>Khung giờ thực hiện</dt>
+                <dd>
+                  {dateFmt(t.workWindowStart)}
+                  {t.workWindowEnd &&
+                    ` · ${timeFmt(t.workWindowStart)} → ${dateFmt(t.workWindowEnd)} · ${timeFmt(t.workWindowEnd)}`}
+                </dd>
+              </div>
+            )}
+            <div>
+              {icon("calendar")}
+              <dt>{children.length ? "Hạn chót project" : "Hạn chót"}</dt>
+              <dd>
+                {t.deadline
+                  ? `${dateFmt(t.deadline)} · ${timeFmt(t.deadline)}`
+                  : "Chưa có hạn"}
+              </dd>
+            </div>
+            <div>
+              {icon("clock")}
+              <dt>Thời gian dự kiến / điều chỉnh</dt>
+              <dd>
+                {t.estimatedMinutes > 0
+                  ? `${minutes(t.estimatedMinutes)} / ${minutes(t.adjustedMinutes)}`
+                  : "Chưa ước lượng"}
+              </dd>
+            </div>
+            <div>
+              {icon("clock")}
+              <dt>Đã thực hiện / đang lên lịch</dt>
+              <dd>
+                {minutes(t.actualMinutes)}
+                {" / "}
+                {minutes(t.plannedMinutes)}
+              </dd>
+            </div>
+            <div>
+              {icon("insights")}
+              <dt>Tiến độ</dt>
+              <dd>{t.progress}%</dd>
+            </div>
+          </dl>
+          {hasPlanningDetails(t) && (
+            <TaskEisenhowerDetail
+              task={t}
+              onChanged={async () => {
+                state.workspace = await api("/api/workspace");
+                openDetail(id);
+              }}
+            />
+          )}
+          {t.version &&
+            !children.length &&
+            (!t.isTeamTask || t.teamChecklist?.length > 0) && (
+              <details
+                className="task-detail-steps"
+                open={!!(t.isTeamTask ? t.teamChecklist : t.checklist)?.length}
+              >
+                <summary>Các bước thực hiện</summary>
+                {t.isTeamTask && t.teamStatus !== "Assigned" ? (
+                  <TeamChecklist items={t.teamChecklist} />
+                ) : (
+                  <TaskChecklistForm key={`${id}:${t.version}`} task={t} />
+                )}
+              </details>
+            )}
+          {secretaryMode() ? (
+            <div className="form-actions">
+              {!["Completed", "Cancelled"].includes(t.status) &&
+                button(
+                  "Đã hoàn thành công việc",
+                  "task-finish",
+                  "primary small",
+                  id,
+                  "check",
+                )}
+            </div>
+          ) : (
+            <form data-form="task-progress" data-id={id}>
+              <div className="form-grid">
+                {field(
+                  "Tiến độ (%)",
+                  "progress",
+                  "number",
+                  t.progress,
+                  'min="0" max="100" required',
+                )}
+                <label className="field">
+                  Trạng thái
+                  <Select name="status">
+                    {nodeList(
+                      ["Todo", "InProgress", "Completed", "Cancelled"].map(
+                        (key) => (
+                          <option value={key} selected={key === t.status}>
+                            {statusLabels[key]}
+                          </option>
+                        ),
+                      ),
+                    )}
+                  </Select>
+                </label>
+              </div>
+              <div className="form-error" />
+              <div className="form-actions">
+                <button type="submit" className="btn secondary">
+                  Cập nhật tiến độ
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+        <section
+          role="tabpanel"
+          id="task-drawer-panel-children"
+          aria-labelledby="task-drawer-tab-children"
+          hidden={tab !== "children"}
+        >
+          {parent &&
+            button(
+              `Về ${parent.name}`,
+              "task-detail",
+              "small ghost",
+              parent.id,
+            )}
+          <div className="spaced">
+            <h3>Công việc con</h3>
+            {children.length ? (
+              <ProjectTaskList children={children} projectId={id} />
+            ) : (
+              <p className="muted">
+                <small>Chưa có công việc con.</small>
+              </p>
+            )}
+            <div className="actions">
+              {button(
+                "Thêm việc con",
+                "subtask",
+                "small secondary",
+                id,
+                "plus",
+              )}
+              {hasPlanningDetails(t) &&
+                button(
+                  "Gợi ý chia nhỏ",
+                  "breakdown",
+                  "small ghost",
+                  id,
+                  "spark",
+                )}
+            </div>
+          </div>
+          <div className="spaced">
+            <h3>Phải hoàn thành trước</h3>
+            {nodeList(
+              deps.map((d) => (
+                <div className="list-line">
+                  <span>{d.name}</span>
+                  {button(
+                    "Bỏ phụ thuộc",
+                    "remove-dependency",
+                    "small ghost",
+                    `${id}|${d.id}`,
+                    "close",
+                  )}
+                </div>
+              )),
+            )}
+            {!secretaryMode() && (
+              <form data-form="dependency" data-id={id}>
+                <div className="actions">
+                  <Select name="predecessor" className="filter">
+                    {nodeList(
+                      state.workspace.tasks
+                        .filter(
+                          (x) => x.id !== id && !t.dependencies.includes(x.id),
+                        )
+                        .map((x) => <option value={x.id}>{x.name}</option>),
+                    )}
+                  </Select>
+                  <button type="submit" className="btn small secondary">
+                    Thêm phụ thuộc
+                  </button>
+                </div>
+                <div className="form-error" />
+              </form>
+            )}
+          </div>
+        </section>
+        <section
+          role="tabpanel"
+          id="task-drawer-panel-sessions"
+          aria-labelledby="task-drawer-tab-sessions"
+          hidden={tab !== "sessions"}
+        >
+          {sessions.length ? (
+            sessions.map((session) => (
+              <div className="list-line" key={session.id}>
+                <span>
+                  {dateFmt(session.start)} · {timeFmt(session.start)}–
+                  {timeFmt(session.end)}
+                </span>
+                {button(
+                  statusLabels[session.status] || session.status,
+                  "session-detail",
+                  "small ghost",
+                  session.id,
+                  "clock",
+                )}
+              </div>
+            ))
+          ) : (
+            <p className="muted">Công việc chưa có phiên đã xếp.</p>
+          )}
+        </section>
       </div>
-      <div className="form-actions">
+      <footer className="form-actions task-drawer-footer">
         {button("Xóa công việc", "delete-task", "danger small", id, "trash")}
         {button(
           t.isTeamTask ? "Xem lịch cho phần còn lại" : "Lập lại lịch liên quan",
@@ -897,10 +1301,11 @@ export function openDetail(id, afterSession = false) {
           "refresh",
         )}
         {button("Chỉnh sửa", "edit-task", "primary small", id, "edit")}
-      </div>
-    </>,
+      </footer>
+    </div>
   );
 }
+
 export function captureModal(text = "") {
   modal(
     "Ghi việc trước",

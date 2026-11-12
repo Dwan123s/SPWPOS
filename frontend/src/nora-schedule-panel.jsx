@@ -144,7 +144,7 @@ export function NoraSchedulePanel({
           >
             <h3>{displayDate(date)}</h3>
             <p className="nora-day-legend">
-              {icon("calendar")} Lịch bận <span>· Phiên đã xếp</span>
+              {icon("calendar")} Lịch Trình <span>· Phiên đã xếp</span>
             </p>
             {!entries.length && !timelineError && (
               <p className="nora-day-empty">

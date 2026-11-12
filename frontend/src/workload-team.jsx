@@ -82,7 +82,7 @@ export function TeamWorkload({ teamId, week, renderToolbar }) {
                       </th>
                       <td>{recipient(task) ? names.get(recipient(task)) || "Thành viên" : "Chưa có người nhận"}</td>
                       <td>{dateFmt(task.deadline)}</td>
-                      <td>{minutes(task.estimatedMinutes)}</td>
+                      <td>{minutes(task.estimatedMinutes, "long")}</td>
                       <td>{task.progress}%</td>
                       <td><span className="workload-pill" data-risk={task.risk === "OVERDUE" || undefined}>{statuses[task.risk]}</span></td>
                     </tr>

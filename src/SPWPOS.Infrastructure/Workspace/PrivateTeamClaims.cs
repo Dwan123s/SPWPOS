@@ -15,6 +15,7 @@ public sealed partial class WorkspaceService
         UserId = uid, Name = data.Name, Description = data.Description, EstimatedMinutes = data.EstimatedMinutes,
         Deadline = data.Deadline, Priority = data.Priority, Splittable = data.Splittable, IsHardDeadline = true,
         CreationSource = "TEAM", CreatedAt = now, UpdatedAt = now, MinimumSessionMinutes = state.Preference.MinimumSessionMinutes,
+        ChecklistJson = JsonSerializer.Serialize(TeamRequirements(shared.Id, data.Description), AgentJson),
         InheritedImportance = shared.ImportanceLevel, InheritedImportanceReason = shared.ImportanceReason
     };
 
@@ -197,6 +198,11 @@ public sealed partial class WorkspaceService
             db.TeamPlanningWrite = true;
             if (personal.EstimatedMinutes != payload.Task.EstimatedMinutes)
                 personal.ConfirmedRemainingMinutes = null;
+            var previousIds = TeamRequirements(shared.Id, shared.Description).Select(item => item.Id).ToHashSet();
+            var stored = ReadTaskChecklist(personal);
+            var updated = CheckedTeamRequirements(TeamRequirements(shared.Id, payload.Task.Description), stored);
+            personal.ChecklistJson = JsonSerializer.Serialize(updated.Concat(stored.Where(item =>
+                !previousIds.Contains(item.Id) && !updated.Any(requirement => requirement.Id == item.Id))), AgentJson);
             personal.Name = payload.Task.Name; personal.Description = payload.Task.Description; personal.EstimatedMinutes = payload.Task.EstimatedMinutes; personal.Deadline = payload.Task.Deadline;
             personal.Priority = payload.Task.Priority; personal.Splittable = payload.Task.Splittable; personal.UpdatedAt = Now;
             candidate = state;
@@ -275,7 +281,7 @@ public sealed partial class WorkspaceService
     public async Task<TeamTaskDraft> ProposeTeamTaskChangeAsync(Guid uid, Guid taskId, TeamTextInput input, CancellationToken ct)
     {
         var current = await SharedTask(uid, taskId, ct); await TeamMember(uid, current.TeamId, ct, true); var version = current.Version;
-        Require(current.Status is not ("Completed" or "PendingReview"), "TASK_COMPLETED", "Không đổi yêu cầu công việc đang chờ duyệt hoặc đã hoàn thành.", 409);
+        Require(current.Status is "Open" or "Assigned", "TASK_COMPLETED", "Chỉ đổi yêu cầu công việc đang chờ nhận hoặc đang thực hiện.", 409);
         var draft = await InterpretSharedDraft(uid, current.TeamId, input.Text, SharedDto(current), ct);
         if (draft is null) return new(Guid.Empty, "Chưa thay đổi yêu cầu.", "Hãy nêu cụ thể yêu cầu và deadline mới.", null);
         var member = await TeamMember(uid, current.TeamId, ct, true);

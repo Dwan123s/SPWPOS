@@ -932,7 +932,7 @@ export function EventConflictReview({ input, onSaved, onBack }) {
             disabled={busy}
             onClick={() => run(false)}
           >
-            Giữ giờ sự kiện và xem lịch đề xuất
+            Giữ giờ này và xem lịch đề xuất
           </button>
         )}
         {preview?.id && (
@@ -941,11 +941,11 @@ export function EventConflictReview({ input, onSaved, onBack }) {
             disabled={busy}
             onClick={() => run(true)}
           >
-            Xác nhận sự kiện và lịch mới
+            Lưu Lịch Trình và áp dụng đề xuất
           </button>
         )}
         <button className="btn ghost" disabled={busy} onClick={onBack}>
-          Sửa sự kiện
+          Chỉnh sửa Lịch Trình
         </button>
       </div>
     </>

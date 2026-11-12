@@ -65,21 +65,22 @@ it.each(["week", "agenda"])(
       },
     ];
     render(calendarPage());
-    for (const [title, phase, label] of [
-      ["Buổi đã qua", "past", "Đã qua"],
-      ["Buổi đang học", "current", "Đang diễn ra"],
-      ["Buổi sắp tới", "future", "Sắp tới"],
-      ["Phiên cũ chưa kết thúc timer", "past", "Đã qua"],
+    for (const [title, kind, phase, label] of [
+      ["Buổi đã qua", "event", "past", "Đã qua"],
+      ["Buổi đang học", "event", "current", "Đang diễn ra"],
+      ["Buổi sắp tới", "event", "future", "Sắp tới"],
+      ["Phiên cũ chưa kết thúc timer", "task", "past", "Đã qua"],
     ]) {
       const card = screen.getByText(title).closest(".calendar-timed-card");
+      expect(card.classList.contains(`calendar-entry-${kind}`)).toBe(true);
       expect(card.classList.contains(`calendar-time-${phase}`)).toBe(true);
       expect(
         within(card).getByText(label).classList.contains("calendar-time-tag"),
       ).toBe(true);
     }
-    expect(screen.getByLabelText("Màu lịch theo thời gian").textContent).toBe(
-      "Đã quaĐang diễn raSắp tới",
-    );
+    const legend = within(screen.getByLabelText("Màu theo loại lịch"));
+    expect(legend.getByText("Phiên công việc")).toBeTruthy();
+    expect(legend.getByText("Lịch Trình")).toBeTruthy();
   },
 );
 

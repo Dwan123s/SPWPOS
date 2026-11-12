@@ -1,4 +1,4 @@
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { taskRows } from "../src/tasks.jsx";
@@ -38,4 +38,12 @@ it("offers scheduling for unfinished tasks and preserves the full long title", (
   expect(
     screen.getAllByRole("button", { name: /^Xếp lịch công việc/ }),
   ).toHaveLength(1);
+});
+
+it("shows the on-track label when scheduled work covers the remaining time before the deadline", () => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-12T07:00:00Z"));
+  const task = { ...state.workspace.tasks[1], deadline: "2026-11-12T12:00:00Z", remainingMinutes: 45 };
+  state.workspace.sessions = [{ taskId: task.id, status: "Scheduled", start: "2026-11-12T08:00:00Z", end: "2026-11-12T08:45:00Z" }];
+  render(taskRows([task]));
+  expect(screen.getByTitle("Đúng tiến độ").textContent).toBe("Hôm nay");
 });

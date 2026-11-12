@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { TaskBoard } from "../src/team-task-board.jsx";
+import { TeamTaskSplitDialog } from "../src/team-task-checklist.jsx";
 
 const makeTask = (index, extra = {}) => ({
   id: `task-${index}`,
@@ -27,6 +28,62 @@ function board(tasks, props = {}) {
 const rows = () => screen.queryAllByRole("article");
 const statusButton = (name) =>
   within(screen.getByLabelText("Lọc trạng thái")).getByRole("button", { name });
+
+it("shows hours and minutes for longer team tasks in the board and detail", () => {
+  render(board([
+    makeTask(0),
+    makeTask(1, { estimatedMinutes: 90 }),
+    makeTask(2, { estimatedMinutes: 120 }),
+  ]));
+  expect(screen.getByText("60 phút")).toBeTruthy();
+  expect(screen.getByText("1 giờ 30 phút")).toBeTruthy();
+  expect(screen.getByText("2 giờ")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Công việc 1" }));
+  expect(within(screen.getByRole("dialog")).getByText("1 giờ 30 phút")).toBeTruthy();
+});
+
+it("shows checkable requirements separately from notes for the assignee", () => {
+  const onChecklistToggle = vi.fn();
+  const parent = makeTask(0, { status: "Split", subtaskCount: 2, subtasksCompleted: 0 });
+  const child = makeTask(1, { parentTaskId: parent.id, assigneeId: "me", status: "Assigned",
+    description: "Yêu cầu\n- Vẽ biểu đồ\n\nGhi chú\nDùng số liệu tuần này.",
+    checklist: [{ id: "step", text: "Vẽ biểu đồ", completed: false }] });
+  render(board([parent, child], { onChecklistToggle }));
+  fireEvent.click(screen.getByRole("button", { name: "Công việc 0" }));
+  fireEvent.click(within(screen.getByRole("region", { name: "Việc con" })).getByRole("button", { name: "Công việc 1" }));
+  expect(screen.getByText("Dùng số liệu tuần này.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Vẽ biểu đồ" }));
+  expect(onChecklistToggle).toHaveBeenCalledWith(child, "step", true);
+});
+
+it("offers splitting directly on the leader's unclaimed top-level rows", () => {
+  const parent = makeTask(0);
+  const child = makeTask(1, { parentTaskId: parent.id });
+  const assigned = makeTask(2, { status: "Assigned", assigneeId: "other" });
+  const onSplit = vi.fn();
+  render(board([parent, child, assigned], { onSplit }));
+  const split = screen.getByRole("button", { name: "Chia thành 2 việc con" });
+  fireEvent.click(split);
+  expect(onSplit).toHaveBeenCalledWith(parent);
+});
+
+it("prepares two independently assignable children with requirements and notes", () => {
+  const parent = makeTask(0, { estimatedMinutes: 90, designatedUserId: "other",
+    checklist: [{ id: "a", text: "Thu số liệu" }, { id: "b", text: "Viết báo cáo" }] });
+  const onSubmit = vi.fn();
+  render(<TeamTaskSplitDialog task={parent} members={detail([]).members} onSubmit={onSubmit} />);
+  const first = within(screen.getByRole("group", { name: "Việc con 1" }));
+  const second = within(screen.getByRole("group", { name: "Việc con 2" }));
+  fireEvent.change(first.getByLabelText("Tên công việc"), { target: { value: "Thu thập" } });
+  fireEvent.change(second.getByLabelText("Tên công việc"), { target: { value: "Báo cáo" } });
+  fireEvent.change(second.getByLabelText("Ghi chú"), { target: { value: "Xuất PDF" } });
+  fireEvent.change(second.getByLabelText("Người nhận việc con 2"), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tạo 2 việc con" }));
+  expect(onSubmit).toHaveBeenCalledWith([
+    { name: "Thu thập", estimatedMinutes: 45, requirements: ["Thu số liệu"], notes: "", designatedUserId: "other" },
+    { name: "Báo cáo", estimatedMinutes: 45, requirements: ["Viết báo cáo"], notes: "Xuất PDF", designatedUserId: null },
+  ]);
+});
 
 it("keeps a large backlog on eight rows and archives completed work behind its status filter", () => {
   render(

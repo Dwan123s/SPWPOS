@@ -902,12 +902,6 @@
 .note-review-header h2 {
   scroll-margin-top: 115px;
 }
-.session-start-hint {
-  font-size: 12px;
-  color: #000;
-  margin: 8px 0;
-  line-height: 1.5;
-}
 @media (max-width: 1100px) {
   .note-studio.notes-workspace {
     grid-template-columns: 190px minmax(0, 1fr);

@@ -47,6 +47,7 @@ internal static class PrivateTeamModel
         b.Entity<TeamCompletionFile>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.SubmissionId); e.Property(x => x.Name).HasMaxLength(180); e.Property(x => x.MimeType).HasMaxLength(100); e.HasOne<TeamCompletionSubmission>().WithMany().HasForeignKey(x => x.SubmissionId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamTaskDocument>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.TeamId); e.Property(x => x.Name).HasMaxLength(180); e.Property(x => x.MimeType).HasMaxLength(100); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamTask>().HasOne<TeamTaskDocument>().WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<TeamTask>().HasOne<TeamTask>().WithMany().HasForeignKey(x => x.ParentTaskId).OnDelete(DeleteBehavior.Restrict);
         b.Entity<TeamTask>().HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.DesignatedUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

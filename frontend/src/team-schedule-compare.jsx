@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { dateFmt, dayKey, icon, timeFmt, zone } from "./ui.jsx";
+import { dateFmt, dayKey, icon, timeFmt, zone, minutes } from "./ui.jsx";
 import "./team-schedule-compare.css";
 
 const sameTime = (a, b) =>
@@ -42,7 +42,7 @@ function ScheduleSessions({ items, side, beforeById, afterById }) {
             : moved
               ? "Đổi giờ"
               : "Thêm / xếp lại";
-        const minutes = Math.round(
+        const duration = Math.round(
           (new Date(session.end) - new Date(session.start)) / 60000,
         );
         return (
@@ -61,7 +61,7 @@ function ScheduleSessions({ items, side, beforeById, afterById }) {
             </div>
             <p className="team-compare-task">{session.taskName}</p>
             <span className="team-compare-duration">
-              {minutes} phút
+              {minutes(duration, "long")}
               {dayKey(session.start) !== dayKey(session.end)
                 ? ` · kết thúc ${dateFmt(session.end)}`
                 : ""}

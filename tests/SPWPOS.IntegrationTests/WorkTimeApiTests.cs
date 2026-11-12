@@ -12,6 +12,25 @@ using SPWPOS.TestSupport;
 namespace SPWPOS.IntegrationTests;
 public sealed class WorkTimeApiTests
 {
+    [Theory]
+    [InlineData("hi")]
+    [InlineData("Xin chào, NORA!")]
+    public async Task Nora_answers_a_short_greeting_with_ai_disabled(string text)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = new ApiFactory();
+        using var client = await factory.ClientAsync();
+        await WorkspaceFlowTests.Authorize(factory, client);
+        var request = new { conversationId = Guid.NewGuid(), requestId = Guid.NewGuid(), text, autoApply = true };
+        var result = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns", request)).GetProperty("data");
+        Assert.Equal("ANSWERED", result.GetProperty("status").GetString());
+        Assert.StartsWith("Chào bạn!", result.GetProperty("reply").GetString());
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.False(await db.SystemJobRuns.AnyAsync(job => job.JobType == "AI_REQUEST", ct));
+        Assert.False(await db.PlanProposals.AnyAsync(ct));
+    }
+
     [Fact]
     public async Task Nora_today_advice_matches_workload_with_ai_disabled_and_does_not_change_the_plan()
     {

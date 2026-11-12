@@ -133,7 +133,7 @@ it("identifies fixed calendar events on today's schedule and highlights their ac
   );
   expect(schedule.getAllByRole("button", { name: /PRN212 - SE20B02/ })).toHaveLength(1);
   const title = schedule.getByText("PRN212 - SE20B02");
-  expect(within(title.closest(".daily-agenda-row")).getByText("Lịch bận")).toBeTruthy();
+  expect(within(title.closest(".daily-agenda-row")).getByText("Lịch Trình")).toBeTruthy();
   expect(
     title.closest(".daily-agenda-row").classList.contains("is-active"),
   ).toBe(true);

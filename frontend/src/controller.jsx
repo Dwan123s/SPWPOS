@@ -203,13 +203,15 @@ function render() {
   const friendsMatch = location.hash
     .slice(1)
     .match(/^friends\/(people|friends|incoming|outgoing)$/);
+  const taskMatch = location.hash.slice(1)
+    .match(/^tasks\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i);
   state.socialFriendsTab = friendsMatch?.[1] || null;
   state.profileUserId = profileMatch?.[1] || null;
   state.route = profileMatch
     ? "profile"
     : friendsMatch
       ? "friends"
-      : location.hash.slice(1) || "today";
+      : taskMatch ? "tasks" : location.hash.slice(1) || "today";
   if (state.route === "admin") {
     state.route = "admin-users";
     history.replaceState(null, "", "#admin-users");
@@ -249,6 +251,11 @@ function render() {
   );
   setMobileMenu(false);
   syncDecorations();
+  if (taskMatch) {
+    history.replaceState(null, "", "#tasks");
+    if (taskById(taskMatch[1])) openDetail(taskMatch[1]);
+    else toast("Không tìm thấy công việc trong tài khoản này.", "error");
+  }
 }
 async function loadAdmin(search = "") {
   if (state.route === "admin-users") {
@@ -559,13 +566,42 @@ async function action(name, id, element) {
         status: completed ? "Todo" : "Completed",
         progress: completed ? 0 : 100,
       });
-      await refreshAfter(completed ? "Đã mở lại công việc." : "Đã hoàn thành công việc.");
+      const message = completed ? "Đã mở lại công việc." : "Đã hoàn thành công việc.";
+      if (element?.dataset.keepTaskDetail) {
+        await load(false);
+        openDetail(id);
+        toast(message, "success");
+      } else await refreshAfter(message);
       if (element?.dataset.returnProject) openDetail(element.dataset.returnProject);
       break;
     }
     case "edit-task":
       openTask(taskById(id));
       break;
+    case "duplicate-task": {
+      const task = taskById(id);
+      if (!task) break;
+      openTask({
+        name: `${task.name.slice(0, 189)} (bản sao)`,
+        description: task.description,
+        estimatedMinutes: task.estimatedMinutes,
+        deadline: Date.parse(task.deadline) >= Date.now() ? task.deadline : null,
+        priority: task.priority,
+        taskType: task.taskType,
+        splittable: task.splittable,
+        minimumSessionMinutes: task.minimumSessionMinutes,
+        isHardDeadline: task.isHardDeadline,
+      });
+      break;
+    }
+    case "copy-task-link": {
+      if (!taskById(id)) break;
+      const link = new URL(location.href);
+      link.hash = `tasks/${id}`;
+      await navigator.clipboard.writeText(link.href);
+      toast("Đã sao chép liên kết công việc.", "success");
+      break;
+    }
     case "reload-task":
       await load(false);
       if (taskById(id)) openTask(taskById(id));
@@ -696,13 +732,13 @@ async function action(name, id, element) {
       const entry = state.workspace.events.find((e) => e.id === id);
       if (!entry) break;
       confirmAction(
-        "Xóa sự kiện?",
+        "Xóa Lịch Trình?",
         `Xóa “${entry.name}” ngày ${dateFmt(entry.start)} lúc ${timeFmt(entry.start)}? Chỉ xóa lần xuất hiện này và dừng các nhắc nhở của lịch này.`,
         async () => {
           await api(`/api/time/events/${id}`, "DELETE");
-          await refreshAfter("Đã xóa sự kiện khỏi lịch.");
+          await refreshAfter("Đã xóa Lịch Trình.");
         },
-        "Xóa sự kiện",
+        "Xóa Lịch Trình",
       );
       break;
     }
@@ -1320,14 +1356,17 @@ async function formAction(form, data, nextAction = null) {
       break;
     case "event": {
       const start = toUtc(String(data.get("start")));
+      const end = toUtc(String(data.get("end")));
       if (!id && Date.parse(start) <= Date.now())
         throw new Error(
           "Không thể tạo lịch trong quá khứ. Hãy chọn giờ bắt đầu sau thời điểm hiện tại.",
         );
+      if (Date.parse(end) <= Date.parse(start))
+        throw new Error("Giờ kết thúc phải sau giờ bắt đầu.");
       const input = {
         name: String(data.get("name")),
         start,
-        end: toUtc(String(data.get("end"))),
+        end,
         description: String(data.get("description") || ""),
         eventType: String(data.get("eventType") || "OTHER"),
         repeatWeeks: Number(data.get("repeatWeeks") || 1),
@@ -1343,12 +1382,12 @@ async function formAction(form, data, nextAction = null) {
         if (id || input.repeatWeeks !== 1 || error.code !== "SESSION_OVERLAP")
           throw error;
         modal(
-          "Sự kiện trùng phiên làm việc",
+          "Lịch Trình trùng phiên đã xếp",
           error.message,
           <EventConflictReview
             input={input}
             onBack={() => eventModal(input, { manual: true })}
-            onSaved={() => refreshAfter("Đã lưu sự kiện và lịch làm việc.")}
+            onSaved={() => refreshAfter("Đã lưu Lịch Trình và cập nhật phiên đã xếp.")}
           />,
         );
         return;

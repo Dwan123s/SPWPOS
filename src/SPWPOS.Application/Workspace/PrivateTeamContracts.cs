@@ -25,7 +25,8 @@ public sealed record SharedTaskView(Guid Id, string Name, string Description, in
     Guid? CompletionRequestId = null, DateTimeOffset? CompletionSubmittedAt = null, DateTimeOffset? CompletionReviewedAt = null,
     Guid? CompletionReviewedBy = null, bool? CompletionApproved = null, string? CompletionReviewNote = null,
     string? CompletionSubmissionNote = null, TeamCompletionFileView[]? CompletionFiles = null, TeamSourceFileView[]? SourceFiles = null,
-    Guid? DesignatedUserId = null, ImportanceView? Importance = null);
+    Guid? DesignatedUserId = null, ImportanceView? Importance = null, Guid? ParentTaskId = null, TaskChecklistItem[]? Checklist = null,
+    int SubtasksCompleted = 0, int SubtaskCount = 0);
 public sealed record TeamActivityView(Guid ActorId, Guid? TaskId, string Kind, DateTimeOffset CreatedAt);
 public sealed record TeamDetailView(TeamView Team, TeamMemberView[] Members, SharedTaskView[] Tasks, TeamActivityView[] Activity, TeamJoinRequestView[]? JoinRequests = null);
 public sealed record TeamInviteView(Guid Id, string Code, DateTimeOffset ExpiresAt);
@@ -33,6 +34,9 @@ public sealed record TeamInvitePreview(string TeamName, int MemberCount, DateTim
 public sealed record ManualTeamTaskInput(string Name, string? Description, int EstimatedMinutes,
     DateTimeOffset Deadline, int Priority = 2, bool Splittable = true);
 public sealed record ManualTeamTaskChangeInput(Guid Version, ManualTeamTaskInput Task);
+public sealed record TeamSubtaskInput(string Name, int EstimatedMinutes, string[] Requirements, string? Notes = null, Guid? DesignatedUserId = null);
+public sealed record TeamTaskSplitInput(Guid Version, [Required, MinLength(2), MaxLength(2)] TeamSubtaskInput[] Children);
+public sealed record TeamChecklistToggleInput(Guid Version, bool Completed);
 public sealed record TeamTaskDraft(Guid ProposalId, string Reply, string Question, SharedTaskView? Task);
 public sealed record PrivateClaimSession(Guid Id, string TaskName, DateTimeOffset Start, DateTimeOffset End, bool Preserved);
 public sealed record PrivateClaimOption(int Index, string Label, PrivateClaimSession[] After, PrivateClaimSession[] Before, string[] Explanations);
@@ -74,6 +78,8 @@ public interface IPrivateTeamService
     Task<TeamTaskDraft> DraftTeamTaskAsync(Guid uid, Guid teamId, TeamTextInput input, CancellationToken ct);
     Task<Guid> ConfirmTeamTaskDraftAsync(Guid uid, Guid teamId, Guid proposalId, CancellationToken ct, TeamTaskRecipientInput? recipient = null);
     Task ChangeTeamTaskRecipientAsync(Guid uid, Guid taskId, TeamTaskRecipientChangeInput input, CancellationToken ct);
+    Task<Guid[]> SplitTeamTaskAsync(Guid uid, Guid taskId, TeamTaskSplitInput input, CancellationToken ct);
+    Task SetTeamChecklistItemAsync(Guid uid, Guid taskId, Guid itemId, TeamChecklistToggleInput input, CancellationToken ct);
     Task<TeamBriefDraft> DraftTeamBriefAsync(Guid uid, Guid teamId, TeamBriefInput input, CancellationToken ct);
     Task<TeamBriefDraft> EditTeamBriefDraftAsync(Guid uid, Guid teamId, Guid proposalId, TeamDraftEditInput input, CancellationToken ct);
     Task<TeamBriefConfirmView> ConfirmTeamBriefAsync(Guid uid, Guid teamId, Guid proposalId, CancellationToken ct, TeamBriefConfirmInput? input = null);

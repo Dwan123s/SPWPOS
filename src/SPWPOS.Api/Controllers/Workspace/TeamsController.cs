@@ -40,6 +40,12 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
         => Data(await service.ConfirmTeamBriefAsync(UserId, id, proposalId, ct, input));
     [HttpPost("tasks/{id:guid}/recipient")] public async Task<IActionResult> Recipient(Guid id, TeamTaskRecipientChangeInput input, CancellationToken ct)
     { await service.ChangeTeamTaskRecipientAsync(UserId, id, input, ct); return Done(); }
+    [HttpPost("tasks/{id:guid}/split")]
+    public async Task<IActionResult> Split(Guid id, TeamTaskSplitInput input, CancellationToken ct) =>
+        Data(await service.SplitTeamTaskAsync(UserId, id, input, ct));
+    [HttpPut("tasks/{id:guid}/checklist/{itemId:guid}")]
+    public async Task<IActionResult> SetChecklistItem(Guid id, Guid itemId, TeamChecklistToggleInput input, CancellationToken ct)
+    { await service.SetTeamChecklistItemAsync(UserId, id, itemId, input, ct); return Done(); }
     [HttpPost("tasks/{id:guid}/preview")] public async Task<IActionResult> Preview(Guid id, CancellationToken ct, [FromQuery] bool extend = false) => Data(await service.PreviewTeamClaimAsync(UserId, id, ct, extend));
     [HttpPost("claims/{id:guid}/explanation")]
     public async Task<IActionResult> ClaimExplanation(Guid id, CancellationToken ct) =>

@@ -1,97 +1,78 @@
+import { useId, useState } from "react";
 import { SessionTimer } from "./react-ui.jsx";
 import { Select, nodeList } from "./react-ui.jsx";
-import { StartSessionButton } from "./session-start.jsx";
+import { sessionStartIssue, sessionStartOpensAt } from "./session-start.jsx";
 import { CalendarClock, CalendarTimeTag, calendarPhase } from "./calendar-time.jsx";
 import { askNora, secretaryMode } from "./agent-handoff.js";
 import {
   state,
   button,
   badge,
+  icon,
   statusLabels,
   reasons,
   dateFmt,
   timeFmt,
   dayKey,
   localInput,
+  toUtc,
   toast,
   field,
   modal,
   minutes,
   timeValue,
 } from "./ui.jsx";
+import "./calendar-event-form.css";
+import "./calendar-detail.css";
+
+const eventTypes = {
+  MEETING: "Cuộc họp",
+  CLASS: "Lịch học",
+  APPOINTMENT: "Cuộc hẹn",
+  WORK: "Ca làm",
+  OTHER: "Khác",
+};
 export const sessionById = (id) =>
   state.workspace.sessions.find((s) => s.id === id);
 export const canDeleteSession = (session) => session?.status === "Scheduled" &&
   !session.actualSeconds && !session.actualMinutes && !session.segmentStartedAt;
-export function sessionCard(s, calendarTime) {
+function SessionSummary({ session: s, task, duration, now }) {
   const upcoming = s.status === "Scheduled",
     active = ["Running", "Paused"].includes(s.status);
-  const expired = active && new Date(s.end).getTime() <= Date.now();
+  const ended = Date.parse(s.end) <= now;
+  const issue = upcoming ? sessionStartIssue(s, state.workspace, now) : null;
+  const hintId = useId();
   return (
-    <div
-      className={`session-card ${s.status === "Completed" ? "completed" : ""} ${calendarTime ? `calendar-timed-card calendar-time-${calendarTime}` : ""}`}
-    >
-      <div className="session-top">
-        <h3>{s.taskName}</h3>
-        {calendarTime && <CalendarTimeTag phase={calendarTime} />}
-        {badge(
-          statusLabels[s.status],
-          active ? "purple" : s.status === "Completed" ? "green" : "",
+    <section className="calendar-entry-summary calendar-entry-task" aria-label="Phiên làm việc">
+      <div className="calendar-entry-summary-header">
+        <strong>{dateFmt(s.start, { year: "numeric" })} · {timeFmt(s.start)}–{timeFmt(s.end)}</strong>
+        {badge(statusLabels[s.status], active ? "purple" : s.status === "Completed" ? "green" : "")}
+      </div>
+      <dl className="calendar-entry-metrics">
+        <div><dt>Thời lượng phiên</dt><dd>{minutes(duration)}</dd></div>
+        {task?.remainingMinutes != null && (
+          <div><dt>Công việc còn lại</dt><dd>{minutes(task.remainingMinutes)}</dd></div>
         )}
+        <div><dt>Đã thực hiện</dt><dd>{minutes(s.actualMinutes ?? 0)}</dd></div>
+      </dl>
+      {s.isLocked && <p className="calendar-entry-note">Đã khóa phiên</p>}
+      {active && <SessionTimer id={s.id} className="timer" />}
+      {(reasons[s.reasonCode] || s.reasonCode) && <p className="calendar-entry-note">{reasons[s.reasonCode] || s.reasonCode}</p>}
+      <div className="calendar-entry-actions">
+        {upcoming && !ended && <button type="button" className="btn small primary"
+          data-action="session-start" data-id={s.id} disabled={Boolean(issue)} aria-describedby={issue ? hintId : undefined}>
+          {icon("play")} Bắt đầu
+        </button>}
+        {s.status === "Running" && button("Tạm dừng", "session-pause", "small secondary", s.id, "pause")}
+        {s.status === "Paused" && !ended && button("Tiếp tục", "session-resume", "small secondary", s.id, "play")}
+        {active && button("Xong phiên", "session-complete", "small primary", s.id, "check")}
+        {ended && ["Scheduled", "NeedsReview", "Running", "Paused", "Completed", "Missed"].includes(s.status) &&
+          button("Ghi kết quả phiên", "session-outcome", "small secondary", s.id)}
+        {(upcoming || active) && button("Bỏ qua", "session-skip", "small ghost", s.id)}
       </div>
-      <div className="session-time">
-        {timeFmt(s.start)}
-        {" – "}
-        {timeFmt(s.end)}
-        {" · "}
-        {minutes(Math.round((new Date(s.end) - new Date(s.start)) / 60000))}
-        {s.isLocked ? " · Đã khóa" : ""}
-      </div>
-      {active ? <SessionTimer id={s.id} className="timer" /> : ""}
-      {expired && (
-        <p className="warning" role="status">
-          Phiên đã hết khung lịch. Hãy kết thúc phiên để giữ thời gian đã làm và
-          xếp lại phần còn lại.
-        </p>
-      )}
-      <div className="reason">{reasons[s.reasonCode] || s.reasonCode}</div>
-      <div className="actions">
-        {upcoming && (
-          <StartSessionButton session={s} workspace={state.workspace} />
-        )}
-        {s.status === "Running"
-          ? button(
-              "Tạm dừng",
-              "session-pause",
-              "small secondary",
-              s.id,
-              "pause",
-            )
-          : ""}
-        {s.status === "Paused" && !expired
-          ? button(
-              "Tiếp tục",
-              "session-resume",
-              "small secondary",
-              s.id,
-              "play",
-            )
-          : ""}
-        {active
-          ? button(
-              "Xong phiên",
-              "session-complete",
-              "small primary",
-              s.id,
-              "check",
-            )
-          : ""}
-        {upcoming || active
-          ? button("Bỏ qua", "session-skip", "small ghost", s.id)
-          : ""}
-        {button("Chi tiết", "session-detail", "small ghost", s.id, "edit")}
-      </div>
-    </div>
+      {issue && <p id={hintId} className="calendar-entry-note" role="status">{issue}</p>}
+      {active && ended && <p className="calendar-entry-note" role="status">Phiên đã hết giờ. Bấm Xong phiên để lưu thời gian đã làm.</p>}
+    </section>
   );
 }
 export function sessionDetail(id) {
@@ -99,25 +80,17 @@ export function sessionDetail(id) {
   if (!s) return;
   const task = state.workspace.tasks.find((item) => item.id === s.taskId);
   const canSplit = task?.splittable === true && !task.requiresContinuousSession;
+  const duration = Math.round((Date.parse(s.end) - Date.parse(s.start)) / 60000);
+  const minimumSplit = Math.max(task?.minimumSessionMinutes ?? 25, state.workspace.preference?.minimumSessionMinutes ?? 25);
+  const boundaries = [sessionStartOpensAt(s), ...[...(state.workspace.events || []), ...state.workspace.sessions]
+    .flatMap((entry) => [Date.parse(entry.start), Date.parse(entry.end)])];
   modal(
     s.taskName,
-    "Điều chỉnh lịch và xem thời gian thực tế.",
+    "Phiên làm việc",
     <>
-      {sessionCard(s)}
-      <dl className="detail-list">
-        <div>
-          <dt>Ngày</dt>
-          <dd>
-            {dateFmt(s.start, {
-              year: "numeric",
-            })}
-          </dd>
-        </div>
-        <div>
-          <dt>Thực tế</dt>
-          <dd>{minutes(s.actualMinutes)}</dd>
-        </div>
-      </dl>
+      <CalendarClock boundaries={boundaries}>
+        {(now) => <SessionSummary session={s} task={task} duration={duration} now={now} />}
+      </CalendarClock>
       {s.status === "Scheduled" && !secretaryMode() ? (
         <>
           <form data-form="session-edit" data-id={id}>
@@ -155,14 +128,14 @@ export function sessionDetail(id) {
               </button>
             </div>
           </form>
-          {!s.isLocked && canSplit ? (
+          {!s.isLocked && canSplit && duration >= 2 * minimumSplit && Date.parse(s.start) >= Date.now() ? (
             <form data-form="session-split" data-id={id} className="spaced">
               {field(
                 "Chia phiên: phần đầu (phút)",
                 "firstMinutes",
                 "number",
-                25,
-                'required min="5" max="480"',
+                minimumSplit,
+                `required min="${minimumSplit}" max="${Math.min(480, duration - minimumSplit)}"`,
               )}
               <div className="form-error" />
               <div className="form-actions">
@@ -180,8 +153,6 @@ export function sessionDetail(id) {
       ) : (
         ""
       )}
-      {Date.parse(s.end) <= Date.now() && ["Scheduled", "NeedsReview", "Running", "Paused", "Completed", "Missed"].includes(s.status) &&
-        button("Ghi kết quả phiên", "session-outcome", "secondary", id)}
       {s.status === "Completed" ? (
         <form data-form="actual-duration" data-id={id}>
           {field(
@@ -201,32 +172,44 @@ export function sessionDetail(id) {
       ) : (
         ""
       )}
-      {button("Lịch sử timer", "execution-history", "ghost", s.id)}
-      {button("Xem công việc", "task-detail", "ghost", s.taskId)}
-      {canDeleteSession(s) && <div className="form-actions spaced">
-        {s.isLocked && secretaryMode() && button("Mở khóa phiên", "session-unlock", "secondary", s.id, "lock")}
-        <button type="button" className="btn danger" data-action="delete-session" data-id={s.id}
-          disabled={s.isLocked} title={s.isLocked ? "Mở khóa phiên trước khi xóa" : "Xóa phiên này, giữ công việc và deadline"}>
-          Xóa phiên khỏi lịch
-        </button>
-      </div>}
+      <footer className="calendar-detail-footer">
+        <div className="calendar-entry-actions">
+          {button("Lịch sử phiên", "execution-history", "ghost", s.id)}
+          {button("Xem công việc", "task-detail", "secondary", s.taskId)}
+        </div>
+        {canDeleteSession(s) && <div className="calendar-entry-actions">
+          {s.isLocked && secretaryMode() && button("Mở khóa phiên", "session-unlock", "secondary", s.id, "lock")}
+          <button type="button" className="btn danger" data-action="delete-session" data-id={s.id}
+            disabled={s.isLocked} title={s.isLocked ? "Mở khóa phiên trước khi xóa" : "Xóa phiên này, giữ công việc và deadline"}>
+            Xóa phiên khỏi lịch
+          </button>
+        </div>}
+      </footer>
     </>,
   );
 }
 export function eventDetail(id) {
   const event = state.workspace.events.find((entry) => entry.id === id);
   if (!event) return;
-  const types = { CLASS: "Lớp học", WORK: "Công việc", MEETING: "Cuộc họp", APPOINTMENT: "Cuộc hẹn", OTHER: "Lịch cố định" };
-  modal(event.name, "Chi tiết lịch cố định · Thao tác chỉ áp dụng cho lần xuất hiện này.", <>
+  modal(event.name, "Lịch Trình · Thao tác chỉ áp dụng cho lần xuất hiện này.", <>
     <CalendarClock boundaries={[Date.parse(event.start), Date.parse(event.end)]}>
-      {(now) => <CalendarTimeTag phase={calendarPhase(event.start, event.end, now)} />}
+      {(now) => {
+        const phase = calendarPhase(event.start, event.end, now);
+        return (
+          <section className={`calendar-entry-summary calendar-entry-event calendar-time-${phase}`} aria-label="Thông tin Lịch Trình">
+            <div className="calendar-entry-summary-header">
+              <strong>{eventTypes[event.eventType] || eventTypes.OTHER}</strong>
+              <CalendarTimeTag phase={phase} />
+            </div>
+            <dl className="calendar-entry-metrics">
+              <div><dt>Bắt đầu</dt><dd>{dateFmt(event.start, { year: "numeric" })} · {timeFmt(event.start)}</dd></div>
+              <div><dt>Kết thúc</dt><dd>{dateFmt(event.end, { year: "numeric" })} · {timeFmt(event.end)}</dd></div>
+              <div><dt>Thời lượng</dt><dd>{minutes(Math.round((Date.parse(event.end) - Date.parse(event.start)) / 60000))}</dd></div>
+            </dl>
+          </section>
+        );
+      }}
     </CalendarClock>
-    <dl className="detail-list">
-      <div><dt>Loại lịch</dt><dd>{types[event.eventType] || "Lịch cố định"}</dd></div>
-      <div><dt>Bắt đầu</dt><dd>{dateFmt(event.start, { year: "numeric" })} · {timeFmt(event.start)}</dd></div>
-      <div><dt>Kết thúc</dt><dd>{dateFmt(event.end, { year: "numeric" })} · {timeFmt(event.end)}</dd></div>
-      <div><dt>Thời lượng</dt><dd>{minutes(Math.round((Date.parse(event.end) - Date.parse(event.start)) / 60000))}</dd></div>
-    </dl>
     {event.description && <p className="info" style={{ whiteSpace: "pre-wrap" }}>{event.description}</p>}
     <div className="form-actions">
       {button("Xóa lịch", "delete-event", "danger", event.id, "trash")}
@@ -243,84 +226,98 @@ export function eventModal(event = {}, { manual = true } = {}) {
     return;
   }
   modal(
-    event.id ? "Sửa sự kiện" : "Thêm sự kiện cố định",
-    "Khoảng này được đánh dấu bận. Khi tạo lịch lặp, mỗi lần xuất hiện có thể sửa hoặc xóa riêng.",
-    <form data-form="event" data-id={event.id || ""}>
-      {field(
-        "Tên sự kiện",
-        "name",
-        "text",
-        event.name || "",
-        { required: true, maxLength: 200, autoFocus: manual },
+    event.id ? "Chỉnh sửa Lịch Trình" : "Thêm Lịch Trình",
+    event.id ? "Thay đổi áp dụng cho lần xuất hiện này." : "Giữ khung giờ này cho lịch học, ca làm hoặc cuộc hẹn. Planora sẽ xếp công việc quanh giờ bận.",
+    <BusyEventForm event={event} start={start} end={end} manual={manual} />,
+  );
+}
+
+function BusyEventForm({ event, start, end, manual }) {
+  const [repeat, setRepeat] = useState(event.repeatWeeks > 1);
+  const [range, setRange] = useState({ start: localInput(start), end: localInput(end) });
+  let duration = 0;
+  try {
+    duration = Math.round((Date.parse(toUtc(range.end)) - Date.parse(toUtc(range.start))) / 60000);
+  } catch {
+    // A partially entered time has no duration yet.
+  }
+  function handoff(form) {
+    const data = new FormData(form);
+    const type = eventTypes[data.get("eventType")];
+    const name = String(data.get("name") || "").trim();
+    const description = String(data.get("description") || "").trim();
+    const localDateTime = (key) => String(data.get(key) || "").replace("T", " ");
+    const from = localDateTime("start");
+    const until = localDateTime("end");
+    askNora([
+      "Chỉ xem trước một sự kiện cố định để giữ khung giờ này. Chờ tôi xác nhận trước khi lưu.",
+      name && `Tên lịch: ${name}.`,
+      type && type !== eventTypes.OTHER && `Loại lịch: ${type}.`,
+      from && `Bắt đầu: ${from}.`,
+      until && `Kết thúc: ${until}.`,
+      repeat && data.get("repeatWeeks") && `Lặp hằng tuần, tổng ${data.get("repeatWeeks")} lần tính cả lần đầu.`,
+      data.has("isUrgent") && "Đây là lịch khẩn.",
+      description && `Ghi chú: ${description}`,
+    ].filter(Boolean).join("\n"));
+  }
+  return (
+    <form className="busy-event-form" data-form="event" data-id={event.id || ""}>
+      {field("Tên Lịch Trình", "name", "text", event.name || "",
+        { required: true, maxLength: 200, autoFocus: manual, placeholder: "Ví dụ: Ca làm chiều" })}
+      <div className="form-grid">
+        <label className="field">
+          Bắt đầu
+          <input type="datetime-local" name="start" required value={range.start}
+            min={event.id ? undefined : localInput(Math.ceil((Date.now() + 1) / 60000) * 60000)}
+            onChange={(e) => setRange({ ...range, start: e.target.value })} />
+        </label>
+        <label className="field">
+          Kết thúc
+          <input type="datetime-local" name="end" required value={range.end}
+            onChange={(e) => setRange({ ...range, end: e.target.value })} />
+        </label>
+      </div>
+      {duration > 0 && <p className="busy-event-hint">Thời lượng {minutes(duration, "long")}</p>}
+      <div className="form-grid">
+        <label className="field">
+          Loại lịch
+          <Select name="eventType" defaultValue={event.eventType || "OTHER"}>
+            {Object.entries(eventTypes).map(([code, label]) => <option value={code} key={code}>{label}</option>)}
+          </Select>
+        </label>
+        {!event.id && (
+          <label className="field">
+            Lặp lại
+            <select value={repeat ? "weekly" : "once"} onChange={(e) => setRepeat(e.target.value === "weekly")}>
+              <option value="once">Không lặp</option>
+              <option value="weekly">Hằng tuần</option>
+            </select>
+          </label>
+        )}
+      </div>
+      {!event.id && repeat && (
+        <div className="busy-event-repeat">
+          {field("Tổng số lần", "repeatWeeks", "number", event.repeatWeeks > 1 ? event.repeatWeeks : 2,
+            { required: true, min: 2, max: 12 })}
+          <p className="busy-event-hint">Tính cả lần đầu. Mỗi lần có thể sửa hoặc xóa riêng.</p>
+        </div>
       )}
-      <label className="field spaced">
-        Loại sự kiện
-        <Select name="eventType">
-          {nodeList(
-            Object.entries({
-              MEETING: "Cuộc họp",
-              CLASS: "Lớp học",
-              APPOINTMENT: "Cuộc hẹn",
-              WORK: "Công việc",
-              OTHER: "Khác",
-            }).map(([code, label]) => (
-              <option
-                value={code}
-                selected={code === (event.eventType || "OTHER")}
-              >
-                {label}
-              </option>
-            )),
-          )}
-        </Select>
+      <label className="field">
+        Ghi chú (tùy chọn)
+        <textarea name="description" maxLength={1000} rows={3} defaultValue={event.description || ""} />
       </label>
-      <label className="check spaced">
-        <input type="checkbox" name="isUrgent" defaultChecked={Boolean(event.isUrgent)} />
-        Lịch khẩn
+      <label className="busy-event-urgent">
+        <input type="checkbox" name="isUrgent" defaultChecked={Boolean(event.isUrgent)} aria-describedby="busy-event-urgent-hint" />
+        <span>Lịch khẩn</span>
       </label>
-      <label className="field spaced">
-        Mô tả
-        <textarea
-          name="description"
-          maxLength="1000"
-          defaultValue={event.description || ""}
-        />
-      </label>
-      <div className="form-grid spaced">
-        {field(
-          "Bắt đầu",
-          "start",
-          "datetime-local",
-          localInput(start),
-          event.id ? "required" : { required: true, min: localInput(Math.ceil((Date.now() + 1) / 60000) * 60000) },
-        )}
-        {field(
-          "Kết thúc",
-          "end",
-          "datetime-local",
-          localInput(end),
-          "required",
-        )}
-      </div>
-      {!event.id &&
-        field(
-          "Số lần lặp hàng tuần (1 = một lần)",
-          "repeatWeeks",
-          "number",
-          1,
-          'required min="1" max="12"',
-        )}
-      <div className="form-error" />
+      <p id="busy-event-urgent-hint" className="busy-event-hint">Đánh dấu ưu tiên khi xem phương án xử lý trùng lịch.</p>
+      <div className="form-error" role="alert" />
       <div className="form-actions">
-        {event.id
-          ? button("Xóa sự kiện", "delete-event", "danger", event.id, "trash")
-          : ""}
-        <button type="submit" className="btn primary">
-          Lưu sự kiện
-        </button>
-        {state.noraAvailable && !event.id && <button type="button" className="btn ghost" onClick={() => askNora("Giúp tôi thêm một sự kiện cố định.")}>Nhờ NORA</button>}
+        {event.id && button("Xóa lịch", "delete-event", "danger", event.id, "trash")}
+        {state.noraAvailable && !event.id && <button type="button" className="btn ghost" onClick={(e) => handoff(e.currentTarget.form)}>Nhờ NORA</button>}
+        <button type="submit" className="btn primary">Lưu Lịch Trình</button>
       </div>
-    </form>,
+    </form>
   );
 }
 export function exceptionModal(e = {}) {

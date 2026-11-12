@@ -120,6 +120,11 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         var sessionsByTask = state.Sessions.ToLookup(x => x.TaskId);
         var dependenciesByTask = state.Dependencies.ToLookup(x => x.TaskId);
         var tasksById = state.Tasks.ToDictionary(x => x.Id);
+        var sharedTasks = await (from assignment in db.TeamTaskAssignments.AsNoTracking()
+            join task in db.TeamTasks.AsNoTracking() on assignment.TeamTaskId equals task.Id
+            join member in db.TeamMemberships.AsNoTracking() on task.TeamId equals member.TeamId
+            where assignment.Active && assignment.UserId == userId && member.UserId == userId && member.Active
+            select new { assignment.WorkTaskId, task.Id, task.Description, task.Status }).ToDictionaryAsync(x => x.WorkTaskId, ct);
         var profile = await db.UserProfiles.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct);
         var ns = await db.NotificationSettings.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct) ?? new();
         return new(new(user.Id, user.Email!, user.FirstName, user.LastName, profile?.DisplayName ?? (user.FirstName + " " + user.LastName), profile?.Bio ?? "", profile?.AvatarUrl ?? ""),
@@ -129,7 +134,10 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
                 (int)sessionsByTask[t.Id].Where(s => s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).Sum(s => (s.End - s.Start).TotalMinutes),
                 t.Priority, t.TaskType, t.CanSplit, t.MinimumSessionMinutes, t.CategoryId, t.ParentId, t.Status.ToString(), t.Progress, t.CreatedAt, t.CompletedAt,
                 dependenciesByTask[t.Id].Select(d => d.PredecessorId).ToArray(), t.IsHardDeadline, t.CreationSource, t.WorkWindowStart, t.WorkWindowEnd, t.Version, ImportanceDto(t), t.RequiresContinuousSession,
-                IsTeamTask: t.InheritedImportance is not null, Checklist: ReadTaskChecklist(t), InheritsProjectDeadline: t.InheritsProjectDeadline)).ToArray(),
+                IsTeamTask: t.InheritedImportance is not null, Checklist: ReadTaskChecklist(t), InheritsProjectDeadline: t.InheritsProjectDeadline,
+                TeamChecklist: sharedTasks.TryGetValue(t.Id, out var shared)
+                    ? CheckedTeamRequirements(TeamRequirements(shared.Id, shared.Description), ReadTaskChecklist(t)) : null,
+                TeamStatus: shared?.Status)).ToArray(),
             state.Availability.Select(x => new AvailabilityInput(x.DayOfWeek, x.StartMinute, x.EndMinute)).ToArray(),
             state.Exceptions.Select(x => new ExceptionView(x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note, x.OverridesWeeklyAvailability, x.IsWeekEdit)).ToArray(),
             state.Events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),

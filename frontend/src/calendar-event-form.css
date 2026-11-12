@@ -1,0 +1,58 @@
+.busy-event-form {
+  display: grid;
+  gap: 14px;
+}
+
+.busy-event-form .form-grid {
+  align-items: start;
+}
+
+.busy-event-form .field {
+  margin: 0;
+}
+
+.busy-event-repeat {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  align-items: end;
+  gap: 12px;
+}
+
+.busy-event-hint {
+  margin: 0;
+  color: var(--ui-muted, #4b6078);
+  font-size: 13px;
+}
+
+.busy-event-urgent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  cursor: pointer;
+}
+
+.busy-event-urgent input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.busy-event-urgent + .busy-event-hint {
+  margin-top: -8px;
+  padding-inline-start: 24px;
+}
+
+.busy-event-form .form-error:empty {
+  display: none;
+}
+
+.busy-event-form .form-actions {
+  margin-top: 4px;
+}
+
+@media (max-width: 560px) {
+  .busy-event-repeat {
+    grid-template-columns: 1fr;
+  }
+}

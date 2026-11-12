@@ -484,6 +484,10 @@
   box-shadow: none;
 }
 
+.shell.planning-console .nora-studio .agent-user-message p {
+  color: inherit;
+}
+
 .shell.planning-console
   :is(
     .workspace-section-links,

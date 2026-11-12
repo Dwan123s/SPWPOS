@@ -20,7 +20,8 @@ public sealed record TaskView(Guid Id, string Name, string Description, DateTime
     DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, Guid[] Dependencies, bool IsHardDeadline = false, string CreationSource = "MANUAL",
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default,
     ImportanceView? Importance = null, bool RequiresContinuousSession = false, bool IsTeamTask = false,
-    TaskChecklistItem[]? Checklist = null, bool InheritsProjectDeadline = false);
+    TaskChecklistItem[]? Checklist = null, bool InheritsProjectDeadline = false,
+    TaskChecklistItem[]? TeamChecklist = null, string? TeamStatus = null);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
 public sealed record CategoryView(Guid Id, string Name, string Color);

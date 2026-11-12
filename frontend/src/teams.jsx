@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
-import { state, dateFmt, timeFmt, icon } from "./ui.jsx";
+import { state, dateFmt, timeFmt, icon, minutes } from "./ui.jsx";
 import { askNora } from "./agent-handoff.js";
 import { TeamChat } from "./team-chat.jsx";
 import {
@@ -21,6 +21,7 @@ import {
 } from "./team-invite-link.js";
 import { SessionList } from "./team-session-list.jsx";
 import { TeamScheduleCompare } from "./team-schedule-compare.jsx";
+import { TeamChecklist, TeamTaskSplitDialog } from "./team-task-checklist.jsx";
 export { SessionList } from "./team-session-list.jsx";
 import {
   GroupHub,
@@ -110,16 +111,16 @@ export function PrivateClaimPreview({
             <div className="team-failure-metrics">
               <div>
                 <span>Công việc cần</span>
-                <strong>{claim.failure.requiredMinutes} phút</strong>
+                <strong>{minutes(claim.failure.requiredMinutes, "long")}</strong>
               </div>
               <div>
                 <span>Quỹ có thể xếp trước hạn</span>
-                <strong>{claim.failure.capacityMinutes} phút</strong>
+                <strong>{minutes(claim.failure.capacityMinutes, "long")}</strong>
               </div>
               {claim.failure.missingMinutes > 0 && (
                 <div>
                   <span>Còn thiếu ít nhất</span>
-                  <strong>{claim.failure.missingMinutes} phút</strong>
+                  <strong>{minutes(claim.failure.missingMinutes, "long")}</strong>
                 </div>
               )}
             </div>
@@ -218,6 +219,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
     [returning, setReturning] = useState(null);
   const uid = state.workspace?.profile?.id;
   const [completion, setCompletion] = useState(null);
+  const [splittingTask, setSplittingTask] = useState(null);
   const [reviewNote, setReviewNote] = useState("");
   const [completionFiles, setCompletionFiles] = useState([]);
   const [completionNote, setCompletionNote] = useState("");
@@ -331,6 +333,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
           setComposerOpen(false);
           setRemovingMember(null);
           setCompletion(null);
+          setSplittingTask(null);
           setReturning(null);
           setInvite(null);
           setDraft(null);
@@ -468,6 +471,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
     setupOpen ||
     claimOpen ||
     composerOpen ||
+    !!splittingTask ||
     !!invite ||
     !!returning ||
     !!completion ||
@@ -605,6 +609,17 @@ export function TeamsPage({ onWorkspaceChanged }) {
                 busy={busy}
                 onCompose={() => openComposer()}
                 onClaim={openClaim}
+                onSplit={(task) => {
+                  setError("");
+                  setSplittingTask(task);
+                }}
+                onChecklistToggle={(task, itemId, completed) => run(async () => {
+                  await api(`/api/teams/tasks/${task.id}/checklist/${itemId}`, "PUT", {
+                    version: task.version,
+                    completed,
+                  });
+                  await changed();
+                })}
                 onProgress={(task, progress) => {
                   if (progress === 100) {
                     setError("");
@@ -1156,6 +1171,16 @@ export function TeamsPage({ onWorkspaceChanged }) {
           </div>
         </TeamDialog>
       )}
+      {splittingTask && detail && (
+        <TeamTaskSplitDialog task={splittingTask} members={detail.members} busy={busy} error={error}
+          onClose={() => { setError(""); setSplittingTask(null); }}
+          onSubmit={(children) => run(async () => {
+            await post(`tasks/${splittingTask.id}/split`, { version: splittingTask.version, children });
+            setSplittingTask(null);
+            await changed();
+            setTaskToOpen({ teamId: detail.team.id, taskId: splittingTask.id });
+          })} />
+      )}
       {claimOpen && (
         <TeamDialog
           title={claimRequest?.change ? "Xem lịch cho yêu cầu mới" : "Xem lịch trước khi nhận việc"}
@@ -1168,13 +1193,14 @@ export function TeamsPage({ onWorkspaceChanged }) {
           <div className="team-claim-summary">
             <span>
               {icon("clock")}
-              {claimRequest?.task.estimatedMinutes} phút
+              {minutes(claimRequest?.task.estimatedMinutes, "long")}
             </span>
             <span>
               {icon("calendar")}Hạn {dateFmt(claimRequest?.task.deadline)}{" "}
               {timeFmt(claimRequest?.task.deadline)}
             </span>
           </div>
+          {!claimRequest?.change && <TeamChecklist items={claimRequest?.task.checklist} />}
           {error && (
             <div className="team-error" role="alert">
               {error}
@@ -1231,6 +1257,8 @@ export function TeamsPage({ onWorkspaceChanged }) {
                     setClaim(null);
                     setClaimOpen(false);
                     await changed();
+                    if (claimRequest?.task.checklist?.length)
+                      setTaskToOpen({ teamId: detail.team.id, taskId: claim.taskId });
                   })
                 }
                 onCancel={cancelClaim}

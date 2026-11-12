@@ -59,8 +59,8 @@ export function setScreen(screen, screenKey, { group = null } = {}) {
 export function setSlot(id, node) {
   update({ slots: { ...snapshot.slots, [id]: node } });
 }
-export function showModal(title, subtitle, body) {
-  update({ modal: { title, subtitle, body }, modalKey: snapshot.modalKey + 1 });
+export function showModal(title, subtitle, body, options) {
+  update({ modal: { title, subtitle, body, ...options }, modalKey: snapshot.modalKey + 1 });
 }
 export function hideModal() {
   update({ modal: null });

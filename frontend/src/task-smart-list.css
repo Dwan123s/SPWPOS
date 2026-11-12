@@ -148,12 +148,16 @@
   min-width: 0;
 }
 .task-smart-toolbar {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-height: 66px;
   padding: 10px 0;
+}
+.task-smart-toolbar:has(> .task-selection-toolbar) > :not(.task-selection-toolbar) {
+  visibility: hidden;
 }
 .task-work-toolbar-end {
   display: flex;
@@ -383,7 +387,8 @@
   color: #ac372a;
 }
 .work-task-table .task-row-actions {
-  flex: none;
+  position: static;
+  flex: 0 0 66px;
   gap: 2px;
 }
 @media (hover: hover) {
@@ -401,7 +406,8 @@
   padding-inline: 0;
   color: var(--work-blue);
 }
-.work-task-date-button {
+.work-task-date-button,
+.work-task-estimate-button {
   min-height: 32px;
   min-width: 30px;
   padding: 0;
@@ -411,7 +417,8 @@
   font: inherit;
   cursor: pointer;
 }
-.work-task-date-button:hover {
+.work-task-date-button:hover,
+.work-task-estimate-button:hover {
   color: var(--work-blue);
 }
 .task-complete-toggle {
@@ -440,7 +447,7 @@
   width: 13px;
   height: 13px;
 }
-.task-smart-layout :is(.task-smart-nav-item, .task-complete-toggle, .task-quick-add-button, .work-task-date-button, .title-button, input):focus-visible,
+.task-smart-layout :is(.task-smart-nav-item, .task-complete-toggle, .task-quick-add-button, .work-task-date-button, .work-task-estimate-button, .title-button, input):focus-visible,
 .task-inbox-actions button:focus-visible,
 .task-inbox-title:focus-visible {
   outline: 2px solid #377be0;

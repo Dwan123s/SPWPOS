@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { icon, dateFmt, timeFmt, toUtc, localInput } from "./ui.jsx";
+import { icon, dateFmt, timeFmt, toUtc, localInput, minutes } from "./ui.jsx";
 import { readTeamBriefFile, TEAM_BRIEF_ACCEPT } from "./team-brief-file.js";
 import { TeamRecipientSelect } from "./team-recipient-select.jsx";
 import { ImportancePreview } from "./eisenhower.jsx";
@@ -829,8 +829,7 @@ export function TeamTaskComposer({
                 </h3>
                 <div className="team-task-facts">
                   <span>
-                    {icon("clock")}Thời lượng đề xuất: {task.estimatedMinutes}{" "}
-                    phút
+                    {icon("clock")}Thời lượng đề xuất: {minutes(task.estimatedMinutes, "long")}
                   </span>
                   <span>
                     {icon("calendar")}
@@ -926,6 +925,7 @@ export function TeamActivity({ detail }) {
     MEMBER_JOIN_REJECTED: "đã từ chối yêu cầu tham gia",
     MEMBER_REMOVED: "đã loại một thành viên khỏi nhóm",
     TASK_CREATED: "đã tạo task",
+    TASK_SPLIT: "đã chia thành hai việc con",
     TASK_IMPORTANCE_CHANGED: "đã cập nhật mức quan trọng",
     TASK_RECIPIENT_CHANGED: "đã đổi người được chỉ định",
     TASK_CLAIMED: "đã nhận task",

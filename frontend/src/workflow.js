@@ -26,11 +26,11 @@ export function workflowSteps(workspace, now = Date.now()) {
   );
   return [
     {
-      title: "Thêm sự kiện cố định",
-      description: "Thêm lịch học, lịch làm hoặc các sự kiện đã có.",
+      title: "Thêm Lịch Trình",
+      description: "Giữ giờ cho lịch học, ca làm hoặc cuộc hẹn.",
       done: true,
       route: "calendar",
-      label: "Thêm sự kiện cố định",
+      label: "Thêm Lịch Trình",
       symbol: "calendar",
     },
     {

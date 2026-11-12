@@ -307,10 +307,10 @@ it("previews a conflicting event only on request and confirms only on a second a
   );
   expect(api).not.toHaveBeenCalled();
   fireEvent.click(
-    screen.getByRole("button", { name: "Giữ giờ sự kiện và xem lịch đề xuất" }),
+    screen.getByRole("button", { name: "Giữ giờ này và xem lịch đề xuất" }),
   );
   const confirm = await screen.findByRole("button", {
-    name: "Xác nhận sự kiện và lịch mới",
+    name: "Lưu Lịch Trình và áp dụng đề xuất",
   });
   expect(api.mock.calls).toEqual([
     ["/api/time/events/replan/preview", "POST", input],

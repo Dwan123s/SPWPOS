@@ -63,11 +63,13 @@ function TodayTaskPane({ model }) {
   );
 }
 
-export function TaskSmartList({ onShowMatrix }) {
+export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
   const [scope, setScope] = useState(() =>
     lists[state.taskScope] ? state.taskScope : "personal",
   );
   const [columns, setColumns] = useState(() => Object.keys(taskColumns));
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [toolbarHost, setToolbarHost] = useState(null);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const searchTrigger = useRef(null);
@@ -134,6 +136,7 @@ export function TaskSmartList({ onShowMatrix }) {
   function choose(key) {
     state.taskScope = key;
     setScope(key);
+    setSelectedTaskId(null);
     setNow(Date.now());
     if ((key === "today" || key === "week") && ["Completed", "Cancelled"].includes(filters.status))
       setFilters((current) => ({ ...current, status: "" }));
@@ -197,7 +200,7 @@ export function TaskSmartList({ onShowMatrix }) {
         className="task-smart-main"
         aria-label={`Nội dung ${selected.label}`}
       >
-        <div className="task-smart-toolbar">
+        <div className="task-smart-toolbar" ref={setToolbarHost}>
           {!isDrafts && (
             <PopupDetails className="task-work-popup task-work-scope">
               <summary aria-label={`Lọc danh sách · ${selected.label}`}>{selected.label}</summary>
@@ -377,6 +380,10 @@ export function TaskSmartList({ onShowMatrix }) {
                     )}
                     {taskRows(group.tasks, model.plannedDays, {
                       columns,
+                      selectedId: selectedTaskId,
+                      onSelect: setSelectedTaskId,
+                      toolbarHost,
+                      onWorkspaceChanged,
                       addTask: isFlat ? addTask : null,
                       emptyMessage: filtered ? "Không có công việc phù hợp" : null,
                     })}

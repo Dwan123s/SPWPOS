@@ -23,7 +23,7 @@ public sealed partial class WorkspaceService
             ?? throw new AuthException("NOT_FOUND", "Không tìm thấy công việc nhóm.", 404);
         await TeamMember(uid, task.TeamId, ct); return task;
     }
-    private static SharedTaskView SharedDto(TeamTask t) => new(t.Id, t.Name, t.Description, t.EstimatedMinutes, t.Deadline, t.Priority, t.Splittable, t.AssigneeId, t.Progress, t.Status, t.Version, t.PendingChangeJson != null, t.CompletionRequestId, t.CompletionSubmittedAt, t.CompletionReviewedAt, t.CompletionReviewedBy, t.CompletionApproved, t.CompletionReviewNote, DesignatedUserId: t.DesignatedUserId, Importance: ImportanceDto(t));
+    private static SharedTaskView SharedDto(TeamTask t) => new(t.Id, t.Name, t.Description, t.EstimatedMinutes, t.Deadline, t.Priority, t.Splittable, t.AssigneeId, t.Progress, t.Status, t.Version, t.PendingChangeJson != null, t.CompletionRequestId, t.CompletionSubmittedAt, t.CompletionReviewedAt, t.CompletionReviewedBy, t.CompletionApproved, t.CompletionReviewNote, DesignatedUserId: t.DesignatedUserId, Importance: ImportanceDto(t), ParentTaskId: t.ParentTaskId);
     private void TeamLog(Guid uid, Guid teamId, Guid? taskId, string kind) => db.TeamActivities.Add(new() { ActorId = uid, TeamId = teamId, TaskId = taskId, Kind = kind, CreatedAt = Now });
     // DTOs for group reads are deliberately projected from shared tables only.
     public async Task<TeamView[]> ListTeamsAsync(Guid uid, CancellationToken ct) => await
@@ -45,7 +45,17 @@ public sealed partial class WorkspaceService
             where m.TeamId == teamId && m.Active select new TeamMemberView(m.UserId,
                 p != null && p.DisplayName != "" ? p.DisplayName : u.FirstName + " " + u.LastName, m.Role, m.Version,
                 p != null ? p.AvatarUrl : "")).ToArrayAsync(ct);
-        var tasks = await db.TeamTasks.AsNoTracking().Where(x => x.TeamId == teamId).OrderBy(x => x.Deadline).Take(500).ToArrayAsync(ct);
+        var teamTasks = db.TeamTasks.AsNoTracking().Where(x => x.TeamId == teamId);
+        var tasks = await teamTasks.OrderBy(x => x.Status == "Completed" || x.Status == "Split")
+            .ThenBy(x => x.Deadline).ThenBy(x => x.Id).Take(500).ToArrayAsync(ct);
+        var parentIds = tasks.Select(task => task.ParentTaskId ?? (task.Status == "Split" ? task.Id : Guid.Empty))
+            .Where(id => id != Guid.Empty).Distinct().ToArray();
+        if (parentIds.Length > 0)
+        {
+            var related = await teamTasks.Where(task => parentIds.Contains(task.Id) ||
+                task.ParentTaskId != null && parentIds.Contains(task.ParentTaskId.Value)).ToArrayAsync(ct);
+            tasks = tasks.Concat(related).DistinctBy(task => task.Id).ToArray();
+        }
         var activity = await db.TeamActivities.AsNoTracking().Where(x => x.TeamId == teamId).OrderByDescending(x => x.CreatedAt).Take(100)
             .Select(x => new TeamActivityView(x.ActorId, x.TaskId, x.Kind, x.CreatedAt)).ToArrayAsync(ct);
         var visibleRequests = tasks.Where(x => x.CompletionRequestId != null && (member.Role == "Leader" || x.AssigneeId == uid))
@@ -57,8 +67,19 @@ public sealed partial class WorkspaceService
         var sourceIds = tasks.Where(x => x.SourceDocumentId != null).Select(x => x.SourceDocumentId!.Value).Distinct().ToArray();
         var sources = await db.TeamTaskDocuments.AsNoTracking().Where(x => x.TeamId == teamId && sourceIds.Contains(x.Id))
             .Select(x => new TeamSourceFileView(x.Id, x.Name, x.MimeType, x.Size, x.CreatedAt)).ToDictionaryAsync(x => x.Id, ct);
+        var myTaskIds = tasks.Where(t => t.AssigneeId == uid).Select(t => t.Id).ToArray();
+        var myChecklists = await (from assignment in db.TeamTaskAssignments.AsNoTracking()
+            join personal in Mine<WorkTask>(uid).AsNoTracking() on assignment.WorkTaskId equals personal.Id
+            where assignment.Active && assignment.UserId == uid && myTaskIds.Contains(assignment.TeamTaskId)
+            select new { assignment.TeamTaskId, personal.ChecklistJson }).ToDictionaryAsync(x => x.TeamTaskId, x => x.ChecklistJson, ct);
+        var children = tasks.Where(t => t.ParentTaskId.HasValue).ToLookup(t => t.ParentTaskId!.Value);
         var views = tasks.Select(t => {
-            var dto = SharedDto(t) with { SourceFiles = t.SourceDocumentId is { } source && sources.TryGetValue(source, out var file) ? [file] : [] };
+            var checklist = t.Status == "Split" ? [] : TeamRequirements(t.Id, t.Description);
+            if (myChecklists.TryGetValue(t.Id, out var stored))
+                checklist = CheckedTeamRequirements(checklist, JsonSerializer.Deserialize<TaskChecklistItem[]>(stored, AgentJson) ?? []);
+            var subtasks = children[t.Id].ToArray();
+            var dto = SharedDto(t) with { SourceFiles = t.SourceDocumentId is { } source && sources.TryGetValue(source, out var file) ? [file] : [],
+                Checklist = checklist, SubtaskCount = subtasks.Length, SubtasksCompleted = subtasks.Count(child => child.Status == "Completed") };
             return t.CompletionRequestId is { } request && visibleRequests.Contains(request)
                 ? dto with { CompletionSubmissionNote = submissions.GetValueOrDefault(request)?.Note,
                     CompletionFiles = reports.Where(x => x.SubmissionId == request).Select(x => x.File).ToArray() } : dto;
@@ -198,7 +219,7 @@ public sealed partial class WorkspaceService
         {
             await TeamMember(uid, teamId, ct, true);
             var existing = await SharedTask(uid, t.Id, ct);
-            Require(existing.Version == t.Version && existing.Status is not ("Completed" or "PendingReview"), "TASK_STALE", "Task đã thay đổi, hãy tạo lại đề xuất.", 409);
+            Require(existing.Version == t.Version && existing.Status is "Open" or "Assigned", "TASK_STALE", "Task đã thay đổi, hãy tạo lại đề xuất.", 409);
             if (existing.Deadline != t.Deadline) ValidateTeamDeadline(t.Deadline);
             if (existing.AssigneeId != null) existing.PendingChangeJson = JsonSerializer.Serialize(t);
             else { existing.Name = t.Name; existing.Description = t.Description; existing.EstimatedMinutes = t.EstimatedMinutes; existing.Deadline = t.Deadline; existing.Priority = t.Priority; existing.Splittable = t.Splittable; }

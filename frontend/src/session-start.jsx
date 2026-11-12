@@ -1,5 +1,6 @@
-import { useEffect, useId, useState } from "react";
-import { icon, timeFmt } from "./ui.jsx";
+import { dateFmt, dayKey, timeFmt } from "./ui.jsx";
+
+export const sessionStartOpensAt = (session) => Date.parse(session.start) - 15 * 60000;
 
 export function sessionStartIssue(session, workspace, now = Date.now()) {
   if (session.status !== "Scheduled") return "Phiên không còn chờ bắt đầu.";
@@ -7,15 +8,21 @@ export function sessionStartIssue(session, workspace, now = Date.now()) {
     end = new Date(session.end).getTime();
   if (!Number.isFinite(start) || !Number.isFinite(end))
     return "Cần cập nhật thời gian của phiên.";
-  if (now < start - 15 * 60000)
-    return `Có thể bắt đầu từ ${timeFmt(start - 15 * 60000)} (sớm 15 phút).`;
-  if (now >= end) return "Phiên đã quá giờ. Điều chỉnh lịch trước khi bắt đầu.";
+  const opensAt = sessionStartOpensAt(session);
+  if (now < opensAt) {
+    const day = dayKey(now) === dayKey(opensAt) ? "" : ` ngày ${dateFmt(opensAt)}`;
+    return `Chưa đến giờ. Có thể bắt đầu từ ${timeFmt(opensAt)}${day} (sớm 15 phút).`;
+  }
+  if (now >= end) return "Phiên đã quá giờ. Bạn có thể ghi kết quả nếu đã làm việc.";
   if (
     (workspace?.sessions || []).some((item) =>
       ["Running", "Paused"].includes(item.status),
     )
   )
     return "Hoàn thành hoặc bỏ qua phiên đang chạy trước.";
+  if (workspace?.sessions?.some((item) => item.id !== session.id && item.status === "Scheduled" &&
+      Date.parse(item.start) <= now && now < Date.parse(item.end)))
+    return "Khung giờ hiện tại dành cho phiên khác. Hãy chờ phiên đó kết thúc.";
   const task = workspace?.tasks?.find((item) => item.id === session.taskId);
   if (task?.isDeleted || ["Completed", "Cancelled"].includes(task?.status))
     return "Công việc đã kết thúc.";
@@ -35,39 +42,4 @@ export function sessionStartIssue(session, workspace, now = Date.now()) {
   )
     return "Bạn đang có sự kiện cố định. Bắt đầu sau khi sự kiện kết thúc.";
   return null;
-}
-
-export function StartSessionButton({
-  session,
-  workspace,
-  label = "Bắt đầu",
-  className = "small primary",
-}) {
-  const [now, setNow] = useState(Date.now);
-  const helpId = useId();
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 15000);
-    return () => clearInterval(timer);
-  }, []);
-  const issue = sessionStartIssue(session, workspace, now);
-  return (
-    <div className="session-start-control">
-      <button
-        type="button"
-        className={`btn ${className}`}
-        data-action="session-start"
-        data-id={session.id}
-        disabled={!!issue}
-        aria-describedby={issue ? helpId : undefined}
-      >
-        {icon("play")}
-        {label}
-      </button>
-      {issue && (
-        <p className="session-start-hint" id={helpId}>
-          {issue}
-        </p>
-      )}
-    </div>
-  );
 }

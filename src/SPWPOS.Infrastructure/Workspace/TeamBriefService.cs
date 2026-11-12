@@ -128,7 +128,7 @@ public sealed partial class WorkspaceService
         Require(row.ExpiresAt > Now && payload.Tasks.All(x => x.Deadline > Now), "PROPOSAL_EXPIRED", "Bản chia việc đã hết hạn. Hãy phân tích lại.", 409);
         foreach (var task in payload.Tasks) ValidateTeamDeadline(task.Deadline);
         Require(payload.Members.SequenceEqual(await BriefMembers(teamId, ct)), "TEAM_MEMBERS_CHANGED", "Thành viên nhóm đã thay đổi. Hãy chia việc lại theo số thành viên mới.", 409);
-        Require(await db.TeamTasks.CountAsync(x => x.TeamId == teamId && x.Status != "Completed", ct) + payload.Tasks.Length <= 500,
+        Require(await db.TeamTasks.CountAsync(x => x.TeamId == teamId && x.Status != "Completed" && x.Status != "Split", ct) + payload.Tasks.Length <= 500,
             "TEAM_TASK_LIMIT", "Nhóm đang có quá nhiều task. Hãy hoàn thành hoặc xử lý công việc cũ trước.");
         foreach (var recipient in recipients.Values.Distinct()) await ValidateDesignatedMember(teamId, recipient, ct);
         Guid? sourceId = null;

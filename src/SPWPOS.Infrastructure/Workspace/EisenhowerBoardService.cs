@@ -68,8 +68,20 @@ public sealed partial class WorkspaceService
         Require(!task.IsDeleted, "NOT_FOUND", "Không tìm thấy công việc.", 404);
         Require(input.Version != Guid.Empty && task.Version == input.Version,
             "TASK_STALE", "Công việc vừa thay đổi. Mở lại trước khi chỉnh sửa.", 409);
-        Require(!await db.TeamTaskAssignments.AnyAsync(a => a.WorkTaskId == id && a.Active, ct),
-            "TEAM_CONTRACT_PROTECTED", "Mở checklist của việc nhóm trong ma trận Eisenhower.", 409);
+        var shared = await (from assignment in db.TeamTaskAssignments
+            join teamTask in db.TeamTasks on assignment.TeamTaskId equals teamTask.Id
+            where assignment.WorkTaskId == id && assignment.Active && assignment.UserId == uid
+            select teamTask).SingleOrDefaultAsync(ct);
+        if (shared is not null)
+        {
+            Require(shared.AssigneeId == uid && shared.Status == "Assigned",
+                "TASK_STALE", "Công việc đã thay đổi hoặc đang chờ duyệt. Hãy tải lại.", 409);
+            var requirements = TeamRequirements(shared.Id, shared.Description);
+            var items = ValidateTaskChecklist(input.Items);
+            var requiredIds = requirements.Select(item => item.Id).ToHashSet();
+            await SaveTeamRequirementProgress(uid, task, requirements, items.Where(item => requiredIds.Contains(item.Id)).ToArray(), ct);
+            return;
+        }
         await SaveTaskChecklist(uid, task, input, ct);
     }, ct, false);
 

@@ -52,10 +52,10 @@ export function App({ initialize = true }) {
     if (snapshot.modal) dialog.current.querySelector("[data-dialog-autofocus]")?.focus();
   }, [snapshot.modal]);
   useEffect(() => {
-    if (!snapshot.modal) return;
+    if (!snapshot.modal || snapshot.modal.placement === "right") return;
     const animation = revealModal(dialog.current.querySelector(".modal-body"));
     return () => animation?.cancel();
-  }, [snapshot.modalKey, !!snapshot.modal]);
+  }, [snapshot.modalKey, snapshot.modal?.placement]);
   return (
     <FocusTimerProvider
       uid={state.workspace?.profile?.id}
@@ -109,6 +109,7 @@ export function App({ initialize = true }) {
         <dialog
           ref={dialog}
           id="modal"
+          data-placement={snapshot.modal?.placement}
           aria-labelledby="modal-title"
           onCancel={(event) => {
             event.preventDefault();
@@ -119,7 +120,9 @@ export function App({ initialize = true }) {
             {snapshot.modal && (
               <div key={snapshot.modalKey} className="modal-body">
                 <div className="modal-head">
+                  {snapshot.modal.leading}
                   <div>
+                    {snapshot.modal.context && <div className="modal-context">{snapshot.modal.context}</div>}
                     <h2 id="modal-title">{snapshot.modal.title}</h2>
                     <p>{snapshot.modal.subtitle}</p>
                   </div>

@@ -142,7 +142,7 @@ it("opens task and event forms without a NORA action in the create-task form", (
   fireEvent.click(screen.getByRole("button", { name: "Lưu nháp" }));
   expect(screen.getByRole("textbox").value).toBe("Five-hour report");
   act(() => eventModal());
-  expect(screen.getByRole("button", { name: "Lưu sự kiện" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Lưu Lịch Trình" })).toBeTruthy();
   expect(location.hash).not.toBe("#agent");
 });
 

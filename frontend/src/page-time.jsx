@@ -303,7 +303,7 @@ export function timePage({ onWorkspaceChanged } = {}) {
         </section>
         <section className="card">
           <div className="card-header">
-            <h2>Lịch bận</h2>
+            <h2>Lịch Trình</h2>
             {button("Thêm", "new-event", "small secondary", "", "plus")}
           </div>
           {nodeList(

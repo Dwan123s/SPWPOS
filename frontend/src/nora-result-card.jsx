@@ -82,7 +82,7 @@ export function NoraResultCard({
           return (
             <li key={index}>
               <div>
-                {["EVENT", "TASK", "SESSION"].includes(change.kind) && <span className="nora-result-kind">{change.kind === "EVENT" ? "Lịch bận" : change.kind === "TASK" ? "Công việc · có thể cấu hình ưu tiên" : "Phiên đã xếp"}</span>}
+                {["EVENT", "TASK", "SESSION"].includes(change.kind) && <span className="nora-result-kind">{change.kind === "EVENT" ? "Lịch Trình" : change.kind === "TASK" ? "Công việc · có thể cấu hình ưu tiên" : "Phiên đã xếp"}</span>}
                 <strong>{change.name}</strong>
                 {compareTimes && ["SESSION", "EVENT"].includes(change.kind) && change.before && (
                   <p>Giờ cũ: {compactScheduleText(change.before)}</p>

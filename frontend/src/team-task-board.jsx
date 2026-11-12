@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { icon, dateFmt, timeFmt } from "./ui.jsx";
+import { icon, dateFmt, timeFmt, minutes } from "./ui.jsx";
 import { TeamTaskDetail } from "./team-task-detail.jsx";
 
 const statuses = [
@@ -8,10 +8,13 @@ const statuses = [
   { key: "Assigned", label: "Đang làm", tone: "active" },
   { key: "PendingReview", label: "Chờ duyệt", tone: "review" },
   { key: "Completed", label: "Hoàn thành", tone: "done" },
+  { key: "Split", label: "Đã chia", tone: "open" },
 ];
 const PAGE_SIZE = 8;
 const matchesStatus = (task, status) =>
-  status === "active" ? task.status !== "Completed" : task.status === status;
+  status === "active" ? task.status !== "Completed" &&
+    !(task.status === "Split" && task.subtaskCount > 0 && task.subtasksCompleted === task.subtaskCount)
+    : task.status === status;
 const normalize = (text = "") =>
   text
     .toLocaleLowerCase("vi")
@@ -44,6 +47,7 @@ export function TaskBoard({
     onTaskOpened();
   }, [taskToOpen, onTaskOpened]);
   const selectedTask = detail.tasks.find((task) => task.id === selectedId);
+  const tasksById = new Map(detail.tasks.map((task) => [task.id, task]));
   const dialogOpen = !!selectedTask;
   useEffect(() => {
     onDialogChange?.(dialogOpen);
@@ -202,6 +206,7 @@ export function TaskBoard({
               <TaskRow
                 key={task.id}
                 task={task}
+                parentName={tasksById.get(task.parentTaskId)?.name}
                 uid={uid}
                 busy={busy}
                 leader={detail.team.role === "Leader"}
@@ -247,6 +252,9 @@ export function TaskBoard({
       {selectedTask && (
         <TeamTaskDetail
           task={selectedTask}
+          parent={tasksById.get(selectedTask.parentTaskId)}
+          childrenTasks={detail.tasks.filter((task) => task.parentTaskId === selectedTask.id)}
+          onOpenTask={(task) => setSelectedId(task.id)}
           uid={uid}
           busy={busy}
           leader={detail.team.role === "Leader"}
@@ -265,6 +273,7 @@ export function TaskBoard({
 
 function TaskRow({
   task,
+  parentName,
   uid,
   busy,
   leader,
@@ -274,6 +283,7 @@ function TaskRow({
   onClaim,
   onProgress,
   onReviewCompletion,
+  onSplit,
 }) {
   const mine = task.assigneeId === uid;
   const status =
@@ -320,13 +330,17 @@ function TaskRow({
             </span>
             <span>
               {icon("clock")}
-              {task.estimatedMinutes} phút
+              {task.status === "Split" ? `${task.subtasksCompleted}/${task.subtaskCount} việc con đã xong` : minutes(task.estimatedMinutes, "long")}
             </span>
+            {parentName && <span>Việc con của {parentName}</span>}
+            {mine && task.checklist?.length > 0 && (
+              <span>{icon("check")} Checklist {task.checklist.filter((item) => item.completed).length}/{task.checklist.length}</span>
+            )}
           </div>
         </div>
         <div className="team-task-row-owner">
           <span>
-            {task.assigneeId
+            {task.status === "Split" ? "Theo dõi theo việc con" : task.assigneeId
               ? mine
                 ? "Bạn"
                 : assignee?.name || "Thành viên"
@@ -346,6 +360,11 @@ function TaskRow({
           )}
         </div>
         <div className="team-task-row-actions">
+          {leader && task.status === "Open" && !task.assigneeId && !task.parentTaskId && onSplit && (
+            <button type="button" className="btn secondary" disabled={busy} onClick={() => onSplit(task)}>
+              Chia thành 2 việc con
+            </button>
+          )}
           {!task.assigneeId &&
             task.status === "Open" &&
             (!task.designatedUserId || task.designatedUserId === uid) && (

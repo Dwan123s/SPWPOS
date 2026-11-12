@@ -160,7 +160,7 @@ function DayRunway({ model, now }) {
   return (
     <section className="runway-card daily-schedule" aria-label="Lịch hôm nay">
       <header className="home-agenda-heading">
-        <ToolButton label="Thêm sự kiện" action="new-event" symbol="plus" />
+        <ToolButton label="Thêm Lịch Trình" action="new-event" symbol="plus" />
         <DaySummary
           summary={model.daySummary}
           hasAvailability={model.hasAvailability}
@@ -231,7 +231,7 @@ function DayRunway({ model, now }) {
               return (
                 <Fragment key={`${item.kind}-${item.id}`}>
                   <div
-                    className={`daily-agenda-row calendar-time-${phase} ${phase === "current" ? "is-active" : ""}`}
+                    className={`daily-agenda-row calendar-entry-${item.kind === "event" ? "event" : "task"} calendar-time-${phase} ${phase === "current" ? "is-active" : ""}`}
                   >
                     <div className="daily-agenda-time">
                       <strong>{timeFmt(item.start)}</strong>
@@ -265,7 +265,7 @@ function DayRunway({ model, now }) {
                             ? "Đã khóa lịch"
                             : item.kind === "session"
                               ? "Phiên đã xếp"
-                              : "Lịch bận"}
+                              : "Lịch Trình"}
                         </span>
                         {icon("arrow")}
                       </div>
@@ -338,7 +338,7 @@ function DayRunway({ model, now }) {
                     <button
                       key={`${item.kind}-${item.id}`}
                       type="button"
-                      className={`runway-block calendar-time-${calendarPhase(item.start, item.end, now)} ${item.span[1] - item.span[0] < 45 ? "is-short" : ""} ${item.kind === "event" ? "runway-block--event" : cyan ? "runway-block--cyan" : "runway-block--blue"} ${item.status === "Completed" ? "is-completed" : ""}`}
+                      className={`runway-block calendar-entry-${item.kind === "event" ? "event" : "task"} calendar-time-${calendarPhase(item.start, item.end, now)} ${item.span[1] - item.span[0] < 45 ? "is-short" : ""} ${item.kind === "event" ? "runway-block--event" : cyan ? "runway-block--cyan" : "runway-block--blue"} ${item.status === "Completed" ? "is-completed" : ""}`}
                       data-action={
                         item.kind === "session" ? "session-detail" : "nav"
                       }
@@ -603,7 +603,7 @@ function Deadlines({ model }) {
                   <strong>{item.name}</strong>
                   <small>
                     {calendarMode
-                      ? `${item.ongoing ? "Đang diễn ra · Kết thúc" : item.kind === "event" ? "Lịch bận" : "Phiên đã xếp"} ${timeFmt(at)}`
+                      ? `${item.ongoing ? "Đang diễn ra · Kết thúc" : item.kind === "event" ? "Lịch Trình" : "Phiên đã xếp"} ${timeFmt(at)}`
                       : `${timeFmt(at)} · ${minutes(item.remainingMinutes)} còn lại`}
                   </small>
                 </span>

@@ -1,0 +1,58 @@
+.calendar-entry-summary {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--calendar-entry-border);
+  border-inline-start: 4px solid var(--calendar-entry-accent);
+  border-radius: 10px;
+  background: var(--calendar-entry-bg);
+  color: var(--calendar-entry-text);
+}
+
+.calendar-entry-summary-header,
+.calendar-entry-actions,
+.calendar-detail-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calendar-entry-summary-header,
+.calendar-detail-footer {
+  justify-content: space-between;
+}
+
+.calendar-entry-actions:empty {
+  display: none;
+}
+
+.calendar-entry-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(125px, 100%), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding-block: 12px;
+  border-block: 1px solid var(--calendar-entry-border);
+}
+
+.calendar-entry-metrics dt,
+.calendar-entry-note {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.calendar-entry-metrics dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+.calendar-entry-note {
+  margin: 0;
+}
+
+.calendar-detail-footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-line, #dbe5ef);
+}

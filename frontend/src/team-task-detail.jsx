@@ -1,20 +1,24 @@
 import { createPortal } from "react-dom";
-import { icon, dateFmt, timeFmt } from "./ui.jsx";
+import { icon, dateFmt, timeFmt, minutes } from "./ui.jsx";
 import { TeamDialog } from "./team-dialog.jsx";
 import { CompletionReport } from "./team-completion-files.jsx";
 import { TaskRequirements, TaskSourceFiles } from "./team-task-notes.jsx";
 import { TeamRecipientEditor } from "./team-recipient-select.jsx";
 import { TaskEisenhowerDetail } from "./eisenhower.jsx";
+import { TeamChecklist } from "./team-task-checklist.jsx";
 
 const statusLabels = {
   Open: "Chờ nhận",
   Assigned: "Đang thực hiện",
   PendingReview: "Chờ trưởng nhóm duyệt",
   Completed: "Đã hoàn thành",
+  Split: "Đã chia thành việc con",
 };
 
 export function TeamTaskDetail({
   task,
+  parent,
+  childrenTasks = [],
   uid,
   busy,
   leader,
@@ -33,6 +37,9 @@ export function TeamTaskDetail({
   onAttachSource,
   onRecipientChange,
   onImportanceChanged,
+  onOpenTask,
+  onSplit,
+  onChecklistToggle,
 }) {
   const mine = task.assigneeId === uid;
   // Close the task viewer before opening the scheduling, submission or review dialog.
@@ -49,6 +56,9 @@ export function TeamTaskDetail({
       className="team-task-dialog"
     >
       <div className="team-task-dialog-content">
+        {parent && <button type="button" className="team-text-button" onClick={() => onOpenTask(parent)}>
+          Việc gốc · {parent.name}
+        </button>}
         <div className="team-task-dialog-badges">
           <span className={`team-detail-status status-${task.status}`}>
             {statusLabels[task.status] || task.status}
@@ -74,8 +84,8 @@ export function TeamTaskDetail({
             </strong>
           </div>
           <div>
-            <span>{icon("clock")} Thời lượng</span>
-            <strong>{task.estimatedMinutes} phút</strong>
+            <span>{icon("clock")} {task.status === "Split" ? "Việc con" : "Thời lượng"}</span>
+            <strong>{task.status === "Split" ? `${task.subtasksCompleted}/${task.subtaskCount} đã hoàn thành` : minutes(task.estimatedMinutes, "long")}</strong>
           </div>
           <div>
             <span>{icon("users")} Người thực hiện</span>
@@ -84,7 +94,7 @@ export function TeamTaskDetail({
                 ? mine
                   ? "Bạn"
                   : assignee?.name || "Thành viên"
-                : task.designatedUserId
+                : task.status === "Split" ? "Theo từng việc con" : task.designatedUserId
                   ? `${task.designatedUserId === uid ? "Bạn" : designated?.name || "Thành viên được chỉ định"} · Chờ nhận`
                   : "Chưa có người nhận"}
             </strong>
@@ -120,7 +130,23 @@ export function TeamTaskDetail({
             </div>
           </div>
         )}
-        <TaskEisenhowerDetail task={task} team leader={leader} onChanged={onImportanceChanged} />
+        {task.status !== "Split" && <TaskEisenhowerDetail task={task} team leader={leader} onChanged={onImportanceChanged} />}
+        {childrenTasks.length > 0 && (
+          <section className="team-checklist" aria-label="Việc con">
+            <h3>Việc con</h3>
+            <ul>{childrenTasks.map((child) => (
+              <li key={child.id}>
+                <button type="button" className="team-text-button" onClick={() => onOpenTask(child)}>{child.name}</button>
+                <small>{statusLabels[child.status]}</small>
+              </li>
+            ))}</ul>
+          </section>
+        )}
+        {(mine || task.status === "Open") && (
+          <TeamChecklist items={task.checklist} busy={busy}
+            onToggle={mine && task.status === "Assigned" && onChecklistToggle
+              ? (itemId, completed) => onChecklistToggle(task, itemId, completed) : undefined} />
+        )}
         <TaskRequirements task={task} />
         <TaskSourceFiles
           task={task}
@@ -154,7 +180,7 @@ export function TeamTaskDetail({
           </p>
         )}
         <CompletionReport task={task} />
-        {!task.assigneeId && (
+        {!task.assigneeId && task.status === "Open" && (
           <p className="team-task-dialog-privacy">
             {icon("lock")} Khi nhận task, NORA sẽ xếp theo lịch riêng của bạn.
           </p>
@@ -213,14 +239,21 @@ export function TeamTaskDetail({
         )}
       </div>
       <footer className="team-task-dialog-actions">
-        {leader && !["Completed", "PendingReview"].includes(task.status) && (
-          <button
-            className="team-text-button"
-            disabled={busy}
-            onClick={() => handoff(onChange, task)}
-          >
-            Đề xuất đổi yêu cầu
-          </button>
+        {leader && ["Open", "Assigned"].includes(task.status) && (
+          <div>
+            <button
+              className="team-text-button"
+              disabled={busy}
+              onClick={() => handoff(onChange, task)}
+            >
+              Đề xuất đổi yêu cầu
+            </button>
+            {task.status === "Open" && !task.parentTaskId && onSplit && (
+              <button type="button" className="btn secondary" disabled={busy} onClick={() => handoff(onSplit, task)}>
+                Chia thành 2 việc con
+              </button>
+            )}
+          </div>
         )}
         <div>
           <button

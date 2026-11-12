@@ -27,6 +27,7 @@ const paths = {
   refresh:
     "M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-1l2 6 M4 12l2 6a7 7 0 0 0 12-1",
   copy: "M9 9h12v12H9z M5 15H3V3h12v2",
+  link: "M10 13l4-4 M8 15l-2 2a3 3 0 0 1-4-4l4-4a3 3 0 0 1 4 0m4 0 2-2a3 3 0 0 1 4 4l-4 4a3 3 0 0 1-4 0",
   chat: "M4 4h16v12H9l-5 4z M8 8h8 M8 12h5",
   stop: "M6 6h12v12H6z",
   mic: "M9 5a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0z M6 10v1a6 6 0 0 0 12 0v-1 M12 17v4 M9 21h6",
@@ -187,12 +188,16 @@ export const toUtc = (value) => {
     throw new Error("Giờ này không hợp lệ trong múi giờ đã chọn.");
   return new Date(candidate).toISOString();
 };
-export const minutes = (value) =>
-  value === null || value === undefined
-    ? "—"
-    : value >= 60
-      ? `${Math.floor(value / 60)}h${value % 60 ? ` ${value % 60}p` : ""}`
-      : `${value}p`;
+export function minutes(value, format = "short") {
+  if (value == null) return "—";
+  const long = format === "long";
+  const minuteUnit = long ? " phút" : "p";
+  const hasHours = long ? value > 60 : value >= 60;
+  if (!hasHours) return `${value}${minuteUnit}`;
+  const hours = Math.floor(value / 60);
+  const rest = value % 60;
+  return `${hours}${long ? " giờ" : "h"}${rest ? ` ${rest}${minuteUnit}` : ""}`;
+}
 export const timeValue = (value) =>
   `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
 export const minuteValue = (value) =>
@@ -262,10 +267,10 @@ export function userAvatar(p, extra = "") {
 }
 export const toast = notify;
 let modalTrigger = null;
-export function modal(title, subtitle, body) {
+export function modal(title, subtitle, body, options) {
   if (!document.querySelector("#modal")?.open)
     modalTrigger = document.activeElement;
-  showModal(title, subtitle, body);
+  showModal(title, subtitle, body, options);
 }
 export function closeModal() {
   hideModal();

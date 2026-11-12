@@ -73,6 +73,7 @@ public sealed class TeamTask : ITaskImportance
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TeamId { get; set; }
     public Guid? SourceDocumentId { get; set; }
+    public Guid? ParentTaskId { get; set; }
     public Guid? DesignatedUserId { get; set; }
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";

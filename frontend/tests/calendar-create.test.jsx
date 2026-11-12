@@ -5,6 +5,7 @@ import { calendarPage } from "../src/schedule.jsx";
 import { createCalendarRange, minuteHeight } from "../src/calendar-drag.js";
 import { state } from "../src/ui.jsx";
 import { getSnapshot, update } from "../src/store.js";
+import { takeAgentDraft } from "../src/agent-handoff.js";
 vi.mock("../src/api.js", () => ({ api: vi.fn() }));
 import { api } from "../src/api.js";
 
@@ -25,6 +26,7 @@ beforeEach(() => {
   state.calendarStart = "2026-11-02";
   state.calendarView = "week";
   state.conflicts = [];
+  state.noraAvailable = false;
   onCreate = vi.fn();
   update({ slots: {}, modal: null });
   window.PointerEvent = class extends MouseEvent {
@@ -209,11 +211,30 @@ it("opens the manual event form with the selected time even in secretary mode", 
     screen.getByRole("button", { name: "Thêm lịch ngày 2026-11-05" }),
   );
   const modal = getSnapshot().modal;
-  expect(modal.title).toBe("Thêm sự kiện cố định");
+  expect(modal.title).toBe("Thêm Lịch Trình");
   render(modal.body);
   expect(screen.getByLabelText("Bắt đầu").value).toBe("2026-11-05T09:00");
   expect(screen.getByLabelText("Kết thúc").value).toBe("2026-11-05T10:00");
-  expect(screen.getByLabelText("Tên sự kiện")).toBe(document.activeElement);
+  expect(screen.getByLabelText("Tên Lịch Trình")).toBe(document.activeElement);
+  expect(api).not.toHaveBeenCalled();
+});
+
+it("shows duration, asks for a count only for weekly repeats, and carries the draft to NORA", () => {
+  state.noraAvailable = true;
+  render(calendarPage());
+  fireEvent.click(screen.getByRole("button", { name: "Thêm lịch ngày 2026-11-05" }));
+  const { container } = render(getSnapshot().modal.body);
+  const form = container.querySelector("form");
+  expect(new FormData(form).has("repeatWeeks")).toBe(false);
+  fireEvent.change(screen.getByLabelText("Tên Lịch Trình"), { target: { value: "Ca làm chiều" } });
+  fireEvent.change(screen.getByLabelText("Loại lịch"), { target: { value: "WORK" } });
+  fireEvent.change(screen.getByLabelText("Kết thúc"), { target: { value: "2026-11-05T10:30" } });
+  expect(screen.getByText("Thời lượng 1 giờ 30 phút")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Lặp lại"), { target: { value: "weekly" } });
+  fireEvent.change(screen.getByLabelText("Tổng số lần"), { target: { value: "4" } });
+  expect(new FormData(form).get("repeatWeeks")).toBe("4");
+  fireEvent.click(screen.getByRole("button", { name: "Nhờ NORA" }));
+  expect(takeAgentDraft()).toMatch(/Chỉ xem trước[\s\S]*Ca làm chiều[\s\S]*2026-11-05 10:30[\s\S]*tổng 4 lần/);
   expect(api).not.toHaveBeenCalled();
 });
 it("clips a click near midnight and computes elapsed time correctly across DST", () => {

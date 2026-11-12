@@ -2672,6 +2672,9 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid?>("ParentTaskId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("PendingChangeJson")
                         .HasColumnType("nvarchar(max)");
 
@@ -2707,6 +2710,8 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasIndex("AssigneeId");
 
                     b.HasIndex("DesignatedUserId");
+
+                    b.HasIndex("ParentTaskId");
 
                     b.HasIndex("SourceDocumentId");
 
@@ -3945,6 +3950,11 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.HasOne("SPWPOS.Domain.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("DesignatedUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SPWPOS.Domain.Entities.TeamTask", null)
+                        .WithMany()
+                        .HasForeignKey("ParentTaskId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SPWPOS.Domain.Entities.TeamTaskDocument", null)

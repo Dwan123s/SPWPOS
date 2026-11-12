@@ -35,10 +35,10 @@
 }
 .daily-agenda-row[class*="calendar-time-"] .daily-agenda-session,
 .daily-schedule .runway-block[class*="calendar-time-"] {
-  border-color: var(--calendar-time-border);
-  border-left-color: var(--calendar-time-accent);
-  background: var(--calendar-time-bg);
-  color: var(--calendar-time-text);
+  border-color: var(--calendar-entry-border);
+  border-left-color: var(--calendar-entry-accent);
+  background: var(--calendar-entry-bg);
+  color: var(--calendar-entry-text);
   opacity: 1;
 }
 .daily-agenda-row[class*="calendar-time-"] .daily-agenda-status {
@@ -48,5 +48,5 @@
   color: #176344;
 }
 .daily-agenda-row.calendar-time-current .daily-agenda-session {
-  box-shadow: 0 0 0 1px #86d7aa;
+  box-shadow: 0 0 0 1px var(--calendar-entry-border);
 }

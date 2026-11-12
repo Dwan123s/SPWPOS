@@ -13,7 +13,6 @@ import {
   CalendarClock,
   CalendarTimeTag,
   calendarPhase,
-  calendarPhases,
 } from "./calendar-time.jsx";
 import { workflowSteps } from "./workflow.js";
 import { CalendarWeek } from "./calendar-week.jsx";
@@ -78,7 +77,7 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
       <button
         key={`event-${e.id}-${date}`}
         type="button"
-        className={`calendar-block fixed-event calendar-timed-card calendar-time-${phase}${compact ? "" : " calendar-agenda-entry"}`}
+        className={`calendar-block fixed-event calendar-entry-event calendar-timed-card calendar-time-${phase}${compact ? "" : " calendar-agenda-entry"}`}
         data-action="event-detail"
         data-id={e.id}
       >
@@ -91,7 +90,7 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
         <CalendarTimeTag phase={phase} />
         <span className="block-meta">
           {icon("lock")}
-          Lịch bận
+          Lịch Trình
         </span>
       </button>
     );
@@ -100,7 +99,7 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
     <button
       key={`session-${s.id}`}
       type="button"
-      className={`calendar-block calendar-timed-card calendar-time-${calendarPhase(s.start, s.end, now)} ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}${agenda ? " calendar-agenda-entry" : ""}`}
+      className={`calendar-block calendar-entry-task calendar-timed-card calendar-time-${calendarPhase(s.start, s.end, now)} ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}${agenda ? " calendar-agenda-entry" : ""}`}
       data-action="session-detail"
       data-id={s.id}
     >
@@ -290,7 +289,7 @@ function calendarMarkup(
               className="btn small secondary"
               onClick={() => eventModal({}, { manual: true })}
             >
-              {icon("plus")}Sự kiện
+              {icon("plus")} Lịch Trình
             </button>
             {workflowSteps(state.workspace)
               .slice(0, 3)
@@ -307,14 +306,15 @@ function calendarMarkup(
         <div className="calendar-context">
           <div
             className="calendar-legend calendar-time-legend"
-            aria-label="Màu lịch theo thời gian"
+            aria-label="Màu theo loại lịch"
           >
-            {Object.entries(calendarPhases).map(([phase, label]) => (
-              <span key={phase} className={`calendar-time-${phase}`}>
-                <i aria-hidden="true" />
-                {label}
-              </span>
-            ))}
+            <span className="calendar-entry-task"><i aria-hidden="true" /> Phiên công việc</span>
+            <span>
+              <i className="calendar-time-past" aria-hidden="true" />
+              <i className="calendar-time-current" aria-hidden="true" />
+              <i className="calendar-time-future" aria-hidden="true" />
+              Lịch Trình
+            </span>
           </div>
           <span>
             {sessions.length}
@@ -366,7 +366,7 @@ function calendarMarkup(
                         <button
                           className="btn ghost icon-only"
                           type="button"
-                          aria-label={`Thêm sự kiện ${label}`}
+                          aria-label={`Thêm Lịch Trình ${label}`}
                           onClick={() =>
                             eventModal(
                               {
