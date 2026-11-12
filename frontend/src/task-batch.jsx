@@ -75,7 +75,7 @@ export function TaskBatchForm() {
           <div className="task-batch-upload">
             <label className="field">
               <span>Tải tài liệu</span>
-              <input type="file" accept={`${TEAM_BRIEF_ACCEPT},.csv`} onChange={(event) => {
+              <input type="file" name="source" accept={`${TEAM_BRIEF_ACCEPT},.csv`} onChange={(event) => {
                 setFile(event.target.files[0] ?? null);
                 setDraft(null);
                 setError("");

@@ -3,7 +3,7 @@ import { RoutePage } from "./route-pages.jsx";
 import { adminRoutes, isAdminRoute } from "./admin-navigation.js";
 import { ConnectionState } from "./connection-state.jsx";
 import { Loading } from "./loading.jsx";
-import { setScreen, setSlot } from "./store.js";
+import { getSnapshot, setScreen, setSlot } from "./store.js";
 import { setAvatar, openAvatarCropper } from "./interactive.jsx";
 import {
   workspaceShell,
@@ -31,6 +31,7 @@ import {
   minuteValue,
 } from "./ui.jsx";
 import { api, submit } from "./api.js";
+import { readTeamBriefFile } from "./team-brief-file.js";
 import { syncPetProfile } from "./pet-appearance.jsx";
 import { captureTeamInvite, pendingTeamInvite } from "./team-invite-link.js";
 import {
@@ -470,6 +471,9 @@ async function refreshAfter(message = "Đã lưu.") {
   await load();
   toast(message, "success");
 }
+function completeTask(id) {
+  return api(`/api/tasks/${id}/status`, "PATCH", { status: "Completed", progress: 100 });
+}
 async function action(name, id, element) {
   if (await handleAuthAction(name)) return;
   switch (name) {
@@ -552,10 +556,7 @@ async function action(name, id, element) {
       openDetail(id);
       break;
     case "task-finish":
-      await api(`/api/tasks/${id}/status`, "PATCH", {
-        status: "Completed",
-        progress: 100,
-      });
+      await completeTask(id);
       await refreshAfter("Đã đánh dấu hoàn thành cả công việc.");
       break;
     case "toggle-task-completion": {
@@ -856,7 +857,7 @@ async function action(name, id, element) {
           ? "Đã ghi nhận phiên. Cập nhật tiến độ công việc để kế hoạch tiếp theo chính xác."
           : "Đã cập nhật phiên.",
       );
-      if (name === "session-complete") openDetail(s.taskId, true);
+      if (name === "session-complete") openDetail(s.taskId, { afterSession: true });
       break;
     }
     case "discard-plan":
@@ -1123,7 +1124,9 @@ async function formAction(form, data, nextAction = null) {
       }));
       if (nextAction === "preview" && tasks.some((task) => !hasPlanningDetails({ ...task, deadline: task.deadline || projectDeadline })))
         throw new Error("Nhập hạn chót của project và thời lượng từng việc trước khi xếp lịch, hoặc chọn Lưu project.");
-      const saved = await api("/api/tasks/batch", "POST", { ...batch, projectDeadline, tasks });
+      const source = form.elements.namedItem("source")?.files?.[0];
+      const sourceFile = source?.size ? await readTeamBriefFile(source, { allowCsv: true }) : null;
+      const saved = await api("/api/tasks/batch", "POST", { ...batch, projectDeadline, tasks, sourceFile });
       completeGuideStep(0);
       await refreshAfter("Đã lưu project và các công việc.");
       if (nextAction === "preview") {
@@ -1143,15 +1146,22 @@ async function formAction(form, data, nextAction = null) {
       }
       break;
     }
-    case "task-checklist":
-      await api(`/api/tasks/${id}/checklist`, "PUT", {
-        version: data.get("version"),
-        items: JSON.parse(data.get("items")),
-      });
-      await load();
-      openDetail(id);
-      toast("Đã lưu checklist.", "success");
+    case "complete-checklist-task": {
+      const task = taskById(id);
+      if (!task || task.isTeamTask || task.status === "Cancelled" ||
+          !task.checklist?.length || !task.checklist.every((item) => item.completed)) {
+        throw new Error("Checklist đã thay đổi. Hãy kiểm tra lại các mục trước khi hoàn thành công việc.");
+      }
+      const detailKey = form.closest("#modal") ? getSnapshot().modalKey : null;
+      const confirmation = form.closest("dialog");
+      if (task.status !== "Completed") await completeTask(id);
+      await load(false);
+      if (confirmation?.open) confirmation.close();
+      const { modal: currentModal, modalKey } = getSnapshot();
+      if (currentModal && detailKey === modalKey && taskById(id)) openDetail(id, { initialTab: "checklist" });
+      toast("Đã hoàn thành công việc.", "success");
       break;
+    }
     case "task": {
       if (form.dataset.stale === "true")
         throw new Error("Tải lại bản mới trước khi chỉnh sửa công việc.");

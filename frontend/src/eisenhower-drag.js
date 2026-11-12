@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-// Handle-only pointer dragging supports mouse, pen and touch without making
-// ordinary scrolling or selecting task text move an item.
+// Callers choose the drag surface so inputs and other controls stay interactive.
 export function useEisenhowerDrag(resolve, commit, disabled = false) {
   const latest = useRef({ resolve, commit, disabled });
   latest.current = { resolve, commit, disabled };
@@ -36,7 +35,7 @@ export function useEisenhowerDrag(resolve, commit, disabled = false) {
         id,
         e.clientY,
       );
-      setDrag({ id, target });
+      setDrag({ id, target, offsetY: e.clientY - from.y });
       document.body.classList.add("eis-is-dragging");
       const scroll = document
         .elementFromPoint(e.clientX, e.clientY)
@@ -79,14 +78,12 @@ export function useEisenhowerDrag(resolve, commit, disabled = false) {
 
 export function moveChecklist(items, id, beforeId) {
   if (id === beforeId) return items;
-  const selected = items.find((i) => i.id === id);
-  if (!selected || (beforeId && !items.some((i) => i.id === beforeId)))
+  const from = items.findIndex((i) => i.id === id);
+  const to = beforeId ? items.findIndex((i) => i.id === beforeId) : items.length;
+  if (from === -1 || to === -1 || to === from + 1)
     return items;
-  const rest = items.filter((i) => i.id !== id);
-  rest.splice(
-    beforeId ? rest.findIndex((i) => i.id === beforeId) : rest.length,
-    0,
-    selected,
-  );
+  const rest = [...items];
+  const [selected] = rest.splice(from, 1);
+  rest.splice(to > from ? to - 1 : to, 0, selected);
   return rest;
 }

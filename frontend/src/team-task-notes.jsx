@@ -84,7 +84,7 @@ function InlineText({ text }) {
       ),
     );
 }
-function NoteContent({ lines }) {
+export function TaskNoteContent({ lines }) {
   const blocks = [];
   let current;
   for (const line of lines) {
@@ -138,7 +138,7 @@ export function TaskRequirements({ task }) {
                 <span>{icon(section.glyph)}</span>
                 {section.title}
               </h4>
-              <NoteContent lines={section.lines} />
+              <TaskNoteContent lines={section.lines} />
             </section>
           ))}
         </div>

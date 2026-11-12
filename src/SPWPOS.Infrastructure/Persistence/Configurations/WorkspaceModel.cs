@@ -45,6 +45,11 @@ public static class WorkspaceModel
         task.Property(x => x.TaskType).HasMaxLength(60); task.HasIndex(x => new { x.UserId, x.Deadline });
         task.HasOne<TaskCategory>().WithMany().HasForeignKey(x => new { x.UserId, x.CategoryId }).HasPrincipalKey(x => new { x.UserId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         task.HasOne<WorkTask>().WithMany().HasForeignKey(x => new { x.UserId, x.ParentId }).HasPrincipalKey(x => new { x.UserId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        var source = b.Entity<ProjectSourceDocument>();
+        source.HasKey(x => x.ProjectId);
+        source.Property(x => x.Name).HasMaxLength(180);
+        source.Property(x => x.MimeType).HasMaxLength(100);
+        source.HasOne<WorkTask>().WithOne().HasForeignKey<ProjectSourceDocument>(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
         var category = Owned<TaskCategory>(b); category.Property(x => x.Name).HasMaxLength(80); category.Property(x => x.Color).HasMaxLength(7);
         category.HasIndex(x => new { x.UserId, x.Name }).IsUnique();
         var dep = Owned<TaskDependency>(b); dep.HasIndex(x => new { x.UserId, x.TaskId, x.PredecessorId }).IsUnique();

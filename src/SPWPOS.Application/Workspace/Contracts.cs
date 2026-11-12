@@ -21,7 +21,8 @@ public sealed record TaskView(Guid Id, string Name, string Description, DateTime
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default,
     ImportanceView? Importance = null, bool RequiresContinuousSession = false, bool IsTeamTask = false,
     TaskChecklistItem[]? Checklist = null, bool InheritsProjectDeadline = false,
-    TaskChecklistItem[]? TeamChecklist = null, string? TeamStatus = null);
+    TaskChecklistItem[]? TeamChecklist = null, string? TeamStatus = null, string? SourceFileName = null);
+public sealed record TaskChecklistSaveResult(Guid Version, TaskChecklistItem[] Checklist, TaskChecklistItem[]? TeamChecklist, Guid Revision);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
 public sealed record CategoryView(Guid Id, string Name, string Color);
@@ -109,8 +110,10 @@ public sealed record TaskBatchTaskInput([Required, StringLength(200)] string Nam
     [Range(1, 43200)] int? EstimatedMinutes = null, [MaxLength(100)] TaskChecklistItem[]? Checklist = null);
 public sealed record TaskBatchPreview(string ProjectName, string Summary, TaskBatchTaskInput[] Tasks, string[] Warnings, DateTimeOffset? ProjectDeadline = null);
 public sealed record TaskBatchInput(Guid RequestId, [Required, StringLength(200)] string ProjectName,
-    [Required, MinLength(1), MaxLength(12)] TaskBatchTaskInput[] Tasks, bool Sequential = true, DateTimeOffset? ProjectDeadline = null);
+    [Required, MinLength(1), MaxLength(12)] TaskBatchTaskInput[] Tasks, bool Sequential = true, DateTimeOffset? ProjectDeadline = null,
+    TeamBriefFile? SourceFile = null);
 public sealed record TaskBatchResult(Guid ProjectId, Guid[] TaskIds);
+public sealed record ProjectSourceDownload(string Name, string MimeType, byte[] Content);
 public sealed record BreakdownView(TaskInput[] Subtasks, string Source);
 public sealed record AdminUserView(Guid Id, string Email, string FirstName, string LastName, bool IsActive, bool EmailConfirmed, DateTimeOffset? LastLoginAt,
     string? UserName = null, DateTimeOffset? CreatedAt = null,
@@ -161,7 +164,7 @@ public interface IWorkspaceService
     Task<Guid> SaveTaskAsync(Guid userId, Guid? id, TaskInput input, CancellationToken ct);
     Task DeleteTaskAsync(Guid userId, Guid id, CancellationToken ct);
     Task SetStatusAsync(Guid userId, Guid id, StatusInput input, CancellationToken ct);
-    Task UpdateTaskChecklistAsync(Guid userId, Guid id, MatrixChecklistInput input, CancellationToken ct);
+    Task<TaskChecklistSaveResult> UpdateTaskChecklistAsync(Guid userId, Guid id, MatrixChecklistInput input, CancellationToken ct);
     Task<Guid> SaveCategoryAsync(Guid userId, Guid? id, CategoryInput input, CancellationToken ct);
     Task DeleteCategoryAsync(Guid userId, Guid id, CancellationToken ct);
     Task SetDependencyAsync(Guid userId, Guid id, Guid predecessor, bool remove, CancellationToken ct);
@@ -198,6 +201,8 @@ public interface IWorkspaceService
     Task<NoteAnalysis> PreviewTaskTextAsync(Guid userId, CaptureInput input, CancellationToken ct);
     Task<TaskBatchPreview> PreviewTaskBatchAsync(Guid userId, TeamBriefInput input, CancellationToken ct);
     Task<TaskBatchResult> SaveTaskBatchAsync(Guid userId, TaskBatchInput input, CancellationToken ct);
+    Task<string> AttachProjectSourceAsync(Guid userId, Guid taskId, TeamBriefFile input, CancellationToken ct);
+    Task<ProjectSourceDownload> DownloadProjectSourceAsync(Guid userId, Guid taskId, CancellationToken ct);
     Task<BreakdownView> BreakdownAsync(Guid userId, Guid taskId, bool useAi, CancellationToken ct);
     Task<AdminUserView[]> SearchUsersAsync(string? search, CancellationToken ct);
     Task SetUserActiveAsync(Guid adminId, Guid targetId, bool active, CancellationToken ct, string? reason = null);

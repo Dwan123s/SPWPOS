@@ -6,7 +6,7 @@ import {
   within,
   waitFor,
 } from "@testing-library/react";
-import { EisenhowerBoard } from "../src/eisenhower-board.jsx";
+import { Checklist, EisenhowerBoard } from "../src/eisenhower-board.jsx";
 import { moveChecklist } from "../src/eisenhower-drag.js";
 import { state } from "../src/ui.jsx";
 import { workspace } from "./fixtures.js";
@@ -232,7 +232,7 @@ it("opens task detail and reorders checklist with the keyboard, saving the exact
     screen.getByRole("button", { name: "Report a", exact: true }),
   );
   const dialog = screen.getByRole("dialog", { name: "Chi tiết task" });
-  fireEvent.keyDown(within(dialog).getByRole("button", { name: "Kéo mục 2" }), {
+  fireEvent.keyDown(within(dialog).getByRole("group", { name: "Mục checklist 2" }), {
     key: "ArrowUp",
     altKey: true,
   });
@@ -245,6 +245,42 @@ it("opens task detail and reorders checklist with the keyboard, saving the exact
     "step2",
     "step1",
   ]);
+});
+
+it("drags checklist cards from the row, shifts nearby cards and commits only on a valid drop", () => {
+  const items = item().checklist;
+  const onChange = vi.fn();
+  render(<Checklist items={items} onChange={onChange} />);
+  const [first, second] = screen.getAllByRole("group", { name: /Mục checklist/ });
+  const list = first.parentElement;
+  list.style.rowGap = "7px";
+  Object.defineProperties(first, { offsetHeight: { value: 40 }, offsetTop: { value: 0 } });
+  Object.defineProperties(second, { offsetHeight: { value: 40 }, offsetTop: { value: 47 } });
+  document.elementFromPoint = vi.fn(() => list);
+  const origin = { button: 0, pointerId: 1, clientX: 10, clientY: 15 };
+  const destination = { ...origin, clientY: 75 };
+
+  expect(screen.queryByRole("button", { name: /Kéo mục/ })).toBeNull();
+  fireEvent.pointerDown(screen.getByLabelText("Nội dung mục 1"), origin);
+  fireEvent.pointerMove(window, destination);
+  fireEvent.pointerUp(window, destination);
+  expect(onChange).not.toHaveBeenCalled();
+
+  fireEvent.pointerDown(first, origin);
+  fireEvent.pointerMove(window, destination);
+  expect(first.classList.contains("is-dragging")).toBe(true);
+  expect(first.style.transform).toBe("translateY(60px)");
+  expect(second.style.transform).toBe("translateY(-47px)");
+  expect(onChange).not.toHaveBeenCalled();
+  document.elementFromPoint.mockReturnValueOnce(document.body);
+  fireEvent.pointerUp(window, destination);
+  expect(onChange).not.toHaveBeenCalled();
+  expect(first.style.transform).toBe("");
+
+  fireEvent.pointerDown(first, origin);
+  fireEvent.pointerMove(window, destination);
+  fireEvent.pointerUp(window, destination);
+  expect(onChange).toHaveBeenCalledExactlyOnceWith([items[1], items[0]]);
 });
 it("moves tasks between quadrants from a mobile/keyboard accessible selector, without changing deadline", async () => {
   setup();

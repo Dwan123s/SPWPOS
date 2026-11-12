@@ -1672,6 +1672,30 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                     b.ToTable("PrivatePlanningProposals");
                 });
 
+            modelBuilder.Entity("SPWPOS.Domain.Entities.ProjectSourceDocument", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.HasKey("ProjectId");
+
+                    b.ToTable("ProjectSourceDocuments");
+                });
+
             modelBuilder.Entity("SPWPOS.Domain.Entities.RecoveryCase", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3656,6 +3680,15 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SPWPOS.Domain.Entities.ProjectSourceDocument", b =>
+                {
+                    b.HasOne("SPWPOS.Domain.Entities.WorkTask", null)
+                        .WithOne()
+                        .HasForeignKey("SPWPOS.Domain.Entities.ProjectSourceDocument", "ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

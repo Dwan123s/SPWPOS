@@ -85,8 +85,12 @@ public sealed class TaskBatchTests
         Assert.Equal(deadline.AddHours(-1), secondChild.Deadline);
         Assert.Equal(firstChild.Id, Assert.Single(secondChild.Dependencies));
         Assert.Equal(step, Assert.Single(firstChild.Checklist!));
-        await service.UpdateTaskChecklistAsync(user.Id, firstChild.Id, new(firstChild.Version, [step with { Completed = true }]), ct);
-        var updated = (await service.GetAsync(user.Id, ct)).Tasks.Single(task => task.Id == firstChild.Id);
+        var savedChecklist = await service.UpdateTaskChecklistAsync(user.Id, firstChild.Id, new(firstChild.Version, [step with { Completed = true }]), ct);
+        var workspace = await service.GetAsync(user.Id, ct);
+        var updated = workspace.Tasks.Single(task => task.Id == firstChild.Id);
+        Assert.Equal(updated.Version, savedChecklist.Version);
+        Assert.Equal(workspace.Preference.Revision, savedChecklist.Revision);
+        Assert.Equal(Assert.Single(updated.Checklist!), Assert.Single(savedChecklist.Checklist));
         Assert.True(Assert.Single(updated.Checklist!).Completed);
         Assert.Equal("Todo", updated.Status);
         Assert.Equal(0, updated.Progress);

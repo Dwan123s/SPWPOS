@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using SPWPOS.Application.Workspace;
+using SPWPOS.Domain.Enums;
 using SPWPOS.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 namespace SPWPOS.IntegrationTests;
@@ -33,6 +34,52 @@ public sealed class WorkspaceFlowTests
         (await Send(client, HttpMethod.Post, "/api/tasks", new TaskInput(name, "", now.AddDays(1), 60))).GetProperty("data").GetProperty("id").GetGuid();
     internal static async Task SetupTime(HttpClient client) => _ = await Send(client, HttpMethod.Put, "/api/time/availability",
         new WeeklyInput(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()));
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Project_source_download_preserves_original_file(bool uploadWithBatch)
+    {
+        await using var factory = new ApiFactory();
+        using var client = await factory.ClientAsync();
+        await Authorize(factory, client);
+        var content = "Nội dung đề bài SWP"u8.ToArray();
+        var file = new TeamBriefFile("Đề bài SWP.txt", "text/plain", Convert.ToBase64String(content));
+        var input = new TaskBatchInput(Guid.NewGuid(), "SWP", [new("Thiết kế ERD"), new("Kiểm thử SQL")],
+            SourceFile: uploadWithBatch ? file : null);
+        var batch = (await Send(client, HttpMethod.Post, "/api/tasks/batch", input)).GetProperty("data");
+        var childIds = batch.GetProperty("taskIds").EnumerateArray().Select(id => id.GetGuid()).ToArray();
+        if (!uploadWithBatch)
+        {
+            await Send(client, HttpMethod.Get, $"/api/tasks/{childIds[0]}/source", expected: HttpStatusCode.NotFound);
+            await Send(client, HttpMethod.Put, $"/api/tasks/{childIds[0]}/source", file);
+        }
+        var task = (await Send(client, HttpMethod.Get, $"/api/tasks/{childIds[1]}")).GetProperty("data");
+        Assert.Equal(file.Name, task.GetProperty("sourceFileName").GetString());
+        var sourceUrl = $"/api/tasks/{childIds[1]}/source";
+        using var browser = await factory.ClientAsync();
+        browser.DefaultRequestHeaders.Add("Cookie", $"__Host-spwpos-access={client.DefaultRequestHeaders.Authorization!.Parameter}");
+        using var download = await browser.GetAsync(sourceUrl, Ct);
+        Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+        Assert.Equal("attachment", download.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.Equal(file.Name, download.Content.Headers.ContentDisposition?.FileNameStar);
+        Assert.Equal(content, await download.Content.ReadAsByteArrayAsync(Ct));
+        using var anonymous = await factory.ClientAsync();
+        using var denied = await anonymous.GetAsync(sourceUrl, Ct);
+        Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
+        using var otherUser = await factory.ClientAsync();
+        const string email = "other.project@example.com";
+        await Send(otherUser, HttpMethod.Post, "/api/auth/register", new
+        {
+            userName = "other.project", email, password = ServiceHarness.Password,
+            confirmPassword = ServiceHarness.Password, firstName = "Other", lastName = "User"
+        });
+        await Send(otherUser, HttpMethod.Post, "/api/auth/verify-email",
+            new { email, otp = factory.Email.Inbox[(email, OtpPurpose.EmailVerification)] });
+        var otherSession = await Send(otherUser, HttpMethod.Post, "/api/auth/login", new { email, password = ServiceHarness.Password });
+        otherUser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            otherSession.GetProperty("data").GetProperty("accessToken").GetString());
+        await Send(otherUser, HttpMethod.Get, sourceUrl, expected: HttpStatusCode.NotFound);
+    }
     [Fact] public async Task Dated_week_can_save_more_intervals_than_recurring_hours()
     {
         await using var factory = new ApiFactory();

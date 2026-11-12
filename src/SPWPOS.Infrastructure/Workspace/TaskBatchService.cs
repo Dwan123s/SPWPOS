@@ -82,6 +82,7 @@ public sealed partial class WorkspaceService
         }).ToArray();
         db.WorkTasks.Add(project);
         db.WorkTasks.AddRange(tasks);
+        if (input.SourceFile is { } sourceFile) db.ProjectSourceDocuments.Add(ReadProjectSource(project.Id, sourceFile));
         if (input.Sequential)
             for (var index = 1; index < tasks.Length; index++)
                 db.TaskDependencies.Add(new TaskDependency { UserId = uid, TaskId = tasks[index].Id,

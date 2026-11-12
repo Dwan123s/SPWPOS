@@ -49,6 +49,7 @@ const paths = {
   chevron: "M6 9l6 6 6-6",
   close: "M6 6l12 12 M18 6L6 18",
   alertCircle: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v6 M12 16h.01",
+  alertTriangle: "M12 3 2 21h20L12 3z M12 10v4 M12 17h.01",
   check: "M5 12l4 4L19 6",
   clock: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v5l4 2",
   flag: "M5 21V4m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0",

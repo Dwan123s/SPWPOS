@@ -21,14 +21,20 @@ public sealed class TasksController(IWorkspaceService service) : WorkspaceContro
     [HttpPost("batch/preview"), RequestSizeLimit(12000000)]
     public async Task<IActionResult> PreviewBatch(TeamBriefInput input, CancellationToken ct) =>
         Data(await service.PreviewTaskBatchAsync(UserId, input, ct));
-    [HttpPost("batch")] public async Task<IActionResult> SaveBatch(TaskBatchInput input, CancellationToken ct) =>
+    [HttpPost("batch"), RequestSizeLimit(12000000)] public async Task<IActionResult> SaveBatch(TaskBatchInput input, CancellationToken ct) =>
         Data(await service.SaveTaskBatchAsync(UserId, input, ct));
-    [HttpPut("{id:guid}")] public async Task<IActionResult> Update(Guid id, TaskInput input, CancellationToken ct) { await service.SaveTaskAsync(UserId, id, input, ct); return Done(); }
-    [HttpPut("{id:guid}/checklist")] public async Task<IActionResult> Checklist(Guid id, MatrixChecklistInput input, CancellationToken ct)
+    [HttpPut("{id:guid}/source"), RequestSizeLimit(12000000)]
+    public async Task<IActionResult> AttachSource(Guid id, TeamBriefFile input, CancellationToken ct) =>
+        Data(new { name = await service.AttachProjectSourceAsync(UserId, id, input, ct) });
+    [HttpGet("{id:guid}/source"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> DownloadSource(Guid id, CancellationToken ct)
     {
-        await service.UpdateTaskChecklistAsync(UserId, id, input, ct);
-        return Done();
+        var file = await service.DownloadProjectSourceAsync(UserId, id, ct);
+        return File(file.Content, file.MimeType, file.Name);
     }
+    [HttpPut("{id:guid}")] public async Task<IActionResult> Update(Guid id, TaskInput input, CancellationToken ct) { await service.SaveTaskAsync(UserId, id, input, ct); return Done(); }
+    [HttpPut("{id:guid}/checklist")] public async Task<IActionResult> Checklist(Guid id, MatrixChecklistInput input, CancellationToken ct) =>
+        Data(await service.UpdateTaskChecklistAsync(UserId, id, input, ct));
     [HttpDelete("{id:guid}")] public async Task<IActionResult> Delete(Guid id, CancellationToken ct) { await service.DeleteTaskAsync(UserId, id, ct); return Done(); }
     [HttpPatch("{id:guid}/status")] public async Task<IActionResult> Status(Guid id, StatusInput input, CancellationToken ct) { await service.SetStatusAsync(UserId, id, input, ct); return Done(); }
     [HttpPatch("{id:guid}/progress")] public async Task<IActionResult> Progress(Guid id, ProgressInput input, CancellationToken ct)

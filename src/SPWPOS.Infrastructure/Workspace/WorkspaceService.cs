@@ -120,6 +120,10 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         var sessionsByTask = state.Sessions.ToLookup(x => x.TaskId);
         var dependenciesByTask = state.Dependencies.ToLookup(x => x.TaskId);
         var tasksById = state.Tasks.ToDictionary(x => x.Id);
+        var projectSources = await (from source in db.ProjectSourceDocuments.AsNoTracking()
+            join project in Mine<WorkTask>(userId) on source.ProjectId equals project.Id
+            where !project.IsDeleted && project.ParentId == null
+            select new { source.ProjectId, source.Name }).ToDictionaryAsync(x => x.ProjectId, x => x.Name, ct);
         var sharedTasks = await (from assignment in db.TeamTaskAssignments.AsNoTracking()
             join task in db.TeamTasks.AsNoTracking() on assignment.TeamTaskId equals task.Id
             join member in db.TeamMemberships.AsNoTracking() on task.TeamId equals member.TeamId
@@ -137,7 +141,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
                 IsTeamTask: t.InheritedImportance is not null, Checklist: ReadTaskChecklist(t), InheritsProjectDeadline: t.InheritsProjectDeadline,
                 TeamChecklist: sharedTasks.TryGetValue(t.Id, out var shared)
                     ? CheckedTeamRequirements(TeamRequirements(shared.Id, shared.Description), ReadTaskChecklist(t)) : null,
-                TeamStatus: shared?.Status)).ToArray(),
+                TeamStatus: shared?.Status, SourceFileName: projectSources.GetValueOrDefault(t.ParentId ?? t.Id))).ToArray(),
             state.Availability.Select(x => new AvailabilityInput(x.DayOfWeek, x.StartMinute, x.EndMinute)).ToArray(),
             state.Exceptions.Select(x => new ExceptionView(x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note, x.OverridesWeeklyAvailability, x.IsWeekEdit)).ToArray(),
             state.Events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),

@@ -1,5 +1,5 @@
 import { TaskEisenhowerDetail } from "./eisenhower.jsx";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Select, Slot, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
@@ -24,8 +24,10 @@ import {
 import { api } from "./api.js";
 import { askNora, secretaryMode } from "./agent-handoff.js";
 import { TaskBatchForm } from "./task-batch.jsx";
-import { Checklist } from "./eisenhower-board.jsx";
-import { TeamChecklist } from "./team-task-checklist.jsx";
+import { TaskChecklist } from "./task-checklist.jsx";
+import { parseTaskNotes, TaskNoteContent } from "./team-task-notes.jsx";
+import { readTeamBriefFile, TEAM_BRIEF_ACCEPT } from "./team-brief-file.js";
+import { orderProjectChildren, plannedTaskStarts } from "./task-smart-lists.js";
 import { TaskDeadlinePicker, TaskEstimateEditor, TaskTablePopup } from "./task-table-popup.jsx";
 import { useOutsideDismiss } from "./popup-dismissal.jsx";
 import { sessionStartIssue } from "./session-start.jsx";
@@ -52,13 +54,42 @@ const taskPopupTitles = {
 export function taskRows(tasks, plannedDays, options = {}) {
   return <TaskList tasks={tasks} plannedDays={plannedDays} {...options} />;
 }
-function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addTask, emptyMessage,
-  selectedId, onSelect, toolbarHost, onWorkspaceChanged }) {
-  const signature = tasks.map((task) => task.id).join(",");
+
+function groupProjectTasks(tasks, projectContext, plannedStarts) {
+  if (!projectContext) return tasks.map((task) => ({ task, children: [] }));
+
+  const parents = new Set(projectContext.filter((task) => !task.parentId).map((task) => task.id));
+  const matches = new Set(tasks.map((task) => task.id));
+  const children = new Map();
+  for (const task of tasks) {
+    if (!parents.has(task.parentId)) continue;
+    if (!children.has(task.parentId)) children.set(task.parentId, []);
+    children.get(task.parentId).push(task);
+  }
+
+  return projectContext
+    .filter((task) => children.has(task.id) || (matches.has(task.id) && !parents.has(task.parentId)))
+    .map((task) => ({ task, children: children.has(task.id) ? orderProjectChildren(children.get(task.id), plannedStarts) : [] }));
+}
+
+function TaskList({ tasks, plannedDays, plannedStarts, columns = Object.keys(taskColumns), addTask, emptyMessage,
+  selectedId, onSelect, toolbarHost, onWorkspaceChanged, projectContext, revealMatchingChildren = false }) {
+  const groups = groupProjectTasks(tasks, projectContext, plannedStarts);
+  const signature = groups.map(({ task }) => task.id).join(",");
   const [paging, setPaging] = useState({ signature, page: 0 });
+  const [toggledProjects, setToggledProjects] = useState(() => new Set());
+  const [openChecklists, setOpenChecklists] = useState(() => new Set());
+  const checklistPrefix = useId();
   const page = paging.signature === signature ? paging.page : 0;
-  const pages = Math.ceil(tasks.length / 12);
-  const visible = tasks.slice(page * 12, (page + 1) * 12);
+  const pages = Math.ceil(groups.length / 12);
+  const projectKey = (id) => revealMatchingChildren ? `filtered:${id}` : id;
+  const visible = groups.slice(page * 12, (page + 1) * 12).flatMap(({ task, children }) => {
+    const expanded = revealMatchingChildren !== toggledProjects.has(projectKey(task.id));
+    const row = { task, childCount: children.length, expanded };
+    return children.length && expanded
+      ? [row, ...children.map((child) => ({ task: child, nested: true }))]
+      : [row];
+  });
   const includes = (column) => columns.includes(column);
   const columnCount = columns.length + 2;
   const [localSelected, setLocalSelected] = useState(null);
@@ -66,7 +97,7 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
   const selectedRow = useRef(null);
   const selectionToolbar = useRef(null);
   const popupRoot = useRef(null);
-  const selected = visible.find((task) => task.id === (onSelect ? selectedId : localSelected));
+  const selected = visible.find(({ task }) => task.id === (onSelect ? selectedId : localSelected))?.task;
   const selectTask = onSelect || setLocalSelected;
   const today = dayKey(Date.now());
   function showPopup(event, task, kind) {
@@ -81,6 +112,16 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
   function clearSelection() {
     selectTask(null);
     closePopup(false);
+  }
+  function toggleProject(id, expanded) {
+    if (expanded && selected?.parentId === id) clearSelection();
+    const key = projectKey(id);
+    setToggledProjects((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
   useOutsideDismiss([selectedRow, selectionToolbar, popupRoot], clearSelection, Boolean(selected));
   const popupTask = popup && popup.task.id === selected?.id ? popup.task : null;
@@ -141,14 +182,18 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
             </tr>
           </thead>
           <tbody>
-            {visible.map((task) => {
+            {visible.map(({ task, childCount, expanded, nested }) => {
               const completed = task.status === "Completed";
               const active = !completed && task.status !== "Cancelled";
               const canSchedule = hasPlanningDetails(task);
               const planned = plannedDays?.get(task.id);
+              const plannedStart = plannedStarts?.get(task.id);
               const estimate = task.estimatedMinutes > 0 ? minutes(task.estimatedMinutes) : "";
-              return (
-                <tr key={task.id} className={[completed && "is-completed", selected?.id === task.id && "is-selected"].filter(Boolean).join(" ")}
+              const hasChecklist = Boolean(task.parentId && (task.isTeamTask ? task.teamChecklist?.length : task.version));
+              const checklistOpen = hasChecklist && openChecklists.has(task.id);
+              const checklistId = `${checklistPrefix}-checklist-${task.id}`;
+              return <Fragment key={task.id}>
+                <tr className={[childCount > 0 && "is-project", nested && "is-project-child", completed && "is-completed", selected?.id === task.id && "is-selected"].filter(Boolean).join(" ")}
                   ref={selected?.id === task.id ? selectedRow : null}
                   onClick={(event) => {
                     if (!event.target.closest("button, a, input")) {
@@ -175,14 +220,38 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
                   </td>
                   <td className="work-task-name-cell">
                     <div className="work-task-name-row">
-                      <button type="button" className="title-button" title={task.name}
-                        aria-pressed={selected?.id === task.id}
-                        onClick={() => {
-                          if (selected?.id === task.id) openDetail(task.id);
-                          else { selectTask(task.id); closePopup(false); }
-                        }}>
-                        {task.parentId ? "↳ " : ""}{task.name}
-                      </button>
+                      <div className="work-task-title-group">
+                        {childCount > 0 && (
+                          <button type="button" className="work-project-toggle" aria-expanded={expanded}
+                            aria-label={`${expanded ? "Thu gọn" : "Mở"} ${task.name} · ${childCount} việc con`}
+                            title={expanded ? "Thu gọn việc con" : "Mở việc con"}
+                            onClick={() => toggleProject(task.id, expanded)}>
+                            {icon("chevron")}{icon("folder")}
+                          </button>
+                        )}
+                        <button type="button" className="title-button" title={task.name}
+                          aria-pressed={selected?.id === task.id}
+                          onClick={() => {
+                            if (selected?.id === task.id) openDetail(task.id);
+                            else { selectTask(task.id); closePopup(false); }
+                          }}>
+                          {task.parentId && <span aria-hidden="true">↳ </span>}{task.name}
+                        </button>
+                        {hasChecklist && (
+                          <button type="button" className="work-checklist-toggle" aria-expanded={Boolean(checklistOpen)}
+                            aria-controls={checklistOpen ? checklistId : undefined}
+                            aria-label={`${checklistOpen ? "Thu gọn" : "Mở"} checklist của ${task.name}`}
+                            title={checklistOpen ? "Thu gọn checklist" : "Mở checklist"}
+                            onClick={() => setOpenChecklists((current) => {
+                              const next = new Set(current);
+                              if (next.has(task.id)) next.delete(task.id);
+                              else next.add(task.id);
+                              return next;
+                            })}>
+                            {icon("tasks")} <span>Checklist</span> {icon("chevron")}
+                          </button>
+                        )}
+                      </div>
                       <div className="task-row-actions">
                         {selected?.id === task.id && (
                           <button type="button" className="task-table-icon" aria-label={`Thao tác cho ${task.name}`}
@@ -227,8 +296,12 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
                         data-action="calendar-date"
                         data-id={planned}
                         aria-label={`Mở lịch dự kiến của ${task.name}`}
+                        title={plannedStart != null ? `${dateFmt(plannedStart)} · ${timeFmt(plannedStart)}` : undefined}
                       >
                         {planned === today ? "Hôm nay" : dateFmt(`${planned}T12:00:00Z`, { timeZone: "UTC" })}
+                        {task.parentId && plannedStart != null && dayKey(plannedStart) === planned && (
+                          <small className="work-task-planned-time">{timeFmt(plannedStart)}</small>
+                        )}
                       </button>
                     ) : null}
                   </td>}
@@ -265,7 +338,16 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
                     )}
                   </td>}
                 </tr>
-              );
+                {checklistOpen && (
+                  <tr className="work-task-checklist-row">
+                    <td colSpan={columnCount}>
+                      <div id={checklistId} className="work-task-checklist" role="group" aria-label={`Checklist của ${task.name}`}>
+                        <TaskChecklist task={task} />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>;
             })}
             {!tasks.length && emptyMessage && (
               <tr><td className="work-task-empty" colSpan={columnCount}>{emptyMessage}</td></tr>
@@ -291,7 +373,7 @@ function TaskList({ tasks, plannedDays, columns = Object.keys(taskColumns), addT
             Trước
           </button>
           <span aria-live="polite">
-            Trang {page + 1} / {pages} · {page * 12 + 1}–{Math.min((page + 1) * 12, tasks.length)} / {tasks.length}
+            Trang {page + 1} / {pages} · {page * 12 + 1}–{Math.min((page + 1) * 12, groups.length)} / {groups.length}
           </span>
           <button type="button" className="btn ghost small" disabled={page + 1 >= pages}
             aria-label="Trang sau" onClick={() => setPaging({ signature, page: page + 1 })}>
@@ -836,38 +918,17 @@ export function taskInput(data) {
     version: data.get("version") || null,
   };
 }
-function TaskChecklistForm({ task }) {
-  const [items, setItems] = useState((task.isTeamTask ? task.teamChecklist : task.checklist) || []);
-  return (
-    <form className="task-detail-checklist" data-form="task-checklist" data-id={task.id}>
-      {task.isTeamTask ? <TeamChecklist items={items} onToggle={(id, completed) => setItems((previous) =>
-        previous.map((item) => item.id === id ? { ...item, completed } : item))} /> : <Checklist items={items} onChange={setItems} />}
-      <input type="hidden" name="version" value={task.version} />
-      <input type="hidden" name="items" value={JSON.stringify(items.filter((item) => item.text.trim()))} />
-      <div className="form-error" role="alert" />
-      <button type="submit" className="btn small secondary">Lưu checklist</button>
-    </form>
-  );
-}
-
 function ProjectTaskList({ children, projectId }) {
-  const byId = new Map(children.map((task) => [task.id, task]));
-  const visited = new Set();
-  const ordered = [];
-  function visit(task) {
-    if (visited.has(task.id)) return;
-    visited.add(task.id);
-    task.dependencies.filter((id) => byId.has(id)).forEach((id) => visit(byId.get(id)));
-    ordered.push(task);
-  }
-  children.forEach(visit);
+  const plannedStarts = plannedTaskStarts(state.workspace.sessions);
+  const ordered = orderProjectChildren(children, plannedStarts);
   return (
     <table className="project-task-list">
-      <thead><tr><th>Công việc</th><th>Thời lượng</th><th>Checklist</th></tr></thead>
+      <thead><tr><th>Công việc</th><th>Dự kiến</th><th>Thời lượng</th><th>Checklist</th></tr></thead>
       <tbody>
         {ordered.map((task) => {
           const completed = task.status === "Completed";
           const predecessors = task.dependencies.map(taskById).filter(Boolean);
+          const start = plannedStarts.get(task.id);
           return (
             <tr key={task.id}>
               <td>
@@ -882,6 +943,7 @@ function ProjectTaskList({ children, projectId }) {
                   </div>
                 </div>
               </td>
+              <td>{start == null ? "—" : `${dateFmt(start)} · ${timeFmt(start)}`}</td>
               <td>{task.estimatedMinutes > 0 ? minutes(task.estimatedMinutes) : "—"}</td>
               <td>{task.checklist?.length ? `${task.checklist.filter((item) => item.completed).length}/${task.checklist.length}` : "—"}</td>
             </tr>
@@ -892,7 +954,7 @@ function ProjectTaskList({ children, projectId }) {
   );
 }
 
-export function openDetail(id, afterSession = false) {
+export function openDetail(id, { afterSession = false, initialTab = "details" } = {}) {
   const t = taskById(id);
   if (!t) return;
   const children = state.workspace.tasks.filter((x) => x.parentId === id);
@@ -912,6 +974,7 @@ export function openDetail(id, afterSession = false) {
       childrenTasks={children}
       deps={deps}
       afterSession={afterSession}
+      initialTab={initialTab}
     />,
     {
       placement: "right",
@@ -938,12 +1001,95 @@ export function openDetail(id, afterSession = false) {
   );
 }
 
+function TaskDrawerSource({ task, lines, canAttach }) {
+  const picker = useRef(null);
+  const [attachedName, setAttachedName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const name = task.sourceFileName || attachedName;
+  const path = `/api/tasks/${task.id}/source`;
+
+  async function attach(event) {
+    const file = event.currentTarget.files[0];
+    event.currentTarget.value = "";
+    if (!file || busy) return;
+    const userId = state.workspace?.profile?.id;
+    setBusy(true);
+    setError("");
+    try {
+      const input = await readTeamBriefFile(file, { allowCsv: true });
+      if (state.workspace?.profile?.id !== userId) return;
+      const { name } = await api(path, "PUT", input);
+      const workspace = state.workspace;
+      if (!workspace || workspace.profile?.id !== userId) return;
+      const projectId = task.parentId ?? task.id;
+      workspace.tasks = workspace.tasks.map((item) => (item.parentId ?? item.id) === projectId
+        ? { ...item, sourceFileName: name } : item);
+      setAttachedName(name);
+      window.dispatchEvent(new Event("workspace-updated"));
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="task-drawer-brief-section" data-tone="source" aria-label="Tài liệu nguồn">
+      <h3>{icon("folder")}Tài liệu nguồn</h3>
+      {name ? (
+        <a className="task-drawer-source-link" href={path} download={name}>
+          <span>{name}</span><span aria-hidden="true">↓</span>
+        </a>
+      ) : (
+        <>
+          <TaskNoteContent lines={lines} />
+          {canAttach && <>
+            <input ref={picker} type="file" hidden aria-label="Chọn file gốc" accept={`${TEAM_BRIEF_ACCEPT},.csv`} onChange={attach} />
+            <button type="button" className="btn small secondary task-drawer-source-attach" disabled={busy}
+              onClick={() => picker.current?.click()}>
+              {busy ? "Đang gắn file…" : "Gắn file gốc"}
+            </button>
+            {error && <p className="warning" role="alert">{error}</p>}
+          </>}
+        </>
+      )}
+    </section>
+  );
+}
+
+function TaskDrawerDescription({ task, canAttachSource }) {
+  const description = task.description;
+  const sections = parseTaskNotes(description ?? "").filter((section) =>
+    section.lines.some((line) => line.trim()),
+  );
+  const source = sections.find((section) => section.title === "Tài liệu nguồn");
+  const structured = sections.some((section) => section.explicit);
+  return (
+    <section className="task-drawer-brief" aria-label="Mô tả">
+      {structured ? sections.filter((section) => section !== source).map((section, index) => (
+        <section key={index} className="task-drawer-brief-section"
+          data-tone={section.title === "Tóm tắt" ? "summary" : undefined}>
+          <h3>{icon(section.glyph)}{section.title}</h3>
+          <TaskNoteContent lines={section.lines} />
+        </section>
+      )) : (
+        <div><h3>Mô tả</h3><p>{description?.trim() ? description : "Chưa có mô tả"}</p></div>
+      )}
+      {(source || task.sourceFileName) && (
+        <TaskDrawerSource key={task.id} task={task} lines={source?.lines ?? []} canAttach={canAttachSource} />
+      )}
+    </section>
+  );
+}
+
 function TaskDetailDrawer({
   task: t,
   parent,
   childrenTasks: children,
   deps,
   afterSession,
+  initialTab,
 }) {
   const id = t.id;
   const sessions = state.workspace.sessions
@@ -956,13 +1102,15 @@ function TaskDetailDrawer({
       ["Scheduled", "Running", "Paused"].includes(session.status) &&
       Date.parse(session.end) > Date.now(),
   );
-  const [tab, setTab] = useState("details");
+  const canShowChecklist = Boolean(t.version && !children.length && (!t.isTeamTask || t.teamChecklist?.length));
+  const [tab, setTab] = useState(initialTab === "checklist" && !canShowChecklist ? "details" : initialTab);
   const scroll = useRef(null);
   useEffect(() => {
     scroll.current.scrollTop = 0;
   }, [tab]);
   const tabs = [
     ["details", "Chi tiết"],
+    ...(canShowChecklist ? [["checklist", "Checklist"]] : []),
     ["children", "Việc con"],
     ["sessions", "Phiên đã xếp"],
   ];
@@ -1035,14 +1183,8 @@ function TaskDetailDrawer({
                 )}
             </div>
           )}
+          <TaskDrawerDescription task={t} canAttachSource={!t.isTeamTask && Boolean(parent || children.length)} />
           <dl className="task-drawer-facts">
-            <div>
-              {icon("tasks")}
-              <dt>Mô tả</dt>
-              <dd className="task-drawer-description">
-                {t.description || "Chưa có mô tả"}
-              </dd>
-            </div>
             <div>
               {icon("flag")}
               <dt>Ưu tiên</dt>
@@ -1127,21 +1269,6 @@ function TaskDetailDrawer({
               }}
             />
           )}
-          {t.version &&
-            !children.length &&
-            (!t.isTeamTask || t.teamChecklist?.length > 0) && (
-              <details
-                className="task-detail-steps"
-                open={!!(t.isTeamTask ? t.teamChecklist : t.checklist)?.length}
-              >
-                <summary>Các bước thực hiện</summary>
-                {t.isTeamTask && t.teamStatus !== "Assigned" ? (
-                  <TeamChecklist items={t.teamChecklist} />
-                ) : (
-                  <TaskChecklistForm key={`${id}:${t.version}`} task={t} />
-                )}
-              </details>
-            )}
           {secretaryMode() ? (
             <div className="form-actions">
               {!["Completed", "Cancelled"].includes(t.status) &&
@@ -1187,6 +1314,12 @@ function TaskDetailDrawer({
             </form>
           )}
         </section>
+        {canShowChecklist && (
+          <section role="tabpanel" id="task-drawer-panel-checklist" aria-labelledby="task-drawer-tab-checklist"
+            className="task-detail-steps" hidden={tab !== "checklist"}>
+            <TaskChecklist task={t} />
+          </section>
+        )}
         <section
           role="tabpanel"
           id="task-drawer-panel-children"

@@ -1010,6 +1010,7 @@ it("uploads a document, reviews the order, and previews only the new project tas
   await user.click(screen.getByRole("button", { name: "Lưu và xem lịch đề xuất" }));
   await screen.findByRole("heading", { name: "Xem trước lịch" });
   expect(batchCalls[1].body.tasks.map((task) => task.name)).toEqual(["Viết báo cáo", "Thu thập số liệu"]);
+  expect(batchCalls[1].body.sourceFile).toEqual(batchCalls[0].body.file);
   expect(batchCalls[1].body.projectDeadline).toBe("2099-01-16T16:59:00Z");
   expect(batchCalls[1].body.tasks.map((task) => task.deadline)).toEqual([null, null]);
   expect(batchCalls[1].body.tasks[1].checklist).toEqual([{ id: "step", text: "Đối chiếu số liệu gốc", completed: false }]);
@@ -1049,7 +1050,79 @@ it("saves from the Inbox dialog, keeps options across tabs, and opens the comple
   expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
 });
 
-it("opens a project task and saves checklist completion separately", async () => {
+it("lets a legacy project attach its original file and displays a download link", async () => {
+  const [template] = currentWorkspace.tasks;
+  const project = { ...template, id: "project", name: "SWP", parentId: null };
+  const child = { ...template, id: "child", name: "Thiết kế ERD", parentId: project.id,
+    description: "TÓM TẮT\nMô hình dữ liệu.\n\nTÀI LIỆU NGUỒN: Đề bài SWP.txt" };
+  currentWorkspace.tasks = [project, child];
+  const original = vi.mocked(fetch).getMockImplementation();
+  vi.mocked(fetch).mockImplementation(async (url, options = {}) => {
+    const response = await original(url, options);
+    return url === "/api/tasks/child/source" && options.method === "PUT"
+      ? { ok: true, status: 200, json: async () => ({ data: { name: "Đề bài SWP.txt" } }) }
+      : response;
+  });
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Mở SWP · 1 việc con" }));
+  await user.click(screen.getByRole("button", { name: child.name, exact: true }));
+  await user.click(screen.getByRole("button", { name: "Mở chi tiết" }));
+  const drawer = within(await screen.findByRole("dialog", { name: child.name }));
+  const source = within(drawer.getByRole("region", { name: "Tài liệu nguồn" }));
+  expect(source.queryByRole("link")).toBeNull();
+  expect(source.getByRole("button", { name: "Gắn file gốc" })).toBeTruthy();
+  await user.upload(source.getByLabelText("Chọn file gốc"), new File(["Đề bài"], "Đề bài SWP.txt"));
+  const link = await source.findByRole("link", { name: "Đề bài SWP.txt" });
+  expect(link.getAttribute("href")).toBe("/api/tasks/child/source");
+  expect(link.getAttribute("download")).toBe("Đề bài SWP.txt");
+  expect(calls.find((call) => call.url === "/api/tasks/child/source")?.body)
+    .toMatchObject({ name: "Đề bài SWP.txt", mimeType: "text/plain" });
+});
+
+it("shows project children in scheduled order in the table and the project drawer", async () => {
+  const [template] = currentWorkspace.tasks;
+  const project = { ...template, id: "project", name: "Dự án SWP", parentId: null };
+  const child = (id, name, dependencies = []) => ({ ...template, id, name, dependencies, parentId: project.id });
+  const late = child("late", "Cài đặt CSDL");
+  const next = child("next", "Kiểm thử SQL");
+  const early = child("early", "Xác định bài toán");
+  const unplanned = child("unplanned", "Thiết kế ERD");
+  const after = child("after", "Viết báo cáo", [unplanned.id]);
+  currentWorkspace.tasks = [project, late, next, after, early, unplanned];
+  const today = dayKey(Date.now());
+  const tomorrow = addCalendarDays(today, 1);
+  const nextDay = addCalendarDays(today, 2);
+  const session = (id, task, day, hour, status = "Scheduled") => ({
+    id, taskId: task.id, taskName: task.name, status,
+    start: toUtc(`${day}T${hour}:00`), end: toUtc(`${day}T${hour}:30`),
+  });
+  currentWorkspace.sessions = [
+    session("late", late, tomorrow, "13"), session("next", next, nextDay, "08"),
+    session("early-second", early, nextDay, "10"), session("early-first", early, tomorrow, "09"),
+    session("cancelled", unplanned, tomorrow, "07", "Cancelled"),
+    session("expired", after, addCalendarDays(today, -1), "08"),
+  ];
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Mở Dự án SWP · 5 việc con" }));
+  const expected = [early.name, late.name, next.name, unplanned.name, after.name];
+  const orderedTitles = (table) => [...table.querySelectorAll("tbody tr")]
+    .map((row) => expected.find((name) => within(row).queryByRole("button", { name, exact: true })))
+    .filter(Boolean);
+  expect(orderedTitles(screen.getByRole("table"))).toEqual(expected);
+  expect(screen.getByRole("button", { name: `Mở lịch dự kiến của ${early.name}` }).textContent).toContain("09:00");
+
+  await user.click(screen.getByRole("button", { name: project.name, exact: true }));
+  await user.click(screen.getByRole("button", { name: "Mở chi tiết" }));
+  const drawer = within(await screen.findByRole("dialog", { name: project.name }));
+  await user.click(drawer.getByRole("tab", { name: "Việc con" }));
+  expect(orderedTitles(drawer.getByRole("table"))).toEqual(expected);
+});
+
+it("autosaves the checklist and completes the task only after confirmation", async () => {
   const [template] = currentWorkspace.tasks;
   const step = { id: "step-1", text: "Đối chiếu số liệu", completed: false };
   currentWorkspace.tasks = [
@@ -1057,15 +1130,34 @@ it("opens a project task and saves checklist completion separately", async () =>
     { ...template, id: "child", name: "Viết báo cáo", version: "child-v1", dependencies: [], parentId: "project", status: "Todo", checklist: [step] },
   ];
   const original = vi.mocked(fetch).getMockImplementation();
+  let releaseInlineSave;
+  const inlineSave = new Promise((resolve) => { releaseInlineSave = resolve; });
+  const updates = () => calls.filter((call) => call.url === "/api/tasks/child/checklist");
   vi.mocked(fetch).mockImplementation(async (url, options = {}) => {
-    if (url === "/api/tasks/child/checklist") {
-      currentWorkspace.tasks[1] = { ...currentWorkspace.tasks[1], version: "child-v2", checklist: JSON.parse(options.body).items };
-    }
-    return original(url, options);
+    const response = await original(url, options);
+    if (url !== "/api/tasks/child/checklist") return response;
+    const { version, items } = JSON.parse(options.body);
+    if (version === "child-v2") await inlineSave;
+    const nextVersion = `child-v${Number(version.at(-1)) + 1}`;
+    return { ok: true, status: 200, json: async () => ({ data: { version: nextVersion, checklist: items } }) };
   });
   mount();
   await navigate("tasks", "Công việc");
   const user = userEvent.setup();
+  expect(screen.queryByRole("button", { name: "Viết báo cáo", exact: true })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Mở Báo cáo IoT · 1 việc con" }));
+  const child = screen.getByRole("button", { name: "Viết báo cáo", exact: true });
+  expect(child.closest("tr").classList.contains("is-project-child")).toBe(true);
+  await user.click(child);
+  await user.click(screen.getByRole("button", { name: "Thu gọn Báo cáo IoT · 1 việc con" }));
+  expect(screen.queryByRole("button", { name: "Mở chi tiết" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Tìm kiếm", exact: true }));
+  const search = screen.getByRole("searchbox", { name: "Tìm công việc" });
+  await user.type(search, "Viết báo cáo");
+  expect(screen.getByRole("button", { name: "Báo cáo IoT", exact: true })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Viết báo cáo", exact: true })).toBeTruthy();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("button", { name: "Viết báo cáo", exact: true })).toBeNull();
   await user.click(screen.getByRole("button", { name: "Báo cáo IoT", exact: true }));
   await user.click(screen.getByRole("button", { name: "Mở chi tiết" }));
   const project = await screen.findByRole("dialog", { name: "Báo cáo IoT" });
@@ -1073,16 +1165,66 @@ it("opens a project task and saves checklist completion separately", async () =>
   await user.click(within(project).getByRole("tab", { name: "Việc con" }));
   await user.click(within(project).getByRole("button", { name: "Viết báo cáo" }));
   const task = await screen.findByRole("dialog", { name: "Viết báo cáo" });
-  await user.click(within(task).getByRole("checkbox", { name: "Hoàn thành mục 1" }));
-  await user.click(within(task).getByRole("button", { name: "Lưu checklist" }));
-  await screen.findByText("Đã lưu checklist.");
-  expect(calls.find((call) => call.url === "/api/tasks/child/checklist").body)
+  await user.click(within(task).getByRole("tab", { name: "Checklist" }));
+  const checklist = within(within(task).getByRole("tabpanel", { name: "Checklist" }));
+  await user.click(checklist.getByRole("checkbox", { name: "Hoàn thành mục 1" }));
+  await waitFor(() => expect(state.workspace.tasks[1].version).toBe("child-v2"));
+  const confirmationName = "Bạn đã hoàn thành “Viết báo cáo” chưa?";
+  const completion = () => screen.findByRole("dialog", { name: confirmationName });
+  const statusUpdates = () => calls.filter((call) => call.url === "/api/tasks/child/status");
+  await user.click(within(await completion()).getByRole("button", { name: "Chưa hoàn thành" }));
+  expect(checklist.getByRole("checkbox", { name: "Hoàn thành mục 1" }).checked).toBe(true);
+  expect(within(task).queryByRole("button", { name: "Lưu checklist" })).toBeNull();
+  expect(updates()[0].body)
     .toEqual({ version: "child-v1", items: [{ ...step, completed: true }] });
-  expect(calls.some((call) => call.url === "/api/tasks/child/status")).toBe(false);
-  await user.click(screen.getByRole("button", { name: "Về Báo cáo IoT" }));
+  expect(statusUpdates()).toHaveLength(0);
+  await user.click(within(task).getByRole("tab", { name: "Chi tiết" }));
+  await user.click(within(task).getByRole("button", { name: "Về Báo cáo IoT" }));
   const refreshedProject = within(await screen.findByRole("dialog", { name: "Báo cáo IoT" }));
   await user.click(refreshedProject.getByRole("tab", { name: "Việc con" }));
   expect(refreshedProject.getByRole("cell", { name: "1/1" })).toBeTruthy();
+  await user.click(refreshedProject.getByRole("button", { name: "Đóng", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Mở Báo cáo IoT · 1 việc con" }));
+  await user.click(screen.getByRole("button", { name: "Mở checklist của Viết báo cáo" }));
+  const inline = screen.getByRole("group", { name: "Checklist của Viết báo cáo" });
+  const childRow = screen.getByRole("button", { name: "Viết báo cáo", exact: true }).closest("tr");
+  expect(inline.closest("tr")).toBe(childRow.nextElementSibling);
+  const checkbox = within(inline).getByRole("checkbox", { name: "Hoàn thành mục 1" });
+  expect(checkbox.checked).toBe(true);
+  await user.click(checkbox);
+  expect(checkbox.checked).toBe(false);
+  await user.click(checkbox);
+  expect(checkbox.checked).toBe(true);
+  expect(updates()).toHaveLength(2);
+  expect(updates()[1].body)
+    .toEqual({ version: "child-v2", items: [step] });
+  expect(screen.queryByRole("dialog", { name: confirmationName })).toBeNull();
+  releaseInlineSave();
+  await waitFor(() => expect(state.workspace.tasks[1].version).toBe("child-v4"));
+  expect(updates()[2].body).toEqual({ version: "child-v3", items: [{ ...step, completed: true }] });
+  await user.click(within(await completion()).getByRole("button", { name: "Chưa hoàn thành" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(within(inline).queryByRole("button", { name: "Lưu checklist" })).toBeNull();
+  await user.type(within(inline).getByRole("textbox", { name: "Nội dung mục 1" }), " gốc");
+  expect(updates()).toHaveLength(3);
+  await user.click(screen.getByRole("button", { name: "Thu gọn checklist của Viết báo cáo" }));
+  expect(screen.queryByRole("group", { name: "Checklist của Viết báo cáo" })).toBeNull();
+  await waitFor(() => expect(state.workspace.tasks[1].version).toBe("child-v5"));
+  expect(updates()[3].body).toEqual({ version: "child-v4", items: [{ ...step, text: "Đối chiếu số liệu gốc", completed: true }] });
+  await user.click(screen.getByRole("button", { name: "Mở checklist của Viết báo cáo" }));
+  expect(screen.queryByRole("dialog", { name: confirmationName })).toBeNull();
+  const reopened = within(screen.getByRole("group", { name: "Checklist của Viết báo cáo" }));
+  const checkedItem = reopened.getByRole("checkbox", { name: "Hoàn thành mục 1" });
+  await user.click(checkedItem);
+  await user.click(checkedItem);
+  const confirm = await completion();
+  expect(statusUpdates()).toHaveLength(0);
+  expect(within(childRow).getByRole("checkbox", { name: "Hoàn thành Viết báo cáo" }).getAttribute("aria-checked")).toBe("false");
+  await user.click(within(confirm).getByRole("button", { name: "Đã hoàn thành", exact: true }));
+  const completed = await screen.findByRole("checkbox", { name: "Mở lại Viết báo cáo" });
+  expect(completed.getAttribute("aria-checked")).toBe("true");
+  expect(statusUpdates()).toHaveLength(1);
+  expect(statusUpdates()[0].body).toEqual({ status: "Completed", progress: 100 });
 });
 
 it("keeps the newly created task available if marking it complete fails", async () => {
@@ -1230,16 +1372,32 @@ it("clears the task selection and action menu when clicking outside the selected
 });
 
 it("keeps task details open in the right drawer after marking a task complete", async () => {
+  const task = currentWorkspace.tasks[1];
+  task.description = [
+    "TÓM TẮT\nMô tả nghiệp vụ cho website đã chọn.",
+    "YÊU CẦU CẦN THỰC HIỆN\n• Xác định phạm vi",
+    "ĐẦU RA CẦN BÀN GIAO\n• Bản phát biểu bài toán",
+    "CĂN CỨ DEADLINE: \nTÀI LIỆU NGUỒN: Đề bài SWP.docx",
+  ].join("\n\n");
   mount();
   await navigate("tasks", "Công việc");
   const user = userEvent.setup();
-  const task = currentWorkspace.tasks[1];
   await user.click(await screen.findByRole("button", { name: task.name, exact: true }));
   await user.click(screen.getByRole("button", { name: "Mở chi tiết" }));
   const drawer = await screen.findByRole("dialog", { name: task.name });
   expect(drawer.getAttribute("data-placement")).toBe("right");
   const content = within(drawer);
   expect(content.getByRole("tab", { name: "Chi tiết", selected: true })).toBeTruthy();
+  const description = within(content.getByRole("region", { name: "Mô tả" }));
+  expect(description.getByRole("heading", { name: "Tóm tắt" })).toBeTruthy();
+  expect(description.getByRole("heading", { name: "Việc cần thực hiện" })).toBeTruthy();
+  expect(description.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+    "Xác định phạm vi", "Bản phát biểu bài toán",
+  ]);
+  expect(description.getByText("Đề bài SWP.docx")).toBeTruthy();
+  expect(description.queryByRole("heading", { name: "Căn cứ deadline" })).toBeNull();
+  await user.click(content.getByRole("tab", { name: "Checklist" }));
+  expect(within(content.getByRole("tabpanel", { name: "Checklist" })).getByRole("button", { name: "Thêm bước" })).toBeTruthy();
   await user.click(content.getByRole("tab", { name: "Phiên đã xếp" }));
   expect(content.getByRole("tabpanel", { name: "Phiên đã xếp" })).toBeTruthy();
   await user.click(content.getByRole("checkbox", { name: "Đánh dấu công việc hoàn thành" }));

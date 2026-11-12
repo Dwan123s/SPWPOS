@@ -751,6 +751,7 @@
   margin: 7px 0 12px;
 }
 .eis-check-list {
+  position: relative;
   display: grid;
   gap: 7px;
   min-height: 8px;
@@ -759,6 +760,40 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid #dce6f4;
+  border-radius: 8px;
+  background: #fff;
+}
+.eis-check-row.is-sortable {
+  cursor: grab;
+  touch-action: none;
+}
+.eis-check-row.is-sortable:hover,
+.eis-check-row.is-sortable:focus-visible {
+  border-color: #8eb6e5;
+}
+.eis-check-list.is-sorting .eis-check-row:not(.is-dragging) {
+  transition: transform 160ms ease-out;
+}
+.eis-check-row.is-dragging {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  border-color: #78a9e3;
+  background: #f6faff;
+  box-shadow: 0 8px 18px #1d518c38;
+  animation: eis-check-lift 130ms ease-out both;
+}
+@keyframes eis-check-lift {
+  from { scale: 1; }
+  to { scale: 1.015; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eis-check-list.is-sorting .eis-check-row {
+    transition: none;
+    animation: none;
+  }
 }
 .eis-dialog .eis-check-row input:not([type="checkbox"]) {
   padding: 9px;

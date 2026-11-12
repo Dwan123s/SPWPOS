@@ -63,27 +63,35 @@ public sealed partial class WorkspaceService
         await SaveTaskChecklist(uid, task, input, ct);
     }, ct, false);
 
-    public Task UpdateTaskChecklistAsync(Guid uid, Guid id, MatrixChecklistInput input, CancellationToken ct) => Mutate(uid, async () => {
-        var task = await Find<WorkTask>(uid, id, ct);
-        Require(!task.IsDeleted, "NOT_FOUND", "Không tìm thấy công việc.", 404);
-        Require(input.Version != Guid.Empty && task.Version == input.Version,
-            "TASK_STALE", "Công việc vừa thay đổi. Mở lại trước khi chỉnh sửa.", 409);
-        var shared = await (from assignment in db.TeamTaskAssignments
-            join teamTask in db.TeamTasks on assignment.TeamTaskId equals teamTask.Id
-            where assignment.WorkTaskId == id && assignment.Active && assignment.UserId == uid
-            select teamTask).SingleOrDefaultAsync(ct);
-        if (shared is not null)
+    public async Task<TaskChecklistSaveResult> UpdateTaskChecklistAsync(Guid uid, Guid id, MatrixChecklistInput input, CancellationToken ct)
+    {
+        var (savedTask, teamRequirements, revision) = await Mutate(uid, async () =>
         {
-            Require(shared.AssigneeId == uid && shared.Status == "Assigned",
-                "TASK_STALE", "Công việc đã thay đổi hoặc đang chờ duyệt. Hãy tải lại.", 409);
-            var requirements = TeamRequirements(shared.Id, shared.Description);
-            var items = ValidateTaskChecklist(input.Items);
-            var requiredIds = requirements.Select(item => item.Id).ToHashSet();
-            await SaveTeamRequirementProgress(uid, task, requirements, items.Where(item => requiredIds.Contains(item.Id)).ToArray(), ct);
-            return;
-        }
-        await SaveTaskChecklist(uid, task, input, ct);
-    }, ct, false);
+            var task = await Find<WorkTask>(uid, id, ct);
+            Require(!task.IsDeleted, "NOT_FOUND", "Không tìm thấy công việc.", 404);
+            Require(input.Version != Guid.Empty && task.Version == input.Version,
+                "TASK_STALE", "Công việc vừa thay đổi. Mở lại trước khi chỉnh sửa.", 409);
+            var shared = await (from assignment in db.TeamTaskAssignments
+                join teamTask in db.TeamTasks on assignment.TeamTaskId equals teamTask.Id
+                where assignment.WorkTaskId == id && assignment.Active && assignment.UserId == uid
+                select teamTask).SingleOrDefaultAsync(ct);
+            TaskChecklistItem[]? requirements = null;
+            if (shared is not null)
+            {
+                Require(shared.AssigneeId == uid && shared.Status == "Assigned",
+                    "TASK_STALE", "Công việc đã thay đổi hoặc đang chờ duyệt. Hãy tải lại.", 409);
+                requirements = TeamRequirements(shared.Id, shared.Description);
+                var items = ValidateTaskChecklist(input.Items);
+                var requiredIds = requirements.Select(item => item.Id).ToHashSet();
+                await SaveTeamRequirementProgress(uid, task, requirements, items.Where(item => requiredIds.Contains(item.Id)).ToArray(), ct);
+            }
+            else await SaveTaskChecklist(uid, task, input, ct);
+            return (task, requirements, (await Preference(uid, ct)).Revision);
+        }, ct, false);
+        // SaveChanges assigns the final task version used by the next checklist edit.
+        var checklist = ReadTaskChecklist(savedTask);
+        return new(savedTask.Version, checklist, teamRequirements is null ? null : CheckedTeamRequirements(teamRequirements, checklist), revision);
+    }
 
     public Task MoveMatrixTaskAsync(Guid uid, Guid id, MatrixMoveInput input, CancellationToken ct) => Mutate(uid, async () => {
         var task = await MatrixTask(uid, id, input.Version, ct);

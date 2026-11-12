@@ -72,20 +72,52 @@ function Dialog({ title, children, onClose, busy }) {
     document.body,
   );
 }
-export function Checklist({ items, onChange, disabled, showCompletion = true }) {
+export function Checklist({ items, onChange, onTextChange = onChange, disabled, showCompletion = true }) {
   const list = useRef(null);
+  const dragOrigin = useRef(null);
+  const sortable = !disabled && items.length > 1;
   const { drag, start } = useEisenhowerDrag(
-    (element) => {
+    (element, id, y) => {
       if (!list.current?.contains(element)) return null;
-      return {
-        beforeId: element.closest("[data-check-id]")?.dataset.checkId || null,
-      };
+      const top = list.current.getBoundingClientRect().top;
+      // Offsets describe the original layout while the cards animate around it.
+      const before = [...list.current.children].find((row) =>
+        row.dataset.checkId !== id && y < top + row.offsetTop + row.offsetHeight / 2,
+      );
+      return { beforeId: before?.dataset.checkId ?? null };
     },
-    (id, drop) => onChange(moveChecklist(items, id, drop.beforeId)),
-    disabled,
+    (id, drop) => reorder(id, drop.beforeId),
+    !sortable,
   );
-  function update(id, patch) {
-    onChange(items.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  const from = drag ? items.findIndex((item) => item.id === drag.id) : -1;
+  const before = drag?.target?.beforeId ? items.findIndex((item) => item.id === drag.target.beforeId) : items.length;
+  const to = !drag?.target || before === -1 ? from : before > from ? before - 1 : before;
+
+  function reorder(id, beforeId) {
+    const next = moveChecklist(items, id, beforeId);
+    if (next !== items) onChange(next);
+  }
+
+  function beginDrag(event, id) {
+    if (!sortable || event.button !== 0 || event.target.closest("button, input")) return;
+    const { currentTarget: row } = event;
+    dragOrigin.current = {
+      top: list.current.getBoundingClientRect().top,
+      step: row.offsetHeight + (Number.parseFloat(getComputedStyle(list.current).rowGap) || 0),
+    };
+    start(event, id);
+  }
+
+  function displacement(index) {
+    if (from === -1) return 0;
+    if (index === from) return drag.offsetY + dragOrigin.current.top - list.current.getBoundingClientRect().top;
+    if (index > from && index <= to) return -dragOrigin.current.step;
+    if (index < from && index >= to) return dragOrigin.current.step;
+    return 0;
+  }
+
+  function update(id, patch, change = onChange) {
+    change(items.map((i) => (i.id === id ? { ...i, ...patch } : i)));
   }
   return (
     <section className="eis-check-editor" aria-label="Checklist của task">
@@ -99,33 +131,26 @@ export function Checklist({ items, onChange, disabled, showCompletion = true }) 
         Các bước nhỏ để hoàn thành việc. Tích checklist không tự hoàn thành cả
         task.
       </p>}
-      <div ref={list} className="eis-check-list" data-check-list>
+      <div ref={list} className={`eis-check-list${drag ? " is-sorting" : ""}`} data-check-list>
         {items.map((item, index) => (
           <div
-            className={`eis-check-row${drag?.id === item.id ? " is-dragging" : ""}${drag?.target?.beforeId === item.id ? " is-drop-before" : ""}`}
+            className={`eis-check-row${sortable ? " is-sortable" : ""}${drag?.id === item.id ? " is-dragging" : ""}`}
             key={item.id}
             data-check-id={item.id}
+            role="group"
+            aria-label={`Mục checklist ${index + 1}`}
+            aria-keyshortcuts={sortable ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
+            tabIndex={sortable ? 0 : undefined}
+            style={drag ? { transform: `translateY(${displacement(index)}px)` } : undefined}
+            onPointerDown={(event) => beginDrag(event, item.id)}
+            onKeyDown={(event) => {
+              if (!sortable || event.target !== event.currentTarget || !event.altKey ||
+                  !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+              event.preventDefault();
+              if (event.key === "ArrowUp" && index > 0) reorder(item.id, items[index - 1].id);
+              if (event.key === "ArrowDown") reorder(item.id, items[index + 2]?.id ?? null);
+            }}
           >
-            <button
-              type="button"
-              className="eis-drag-handle"
-              aria-label={`Kéo mục ${index + 1}`}
-              disabled={disabled}
-              onPointerDown={(e) => start(e, item.id)}
-              onKeyDown={(e) => {
-                if (e.altKey && ["ArrowUp", "ArrowDown"].includes(e.key)) {
-                  e.preventDefault();
-                  const before =
-                    e.key === "ArrowUp"
-                      ? items[index - 1]?.id
-                      : items[index + 2]?.id || null;
-                  if (e.key !== "ArrowUp" || index > 0)
-                    onChange(moveChecklist(items, item.id, before));
-                }
-              }}
-            >
-              {icon("menu")}
-            </button>
             {showCompletion && <input
               type="checkbox"
               aria-label={`Hoàn thành mục ${index + 1}`}
@@ -138,7 +163,7 @@ export function Checklist({ items, onChange, disabled, showCompletion = true }) 
               value={item.text}
               maxLength={300}
               disabled={disabled}
-              onChange={(e) => update(item.id, { text: e.target.value })}
+              onChange={(e) => update(item.id, { text: e.target.value }, onTextChange)}
               className={item.completed ? "is-completed" : ""}
             />
             <button

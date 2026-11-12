@@ -3,7 +3,7 @@ import { state, dateFmt, icon, statusLabels } from "./ui.jsx";
 import { api } from "./api.js";
 import { taskColumns, taskRows } from "./tasks.jsx";
 import { TaskInbox } from "./task-inbox.jsx";
-import { isInboxNote, smartTaskLists } from "./task-smart-lists.js";
+import { activeTask, isInboxNote, smartTaskLists } from "./task-smart-lists.js";
 import { PopupDetails } from "./popup-dismissal.jsx";
 import "./task-smart-list.css";
 
@@ -29,34 +29,57 @@ const emptyFilters = {
 };
 
 function TodayTaskPane({ model }) {
+  const overdueCount = model.todayTasks.filter(model.isOverdue).length;
+  const total = model.todayCompleted + model.todayTasks.length;
+  const progressLabel = `Đã hoàn thành ${model.todayCompleted}/${total} việc hôm nay`;
   return (
     <aside className="task-today-pane" aria-label="Việc hôm nay">
       <header>
-        <button type="button" className="btn ghost small" data-action="new-task"
-          aria-label="Mở biểu mẫu công việc từ Hôm nay" aria-haspopup="dialog">
+        <button type="button" className="task-today-tool" data-action="new-task"
+          aria-label="Mở biểu mẫu công việc từ Hôm nay" title="Thêm công việc" aria-haspopup="dialog">
           {icon("plus")}
         </button>
-        <h2>Hôm nay <small>{dateFmt(`${model.today}T12:00:00Z`, { timeZone: "UTC" })}</small></h2>
-        <button type="button" className="btn ghost small" data-action="nav" data-id="today"
-          aria-label="Mở trang Hôm nay">
-          {icon("calendar")}
+        <div className="task-today-date">
+          <h2>Hôm nay <small>{dateFmt(`${model.today}T12:00:00Z`, { timeZone: "UTC" })}</small></h2>
+          <progress className="task-today-progress" max={total || 1} value={model.todayCompleted}
+            aria-label={progressLabel} title={progressLabel} />
+        </div>
+        <button type="button" className="task-today-tool" data-action="nav" data-id="calendar"
+          aria-label="Mở lịch" title="Mở lịch">
+          {icon("clock")}
+        </button>
+        <span className="task-today-warning" role="status" title={overdueCount ? `${overdueCount} việc quá hạn` : undefined}>
+          {overdueCount > 0 && <>{icon("alertTriangle")}<span>{overdueCount} việc quá hạn</span></>}
+        </span>
+        <button type="button" className="task-today-tool" data-action="nav" data-id="today"
+          aria-label="Mở trang Hôm nay" title="Mở trang Hôm nay">
+          {icon("expand")}
         </button>
       </header>
       {model.todayTasks.length ? (
         <ul className="task-today-list">
-          {model.todayTasks.map((task) => (
-            <li key={task.id}>
-              {task.isTeamTask ? <span className="task-today-team" title="Công việc nhóm">{icon("users")}</span> : (
-                <button type="button" className="task-complete-toggle" role="checkbox" aria-checked={false}
-                  aria-label={`Đánh dấu xong ${task.name} trong Hôm nay`}
-                  data-action="toggle-task-completion" data-id={task.id} />
-              )}
-              <button type="button" className="task-today-title" data-action="task-detail" data-id={task.id}
-                aria-label={`Xem ${task.name} trong Hôm nay`}>
-                {task.name}
-              </button>
-            </li>
-          ))}
+          {model.todayTasks.map((task) => {
+            const dueId = model.dayOf(task.deadline) ? `task-today-due-${task.id}` : undefined;
+            const overdue = model.isOverdue(task);
+            return (
+              <li key={task.id}>
+                {task.isTeamTask ? <span className="task-today-team" title="Công việc nhóm">{icon("users")}</span> : (
+                  <button type="button" className="task-complete-toggle" role="checkbox" aria-checked={false}
+                    aria-label={`Đánh dấu xong ${task.name} trong Hôm nay`}
+                    data-action="toggle-task-completion" data-id={task.id} />
+                )}
+                <button type="button" className="task-today-title" data-action="task-detail" data-id={task.id}
+                  aria-label={`Xem ${task.name} trong Hôm nay`} aria-describedby={dueId}>
+                  <span>{task.name}</span>
+                  {dueId && (
+                    <time id={dueId} className="task-today-due" dateTime={task.deadline} data-overdue={overdue}>
+                      {overdue ? "Quá hạn" : "Hạn"} {dateFmt(task.deadline)}
+                    </time>
+                  )}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       ) : <p>Chưa có việc được xếp hoặc đến hạn hôm nay.</p>}
     </aside>
@@ -127,6 +150,15 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
       document.removeEventListener("visibilitychange", visible);
     };
   }, [refresh]);
+  const nextDeadline = (workspace.tasks || []).reduce((next, task) => {
+    const deadline = Date.parse(task.deadline);
+    return activeTask(task) && deadline > now ? Math.min(next, deadline) : next;
+  }, Infinity);
+  useEffect(() => {
+    if (nextDeadline - now > 60000) return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(1, nextDeadline - Date.now()));
+    return () => clearTimeout(timer);
+  }, [nextDeadline, now]);
   const model = smartTaskLists(workspace, now);
   const inbox = notes.filter(isInboxNote);
   const selected = lists[scope];
@@ -162,7 +194,7 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
         ? model.weekGroups
         : [{ key: "all", tasks: scope === "personal" ? model.all.filter((task) => !task.isTeamTask) : model.all }];
   const groups = sourceGroups
-    .map((g) => ({ ...g, tasks: g.tasks.filter(matches) }))
+    .map((g) => ({ ...g, projectContext: isFlat ? g.tasks : undefined, tasks: g.tasks.filter(matches) }))
     .filter((g) => isFlat || g.tasks.length);
   const count = groups.reduce((sum, g) => sum + g.tasks.length, 0);
   const filtered =
@@ -384,6 +416,9 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
                       onSelect: setSelectedTaskId,
                       toolbarHost,
                       onWorkspaceChanged,
+                      projectContext: group.projectContext,
+                      plannedStarts: model.plannedStarts,
+                      revealMatchingChildren: filtered,
                       addTask: isFlat ? addTask : null,
                       emptyMessage: filtered ? "Không có công việc phù hợp" : null,
                     })}

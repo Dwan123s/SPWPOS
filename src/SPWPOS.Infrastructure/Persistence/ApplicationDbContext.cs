@@ -14,6 +14,7 @@ public sealed partial class ApplicationDbContext(DbContextOptions<ApplicationDbC
     public DbSet<SecurityRateLimit> SecurityRateLimits => Set<SecurityRateLimit>();
     public DbSet<PasswordChangeNotification> PasswordChangeNotifications => Set<PasswordChangeNotification>();
     public DbSet<WorkTask> WorkTasks => Set<WorkTask>();
+    public DbSet<ProjectSourceDocument> ProjectSourceDocuments => Set<ProjectSourceDocument>();
     public DbSet<SkinPurchase> SkinPurchases => Set<SkinPurchase>();
     public DbSet<OwnedPetSkin> OwnedPetSkins => Set<OwnedPetSkin>();
     public DbSet<PlanningNote> PlanningNotes => Set<PlanningNote>();

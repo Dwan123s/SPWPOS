@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -104,6 +105,33 @@ beforeEach(() => {
     return {};
   });
 });
+it("warns when a task becomes overdue while the Today pane is open", async () => {
+  const deadline = Date.parse("2026-11-04T01:00:05Z");
+  state.workspace.tasks[0].deadline = new Date(deadline).toISOString();
+  state.workspace.tasks[1].deadline = "2026-11-03T16:00:00+07:00";
+  state.workspace.tasks.push({
+    ...state.workspace.tasks[0], id: "done", name: "Việc đã xong", status: "Completed",
+    completedAt: "2026-11-04T00:00:00Z",
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    await act(async () => { render(<TaskSmartList />); });
+    const pane = within(screen.getByRole("complementary", { name: "Việc hôm nay" }));
+    const dueToday = pane.getByRole("button", { name: "Xem Báo cáo hôm nay trong Hôm nay" });
+    expect(dueToday.querySelector("time").dataset.overdue).toBe("false");
+    expect(pane.getByRole("status").textContent).toBe("1 việc quá hạn");
+    expect(pane.getByRole("progressbar", { name: "Đã hoàn thành 1/3 việc hôm nay" }).value).toBe(1);
+    expect(pane.queryByRole("button", { name: /Việc đã xong/ })).toBeNull();
+
+    Date.now.mockReturnValue(deadline);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(dueToday.querySelector("time").dataset.overdue).toBe("true");
+    expect(pane.getByRole("status").textContent).toBe("2 việc quá hạn");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it("shows the task table and a title-only add row by default", () => {
   state.taskScope = undefined;
   state.workspace.tasks.unshift({
