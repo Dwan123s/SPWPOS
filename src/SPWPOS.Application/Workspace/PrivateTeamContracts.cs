@@ -44,7 +44,8 @@ public sealed record TeamChatMessageView(long Id, Guid UserId, string Author, st
 public sealed record TeamChatAuthorView(Guid UserId, string Name, string AvatarUrl, string SelectedSkin = "classic", int UserLevel = 1);
 public sealed record TeamChatPage(TeamChatMessageView[] Items, long? NextAfter, bool HasMore, TeamChatAuthorView[]? Authors = null);
 public sealed record ClaimConfirmInput([Range(0, 2)] int Option = 0);
-public sealed record PolicyView(int AwakeStart, int AwakeEnd, int LunchStart, int LunchEnd, int DinnerStart, int DinnerEnd, int CommuteMinutes, int FocusMinutes, bool Confirmed, DateTimeOffset? ConfirmedAt = null, bool HasDailyRoutine = false);
+public sealed record PolicyView(int AwakeStart, int AwakeEnd, int LunchStart, int LunchEnd, int DinnerStart, int DinnerEnd, int CommuteMinutes, int FocusMinutes, bool Confirmed, DateTimeOffset? ConfirmedAt = null, bool HasDailyRoutine = false,
+    DateOnly[]? TimetableWeeks = null);
 public sealed record RoutineBlock(string Kind, string Label, DateTimeOffset Start, DateTimeOffset End);
 public sealed record PolicyDayView(DateOnly Date, int CalendarGapMinutes, TimeSlot[] WorkGaps, TimeSlot[] FocusSlots, int SchedulableMinutes,
     SPWPOS.Domain.Entities.RoutineDay? Routine = null, RoutineBlock[]? Timeline = null);
@@ -56,6 +57,8 @@ public interface IPolicyDraftInterpreter
 public interface IPrivateTeamService
 {
     Task<TeamView[]> ListTeamsAsync(Guid uid, CancellationToken ct);
+    Task<TeamWorkloadView> GetTeamWorkloadAsync(Guid uid, Guid teamId, int week, CancellationToken ct);
+    Task<TeamWorkloadCandidate[]> GetTeamWorkloadCandidatesAsync(Guid uid, Guid teamId, Guid taskId, CancellationToken ct);
     Task<TeamChatPage> GetTeamChatAsync(Guid uid, Guid teamId, long? after, long? before, CancellationToken ct);
     Task<TeamChatMessageView> SendTeamChatAsync(Guid uid, Guid teamId, TeamChatInput input, CancellationToken ct);
     Task<Guid> CreateTeamAsync(Guid uid, TeamNameInput input, CancellationToken ct);
@@ -91,7 +94,7 @@ public interface IPrivateTeamService
     Task RejectTeamTaskChangeAsync(Guid uid, Guid taskId, Guid version, CancellationToken ct);
     Task<PolicyView?> GetAvailabilityPolicyAsync(Guid uid, CancellationToken ct);
     Task<PolicyDayView[]> GetPolicySlotsAsync(Guid uid, CancellationToken ct);
-    Task<PolicyPreviewView> PreviewAvailabilityPolicyAsync(Guid uid, CancellationToken ct, Guid? timetableTurnId = null);
-    Task<PolicyPreviewView> DraftAvailabilityPolicyAsync(Guid uid, TeamTextInput input, CancellationToken ct, Guid? timetableTurnId = null);
+    Task<PolicyPreviewView> PreviewAvailabilityPolicyAsync(Guid uid, CancellationToken ct, Guid? timetableTurnId = null, bool useTimetableHours = false);
+    Task<PolicyPreviewView> DraftAvailabilityPolicyAsync(Guid uid, TeamTextInput input, CancellationToken ct, Guid? timetableTurnId = null, bool useTimetableHours = false);
     Task ConfirmAvailabilityPolicyAsync(Guid uid, Guid proposalId, CancellationToken ct);
 }

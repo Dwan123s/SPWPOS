@@ -1,57 +1,12 @@
 import {
-  cloneElement,
   useLayoutEffect,
   useRef,
   useState,
   useEffect,
 } from "react";
-import { availabilityRow } from "./calendar.jsx";
 import { Slot } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
 import { state, modal, closeModal, toast, icon } from "./ui.jsx";
-let editRows = null,
-  nextRow = 0;
-export function editAvailability(action, key) {
-  editRows?.(action, key);
-}
-function AvailabilityEditor({ slots }) {
-  const [rows, setRows] = useState(() =>
-    slots.map((slot) => ({
-      key: String(++nextRow),
-      slot,
-    })),
-  );
-  useLayoutEffect(() => {
-    editRows = (action, key) =>
-      setRows((current) =>
-        action === "add"
-          ? [
-              ...current,
-              {
-                key: String(++nextRow),
-                slot: undefined,
-              },
-            ]
-          : current.filter((row) => row.key !== key),
-      );
-    return () => {
-      editRows = null;
-    };
-  }, []);
-  return (
-    <div id="availability-rows">
-      {rows.map((row) =>
-        cloneElement(availabilityRow(row.slot), {
-          key: row.key,
-          "data-row-key": row.key,
-        }),
-      )}
-    </div>
-  );
-}
-export const availabilityEditor = (slots) => (
-  <AvailabilityEditor slots={slots} />
-);
 const avatarImage = (url, p) =>
   url ? (
     <img src={url} alt="Avatar" className="avatar-img" id="hero-avatar-img" />

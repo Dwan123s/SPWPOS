@@ -40,45 +40,7 @@ export function WorkspaceAtmosphere() {
       <span className="workspace-halo workspace-halo--two" />
       <span className="workspace-orb workspace-orb--one" />
       <span className="workspace-orb workspace-orb--two" />
-      <picture className="workspace-ribbon-art">
-        <source
-          srcSet="/assets/login-sprites/ribbon-background.webp"
-          type="image/webp"
-        />
-        <img
-          src="/assets/login-sprites/ribbon-background.png"
-          width="1000"
-          height="1000"
-          alt=""
-          decoding="async"
-          loading="lazy"
-          fetchPriority="low"
-        />
-      </picture>
-      <picture className="workspace-bubble-art workspace-bubble-art--one">
-        <source srcSet="/assets/login-sprites/bubble.webp" type="image/webp" />
-        <img
-          src="/assets/login-sprites/bubble.png"
-          width="1000"
-          height="1000"
-          alt=""
-          decoding="async"
-          loading="lazy"
-          fetchPriority="low"
-        />
-      </picture>
-      <picture className="workspace-bubble-art workspace-bubble-art--two">
-        <source srcSet="/assets/login-sprites/bubble.webp" type="image/webp" />
-        <img
-          src="/assets/login-sprites/bubble.png"
-          width="1000"
-          height="1000"
-          alt=""
-          decoding="async"
-          loading="lazy"
-          fetchPriority="low"
-        />
-      </picture>
+      <span className="workspace-ribbon-art" />
     </div>
   );
 }

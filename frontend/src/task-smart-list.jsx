@@ -1,35 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { state, icon, statusLabels } from "./ui.jsx";
 import { api } from "./api.js";
-import { taskRows } from "./tasks.jsx";
+import { taskColumns, taskRows } from "./tasks.jsx";
 import { TaskInbox } from "./task-inbox.jsx";
 import { isInboxNote, smartTaskLists } from "./task-smart-lists.js";
 import { PopupDetails } from "./popup-dismissal.jsx";
 import "./task-smart-list.css";
 
 const lists = {
+  personal: { label: "Việc của tôi" },
+  all: { label: "Tất cả công việc" },
   inbox: {
-    label: "Inbox",
-    glyph: "mail",
-    description:
-      "Ghi nhanh việc cần làm, tick khi hoàn thành. Bỏ tick để mở lại bất cứ lúc nào.",
+    label: "Ghi nháp",
   },
   today: {
-    label: "Today",
-    glyph: "calendar",
-    description:
-      "Công việc đến hạn hoặc đã xếp lịch hôm nay, cùng những việc còn quá hạn.",
+    label: "Hôm nay",
   },
   week: {
-    label: "Next 7 Days",
-    glyph: "clock",
-    description: "Bảy ngày tính từ hôm nay, theo múi giờ tài khoản của bạn.",
-  },
-  all: {
-    label: "Tất cả công việc",
-    glyph: "tasks",
-    description:
-      "Tra cứu công việc đã lên kế hoạch, bao gồm cả việc hoàn thành và đã hủy.",
+    label: "7 ngày tới",
   },
 };
 const emptyFilters = {
@@ -39,11 +27,14 @@ const emptyFilters = {
   from: "",
   to: "",
 };
-export function TaskSmartList() {
+export function TaskSmartList({ onShowMatrix }) {
   const [scope, setScope] = useState(() =>
-    lists[state.taskScope] ? state.taskScope : "inbox",
+    lists[state.taskScope] ? state.taskScope : "personal",
   );
+  const [columns, setColumns] = useState(() => Object.keys(taskColumns));
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchTrigger = useRef(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,31 +74,32 @@ export function TaskSmartList() {
     };
     const timer = setInterval(visible, 60000);
     window.addEventListener("focus", visible);
-    window.addEventListener("workspace-updated", visible);
+    const updated = () => {
+      if (lists[state.taskScope]) setScope(state.taskScope);
+      visible();
+    };
+    window.addEventListener("workspace-updated", updated);
     document.addEventListener("visibilitychange", visible);
     return () => {
       alive.current = false;
       epoch.current++;
       clearInterval(timer);
       window.removeEventListener("focus", visible);
-      window.removeEventListener("workspace-updated", visible);
+      window.removeEventListener("workspace-updated", updated);
       document.removeEventListener("visibilitychange", visible);
     };
   }, [refresh]);
   const model = smartTaskLists(workspace, now);
   const inbox = notes.filter(isInboxNote);
-  const counts = {
-    inbox: inbox.filter((note) => !note.inboxCompleted).length,
-    today: model.todayGroups.reduce((sum, g) => sum + g.tasks.length, 0),
-    week: model.weekGroups.reduce((sum, g) => sum + g.tasks.length, 0),
-    all: model.all.length,
-  };
   const selected = lists[scope];
+  const isDrafts = scope === "inbox";
+  const isFlat = scope === "personal" || scope === "all";
+  const incomplete = filters.status === "active";
   function choose(key) {
     state.taskScope = key;
     setScope(key);
     setNow(Date.now());
-    if (key !== "all" && ["Completed", "Cancelled"].includes(filters.status))
+    if ((key === "today" || key === "week") && ["Completed", "Cancelled"].includes(filters.status))
       setFilters((current) => ({ ...current, status: "" }));
   }
   function matches(task) {
@@ -115,11 +107,13 @@ export function TaskSmartList() {
       `${task.name} ${task.description || ""}`
         .toLocaleLowerCase("vi")
         .includes(query.trim().toLocaleLowerCase("vi")) &&
-      (!filters.status || task.status === filters.status) &&
+      (!filters.status || (filters.status === "active"
+        ? !["Completed", "Cancelled"].includes(task.status)
+        : task.status === filters.status)) &&
       (!filters.category || task.categoryId === filters.category) &&
       (!filters.priority || task.priority === Number(filters.priority)) &&
-      (!filters.from || model.dayOf(task.deadline) >= filters.from) &&
-      (!filters.to || model.dayOf(task.deadline) <= filters.to)
+      (!filters.from || (task.deadline && model.dayOf(task.deadline) >= filters.from)) &&
+      (!filters.to || (task.deadline && model.dayOf(task.deadline) <= filters.to))
     );
   }
   const sourceGroups =
@@ -127,132 +121,100 @@ export function TaskSmartList() {
       ? model.todayGroups
       : scope === "week"
         ? model.weekGroups
-        : [{ key: "all", tasks: model.all }];
+        : [{ key: "all", tasks: scope === "personal" ? model.all.filter((task) => !task.isTeamTask) : model.all }];
   const groups = sourceGroups
     .map((g) => ({ ...g, tasks: g.tasks.filter(matches) }))
-    .filter((g) => g.tasks.length);
+    .filter((g) => isFlat || g.tasks.length);
   const count = groups.reduce((sum, g) => sum + g.tasks.length, 0);
   const filtered =
-    !!query || (scope !== "inbox" && Object.values(filters).some(Boolean));
+    !!query || (!isDrafts && Object.values(filters).some(Boolean));
   const setFilter = (key, value) =>
     setFilters((current) => ({ ...current, [key]: value }));
+  const addTask = (
+    <button type="button" className="task-quick-add-button" data-action="new-task" aria-haspopup="dialog">
+      {icon("plus")} Thêm công việc…
+    </button>
+  );
   return (
     <div className="task-smart-layout">
       <nav className="task-smart-nav" aria-label="Danh sách thông minh">
-        <span className="task-smart-eyebrow">DANH SÁCH CỦA BẠN</span>
-        {Object.entries(lists).map(([key, item]) => (
-          <button
-            key={key}
-            type="button"
-            className={`task-smart-nav-item${scope === key ? " is-active" : ""}${key === "all" ? " task-smart-all" : ""}`}
-            aria-pressed={scope === key}
-            onClick={() => choose(key)}
-          >
-            {icon(item.glyph)}
-            <span>{item.label}</span>
-            <small aria-label={`${counts[key]} mục`}>
-              {key === "inbox" && loading ? "…" : counts[key]}
-            </small>
+        <button type="button" className={`task-smart-nav-item${scope === "personal" ? " is-active" : ""}`}
+          aria-pressed={scope === "personal"} onClick={() => choose("personal")}>
+          {icon("mail")} Inbox
+        </button>
+        <button type="button" className={`task-smart-nav-item${!isDrafts && scope !== "personal" ? " is-active" : ""}`}
+          aria-pressed={!isDrafts && scope !== "personal"} onClick={() => choose("all")}>
+          {icon("tasks")} Công việc
+        </button>
+        <button type="button" className={`task-smart-nav-item${isDrafts ? " is-active" : ""}`}
+          aria-pressed={isDrafts} onClick={() => choose("inbox")}>
+          {icon("edit")} Ghi nháp
+        </button>
+        {onShowMatrix && (
+          <button type="button" className="task-smart-nav-item" onClick={onShowMatrix}>
+            {icon("spark")} Eisenhower
           </button>
-        ))}
-        <p>
-          Ghi lại trước.
-          <br />
-          Tập trung vào điều cần làm tiếp theo.
-        </p>
+        )}
       </nav>
       <section
-        className="card task-smart-main"
+        className="task-smart-main"
         aria-label={`Nội dung ${selected.label}`}
       >
-        <header className="task-smart-header">
-          <div>
-            <span className="task-smart-eyebrow">
-              {scope === "inbox" ? "NƠI BẮT ĐẦU Ý TƯỞNG" : "CÔNG VIỆC CỦA BẠN"}
-            </span>
-            <h2>
-              {selected.label}
-              <span>{counts[scope]}</span>
-            </h2>
-            <p>{selected.description}</p>
-          </div>
-          {scope !== "inbox" && (
-            <span className="task-smart-range">
-              {formatTaskDate(`${model.today}T12:00:00Z`)}
-              {scope === "week" &&
-                ` – ${formatTaskDate(`${model.lastDay}T12:00:00Z`)}`}
-            </span>
-          )}
-        </header>
         <div className="task-smart-toolbar">
-          <label className="search-field">
-            {icon("search")}
-            <input
-              className="filter search"
-              type="search"
-              aria-label={
-                scope === "inbox" ? "Tìm trong Inbox" : "Tìm công việc"
-              }
-              placeholder={
-                scope === "inbox"
-                  ? "Tìm ý tưởng, nhiệm vụ tạm thời…"
-                  : "Tìm công việc…"
-              }
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-          {scope !== "inbox" && (
-            <>
-              <select
-                aria-label="Lọc trạng thái"
-                className="filter"
-                value={filters.status}
-                onChange={(event) => setFilter("status", event.target.value)}
-              >
-                <option value="">Trạng thái</option>
-                {Object.entries(statusLabels)
-                  .filter(([key]) =>
-                    (scope === "all"
-                      ? ["Todo", "InProgress", "Completed", "Cancelled"]
-                      : ["Todo", "InProgress"]
-                    ).includes(key),
-                  )
-                  .map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
+          {!isDrafts && (
+            <PopupDetails className="task-work-popup task-work-scope">
+              <summary aria-label={`Lọc danh sách · ${selected.label}`}>{selected.label}</summary>
+              <div>
+                <div className="task-work-scope-options" aria-label="Phạm vi công việc">
+                  {Object.entries(lists).filter(([key]) => key !== "inbox").map(([key, list]) => (
+                    <button key={key} type="button" aria-pressed={scope === key}
+                      onClick={(event) => {
+                        const disclosure = event.currentTarget.closest("details");
+                        choose(key);
+                        disclosure.open = false;
+                        disclosure.querySelector("summary").focus();
+                      }}>
+                      {list.label}
+                    </button>
                   ))}
-              </select>
-              <select
-                aria-label="Lọc danh mục"
-                className="filter"
-                value={filters.category}
-                onChange={(event) => setFilter("category", event.target.value)}
-              >
-                <option value="">Danh mục công việc</option>
-                {workspace.categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="Lọc mức ưu tiên"
-                className="filter"
-                value={filters.priority}
-                onChange={(event) => setFilter("priority", event.target.value)}
-              >
-                <option value="">Ưu tiên</option>
-                {[4, 3, 2, 1].map((priority) => (
-                  <option key={priority} value={priority}>
-                    {["", "Thấp", "Vừa", "Cao", "Khẩn"][priority]}
-                  </option>
-                ))}
-              </select>
-              <PopupDetails className="date-filters">
-                <summary>Khoảng deadline</summary>
-                <div>
+                </div>
+                <select aria-label="Lọc trạng thái" className="filter" value={filters.status}
+                  onChange={(event) => setFilter("status", event.target.value)}>
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="active">Chưa hoàn thành</option>
+                  {(isFlat ? ["Todo", "InProgress", "Completed", "Cancelled"] : ["Todo", "InProgress"])
+                    .map((key) => <option value={key} key={key}>{statusLabels[key]}</option>)}
+                </select>
+                  <select
+                    aria-label="Lọc danh mục"
+                    className="filter"
+                    value={filters.category}
+                    onChange={(event) =>
+                      setFilter("category", event.target.value)
+                    }
+                  >
+                    <option value="">Danh mục công việc</option>
+                    {(workspace.categories || []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Lọc mức ưu tiên"
+                    className="filter"
+                    value={filters.priority}
+                    onChange={(event) =>
+                      setFilter("priority", event.target.value)
+                    }
+                  >
+                    <option value="">Ưu tiên</option>
+                    {[4, 3, 2, 1].map((priority) => (
+                      <option key={priority} value={priority}>
+                        {["", "Thấp", "Vừa", "Cao", "Khẩn"][priority]}
+                      </option>
+                    ))}
+                  </select>
                   <label className="field">
                     Từ ngày
                     <input
@@ -274,21 +236,65 @@ export function TaskSmartList() {
                     />
                   </label>
                 </div>
-              </PopupDetails>
-            </>
+            </PopupDetails>
           )}
-          {filtered && (
-            <button
-              type="button"
-              className="btn ghost small"
-              onClick={() => {
+          <button ref={searchTrigger} type="button" className="task-work-tool task-work-search-toggle"
+            aria-label="Tìm kiếm" aria-expanded={searchOpen} aria-controls="work-task-search"
+            onClick={() => {
+              setSearchOpen((current) => !current);
+              if (searchOpen) setQuery("");
+            }}>
+            {icon("search")}
+          </button>
+          {searchOpen && (
+            <input id="work-task-search" type="search" className="task-work-search-input" autoFocus
+              aria-label={isDrafts ? "Tìm trong ghi nháp" : "Tìm công việc"}
+              placeholder={isDrafts ? "Tìm ghi nháp…" : "Tìm công việc…"}
+              value={query} onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") return;
+                setQuery("");
+                setSearchOpen(false);
+                searchTrigger.current?.focus();
+              }} />
+          )}
+          <div className="task-work-toolbar-end">
+            {filtered && (
+              <button type="button" className="task-work-tool" onClick={() => {
                 setQuery("");
                 setFilters(emptyFilters);
-              }}
-            >
-              Bỏ bộ lọc
-            </button>
-          )}
+              }}>
+                Bỏ bộ lọc
+              </button>
+            )}
+            {isDrafts ? (
+              <button type="button" className="task-work-tool" data-action="capture">
+                {icon("spark")} Ghi nhanh
+              </button>
+            ) : (
+              <>
+                <button type="button" className="task-work-tool task-work-incomplete" aria-pressed={incomplete}
+                  onClick={() => setFilter("status", incomplete ? "" : "active")}>
+                  <span className="task-work-incomplete-icon">{icon("check")}</span>
+                  <span>Chưa hoàn thành</span>
+                </button>
+                <PopupDetails className="task-work-popup task-column-picker">
+                  <summary><span className="task-work-columns-icon" aria-hidden="true" /> Cột</summary>
+                  <div>
+                    {Object.entries(taskColumns).map(([key, label]) => (
+                      <label className="checkbox" key={key}>
+                        <input type="checkbox" checked={columns.includes(key)} onChange={(event) => {
+                          const checked = event.target.checked;
+                          setColumns((current) => checked ? [...current, key] : current.filter((item) => item !== key));
+                        }} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </PopupDetails>
+              </>
+            )}
+          </div>
         </div>
         <div hidden={scope !== "inbox"}>
           <TaskInbox
@@ -332,7 +338,11 @@ export function TaskSmartList() {
                         <span>{group.tasks.length}</span>
                       </h3>
                     )}
-                    {taskRows(group.tasks)}
+                    {taskRows(group.tasks, model.plannedDays, {
+                      columns,
+                      addTask: isFlat ? addTask : null,
+                      emptyMessage: filtered ? "Không có công việc phù hợp" : null,
+                    })}
                   </section>
                 ))
               ) : (
@@ -353,10 +363,8 @@ export function TaskSmartList() {
                 </div>
               )}
             </div>
-            <footer className="task-list-footer">
-              <span aria-live="polite">{count} công việc</span>
-              <span>Bấm tên công việc để xem chi tiết</span>
-            </footer>
+            {!isFlat && <div className="work-task-board">{addTask}</div>}
+            <span className="sr-only" aria-live="polite">{count} công việc</span>
           </>
         )}
       </section>
@@ -373,12 +381,4 @@ function groupLabel(day, today) {
     day: "2-digit",
     month: "2-digit",
   }).format(new Date(`${day}T12:00:00Z`));
-}
-
-function formatTaskDate(value) {
-  return new Intl.DateTimeFormat("vi-VN", {
-    timeZone: "UTC",
-    day: "2-digit",
-    month: "2-digit",
-  }).format(new Date(value));
 }

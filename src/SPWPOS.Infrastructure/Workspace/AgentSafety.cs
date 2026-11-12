@@ -319,6 +319,8 @@ public sealed partial class WorkspaceService
         var listSessions = ChatMatch(request, @"\b(?:neu|liet ke|hien thi|xem)\b[^.!?;\r\n]{0,80}\bphien\b").Success;
         return string.Join("\n", named.Take(12).Select(task =>
         {
+            if (task.Deadline is not { } deadline || !task.HasPlanningDetails)
+                return $"{task.Name}: cần bổ sung hạn chót và thời gian dự kiến để kiểm tra khả năng hoàn thành.";
             var work = sessions.Where(x => x.TaskId == task.Id).ToArray();
             var valid = work.Where(x => x.End <= task.Deadline && PlanningEngine.InsideWorkWindow(task, x.Start, x.End) &&
                 engine.FreeSlots(state, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End) &&
@@ -328,8 +330,8 @@ public sealed partial class WorkspaceService
             var minutes = (int)valid.Sum(x => (x.End - x.Start).TotalMinutes);
             var remaining = engine.Remaining(task, bias);
             var answer = $"{task.Name}: " + (minutes >= remaining && dependenciesValid && (task.Splittable || valid.Any(x => (x.End - x.Start).TotalMinutes >= remaining))
-                ? $"đã có {minutes} phút trong lịch trước hạn {LocalTime(task.Deadline, state.Preference)}."
-                : $"chưa đủ phiên hợp lệ trước hạn {LocalTime(task.Deadline, state.Preference)} (có {minutes}/{remaining} phút). Cần xem phương án xếp lại.");
+                ? $"đã có {minutes} phút trong lịch trước hạn {LocalTime(deadline, state.Preference)}."
+                : $"chưa đủ phiên hợp lệ trước hạn {LocalTime(deadline, state.Preference)} (có {minutes}/{remaining} phút). Cần xem phương án xếp lại.");
             return answer + (listSessions && work.Length > 0 ? "\nPhiên đang lưu: " + string.Join("; ", work.OrderBy(x => x.Start).Take(12)
                 .Select(x => LocalWindow(x.Start, x.End, state.Preference) + (valid.Any(s => s.Id == x.Id) ? "" : " (cần kiểm tra)"))) +
                 (work.Length > 12 ? $"; còn {work.Length - 12} phiên khác trong lịch." : "") : "");

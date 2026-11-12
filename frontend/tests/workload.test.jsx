@@ -122,6 +122,7 @@ it("discards an older response after a newer workspace refresh", async () => {
 
 it("shows missing actual separately from a recorded zero and uses day details", async () => {
   const data = view();
+  data.days[0].status = "PAST";
   data.days.push({
     ...data.days[0],
     date: "2026-11-12",
@@ -131,14 +132,194 @@ it("shows missing actual separately from a recorded zero and uses day details", 
   api.mockResolvedValue(data);
   render(<WorkloadWeek />);
   await screen.findByRole("heading", { name: "Tải công việc trong tuần" });
-  const actual = Array.from(document.querySelectorAll("details > p")).map(
-    (node) => node.textContent,
+  for (const [date, expected] of [["11/11", "—"], ["12/11", "0p"]]) {
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`${date}.*dự kiến`) }));
+    const label = document.querySelector(".workload-day:not([hidden]) dt:last-of-type");
+    expect(label?.textContent).toBe("Thực làm");
+    expect(label.nextElementSibling.textContent).toBe(expected);
+  }
+});
+
+it("shows the following week and moves the workload window", async () => {
+  const current = view();
+  const next = {
+    ...view(),
+    start: "2026-11-16",
+    end: "2026-11-22",
+    days: [{ ...current.days[0], date: "2026-11-21" }],
+  };
+  const later = { ...view(), start: "2026-11-23", end: "2026-11-29", days: [] };
+  api.mockImplementation(async (path) => {
+    if (path.endsWith("?week=1")) return next;
+    if (path.endsWith("?week=2")) return later;
+    return current;
+  });
+  render(<WorkloadWeek />);
+  await screen.findByText("2026-11-09 – 2026-11-22");
+  expect(screen.getByRole("columnheader", { name: /21\/11/ })).toBeTruthy();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Hiện cuối tuần" }));
+  expect(screen.queryByRole("columnheader", { name: /21\/11/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Tuần sau" }));
+  await screen.findByText("2026-11-16 – 2026-11-29");
+  expect(api).toHaveBeenCalledWith("/api/intelligence/workload?week=2");
+});
+
+it("groups child tasks under their project and standalone tasks under Inbox", async () => {
+  const data = view();
+  state.workspace.tasks = state.workspace.tasks.map((task, index) =>
+    index < 2 ? { ...task, parentId: "task-3" } : task,
   );
-  expect(actual[0]).toContain("Thực làm —");
-  expect(actual[1]).not.toContain("Thực làm —");
-  expect(
-    document.querySelectorAll(".workload-day details summary"),
-  ).toHaveLength(2);
+  data.days[0].sessions = ["Viết đề cương", "Rà soát tài liệu", "Kiểm tra email"].map(
+    (name, index) => ({
+      id: `session-${index}`,
+      taskId: `task-${index}`,
+      name,
+      start: "2026-11-11T09:00:00Z",
+      end: "2026-11-11T09:30:00Z",
+    }),
+  );
+  api.mockResolvedValue(data);
+  render(<WorkloadWeek />);
+  const project = state.workspace.tasks[3].name;
+  const cell = await screen.findByRole("button", { name: (label) => label.startsWith(project + ",") });
+  expect(cell.querySelector(".workload-group-hours").textContent).toBe("1h");
+  expect(cell.querySelector(".workload-group-name").textContent).toBe(project);
+  const popup = document.getElementById(cell.getAttribute("popovertarget"));
+  expect(popup.getAttribute("popover")).toBe("auto");
+  expect(popup.querySelector('[data-id="task-0"]').textContent).toMatch(/^Viết đề cương.*30p$/);
+  expect(popup.querySelector('[data-id="task-1"]').textContent).toMatch(/^Rà soát tài liệu.*30p$/);
+  expect(popup.querySelector('[data-id="task-2"]')).toBeNull();
+  const inbox = screen.getByRole("button", { name: /^Inbox,/ });
+  const inboxPopup = document.getElementById(inbox.getAttribute("popovertarget"));
+  expect(inboxPopup.querySelector('[data-id="task-2"]').textContent).toMatch(/^Kiểm tra email.*30p$/);
+  expect(inboxPopup.querySelector('[data-action="new-task"]')).toBeTruthy();
+});
+
+it("compares team capacity and only changes the recipient after confirmation", async () => {
+  const team = {
+    start: "2026-11-09",
+    end: "2026-11-15",
+    members: [
+      {
+        userId: "an",
+        name: "An",
+        timeZoneId: "Asia/Ho_Chi_Minh",
+        days: [
+          {
+            date: "2026-11-11",
+            workingMinutes: 480,
+            busyMinutes: 60,
+            reservedMinutes: 180,
+            schedulableMinutes: 240,
+            recordedActualSeconds: 0,
+          },
+        ],
+      },
+    ],
+    tasks: [
+      {
+        id: "report",
+        name: "Báo cáo nhóm",
+        status: "Open",
+        risk: "UNASSIGNED",
+        deadline: "2026-11-12T10:00:00Z",
+        remainingMinutes: 60,
+        version: "v1",
+      },
+      {
+        id: "launch",
+        name: "Chạy thử",
+        status: "Assigned",
+        risk: "BEHIND",
+        deadline: "2026-11-13T10:00:00Z",
+        remainingMinutes: 90,
+        shortfallMinutes: 30,
+        assigneeId: "an",
+      },
+    ],
+  };
+  const wednesday = team.members[0].days[0];
+  team.members[0].days.push({ ...wednesday, date: "2026-11-14" });
+  team.members.push({
+    userId: "binh",
+    name: "Bình",
+    timeZoneId: "UTC",
+    days: team.members[0].days,
+  });
+  api.mockImplementation(async (path, method, body) => {
+    if (path === "/api/intelligence/workload") return view();
+    if (path === "/api/teams")
+      return [{ id: "swp", name: "SWP", role: "Leader" }];
+    if (path === "/api/teams/swp/workload?week=0") return team;
+    if (path === "/api/teams/swp/workload?week=1") {
+      return {
+        ...team,
+        start: "2026-11-16",
+        end: "2026-11-22",
+        members: [
+          { ...team.members[1], days: [{ ...wednesday, date: "2026-11-18" }] },
+        ],
+      };
+    }
+    if (path === "/api/teams/swp/workload/report/candidates")
+      return [{ userId: "an", status: "FITS", schedulableMinutes: 240 }];
+    if (path === "/api/teams/tasks/report/recipient" && method === "POST") {
+      team.tasks[0] = {
+        ...team.tasks[0],
+        designatedUserId: body.userId,
+        risk: "WAITING",
+      };
+      return {};
+    }
+    throw new Error("Unexpected API call");
+  });
+  render(
+    <>
+      <App initialize={false} />
+      <WorkloadWeek />
+    </>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Nhóm", exact: true }));
+  fireEvent.click(await screen.findByText("Điều phối công việc nhóm"));
+  await screen.findByText("Báo cáo nhóm");
+  await screen.findByRole("columnheader", { name: /18\/11/ });
+  fireEvent.click(screen.getByRole("checkbox", { name: "Hiện cuối tuần" }));
+  expect(screen.queryByRole("columnheader", { name: /14\/11/ })).toBeNull();
+  fireEvent.change(screen.getByLabelText("Lọc theo thành viên"), {
+    target: { value: "an" },
+  });
+  expect(screen.queryByRole("rowheader", { name: "Bình" })).toBeNull();
+  expect(screen.queryByText("Báo cáo nhóm")).toBeNull();
+  fireEvent.change(screen.getByLabelText("Lọc theo thành viên"), {
+    target: { value: "" },
+  });
+  fireEvent.click(screen.getByRole("checkbox", { name: "Hiện số giờ" }));
+  expect(screen.getByRole("button", { name: /^An,/ }).textContent).toContain(
+    "Còn chỗ",
+  );
+  fireEvent.click(screen.getByRole("button", { name: /^An,/ }));
+  expect(screen.getByText("Thực làm cho nhóm")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Lọc tình trạng công việc nhóm"), {
+    target: { value: "risk" },
+  });
+  expect(screen.queryByText("Báo cáo nhóm")).toBeNull();
+  expect(screen.getByText("Dự kiến trễ")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Lọc tình trạng công việc nhóm"), {
+    target: { value: "all" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Chọn người nhận" }));
+  fireEvent.click(await screen.findByRole("radio", { name: /^An/ }));
+  expect(api.mock.calls.some(([, method]) => method === "POST")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Xác nhận người nhận" }));
+  await screen.findByRole("button", { name: "Đổi người nhận" });
+  expect(api).toHaveBeenCalledWith(
+    "/api/teams/tasks/report/recipient",
+    "POST",
+    {
+      version: "v1",
+      userId: "an",
+    },
+  );
 });
 
 it("previews a conflicting event only on request and confirms only on a second action", async () => {

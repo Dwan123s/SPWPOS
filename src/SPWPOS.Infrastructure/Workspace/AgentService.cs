@@ -9,10 +9,11 @@ public sealed partial class WorkspaceService
 {
     private static readonly JsonSerializerOptions AgentJson = new(JsonSerializerDefaults.Web);
     private sealed record AgentChangeSet(WeeklyAvailability[]? Weekly, AvailabilityException[] Exceptions, FixedEvent[] Events, WorkTask[] Tasks, Guid[]? RemovedExceptionIds = null,
-        Guid[]? UrgentEventIds = null, Guid[]? ClippedTimetableEventIds = null, bool AnalyzeTimetable = false);
+        Guid[]? UrgentEventIds = null, Guid[]? ClippedTimetableEventIds = null, bool AnalyzeTimetable = false, AvailabilityPolicy? Policy = null);
     private sealed record AgentUndo(WeeklyAvailability[]? Weekly, Guid[] ExceptionIds, Guid[] EventIds,
         AvailabilityException[] OriginalExceptions, FixedEvent[] OriginalEvents,
-        WorkTask[] OriginalTasks, Guid[] NewTaskIds, WorkSession[] OriginalSessions, Guid[] NewSessionIds, Guid? PlanId);
+        WorkTask[] OriginalTasks, Guid[] NewTaskIds, WorkSession[] OriginalSessions, Guid[] NewSessionIds, Guid? PlanId,
+        bool PolicyChanged = false, AvailabilityPolicy? OriginalPolicy = null);
     private static T Copy<T>(T item) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(item, AgentJson), AgentJson)!;
     public NoteAgentCapabilities GetAgentCapabilities() => interpreter is IPlanningAgentInterpreter agent
         ? agent.Capabilities : new(false, Provider: interpreter.Capabilities.Provider);
@@ -517,7 +518,7 @@ public sealed partial class WorkspaceService
             ValidTask(new(task.Name, task.Description, task.Deadline, task.EstimatedMinutes, task.Priority, task.TaskType, task.Splittable, task.MinimumSessionMinutes));
             Require(task.WorkWindowStart is null && task.WorkWindowEnd is null || task.WorkWindowStart is not null && task.WorkWindowEnd > task.WorkWindowStart &&
                 task.WorkWindowEnd <= Now.AddDays(31) && task.Deadline > task.WorkWindowStart, "TASK_WORK_WINDOW", "Khung giờ thực hiện không hợp lệ hoặc nằm sau deadline.", 409);
-            Require((task.Deadline > Now || item.Importance != null && state.Tasks.Any(original => original.Id == task.Id && SameTaskContract(original, task))) && task.Deadline.Year <= 2100, "DEADLINE_CONFLICT", "Deadline phải ở tương lai.", 409);
+            Require((task.Deadline > Now || item.Importance != null && state.Tasks.Any(original => original.Id == task.Id && SameTaskContract(original, task))) && task.Deadline?.Year <= 2100, "DEADLINE_CONFLICT", "Deadline phải ở tương lai.", 409);
             Require(await db.TaskTypes.AnyAsync(x => x.Code == task.TaskType && x.IsActive, ct), "INVALID_TASK_TYPE", "Loại công việc không hợp lệ.");
             taskChanges.Add(task); affected.Add(task.Id);
         }
@@ -525,6 +526,21 @@ public sealed partial class WorkspaceService
             "TASK_LIMIT", "Tối đa 500 công việc đang hoạt động.");
         var candidate = state with { Availability = weekly ?? state.Availability, Exceptions = state.Exceptions.Where(x => !exceptions.Any(e => e.Id == x.Id) && !removedExceptions.Any(e => e.Id == x.Id)).Concat(exceptions).ToArray(),
             Events = state.Events.Where(x => !events.Any(e => e.Id == x.Id)).Concat(events).ToArray(), Tasks = state.Tasks.Where(x => !taskChanges.Any(t => t.Id == x.Id)).Concat(taskChanges).ToArray() };
+        AvailabilityPolicy? timetablePolicy = null;
+        if (timetableContext && ChatMatch(eventRequest ?? request, @"\bthiet lap gio lam viec theo thoi khoa bieu\b").Success)
+        {
+            var weeks = events.Where(item => item.EventType is "CLASS" or "WORK" && !state.Events.Any(saved => saved.Id == item.Id))
+                .Select(item => RoutineWeekStart(LocalDate(item.Start, state.Preference))).Distinct().Order();
+            foreach (var week in weeks)
+            {
+                timetablePolicy = ProposeTimetableRoutine(candidate, week, useTimetableHours: true);
+                timetablePolicy.ConfirmedAt = Now;
+                candidate = candidate with { Policy = timetablePolicy };
+                summary.Add(new("AVAILABILITY", "Giờ làm việc theo thời khóa biểu", "", $"Tuần {week:dd/MM}–{week.AddDays(6):dd/MM}"));
+            }
+        }
+        Require(!candidate.Tasks.Any(t => affected.Contains(t.Id) && !t.HasPlanningDetails),
+            "TASK_PLANNING_DETAILS_REQUIRED", "Bổ sung hạn chót và thời gian dự kiến trước khi xếp lịch.", 409);
         if (weekly is null && exceptions.Count == 0 && removedExceptions.Length == 0 && events.Count == 0 && taskChanges.Count == 0 && affected.Count == 0 && !intent.Reschedule)
             return (new(null, [], [], []), candidate, [], [], TimetableCutoffNotices(skippedClasses, clippedClasses.Count));
         ValidateProtectedSessions(candidate);
@@ -539,7 +555,7 @@ public sealed partial class WorkspaceService
             "LOCKED_SESSION_CONFLICT", "Thay đổi trùng với phiên sắp bắt đầu trong 5 phút tới. Hãy xử lý phiên đó trước.", 409);
         if (intent.Reschedule && affected.Count == 0)
             foreach (var id in intent.OptimizationQuery is { } scope ? OptimizationTaskIds(candidate, scope) :
-                candidate.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled).Select(x => x.Id)) affected.Add(id);
+                candidate.Tasks.Where(x => x.HasPlanningDetails && ActiveWork(x)).Select(x => x.Id)) affected.Add(id);
         Require(intent.OptimizationQuery is not null || !candidate.Sessions.Any(x => affected.Contains(x.TaskId) && x.Status == WorkSessionStatus.Scheduled && x.Start >= Now.AddMinutes(5).AddDays(intent.HorizonDays) &&
             !engine.FreeSlots(candidate, x.Start, x.End).Any(s => s.Start <= x.Start && s.End >= x.End)), "AGENT_HORIZON_CONFLICT", "Có phiên bị ảnh hưởng ngoài phạm vi đang lập lịch. Hãy mở rộng phạm vi hoặc chỉnh riêng phiên đó.", 409);
         if (ChatMatch(request, @"\b(?:quan trong|importance)\b").Success && !ChatMatch(request, @"\b(?:(?:xep|sap xep|len) lich|reschedule|schedule)\b").Success &&
@@ -547,13 +563,14 @@ public sealed partial class WorkspaceService
             taskChanges.Count > 0 && taskChanges.All(task => state.Tasks.Any(original => original.Id == task.Id && SameTaskContract(original, task)))) affected.Clear();
         return (new(weekly, exceptions.ToArray(), events.ToArray(), taskChanges.ToArray(), removedExceptions.Select(x => x.Id).ToArray(), urgentEventIds, clippedClasses.ToArray(),
             timetableContext && events.Count > 0 || (weekly is not null || exceptions.Count > 0) &&
-                candidate.Events.Any(x => x.End > Now && x.Start <= Now.AddDays(30) && x.EventType == "CLASS")),
+                candidate.Events.Any(x => x.End > Now && x.Start <= Now.AddDays(30) && x.EventType == "CLASS"), timetablePolicy),
             candidate, affected.ToArray(), summary.ToArray(), TimetableCutoffNotices(skippedClasses, clippedClasses.Count));
     }
 
     private static string LocalTime(DateTimeOffset time, WorkPreference preference) => TimeZoneInfo.ConvertTime(time, PlanningEngine.Zone(preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm");
     private static string AgentTaskSummary(WorkTask task, WorkPreference preference) =>
-        $"{task.EstimatedMinutes} phút · hạn chót {LocalTime(task.Deadline, preference)}" +
+        (task.EstimatedMinutes > 0 ? $"{task.EstimatedMinutes} phút" : "Chưa ước lượng") +
+        (task.Deadline is { } due ? $" · hạn chót {LocalTime(due, preference)}" : " · chưa có hạn") +
         (task.Priority != 2 ? " · ưu tiên " + (task.Priority switch { 1 => "thấp", 3 => "cao", _ => "khẩn cấp" }) : "") +
         (task.EffectiveImportance == "Important" ? " · quan trọng: " + task.ImportanceReason : task.EffectiveImportance == "Lower" ? " · mức ảnh hưởng thấp hơn: " + task.ImportanceReason : "") +
         (!task.Splittable ? " · làm liên tục" : "") +
@@ -599,7 +616,7 @@ public sealed partial class WorkspaceService
             view = view with { Changes = view.Changes.Select(change => change.Kind == "EVENT" && change.Name == item.Name && change.After == previousWindow
                 ? change with { After = currentWindow } : change).ToArray() };
         }
-        var candidate = state with { Availability = changes.Weekly ?? state.Availability, Exceptions = state.Exceptions.Where(x => !changes.Exceptions.Any(e => e.Id == x.Id) && !(changes.RemovedExceptionIds ?? []).Contains(x.Id)).Concat(changes.Exceptions).ToArray(),
+        var candidate = state with { Policy = changes.Policy ?? state.Policy, Availability = changes.Weekly ?? state.Availability, Exceptions = state.Exceptions.Where(x => !changes.Exceptions.Any(e => e.Id == x.Id) && !(changes.RemovedExceptionIds ?? []).Contains(x.Id)).Concat(changes.Exceptions).ToArray(),
             Events = state.Events.Where(x => !changes.Events.Any(e => e.Id == x.Id)).Concat(changes.Events).ToArray(), Tasks = state.Tasks.Where(x => !changes.Tasks.Any(t => t.Id == x.Id)).Concat(changes.Tasks).ToArray() };
         ValidateProtectedSessions(candidate);
         var plan = view.Plan;
@@ -623,6 +640,17 @@ public sealed partial class WorkspaceService
         var originalEvents = state.Events.Where(x => changes.Events.Any(e => e.Id == x.Id)).Select(Copy).ToArray();
         var oldSessions = plan is null ? [] : state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && x.Start >= plan.Start && x.Start < plan.End &&
             !plan.Sessions.Any(s => s.Preserved && s.Id == x.Id)).Select(Copy).ToArray();
+        var originalPolicy = changes.Policy is not null && state.Policy is not null ? Copy(state.Policy) : null;
+        if (changes.Policy is { } policy)
+        {
+            policy.ConfirmedAt = Now;
+            if (state.Policy is null) db.AvailabilityPolicies.Add(policy);
+            else
+            {
+                policy.Id = state.Policy.Id;
+                db.Entry(state.Policy).CurrentValues.SetValues(policy);
+            }
+        }
         if (changes.Weekly is not null) { db.WeeklyAvailability.RemoveRange(state.Availability); db.WeeklyAvailability.AddRange(changes.Weekly); }
         db.AvailabilityExceptions.RemoveRange(state.Exceptions.Where(x => (changes.RemovedExceptionIds ?? []).Contains(x.Id)));
         foreach (var item in changes.Exceptions)
@@ -652,7 +680,7 @@ public sealed partial class WorkspaceService
         turn.UndoJson = JsonSerializer.Serialize(new AgentUndo(changes.Weekly is null ? null : state.Availability.Select(Copy).ToArray(),
             changes.Exceptions.Where(x => !originalExceptions.Any(e => e.Id == x.Id)).Select(x => x.Id).ToArray(), changes.Events.Where(x => !originalEvents.Any(e => e.Id == x.Id)).Select(x => x.Id).ToArray(), originalExceptions, originalEvents, originals,
             changes.Tasks.Where(x => !originals.Any(t => t.Id == x.Id)).Select(x => x.Id).ToArray(), oldSessions,
-            plan?.Sessions.Where(x => !x.Preserved).Select(x => x.Id).ToArray() ?? [], planId), AgentJson);
+            plan?.Sessions.Where(x => !x.Preserved).Select(x => x.Id).ToArray() ?? [], planId, changes.Policy is not null, originalPolicy), AgentJson);
         state.Preference.Revision = Guid.NewGuid(); turn.AppliedRevision = state.Preference.Revision; turn.UpdatedAt = Now;
         await db.SaveChangesAsync(ct); await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, state.Preference.PlanningHorizonDays), ct);
         if (view.Run is { } appliedRun)
@@ -661,7 +689,7 @@ public sealed partial class WorkspaceService
             if (run is not null) { run.Status = "APPLIED"; run.UpdatedAt = Now; run.Version = Guid.NewGuid(); }
             view = view with { Run = appliedRun with { Status = "APPLIED" } };
         }
-        return SaveTurn(turn, view with { Status = "APPLIED", SuggestRoutine = timetableAnalysis,
+        return SaveTurn(turn, view with { Status = "APPLIED", SuggestRoutine = timetableAnalysis && changes.Policy is null,
             Reply = timetableAnalysis
                 ? TimetableAnalysis(candidate, changes.Events, plan,
                     applied: true)
@@ -704,6 +732,12 @@ public sealed partial class WorkspaceService
         {
             db.WeeklyAvailability.RemoveRange(await Mine<WeeklyAvailability>(uid).ToArrayAsync(ct));
             await db.SaveChangesAsync(ct); db.WeeklyAvailability.AddRange(undo.Weekly);
+        }
+        if (undo.PolicyChanged)
+        {
+            var policy = await Mine<AvailabilityPolicy>(uid).SingleAsync(ct);
+            if (undo.OriginalPolicy is null) db.AvailabilityPolicies.Remove(policy);
+            else db.Entry(policy).CurrentValues.SetValues(undo.OriginalPolicy);
         }
         if (undo.PlanId is { } planId)
         {

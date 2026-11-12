@@ -61,7 +61,7 @@
   font-size: 9px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #6f88a0;
+  color: #000;
 }
 .glass-workspace .nav-label::after {
   content: "";

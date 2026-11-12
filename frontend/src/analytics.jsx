@@ -141,8 +141,7 @@ export function AnalyticsHistory() {
     >
       <div className="card-header">
         <div>
-          <h2>Nhìn lại tiến độ</h2>
-          <p>Giờ tập trung theo thời điểm thực hiện, theo múi giờ tài khoản.</p>
+          <h2>Bảng giờ làm</h2>
         </div>
         <label className="field">
           Khoảng xem{" "}
@@ -215,33 +214,37 @@ export function AnalyticsHistory() {
           <p className="reason">
             {data.start} – {data.end} · {data.timeZoneId}
           </p>
-          <div className="stats-grid analytics-metrics">
-            <div>
-              <span>Tập trung đã ghi nhận</span>
-              <h3>{duration(data.current.focusSeconds)}</h3>
-              <p>
-                {data.focusChangePercent == null
-                  ? "Chưa có kỳ so sánh"
-                  : `${data.focusChangePercent > 0 ? "+" : ""}${data.focusChangePercent}% so với kỳ trước`}
-              </p>
+          <details className="timesheet-summary">
+            <summary>Tổng hợp giờ và tiến độ</summary>
+            <div className="stats-grid analytics-metrics">
+              <div>
+                <span>Tập trung đã ghi nhận</span>
+                <h3>{duration(data.current.focusSeconds)}</h3>
+                <p>
+                  {data.focusChangePercent == null
+                    ? "Chưa có kỳ so sánh"
+                    : `${data.focusChangePercent > 0 ? "+" : ""}${data.focusChangePercent}% so với kỳ trước`}
+                </p>
+              </div>
+              <div>
+                <span>Đang chạy · tạm tính</span>
+                <h3>{duration(data.current.openFocusSeconds)}</h3>
+              </div>
+              <div>
+                <span>Công việc hoàn thành</span>
+                <h3>{data.current.completedTasks}</h3>
+                <p>
+                  {data.current.onTimeTasks} đúng hạn · không tính trùng việc
+                  cha
+                </p>
+              </div>
+              <div>
+                <span>Lịch dự kiến</span>
+                <h3>{duration(data.current.plannedSeconds)}</h3>
+                <p>Gồm các phiên chưa thực hiện hoặc bị lỡ</p>
+              </div>
             </div>
-            <div>
-              <span>Đang chạy · tạm tính</span>
-              <h3>{duration(data.current.openFocusSeconds)}</h3>
-            </div>
-            <div>
-              <span>Công việc hoàn thành</span>
-              <h3>{data.current.completedTasks}</h3>
-              <p>
-                {data.current.onTimeTasks} đúng hạn · không tính trùng việc cha
-              </p>
-            </div>
-            <div>
-              <span>Lịch dự kiến</span>
-              <h3>{duration(data.current.plannedSeconds)}</h3>
-              <p>Gồm các phiên chưa thực hiện hoặc bị lỡ</p>
-            </div>
-          </div>
+          </details>
           {data.notices.map((code) => (
             <p key={code} className="reason">
               {notices[code] || code}
@@ -262,7 +265,17 @@ export function AnalyticsHistory() {
               <tbody>
                 {data.days.map((day) => (
                   <tr key={day.date}>
-                    <td>{day.date}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="planned-date-link"
+                        data-action="calendar-date"
+                        data-id={day.date}
+                        aria-label={`Mở lịch ngày ${day.date}`}
+                      >
+                        {day.date}
+                      </button>
+                    </td>
                     <td>{duration(day.plannedSeconds)}</td>
                     <td>{duration(day.focusSeconds)}</td>
                     <td>{duration(day.openFocusSeconds)}</td>

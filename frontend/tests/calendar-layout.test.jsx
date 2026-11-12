@@ -57,10 +57,37 @@ it.each(["week", "agenda"])(
 it("opens details from calendar cards and keeps deletion controls inside the popup", () => {
   state.calendarView = "week";
   state.workspace.sessions = [
-    { id: "scheduled", taskName: "Chưa làm", status: "Scheduled", start: "2026-10-21T08:00:00Z", end: "2026-10-21T09:00:00Z", actualSeconds: 0 },
-    { id: "locked", taskName: "Đã khóa", status: "Scheduled", isLocked: true, start: "2026-10-21T09:00:00Z", end: "2026-10-21T10:00:00Z", actualSeconds: 0 },
-    { id: "running", taskName: "Đang làm", status: "Running", start: "2026-10-21T10:00:00Z", end: "2026-10-21T11:00:00Z" },
-    { id: "completed", taskName: "Đã làm", status: "Completed", start: "2026-10-21T11:00:00Z", end: "2026-10-21T12:00:00Z" },
+    {
+      id: "scheduled",
+      taskName: "Chưa làm",
+      status: "Scheduled",
+      start: "2026-10-21T08:00:00Z",
+      end: "2026-10-21T09:00:00Z",
+      actualSeconds: 0,
+    },
+    {
+      id: "locked",
+      taskName: "Đã khóa",
+      status: "Scheduled",
+      isLocked: true,
+      start: "2026-10-21T09:00:00Z",
+      end: "2026-10-21T10:00:00Z",
+      actualSeconds: 0,
+    },
+    {
+      id: "running",
+      taskName: "Đang làm",
+      status: "Running",
+      start: "2026-10-21T10:00:00Z",
+      end: "2026-10-21T11:00:00Z",
+    },
+    {
+      id: "completed",
+      taskName: "Đã làm",
+      status: "Completed",
+      start: "2026-10-21T11:00:00Z",
+      end: "2026-10-21T12:00:00Z",
+    },
   ];
   render(calendarPage());
   expect(screen.queryByRole("button", { name: /Xóa/ })).toBeNull();
@@ -71,7 +98,7 @@ it("opens details from calendar cards and keeps deletion controls inside the pop
   });
 });
 
-it.each(["week", "agenda"])(
+it.each(["week", "agenda", "board"])(
   "keeps fixed events in their day and normal document flow in %s view",
   async (view) => {
     state.calendarView = view;
@@ -87,7 +114,7 @@ it.each(["week", "agenda"])(
     document.head.append(style);
     try {
       const days = container.querySelectorAll(
-        view === "week" ? ".week-day" : ".agenda-day",
+        { week: ".week-day", agenda: ".agenda-day", board: ".plan-day" }[view],
       );
       expect(days).toHaveLength(7);
       state.workspace.events.forEach((event, index) => {

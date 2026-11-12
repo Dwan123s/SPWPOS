@@ -9,7 +9,7 @@ public sealed partial class WorkspaceService
         await SaveTaskCoreAsync(uid, id, input, ct), ct);
     private async Task<Guid> SaveTaskCoreAsync(Guid uid, Guid? id, TaskInput input, CancellationToken ct)
     {
-        ValidTask(input);
+        ValidTask(input, requirePlanningDetails: false);
         WorkTask? existingTask = null;
         if (id is { } existingId)
         {
@@ -24,7 +24,8 @@ public sealed partial class WorkspaceService
         if (input.ParentId is { } parentId)
         {
             var parent = await Find<WorkTask>(uid, parentId, ct);
-            Require(input.Deadline <= parent.Deadline, "SUBTASK_DEADLINE", "Deadline công việc con không được sau công việc cha.");
+            Require(parent.Deadline is null || input.Deadline is null || input.Deadline <= parent.Deadline,
+                "SUBTASK_DEADLINE", "Deadline công việc con không được sau công việc cha.");
             Require(!parent.IsDeleted && parentId != id && parent.ParentId is null, "INVALID_PARENT", "Chỉ hỗ trợ một cấp công việc con, không tự tham chiếu.");
             Require(parent.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled, "INVALID_PARENT", "Công việc cha đã kết thúc.");
             Require(!await Mine<WorkSession>(uid).AnyAsync(x => x.TaskId == parentId && (x.Status == WorkSessionStatus.Running || x.Status == WorkSessionStatus.Paused || x.Status == WorkSessionStatus.Scheduled && x.IsLocked), ct),
@@ -39,16 +40,45 @@ public sealed partial class WorkspaceService
             Require(!await Mine<WorkTask>(uid).AnyAsync(x => x.ParentId == taskId && !x.IsDeleted && x.Deadline > input.Deadline, ct), "SUBTASK_DEADLINE", "Deadline mới phải bao phủ các công việc con.");
             Require(!await Mine<WorkSession>(uid).AnyAsync(x => x.TaskId == taskId && x.IsLocked && x.Status == WorkSessionStatus.Scheduled && x.End > input.Deadline, ct),
                 "LOCKED_SESSION_CONFLICT", "Deadline mới xung đột với phiên đã khóa.", 409);
+            if (input.Deadline is null || input.EstimatedMinutes is null)
+            {
+                Require(!await db.TeamTaskAssignments.AnyAsync(x => x.UserId == uid && x.WorkTaskId == taskId && x.Active, ct),
+                    "TASK_PLANNING_DETAILS_REQUIRED", "Công việc nhóm cần giữ hạn chót và thời gian dự kiến.", 409);
+                var sessions = await Mine<WorkSession>(uid).Where(x => x.TaskId == taskId &&
+                    (x.Status == WorkSessionStatus.Scheduled || x.Status == WorkSessionStatus.Running || x.Status == WorkSessionStatus.Paused)).ToArrayAsync(ct);
+                Require(sessions.All(x => x.Status == WorkSessionStatus.Scheduled && !x.IsLocked),
+                    "LOCKED_SESSION_CONFLICT", "Kết thúc phiên đang làm hoặc bỏ khóa trước khi bỏ hạn hay thời lượng.", 409);
+                foreach (var session in sessions) session.Status = WorkSessionStatus.Cancelled;
+            }
             task.Name = input.Name.Trim(); task.Description = input.Description ?? ""; task.Deadline = input.Deadline;
-            task.EstimatedMinutes = input.EstimatedMinutes; task.Priority = input.Priority; task.TaskType = type; task.IsHardDeadline = input.IsHardDeadline;
+            task.EstimatedMinutes = input.EstimatedMinutes ?? 0; task.Priority = input.Priority; task.TaskType = type; task.IsHardDeadline = input.IsHardDeadline;
             task.Splittable = ActivityContinuity.CanSplit(input.Name, input.TaskType, input.Splittable); task.MinimumSessionMinutes = input.MinimumSessionMinutes; task.CategoryId = input.CategoryId; task.ParentId = input.ParentId; task.UpdatedAt = Now;
-            Require(task.WorkWindowStart is null || task.Deadline > task.WorkWindowStart, "TASK_WORK_WINDOW", "Deadline mới phải sau thời điểm bắt đầu khung thực hiện đã lưu.", 409);
+            Require(task.WorkWindowStart is null || task.Deadline is null || task.Deadline > task.WorkWindowStart, "TASK_WORK_WINDOW", "Deadline mới phải sau thời điểm bắt đầu khung thực hiện đã lưu.", 409);
         }
         else
         {
             Require(await Mine<WorkTask>(uid).CountAsync(x => !x.IsDeleted && x.Status != WorkTaskStatus.Completed && x.Status != WorkTaskStatus.Cancelled, ct) < 500,
                 "TASK_LIMIT", "Tối đa 500 công việc đang hoạt động.");
             task = NewTask(uid, input, Now); db.WorkTasks.Add(task);
+            if (input.StartDate is { } startDate)
+            {
+                var zone = PlanningEngine.Zone((await Preference(uid, ct)).TimeZoneId);
+                var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Now, zone).DateTime);
+                Require(startDate >= today && startDate <= today.AddDays(31),
+                    "TASK_WORK_WINDOW", "Ngày bắt đầu phải nằm trong 31 ngày tới.");
+                var startOfDay = PlanningEngine.At(startDate, 0, zone);
+                Require(input.Deadline is null || input.Deadline > startOfDay,
+                    "TASK_WORK_WINDOW", "Ngày bắt đầu phải trước hạn chót.");
+                task.WorkWindowStart = startOfDay;
+            }
+            else if (input.WorkWindowStart is { } start)
+            {
+                Require(start >= Now && start <= Now.AddDays(31) && (input.Deadline is null || input.Deadline > start),
+                    "TASK_WORK_WINDOW", "Giờ bắt đầu phải nằm trong 31 ngày tới và trước hạn chót.");
+                task.WorkWindowStart = start;
+                if (input.EstimatedMinutes is { } duration)
+                    task.WorkWindowEnd = start.AddMinutes(duration);
+            }
         }
         var tasks = await Mine<WorkTask>(uid).Where(x => !x.IsDeleted).ToArrayAsync(ct);
         var edges = await Mine<TaskDependency>(uid).ToArrayAsync(ct);

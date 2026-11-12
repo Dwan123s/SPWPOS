@@ -49,7 +49,7 @@
   font-size: 10px;
   font-weight: 650;
   letter-spacing: 1.1px;
-  color: #527a9a;
+  color: #000;
 }
 .notice-overview h2 {
   font-size: 24px;
@@ -58,7 +58,7 @@
   line-height: 1.35;
 }
 .notice-overview p {
-  color: #547087;
+  color: #000;
   font-size: 12px;
   line-height: 1.8;
   margin: 0;
@@ -118,7 +118,7 @@
   padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 10px;
-  color: #546b82;
+  color: #000;
   background: transparent;
   font: inherit;
   font-size: 12px;
@@ -140,7 +140,7 @@
   border-radius: 6px;
   background: #e2edf7;
   font-size: 10px;
-  color: #4e6d8b;
+  color: #000;
 }
 .notice-filter.active > span {
   background: #e2f0ff;
@@ -150,7 +150,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #6b8197;
+  color: #000;
   font-size: 10px;
   white-space: nowrap;
 }
@@ -179,7 +179,7 @@
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  color: #7088a0;
+  color: #000;
 }
 :is(.planning-console, #modal) .notice-search input {
   width: 100%;
@@ -229,7 +229,7 @@
 }
 .notice-result-bar p {
   margin: 0;
-  color: #698097;
+  color: #000;
   font-size: 11px;
 }
 .notice-reset {
@@ -253,11 +253,11 @@
   padding: 12px 5px;
   font-size: 11px;
   letter-spacing: 0.2px;
-  color: #546e86;
+  color: #000;
 }
 .notice-day-heading > span {
   font-weight: 400;
-  color: #7b8fa2;
+  color: #000;
 }
 .notice-list {
   display: grid;
@@ -323,7 +323,7 @@
 }
 .notice-item-meta time {
   margin-left: auto;
-  color: #627c92;
+  color: #000;
   font-variant-numeric: tabular-nums;
 }
 .notice-item h4 {
@@ -336,7 +336,7 @@
 }
 .notice-message {
   margin: 5px 0 0;
-  color: #526c82;
+  color: #000;
   font-size: 12px;
   line-height: 1.8;
   white-space: pre-wrap;
@@ -348,7 +348,7 @@
   align-items: flex-start;
   gap: 5px 7px;
   margin: 12px 0 0;
-  color: #4d6b86;
+  color: #000;
   font-size: 10px;
   line-height: 1.7;
 }
@@ -366,7 +366,7 @@
   padding-left: 2px;
 }
 .notice-missing-task {
-  color: #738394;
+  color: #000;
   font-size: 10px;
   line-height: 1.7;
   margin: 10px 0 0;
@@ -415,11 +415,11 @@
   height: 14px;
 }
 .notice-mark-read {
-  color: #607b91;
+  color: #000;
   cursor: pointer;
 }
 .notice-read-label {
-  color: #607b91;
+  color: #000;
 }
 .notice-mark-read:disabled {
   opacity: 0.5;
@@ -458,7 +458,7 @@
 }
 .notice-sidebar-description {
   margin: 10px 0 16px;
-  color: #6a7f91;
+  color: #000;
   font-size: 11px;
   line-height: 1.7;
 }
@@ -475,7 +475,7 @@
   border: 1px solid #e1eaf2;
   border-radius: 10px;
   background: #ffffff82;
-  color: #425f7b;
+  color: #000;
   font: inherit;
   font-size: 11px;
   text-align: left;
@@ -557,7 +557,7 @@
   line-height: 1.7;
 }
 .notice-settings-list dt {
-  color: #698093;
+  color: #000;
 }
 .notice-settings-list dd {
   margin: 0;
@@ -589,7 +589,7 @@
 .notice-read-hint {
   display: flex;
   gap: 8px;
-  color: #657d91;
+  color: #000;
   font-size: 10px;
   line-height: 1.9;
   margin: 0;
@@ -615,7 +615,7 @@
   height: 64px;
   border: 1px solid #dbe8f4;
   border-radius: 20px;
-  color: #6891b6;
+  color: #000;
   background: linear-gradient(145deg, #f6fbff, #e4f0fa);
 }
 .notice-empty-icon .icon {
@@ -630,7 +630,7 @@
 .notice-empty p {
   max-width: 340px;
   margin: 0;
-  color: #6a8094;
+  color: #000;
   font-size: 12px;
   line-height: 1.9;
 }

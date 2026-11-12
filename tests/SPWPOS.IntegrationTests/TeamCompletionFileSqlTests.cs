@@ -26,7 +26,7 @@ public sealed class TeamCompletionFileSqlTests
             db.TeamProjects.Add(new() { Id = team, CreatorId = leader, Name = "SQL report fixture" });
             db.TeamMemberships.AddRange(new TeamMembership { TeamId = team, UserId = leader, Role = "Leader" }, new TeamMembership { TeamId = team, UserId = member });
             var personal = new WorkTask { UserId = member, Name = "Report", Deadline = f.Clock.GetUtcNow().AddDays(2), EstimatedMinutes = 60 }; db.WorkTasks.Add(personal);
-            db.TeamTasks.Add(new() { Id = taskId, TeamId = team, AssigneeId = member, Status = "Assigned", Version = version, Name = "Report", Deadline = personal.Deadline, EstimatedMinutes = 60 });
+            db.TeamTasks.Add(new() { Id = taskId, TeamId = team, AssigneeId = member, Status = "Assigned", Version = version, Name = "Report", Deadline = personal.Deadline!.Value, EstimatedMinutes = 60 });
             db.TeamTaskAssignments.Add(new() { TeamTaskId = taskId, UserId = member, WorkTaskId = personal.Id, ProposalId = Guid.NewGuid() }); await db.SaveChangesAsync(ct);
         }
         var input = new TeamCompletionSubmitInput(version, Guid.NewGuid(), "Kết quả riêng", [new("report.txt", Convert.ToBase64String(Encoding.UTF8.GetBytes("SQL report bytes")))]);

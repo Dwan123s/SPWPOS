@@ -4,7 +4,7 @@
 }
 .nora-studio {
   --nora-ink: #183856;
-  --nora-muted: #5b7390;
+  --nora-muted: #000;
   position: relative;
   isolation: isolate;
   display: grid;
@@ -50,7 +50,7 @@
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: #577a9c;
+  color: #000;
 }
 .nora-header h1 {
   margin: 3px 0 0;
@@ -94,7 +94,7 @@
   border: 1px solid #fff;
   border-radius: 50%;
   background: #ffffffa0;
-  color: #597998;
+  color: #000;
   cursor: pointer;
 }
 .nora-motion-button svg {
@@ -191,7 +191,7 @@
 }
 .agent-empty .nora-greeting {
   margin: 17px 0 9px;
-  color: #557395;
+  color: #000;
   font-size: 12px;
 }
 .agent-empty h2 {
@@ -280,7 +280,7 @@
   height: 15px;
   margin-left: auto;
   flex-shrink: 0;
-  color: #7c9cbb;
+  color: #000;
 }
 .agent-user-message {
   margin-left: 14%;
@@ -330,7 +330,7 @@
 }
 .agent-status {
   background: #eaf3fb;
-  color: #466683;
+  color: #000;
   border: 1px solid #dbe9f3;
   border-radius: 20px;
   font-size: 10px;
@@ -478,7 +478,7 @@
 .agent-composer > .field {
   font-size: 10px;
   font-weight: 600;
-  color: #587593;
+  color: #000;
   gap: 7px;
 }
 .nora-studio .agent-composer textarea {
@@ -518,7 +518,7 @@
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  color: #486681;
+  color: #000;
   cursor: pointer;
 }
 .agent-toggle input {
@@ -538,17 +538,17 @@
 .agent-composer > small {
   display: block;
   font-size: 10px;
-  color: #5b7390;
+  color: #000;
   line-height: 1.6;
 }
 .nora-keyboard-hint {
   float: right;
-  color: #607e9b;
+  color: #000;
   padding-left: 10px;
 }
 .agent-composer .nora-privacy-note {
   margin-top: 4px;
-  color: #6c8097;
+  color: #000;
   font-size: 9px;
 }
 .nora-studio .agent-main > :is(.info, .form-error) {
@@ -693,7 +693,7 @@
   align-items: center;
   gap: 9px;
   margin: 21px 0 1px;
-  color: #5881a6;
+  color: #000;
   font-size: 8px;
   letter-spacing: 0.16em;
 }
@@ -763,7 +763,7 @@
   padding-top: 14px;
   font-size: 11px;
   line-height: 1.6;
-  color: #557592;
+  color: #000;
 }
 .nora-context-limit > svg {
   flex-shrink: 0;
@@ -779,7 +779,7 @@
 .nora-context-note {
   font-size: 10px;
   line-height: 1.8;
-  color: #6a8299;
+  color: #000;
   margin: 12px 0 0;
 }
 .nora-studio :is(button, select, a):focus-visible {

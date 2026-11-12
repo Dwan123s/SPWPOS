@@ -1,7 +1,7 @@
 /* Scoped settings layout; independent of the older horizontal profile tabs. */
 .settings-workspace {
   --settings-ink: #193b5d;
-  --settings-muted: #526a81;
+  --settings-muted: #000;
   --settings-line: #d5e4f2;
   display: grid;
   grid-template-columns: 242px minmax(0, 1fr);
@@ -199,7 +199,7 @@
 }
 .settings-workspace .field input:disabled {
   background: #f1f5f9;
-  color: #62758b;
+  color: #000;
   cursor: default;
   opacity: 1;
 }

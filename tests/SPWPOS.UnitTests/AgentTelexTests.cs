@@ -20,7 +20,7 @@ public sealed partial class PlanningAgentTests
             : s.SendAgentTurnAsync(user.Id, input, Ct));
         Assert.Equal("APPLIED", result.Status); Assert.Equal(raw, result.Text);
         var task = await h.DbAsync(db => db.WorkTasks.SingleAsync(Ct)); Assert.Equal(45, task.EstimatedMinutes);
-        Assert.Equal(21, task.Deadline.Hour);
+        Assert.Equal(21, task.Deadline!.Value.Hour);
         Assert.Equal(raw, await h.DbAsync(db => db.AgentTurns.Where(x => x.Id == result.Id).Select(x => x.Text).SingleAsync(Ct)));
         var retry = await Agent(h, s => s.SendAgentTurnAsync(user.Id, input, Ct));
         Assert.Equal(result.Id, retry.Id); Assert.Equal(1, ai.Calls);

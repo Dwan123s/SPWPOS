@@ -1,71 +1,267 @@
-import { SessionTimer } from "./react-ui.jsx";
+import { useEffect, useState } from "react";
+import { api } from "./api.js";
 import { Select, nodeList } from "./react-ui.jsx";
-import { availabilityEditor } from "./interactive.jsx";
-import { StartSessionButton } from "./session-start.jsx";
+import { WorkHoursEditor } from "./work-hours.jsx";
+import { AvailabilityPolicyCard } from "./availability-policy.jsx";
+import { availabilityWindows, nextDay } from "./dashboard-model.js";
 import { askNora } from "./agent-handoff.js";
 import {
   state,
   button,
-  badge,
-  statusLabels,
-  reasons,
   dateFmt,
   timeFmt,
   dayKey,
-  localInput,
   field,
-  modal,
-  minutes,
   timeValue,
 } from "./ui.jsx";
+const mondayOf = (date) =>
+  nextDay(date, -((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7));
+const displayDate = (date) => dateFmt(`${date}T12:00:00Z`, { timeZone: "UTC" });
+
+function WorkHoursCard({ workspace: w, onWorkspaceChanged }) {
+  const currentWeek = mondayOf(dayKey(Date.now()));
+  const timetableWeeks = w.availabilityPolicy?.timetableWeeks ?? [];
+  const timetableWeek = timetableWeeks.find((week) => week >= currentWeek);
+  const [scope, setScope] = useState(timetableWeek ? "week" : "recurring");
+  const byWeek = scope === "week";
+  const byTimetable = scope === "timetable";
+  const [weekStart, setWeekStart] = useState(timetableWeek || currentWeek);
+  const [effective, setEffective] = useState(null);
+  const [retry, setRetry] = useState(0);
+  const usesTimetable = byWeek && timetableWeeks.includes(weekStart);
+  const effectiveKey = usesTimetable
+    ? `${weekStart}:${w.preference.revision}:${retry}`
+    : null;
+  useEffect(() => {
+    if (!effectiveKey) return;
+    let live = true;
+    api(`/api/time/availability/weeks/${weekStart}`)
+      .then(({ slots }) => {
+        if (live) setEffective({ key: effectiveKey, slots });
+      })
+      .catch((error) => {
+        if (live) setEffective({ key: effectiveKey, error: error.message });
+      });
+    return () => {
+      live = false;
+    };
+  }, [effectiveKey, weekStart]);
+  const weekResult = effective?.key === effectiveKey ? effective : null;
+  const weekEnd = nextDay(weekStart, 6);
+  const dates = [
+    weekEnd,
+    weekStart,
+    ...[1, 2, 3, 4, 5].map((offset) => nextDay(weekStart, offset)),
+  ];
+  const hasOverrides =
+    byWeek &&
+    w.exceptions.some(
+      (item) =>
+        item.date >= weekStart &&
+        item.date <= weekEnd &&
+        item.isAvailable &&
+        item.overridesWeeklyAvailability,
+    );
+  const slots = usesTimetable
+    ? weekResult?.slots
+    : byWeek
+      ? dates.flatMap((date, dayOfWeek) =>
+          availabilityWindows(
+            w.availability,
+            w.exceptions.filter((item) => item.date === date),
+            dayOfWeek,
+          ).map(([startMinute, endMinute]) => ({
+            dayOfWeek,
+            startMinute,
+            endMinute,
+          })),
+        )
+      : w.availability;
+
+  return (
+    <section className="card work-hours-card">
+      <div className="card-header">
+        <div>
+          <h2>Khung giờ làm việc của tôi</h2>
+          <p>
+            Xem giờ rảnh quanh lịch học và ca làm đã lưu, hoặc nhập các khung
+            bạn có thể làm việc.
+          </p>
+        </div>
+        {state.noraAvailable && (
+          <button
+            type="button"
+            className="btn secondary small"
+            onClick={() =>
+              askNora(
+                "Tôi muốn gửi ảnh thời khóa biểu. Hãy đọc giờ học và lưu các buổi học thành lịch cố định sau khi đủ thông tin. Sau đó, thiết lập giờ làm việc theo thời khóa biểu cho các tuần đã nhập, dựa vào lịch học, ca làm và lịch bận đã lưu.",
+              )
+            }
+          >
+            Gửi thời khóa biểu
+          </button>
+        )}
+      </div>
+      <div
+        className="work-hours-scope"
+        role="group"
+        aria-label="Phạm vi giờ làm việc"
+      >
+        <button
+          type="button"
+          className={`btn small ${scope === "recurring" ? "primary" : "secondary"}`}
+          aria-pressed={scope === "recurring"}
+          onClick={() => setScope("recurring")}
+        >
+          Giờ làm việc thường lệ
+        </button>
+        <button
+          type="button"
+          className={`btn small ${byWeek ? "primary" : "secondary"}`}
+          aria-pressed={byWeek}
+          onClick={() => setScope("week")}
+        >
+          Theo từng tuần
+        </button>
+        <button
+          type="button"
+          className={`btn small ${byTimetable ? "primary" : "secondary"}`}
+          aria-pressed={byTimetable}
+          onClick={() => setScope("timetable")}
+        >
+          Theo thời khóa biểu
+        </button>
+      </div>
+      {byTimetable ? (
+        w.events?.length ? (
+          <div className="work-hours-timetable">
+            <AvailabilityPolicyCard
+              autoPreview={!w.availabilityPolicy?.confirmed}
+              useTimetableHours
+              onWorkspaceChanged={onWorkspaceChanged}
+              onConfirmed={(week) => {
+                if (week) setWeekStart(week);
+                setScope("week");
+              }}
+            />
+          </div>
+        ) : (
+          <p className="work-hours-empty-timetable">
+            Thêm buổi học hoặc ca làm vào Lịch làm việc để Planora tính các
+            khoảng rảnh từng ngày.
+          </p>
+        )
+      ) : (
+        <>
+          {byWeek && (
+            <div className="work-hours-week">
+              <label className="field">
+                Chọn ngày trong tuần
+                <input
+                  type="date"
+                  min="2000-01-03"
+                  max="2100-12-31"
+                  value={weekStart}
+                  onChange={(event) => {
+                    const { value, validity } = event.target;
+                    if (value && validity.valid) setWeekStart(mondayOf(value));
+                  }}
+                />
+              </label>
+              <div>
+                <strong>
+                  {displayDate(weekStart)} – {displayDate(weekEnd)}/
+                  {weekEnd.slice(0, 4)}
+                </strong>
+                <p>
+                  {usesTimetable
+                    ? "Các khung tuần này được tính từ thời khóa biểu và lịch bận đã lưu. Chỉnh và lưu nếu bạn muốn đặt giờ riêng cho tuần này."
+                    : "Giờ làm việc bạn lưu ở đây chỉ áp dụng cho tuần này. Tắt ngày bạn không rảnh."}
+                </p>
+                {w.availabilityPolicy?.confirmed &&
+                  !w.availability.length &&
+                  !hasOverrides && (
+                    <p>Tuần này đang dùng lịch sinh hoạt đã xác nhận.</p>
+                  )}
+              </div>
+            </div>
+          )}
+          {slots ? (
+            <form
+              data-form="availability"
+              key={byWeek ? weekStart : "recurring"}
+            >
+              {byWeek && (
+                <input type="hidden" name="weekStart" value={weekStart} />
+              )}
+              <WorkHoursEditor
+                key={JSON.stringify([hasOverrides, slots])}
+                slots={slots}
+                dates={byWeek ? dates.map(displayDate) : undefined}
+              />
+              <div className="form-error" role="alert" />
+              <p className="reason spaced">
+                {w.preference.autoReschedule !== false
+                  ? "Khi lưu, các phiên tương lai linh hoạt bị xung đột sẽ được xếp lại. Phiên đã khóa và đang thực hiện được giữ nguyên."
+                  : "Tự điều chỉnh đang tắt. Lưu giờ làm việc rồi xem lịch đề xuất để xử lý các phiên bị ảnh hưởng."}
+              </p>
+              <div className="form-actions work-hours-save">
+                <button type="submit" className="btn primary">
+                  {byWeek ? "Lưu giờ làm việc tuần này" : "Lưu giờ làm việc"}
+                </button>
+                {hasOverrides && (
+                  <button
+                    type="submit"
+                    className="btn secondary"
+                    formNoValidate
+                    data-next-action="reset"
+                  >
+                    {usesTimetable
+                      ? "Dùng lại giờ theo thời khóa biểu"
+                      : "Dùng lại giờ làm việc thường lệ"}
+                  </button>
+                )}
+                {(byWeek ||
+                  w.tasks.some(
+                    (task) => !["Completed", "Cancelled"].includes(task.status),
+                  )) && (
+                  <button
+                    type="submit"
+                    className="btn secondary"
+                    data-next-action="plan"
+                  >
+                    Lưu và xem lịch
+                  </button>
+                )}
+              </div>
+            </form>
+          ) : weekResult?.error ? (
+            <p role="alert">
+              {weekResult.error}{" "}
+              <button
+                type="button"
+                className="btn ghost small"
+                onClick={() => setRetry(retry + 1)}
+              >
+                Thử lại
+              </button>
+            </p>
+          ) : (
+            <p role="status">Đang tính giờ làm việc theo thời khóa biểu…</p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function timePage({ onWorkspaceChanged } = {}) {
   const w = state.workspace,
     p = w.preference;
   return (
     <div className="equal-columns">
       <div className="stack">
-        <section className="card">
-          <div className="card-header">
-            <div>
-              <h2>Thời gian rảnh hàng tuần</h2>
-              <p>
-                Chỉ những khoảng này được dùng để lên lịch. Mỗi ngày có thể thêm
-                nhiều khoảng, ví dụ 07:00–09:00 và 15:00–17:00.
-              </p>
-            </div>
-          </div>
-          {state.noraAvailable && <button type="button" className="btn ghost" onClick={() => askNora("Giúp tôi xác nhận giờ có thể làm việc.")}>Nhờ NORA</button>}
-          <form data-form="availability">
-            <p className="reason">
-              Giờ được nhập theo múi giờ {p.timeZoneId}. Sau khi lưu, bấm biểu
-              tượng lịch cạnh công việc để xếp vào giờ rảnh.
-            </p>
-            {availabilityEditor(w.availability)}
-            <div className="form-error" />
-            <div className="form-actions">
-              {button("Thêm khoảng", "add-slot", "secondary", "", "plus")}
-              <button type="submit" className="btn secondary">
-                Lưu lịch rảnh
-              </button>
-              {w.tasks.some(
-                (task) => !["Completed", "Cancelled"].includes(task.status),
-              ) && (
-                <button
-                  type="submit"
-                  className="btn primary"
-                  data-next-action="plan"
-                >
-                  Lưu giờ rảnh & xem lịch
-                </button>
-              )}
-            </div>
-            <p className="reason spaced">
-              {p.autoReschedule !== false
-                ? "Khi lưu, các phiên tương lai linh hoạt bị xung đột sẽ được xếp lại. Phiên đã khóa và đang thực hiện được giữ nguyên."
-                : "Tự điều chỉnh đang tắt. Lưu giờ rảnh rồi xem lịch đề xuất để xử lý các phiên bị ảnh hưởng."}
-            </p>
-          </form>
-        </section>
+        <WorkHoursCard workspace={w} onWorkspaceChanged={onWorkspaceChanged} />
         <section className="card">
           <div className="card-header">
             <div>
@@ -75,29 +271,31 @@ export function timePage({ onWorkspaceChanged } = {}) {
             {button("Thêm", "new-exception", "small secondary", "", "plus")}
           </div>
           {nodeList(
-            w.exceptions.map((e) => (
-              <div className="list-line">
-                <div>
-                  <strong>
-                    {e.date}
-                    {" · "}
-                    {e.isAvailable
-                      ? e.overridesWeeklyAvailability
-                        ? "Chỉ rảnh trong khoảng này"
-                        : "Rảnh"
-                      : "Bận"}
-                  </strong>
-                  <p>
-                    {timeValue(e.startMinute)}
-                    {" – "}
-                    {timeValue(e.endMinute)}
-                    {" · "}
-                    {e.note}
-                  </p>
+            w.exceptions
+              .filter((e) => e.startMinute < e.endMinute)
+              .map((e) => (
+                <div className="list-line">
+                  <div>
+                    <strong>
+                      {e.date}
+                      {" · "}
+                      {e.isAvailable
+                        ? e.overridesWeeklyAvailability
+                          ? "Chỉ rảnh trong khoảng này"
+                          : "Rảnh"
+                        : "Bận"}
+                    </strong>
+                    <p>
+                      {timeValue(e.startMinute)}
+                      {" – "}
+                      {timeValue(e.endMinute)}
+                      {" · "}
+                      {e.note}
+                    </p>
+                  </div>
+                  {button("Sửa", "edit-exception", "small ghost", e.id)}
                 </div>
-                {button("Sửa", "edit-exception", "small ghost", e.id)}
-              </div>
-            )),
+              )),
           ) || (
             <p className="muted">
               <small>Chưa có ngoại lệ</small>

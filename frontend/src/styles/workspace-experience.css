@@ -1,7 +1,7 @@
 /* Shared login materials and motion language, sized for productive screens. */
 :root {
   --planora-ink: #071b3d;
-  --planora-muted: #526b8a;
+  --planora-muted: #000;
   --planora-blue: #0068ff;
   --planora-cyan: #36b7ff;
   --planora-edge: #ffffffed;
@@ -279,7 +279,7 @@
 }
 .glass-workspace .task-heading {
   background: #e8f4ff8c;
-  color: #486687;
+  color: #000;
   border-radius: 12px;
 }
 .glass-workspace :is(.task-row, .priority-task) {

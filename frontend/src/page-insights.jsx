@@ -1,32 +1,62 @@
-import { Select, Slot, nodeList } from "./react-ui.jsx";
+import { useState } from "react";
+import { nodeList } from "./react-ui.jsx";
 import {
   state,
-  button,
   badge,
-  icon,
   riskLabels,
   reasons,
   typeLabels,
-  dateFmt,
-  timeFmt,
-  dayKey,
   minutes,
   stat,
-  field,
   empty,
-  modal,
   loadLabel,
 } from "./ui.jsx";
 import { AnalyticsHistory, WorkspacePerformance } from "./analytics.jsx";
 import { WorkloadWeek } from "./workload.jsx";
 export function insightsPage({ onWorkspaceChanged } = {}) {
+  return <ReportsWorkspace onWorkspaceChanged={onWorkspaceChanged} />;
+}
+
+function ReportsWorkspace({ onWorkspaceChanged }) {
+  const [report, setReport] = useState("workload");
+  return (
+    <>
+      <nav className="workspace-section-links report-tabs" aria-label="Báo cáo">
+        {Object.entries({
+          workload: "Workload",
+          time: "Bảng giờ làm",
+          analysis: "Phân tích",
+        }).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={report === key}
+            onClick={() => setReport(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      <div hidden={report !== "workload"}>
+        <WorkloadWeek onWorkspaceChanged={onWorkspaceChanged} />
+      </div>
+      {report === "time" &&
+        (state.workspace.features?.includes("history-v2") ? (
+          <AnalyticsHistory />
+        ) : (
+          <WorkspacePerformance tasks={state.workspace.tasks} />
+        ))}
+      <div hidden={report !== "analysis"}>
+        <ReportsAnalysis />
+      </div>
+    </>
+  );
+}
+
+function ReportsAnalysis() {
   if (!state.insights)
     return (
       <>
-        <WorkloadWeek onWorkspaceChanged={onWorkspaceChanged} />
-        {state.workspace.features?.includes("history-v2") && (
-          <AnalyticsHistory />
-        )}
         <section className="card">
           <h2>Chưa có kết quả phân tích</h2>
           <p>
@@ -39,7 +69,6 @@ export function insightsPage({ onWorkspaceChanged } = {}) {
   const i = state.insights;
   return (
     <>
-      <WorkloadWeek onWorkspaceChanged={onWorkspaceChanged} />
       <div className="stats-grid">
         {stat(
           "Workload còn lại",
@@ -153,11 +182,6 @@ export function insightsPage({ onWorkspaceChanged } = {}) {
           )}
         </section>
       </div>
-      {state.workspace.features?.includes("history-v2") ? (
-        <AnalyticsHistory />
-      ) : (
-        <WorkspacePerformance tasks={state.workspace.tasks} />
-      )}
       <section className="card">
         <div className="card-header">
           <h2>Rủi ro theo công việc</h2>

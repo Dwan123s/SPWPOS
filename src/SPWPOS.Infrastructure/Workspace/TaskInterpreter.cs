@@ -112,15 +112,34 @@ public sealed partial class TaskInterpreter(HttpClient http, IConfiguration conf
         }
         string[] steps = task.TaskType.Equals("Programming", StringComparison.OrdinalIgnoreCase) ? ["Phân tích yêu cầu", "Triển khai", "Kiểm thử và hoàn thiện"] :
             task.TaskType.Equals("Writing", StringComparison.OrdinalIgnoreCase) ? ["Thu thập tài liệu", "Viết bản thảo", "Rà soát và hoàn thiện"] : ["Chuẩn bị", "Thực hiện", "Kiểm tra kết quả"];
+        var estimate = task.EstimatedMinutes.GetValueOrDefault();
         var parts = steps.Select((name, index) => task with { Name = name + ": " + task.Name[..Math.Min(160, task.Name.Length)],
-            EstimatedMinutes = Math.Max(5, task.EstimatedMinutes / 3 + (index == 2 ? task.EstimatedMinutes % 3 : 0)), ParentId = null, CategoryId = null }).ToArray();
+            EstimatedMinutes = estimate > 0 ? Math.Max(5, estimate / 3 + (index == 2 ? estimate % 3 : 0)) : null, ParentId = null, CategoryId = null }).ToArray();
         return new(parts, "Rules");
     }
     private sealed record AiTaskResult(TaskInput[] Tasks, bool NeedsReview, NoteActivity[]? Activities = null, string[]? Messages = null);
-    private async Task<AiTaskResult?> Ask(string prompt, CancellationToken ct, int maxTasks = 8, int maxTokens = 1800, bool noteAnalysis = false, string? noteTimeZone = null)
+    public async Task<NoteAnalysis> PreviewTaskTextAsync(string text, string timeZoneId, DateTimeOffset now, CancellationToken ct)
     {
-        var key = ApiKey; var model = config["AiSettings:Model"];
-        if (!Capabilities.AiAvailable) return null;
+        var model = config["AiSettings:TaskAutofillModel"] ?? (IsGoogle ? "gemini-3.5-flash-lite" : null);
+        if (!ValidModel(model))
+            throw new AuthException("TASK_AUTOFILL_UNAVAILABLE", "Chưa cấu hình model tự điền.", 503);
+        var prompt = $"Extract timing for ONE task. Current time {now:O}; user's time zone {timeZoneId}. " +
+            "Return at most one TASK activity. Extract explicit start, duration, and deadline independently. " +
+            "Use ISO 8601 with explicit offset. Resolve relative dates, and treat a time without a date as today. " +
+            "Keep explicit past dates and times so the form can flag them. Leave unknown fields null. Never ask questions or return explanatory messages. " +
+            "Do not assume a duration or treat a start as a deadline. For plain titles return a task with null timing. Task text: " + JsonSerializer.Serialize(text);
+        var result = await Ask(prompt, ct, 1, 800, noteAnalysis: true, noteTimeZone: timeZoneId, modelOverride: model);
+        if (result?.Activities is null)
+            throw new AuthException("TASK_AUTOFILL_UNAVAILABLE", "Chưa nhận diện được thời gian.", 503);
+        return new([], Provider, result.Messages ?? [], result.NeedsReview, result.Activities);
+    }
+
+    private async Task<AiTaskResult?> Ask(string prompt, CancellationToken ct, int maxTasks = 8, int maxTokens = 1800, bool noteAnalysis = false, string? noteTimeZone = null, string? modelOverride = null)
+    {
+        var key = ApiKey; var model = modelOverride ?? config["AiSettings:Model"];
+        if (modelOverride is null ? !Capabilities.AiAvailable :
+            !config.GetValue<bool>("AiSettings:Enabled") || Provider.Length == 0 || !ValidModel(model) ||
+            (Provider == "VertexAI" ? !ValidVertexConfiguration : string.IsNullOrWhiteSpace(key))) return null;
         try
         {
             var schema = JsonSerializer.Deserialize<JsonElement>("""
@@ -138,7 +157,7 @@ public sealed partial class TaskInterpreter(HttpClient http, IConfiguration conf
             {
                 // Keep the key out of URLs, browser bundles, logs and note data.
                 await AuthenticateGoogleAsync(request, "NOTE", ct);
-                request.Content = GoogleContent(instructions, prompt, schema, maxTokens, includeStore: true);
+                request.Content = GoogleContent(instructions, prompt, schema, maxTokens, includeStore: true, modelOverride: modelOverride);
             }
             else
             {
@@ -229,6 +248,14 @@ public sealed partial class TaskInterpreter(HttpClient http, IConfiguration conf
 }
 public sealed partial class WorkspaceService
 {
+    public async Task<NoteAnalysis> PreviewTaskTextAsync(Guid uid, CaptureInput input, CancellationToken ct)
+    {
+        Require(!string.IsNullOrWhiteSpace(input.Text) && input.Text.Length <= 200, "VALIDATION_ERROR", "Nhập tên công việc tối đa 200 ký tự.");
+        var zone = (await State(uid, ct)).Preference.TimeZoneId;
+        return await aiUsage.RunAsync(uid, "TASK_AUTOFILL",
+            () => interpreter.PreviewTaskTextAsync(input.Text, zone, Now, ct), ct);
+    }
+
     public async Task<TaskSuggestion> CaptureAsync(Guid uid, CaptureInput input, CancellationToken ct)
     {
         Require(!string.IsNullOrWhiteSpace(input.Text) && input.Text.Length <= 2000, "VALIDATION_ERROR", "Nhập nội dung tối đa 2000 ký tự.");
@@ -240,6 +267,7 @@ public sealed partial class WorkspaceService
     public async Task<BreakdownView> BreakdownAsync(Guid uid, Guid taskId, bool useAi, CancellationToken ct)
     {
         var task = await Find<SPWPOS.Domain.Entities.WorkTask>(uid, taskId, ct); Require(!task.IsDeleted, "NOT_FOUND", "Công việc đã xóa.", 404);
+        Require(task.HasPlanningDetails, "TASK_PLANNING_DETAILS_REQUIRED", "Bổ sung hạn chót và thời gian dự kiến trước khi chia nhỏ.", 409);
         var input = new TaskInput(task.Name, task.Description, task.Deadline, task.EstimatedMinutes, task.Priority, task.TaskType, task.Splittable, task.MinimumSessionMinutes, IsHardDeadline: task.IsHardDeadline);
         var result = useAi ? await RunJob(uid, "AI_REQUEST", () => interpreter.BreakdownAsync(input, true, ct), ct, x => x.Source is "OpenAI" or "Gemini" or "VertexAI") : await interpreter.BreakdownAsync(input, false, ct);
         return result with { Subtasks = result.Subtasks.Select(x => x with { CreationSource = "AI_BREAKDOWN", TaskType = NormalizeTaskType(x.TaskType) }).ToArray() };

@@ -59,5 +59,6 @@ try {
     }
 }
 if (-not $SpwposDotnet) {
-    throw 'No compatible .NET 8 SDK found. Run scripts/Install-Dotnet8.ps1 or install the .NET 8 SDK 8.0.425 or newer in the 8.0 feature band (not only the runtime), then open a new terminal.'
+    $minimumSdkVersion = (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'global.json') -Raw | ConvertFrom-Json).sdk.version
+    throw "No compatible .NET 8 SDK found. Run scripts/Install-Dotnet8.ps1 or install a stable .NET 8 SDK ($minimumSdkVersion or later in the 8.0 series), then open a new terminal. The SDK is required."
 }

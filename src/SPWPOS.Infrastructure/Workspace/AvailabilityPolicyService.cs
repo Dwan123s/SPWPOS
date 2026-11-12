@@ -7,22 +7,23 @@ namespace SPWPOS.Infrastructure.Workspace;
 public sealed partial class WorkspaceService
 {
     private sealed record PolicyPayload(AvailabilityPolicy Policy, PlanView Plan, DateOnly? WeekStart = null);
-    private static PolicyView PolicyDto(AvailabilityPolicy p) => new(p.AwakeStart, p.AwakeEnd, p.LunchStart, p.LunchEnd, p.DinnerStart, p.DinnerEnd, p.CommuteMinutes, p.FocusMinutes, p.ConfirmedAt != default, p.ConfirmedAt == default ? null : p.ConfirmedAt, p.RoutineDaysJson != "[]");
+    private static PolicyView PolicyDto(AvailabilityPolicy p) => new(p.AwakeStart, p.AwakeEnd, p.LunchStart, p.LunchEnd, p.DinnerStart, p.DinnerEnd, p.CommuteMinutes, p.FocusMinutes, p.ConfirmedAt != default, p.ConfirmedAt == default ? null : p.ConfirmedAt, p.RoutineDaysJson != "[]", p.TimetableWeeks());
     public async Task<PolicyView?> GetAvailabilityPolicyAsync(Guid uid, CancellationToken ct) =>
         await Mine<AvailabilityPolicy>(uid).AsNoTracking().SingleOrDefaultAsync(ct) is { } p ? PolicyDto(p) : null;
-    public async Task<PolicyPreviewView> PreviewAvailabilityPolicyAsync(Guid uid, CancellationToken ct, Guid? timetableTurnId = null)
-        => await PreviewPolicyCore(uid, null, ct, timetableTurnId);
-    public async Task<PolicyPreviewView> DraftAvailabilityPolicyAsync(Guid uid, TeamTextInput input, CancellationToken ct, Guid? timetableTurnId = null)
+    public async Task<PolicyPreviewView> PreviewAvailabilityPolicyAsync(Guid uid, CancellationToken ct, Guid? timetableTurnId = null, bool useTimetableHours = false)
+        => await PreviewPolicyCore(uid, null, ct, timetableTurnId, useTimetableHours);
+    public async Task<PolicyPreviewView> DraftAvailabilityPolicyAsync(Guid uid, TeamTextInput input, CancellationToken ct, Guid? timetableTurnId = null, bool useTimetableHours = false)
     {
         Require(interpreter is IPolicyDraftInterpreter, "AI_NOT_CONFIGURED", "AI chưa hỗ trợ cấu hình sinh hoạt.", 503);
         var current = await GetAvailabilityPolicyAsync(uid, ct) ?? PolicyDto(new());
         var draft = await RunJob(uid, "AI_REQUEST", () => ((IPolicyDraftInterpreter)interpreter).DraftPolicyAsync(input.Text, current, ct), ct);
         Require(draft.AwakeStart >= 0 && draft.AwakeEnd <= 1440 && draft.AwakeStart < draft.AwakeEnd && draft.LunchStart >= 0 && draft.LunchEnd <= 1440 && draft.LunchStart < draft.LunchEnd && draft.DinnerStart >= 0 && draft.DinnerEnd <= 1440 && draft.DinnerStart < draft.DinnerEnd && draft.CommuteMinutes is >= 0 and <= 180 && draft.FocusMinutes is >= 5 and <= 180,
             "INVALID_POLICY", "Giờ sinh hoạt chưa hợp lệ. Hãy mô tả rõ các khung giờ trong ngày.");
-        return await PreviewPolicyCore(uid, new AvailabilityPolicy { UserId = uid, AwakeStart = draft.AwakeStart, AwakeEnd = draft.AwakeEnd, LunchStart = draft.LunchStart, LunchEnd = draft.LunchEnd, DinnerStart = draft.DinnerStart, DinnerEnd = draft.DinnerEnd, CommuteMinutes = draft.CommuteMinutes, FocusMinutes = draft.FocusMinutes }, ct, timetableTurnId);
+        return await PreviewPolicyCore(uid, new AvailabilityPolicy { UserId = uid, AwakeStart = draft.AwakeStart, AwakeEnd = draft.AwakeEnd, LunchStart = draft.LunchStart, LunchEnd = draft.LunchEnd, DinnerStart = draft.DinnerStart, DinnerEnd = draft.DinnerEnd, CommuteMinutes = draft.CommuteMinutes, FocusMinutes = draft.FocusMinutes }, ct, timetableTurnId, useTimetableHours);
     }
     private async Task<DateOnly> TimetableRoutineWeek(Guid uid, PlanningState state, Guid? turnId, CancellationToken ct)
     {
+        var currentWeek = RoutineWeekStart(LocalDate(Now, state.Preference));
         var turns = turnId is { } id ? new[] { await Find<AgentTurn>(uid, id, ct) } :
             await Mine<AgentTurn>(uid).AsNoTracking().Where(x => x.Status == "APPLIED").OrderByDescending(x => x.UpdatedAt).Take(100).ToArrayAsync(ct);
         foreach (var turn in turns)
@@ -31,30 +32,38 @@ public sealed partial class WorkspaceService
             if (turn.Status != "APPLIED" || changes?.AnalyzeTimetable != true || changes.Events.Length == 0)
             { Require(turnId is null, "TIMETABLE_NOT_APPLIED", "Xác nhận thời khóa biểu trước khi xem đề xuất tuần.", 409); continue; }
             var ids = changes.Events.Select(x => x.Id).ToHashSet();
-            var dates = state.Events.Where(x => ids.Contains(x.Id)).Select(x => LocalDate(x.Start, state.Preference)).ToArray();
-            if (dates.Length > 0) return RoutineWeekStart(dates.Min());
+            var weeks = state.Events.Where(x => ids.Contains(x.Id))
+                .Select(x => RoutineWeekStart(LocalDate(x.Start, state.Preference)))
+                .Where(week => turnId.HasValue || week >= currentWeek).ToArray();
+            if (weeks.Length > 0) return weeks.Min();
             Require(turnId is null, "TIMETABLE_CHANGED", "Thời khóa biểu đã được xóa hoặc thay đổi. Hãy gửi lại để đề xuất đúng tuần.", 409);
         }
         return RoutineWeekStart(LocalDate(state.Events.Where(x => x.End > Now).Select(x => x.Start).DefaultIfEmpty(Now).Min(), state.Preference));
     }
-    private async Task<PolicyPreviewView> PreviewPolicyCore(Guid uid, AvailabilityPolicy? requested, CancellationToken ct, Guid? timetableTurnId)
+    private async Task<PolicyPreviewView> PreviewPolicyCore(Guid uid, AvailabilityPolicy? requested, CancellationToken ct, Guid? timetableTurnId, bool useTimetableHours)
     {
         var state = await State(uid, ct);
         Require(state.Events.Length > 0, "TIMETABLE_REQUIRED", "Gửi và xác nhận thời gian biểu trước khi cấu hình giờ sinh hoạt.", 409);
         var first = await TimetableRoutineWeek(uid, state, timetableTurnId, ct);
         var end = PlanningEngine.At(first.AddDays(7), 0, PlanningEngine.Zone(state.Preference.TimeZoneId));
         Require(end > Now.AddMinutes(5), "TIMETABLE_WEEK_ENDED", "Tuần của thời khóa biểu đã kết thúc. Hãy gửi thời khóa biểu của tuần cần sắp xếp.", 409);
-        var policy = requested ?? ProposeTimetableRoutine(state, first);
+        var policy = requested ?? ProposeTimetableRoutine(state, first, useTimetableHours);
         if (requested is not null)
         {
             var previous = state.Policy is null ? [] : JsonSerializer.Deserialize<RoutineDay[]>(state.Policy.RoutineDaysJson) ?? [];
-            policy.RoutineDaysJson = JsonSerializer.Serialize(Enumerable.Range(0, 7).Select(i => new RoutineDay(first.AddDays(i), policy.AwakeStart, policy.AwakeEnd, policy.LunchStart, policy.LunchEnd, policy.DinnerStart, policy.DinnerEnd))
+            policy.RoutineDaysJson = JsonSerializer.Serialize(Enumerable.Range(0, 7).Select(i => first.AddDays(i))
+                .Select(day => new RoutineDay(day, policy.AwakeStart, policy.AwakeEnd, policy.LunchStart, policy.LunchEnd, policy.DinnerStart, policy.DinnerEnd,
+                    UseTimetableHours: useTimetableHours || state.Policy?.ForDate(day)?.UseTimetableHours == true))
                 .Concat(previous.Where(x => x.Date < first || x.Date >= first.AddDays(7))));
         }
         var candidate = state with { Policy = policy };
         var start = PlanningEngine.At(first, 0, PlanningEngine.Zone(state.Preference.TimeZoneId));
         if (start < Now.AddMinutes(5)) start = Now.AddMinutes(5);
-        var plan = engine.Generate(candidate, new(start, 7, IsReschedule: true, UseCapacityFactor: false, UseEstimateBias: false) { WindowEnd = end }, Now);
+        var affected = useTimetableHours
+            ? TimeConflictTaskIds(candidate with { Sessions = candidate.Sessions.Where(x => x.Start < end).ToArray() })
+            : null;
+        var plan = engine.Generate(candidate, new(start, 7, affected, IsReschedule: true, UseCapacityFactor: false, UseEstimateBias: false)
+        { WindowEnd = end, RestrictAffectedTasks = useTimetableHours, AllowDeadlineRescue = !useTimetableHours }, Now);
         var row = new PrivatePlanningProposal { UserId = uid, Kind = "POLICY", Revision = state.Preference.Revision,
             ExpiresAt = Now.AddMinutes(20), PayloadJson = JsonSerializer.Serialize(new PolicyPayload(policy, plan, first)) };
         db.PrivatePlanningProposals.Add(row); await db.SaveChangesAsync(ct);
@@ -94,8 +103,16 @@ public sealed partial class WorkspaceService
     public async Task<PolicyDayView[]> GetPolicySlotsAsync(Guid uid, CancellationToken ct)
     {
         var state = await State(uid, ct);
-        var routine = state.Policy is null ? [] : JsonSerializer.Deserialize<RoutineDay[]>(state.Policy.RoutineDaysJson) ?? [];
-        return state.Policy is null ? [] : PolicyDays(await AgentCalendarStateAsync(uid, state, ct), routine.FirstOrDefault()?.Date);
+        if (state.Policy is not { } policy) return [];
+        var currentWeek = RoutineWeekStart(LocalDate(Now, state.Preference));
+        var routine = JsonSerializer.Deserialize<RoutineDay[]>(policy.RoutineDaysJson) ?? [];
+        var first = policy.TimetableWeeks().Where(week => week >= currentWeek).Select(week => (DateOnly?)week).FirstOrDefault()
+            ?? routine.FirstOrDefault()?.Date;
+        if (first is null) return PolicyDays(await AgentCalendarStateAsync(uid, state, ct));
+        var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
+        var calendar = await CalendarStateAsync(uid, state, PlanningEngine.At(first.Value, 0, zone),
+            PlanningEngine.At(first.Value.AddDays(7), 0, zone), ct);
+        return PolicyDays(calendar, first);
     }
     private PolicyDayView[] PolicyDays(PlanningState state, DateOnly? weekStart = null)
     {

@@ -21,13 +21,15 @@ public sealed class WorkTask : OwnedRecord, ITaskImportance
     public string Description { get; set; } = "";
     public Guid? CategoryId { get; set; }
     public Guid? ParentId { get; set; }
-    public DateTimeOffset Deadline { get; set; }
+    public DateTimeOffset? Deadline { get; set; }
     public DateTimeOffset? WorkWindowStart { get; set; }
     public DateTimeOffset? WorkWindowEnd { get; set; }
     public int Priority { get; set; } = 2;
     public WorkTaskStatus Status { get; set; }
     public int Progress { get; set; }
     public int EstimatedMinutes { get; set; } = 60;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool HasPlanningDetails => Deadline.HasValue && EstimatedMinutes > 0;
     public string TaskType { get; set; } = "OTHER";
     public bool IsHardDeadline { get; set; }
     public string CreationSource { get; set; } = "MANUAL";

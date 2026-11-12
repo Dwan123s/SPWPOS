@@ -9,6 +9,15 @@ public sealed partial class WorkspaceService
 {
     public Task<PrivateClaimView> PreviewTeamClaimAsync(Guid uid, Guid taskId, CancellationToken ct, bool allowExtendedDisplacement = false) => PreviewClaim(uid, taskId, false, ct, allowExtendedDisplacement);
     public Task<PrivateClaimView> PreviewTeamTaskChangeAsync(Guid uid, Guid taskId, CancellationToken ct) => PreviewClaim(uid, taskId, true, ct);
+
+    private static WorkTask NewTeamClaimTask(Guid uid, SharedTaskView data, TeamTask shared, PlanningState state, DateTimeOffset now) => new()
+    {
+        UserId = uid, Name = data.Name, Description = data.Description, EstimatedMinutes = data.EstimatedMinutes,
+        Deadline = data.Deadline, Priority = data.Priority, Splittable = data.Splittable, IsHardDeadline = true,
+        CreationSource = "TEAM", CreatedAt = now, UpdatedAt = now, MinimumSessionMinutes = state.Preference.MinimumSessionMinutes,
+        InheritedImportance = shared.ImportanceLevel, InheritedImportanceReason = shared.ImportanceReason
+    };
+
     private async Task<PrivateClaimView> PreviewClaim(Guid uid, Guid taskId, bool change, CancellationToken ct, bool extended = false)
     {
         var shared = await SharedTask(uid, taskId, ct); var member = await TeamMember(uid, shared.TeamId, ct);
@@ -24,10 +33,7 @@ public sealed partial class WorkspaceService
                 : "Hạn chót đã quá gần hoặc đã qua. Hãy nhờ trưởng nhóm đổi hạn.";
             return new(Guid.Empty, taskId, Now, [], [], true, message);
         }
-        var task = new WorkTask { UserId = uid, Name = data.Name, Description = data.Description, EstimatedMinutes = data.EstimatedMinutes, Deadline = data.Deadline,
-            Priority = data.Priority, Splittable = data.Splittable, IsHardDeadline = true, CreationSource = "TEAM", CreatedAt = Now, UpdatedAt = Now,
-            MinimumSessionMinutes = state.Preference.MinimumSessionMinutes };
-        task.InheritedImportance = shared.ImportanceLevel; task.InheritedImportanceReason = shared.ImportanceReason;
+        var task = NewTeamClaimTask(uid, data, shared, state, Now);
         if (change)
         {
             var assignment = await db.TeamTaskAssignments.SingleAsync(x => x.TeamTaskId == taskId && x.UserId == uid && x.Active, ct);
@@ -71,7 +77,7 @@ public sealed partial class WorkspaceService
     }
     private PrivateClaimView FailedTeamClaim(Guid sharedId, WorkTask task, PlanningState state, PlanView[] attempts, DateTimeOffset start, bool change)
     {
-        var end = task.Deadline;
+        var end = task.Deadline!.Value;
         var remaining = engine.Remaining(task, [new("All", 0, 1, false)]);
         var occupied = state.Sessions.Where(x => x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused or WorkSessionStatus.Completed)
             .Select(x => new TimeSlot(x.Start.AddMinutes(-state.Preference.BreakMinutes), x.End.AddMinutes(state.Preference.BreakMinutes))).ToArray();
@@ -170,7 +176,7 @@ public sealed partial class WorkspaceService
             personal.Name = payload.Task.Name; personal.Description = payload.Task.Description; personal.EstimatedMinutes = payload.Task.EstimatedMinutes; personal.Deadline = payload.Task.Deadline;
             personal.Priority = payload.Task.Priority; personal.Splittable = payload.Task.Splittable; personal.UpdatedAt = Now;
             candidate = state;
-            shared.Name = personal.Name; shared.Description = personal.Description; shared.EstimatedMinutes = personal.EstimatedMinutes; shared.Deadline = personal.Deadline; shared.Priority = personal.Priority; shared.Splittable = personal.Splittable; shared.PendingChangeJson = null;
+            shared.Name = personal.Name; shared.Description = personal.Description; shared.EstimatedMinutes = personal.EstimatedMinutes; shared.Deadline = personal.Deadline!.Value; shared.Priority = personal.Priority; shared.Splittable = personal.Splittable; shared.PendingChangeJson = null;
         }
         else
         {

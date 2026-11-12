@@ -79,8 +79,8 @@ export function SecretaryTime({ onWorkspaceChanged }) {
         )}
         {(w.exceptions || []).map((item) => (
           <p key={item.id}>
-            {item.date} · {item.isAvailable ? "Có thể làm việc" : "Bận"}{" "}
-            {timeValue(item.startMinute)}–{timeValue(item.endMinute)}{" "}
+            {item.date} · {item.startMinute === item.endMinute ? "Không có giờ rảnh" :
+              `${item.isAvailable ? "Có thể làm việc" : "Bận"} ${timeValue(item.startMinute)}–${timeValue(item.endMinute)}`}{" "}
             {item.note}
           </p>
         ))}

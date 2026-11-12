@@ -23,7 +23,7 @@ public sealed partial class PlanningEngine
         var moves = released.GroupBy(session => session.TaskId).ToDictionary(group => group.Key, group => {
             var anchor = group.Min(session => session.Start);
             var latest = group.Max(session => session.End).AddDays(MaximumUrgentDisplacementDays);
-            if (tasks[group.Key].Deadline < latest) latest = tasks[group.Key].Deadline;
+            if (tasks[group.Key].Deadline is { } deadline && deadline < latest) latest = deadline;
             // Prefer the nearest later slot. Fixed appointments keep their exact
             // requested hours; existing task deadlines and work windows still apply.
             return new UrgentMove(anchor, anchor > start ? anchor : start, latest, true);

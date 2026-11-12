@@ -14,6 +14,14 @@ import { takeInboxNote } from "../src/task-inbox-link.js";
 vi.mock("../src/api.js", () => ({ api: vi.fn() }));
 import { api } from "../src/api.js";
 let notes, failSave;
+function openScopePicker() {
+  const picker = screen.getByLabelText(/^Lọc danh sách/);
+  if (!picker.closest("details").open) fireEvent.click(picker);
+}
+function chooseScope(name) {
+  openScopePicker();
+  fireEvent.click(screen.getByRole("button", { name, exact: true }));
+}
 const draft = {
   id: "draft",
   title: "Ý tưởng ứng dụng học nhóm",
@@ -27,7 +35,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-04T01:00:00Z"));
   state.workspace = workspace();
-  state.taskScope = undefined;
+  state.taskScope = "inbox";
   state.workspace.features = [];
   state.workspace.tasks = [
     {
@@ -96,7 +104,31 @@ beforeEach(() => {
     return {};
   });
 });
-it("defaults to Inbox and saves ideas without deadlines, task creation or automatic AI calls", async () => {
+it("shows the task table and a title-only add row by default", () => {
+  state.taskScope = undefined;
+  state.workspace.tasks.unshift({
+    ...state.workspace.tasks[0],
+    id: "checklist-item",
+    name: "Kiểm tra email",
+    deadline: null,
+    estimatedMinutes: 0,
+  });
+  render(<TaskSmartList />);
+  expect(screen.getByRole("button", { name: "Inbox" }).getAttribute("aria-pressed")).toBe("true");
+  const table = screen.getByRole("table");
+  expect(within(table).getByRole("columnheader", { name: "Hạn chót" })).toBeTruthy();
+  const checkbox = within(table).getByRole("checkbox", { name: "Hoàn thành Kiểm tra email" });
+  expect(checkbox.getAttribute("aria-checked")).toBe("false");
+  expect(checkbox.dataset.action).toBe("toggle-task-completion");
+  const add = screen.getByRole("button", { name: "Thêm công việc…" });
+  expect(add.dataset.action).toBe("new-task");
+  expect(add.getAttribute("aria-haspopup")).toBe("dialog");
+  fireEvent.click(screen.getByText("Cột", { selector: "summary" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Hạn chót" }));
+  expect(within(table).queryByRole("columnheader", { name: "Hạn chót" })).toBeNull();
+});
+
+it("saves ideas in Ghi nháp without deadlines, task creation or automatic AI calls", async () => {
   render(<TaskSmartList />);
   await screen.findByRole("button", { name: draft.title });
   expect(screen.queryByRole("button", { name: "Đã lập kế hoạch" })).toBeNull();
@@ -140,8 +172,8 @@ it("checks an Inbox item, persists across remounts and reopens it with the curre
   expect(
     within(
       screen.getByRole("navigation", { name: "Danh sách thông minh" }),
-    ).getByRole("button", { name: /^Inbox/ }).textContent,
-  ).toBe("Inbox0");
+    ).getByRole("button", { name: "Ghi nháp" }).textContent.trim(),
+  ).toBe("Ghi nháp");
   expect(
     screen.getByRole("list", { name: "Đã hoàn thành" }).contains(completed),
   ).toBe(true);
@@ -190,24 +222,26 @@ it("switches between Today and seven days while preserving filters and the unsav
     screen.getByRole("textbox", { name: "Ý tưởng hoặc nhiệm vụ mới" }),
     { target: { value: "Bản nháp đang gõ" } },
   );
-  fireEvent.click(screen.getByRole("button", { name: /^Today/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Công việc" }));
+  chooseScope("Hôm nay");
   expect(screen.getByRole("button", { name: "Báo cáo hôm nay" })).toBeTruthy();
   expect(
     screen.queryByRole("button", { name: "Chuẩn bị tuần này" }),
   ).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /^Next 7 Days/ }));
+  chooseScope("7 ngày tới");
   expect(
     screen.getByRole("button", { name: "Chuẩn bị tuần này" }),
   ).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Việc tuần sau" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Tìm kiếm" }));
   fireEvent.change(screen.getByRole("searchbox", { name: "Tìm công việc" }), {
     target: { value: "Chuẩn bị" },
   });
   expect(screen.queryByRole("button", { name: "Báo cáo hôm nay" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /^Today/ }));
+  chooseScope("Hôm nay");
   expect(screen.getByText("Không có công việc phù hợp")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Bỏ bộ lọc" }));
-  fireEvent.click(screen.getByRole("button", { name: /^Inbox/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Ghi nháp" }));
   expect(
     screen.getByRole("textbox", { name: "Ý tưởng hoặc nhiệm vụ mới" }).value,
   ).toBe("Bản nháp đang gõ");
@@ -288,7 +322,13 @@ it("keeps completed tasks searchable in All and clears that status when switchin
     status: "Completed",
   });
   render(<TaskSmartList />);
-  fireEvent.click(screen.getByRole("button", { name: /^Tất cả công việc/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Công việc" }));
+  const incomplete = screen.getByRole("button", { name: "Chưa hoàn thành" });
+  fireEvent.click(incomplete);
+  expect(screen.queryByRole("button", { name: "Việc đã hoàn thành" })).toBeNull();
+  fireEvent.click(incomplete);
+  expect(screen.getByRole("button", { name: "Việc đã hoàn thành" })).toBeTruthy();
+  openScopePicker();
   fireEvent.change(screen.getByRole("combobox", { name: "Lọc trạng thái" }), {
     target: { value: "Completed" },
   });
@@ -296,11 +336,12 @@ it("keeps completed tasks searchable in All and clears that status when switchin
     screen.getByRole("button", { name: "Việc đã hoàn thành" }),
   ).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Báo cáo hôm nay" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /^Today/ }));
+  chooseScope("Hôm nay");
   expect(
     screen.queryByRole("button", { name: "Việc đã hoàn thành" }),
   ).toBeNull();
   expect(screen.getByRole("button", { name: "Báo cáo hôm nay" })).toBeTruthy();
+  openScopePicker();
   expect(screen.getByRole("combobox", { name: "Lọc trạng thái" }).value).toBe(
     "",
   );

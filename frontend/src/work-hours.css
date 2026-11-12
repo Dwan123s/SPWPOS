@@ -1,0 +1,231 @@
+.work-hours-card {
+  container-type: inline-size;
+}
+
+.shell.planning-console .work-hours-card .card-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.work-hours-scope,
+.work-hours-week {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.work-hours-week > .field {
+  flex: 0 1 170px;
+}
+
+.work-hours-week > div {
+  flex: 1 1 205px;
+}
+
+.work-hours-timetable,
+.work-hours-empty-timetable {
+  margin-top: 16px;
+}
+
+.work-hours-timetable > p {
+  margin-bottom: 8px;
+}
+
+.work-hours-week p,
+.work-hours-day-name small {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.work-hours-day-name small {
+  display: block;
+  line-height: 1;
+}
+
+.work-hours-days {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  margin: 16px 0 22px;
+}
+
+.work-hours-days > button {
+  --control-corner: 50%;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ui-control-line);
+  border-radius: 50%;
+  color: var(--ui-muted);
+  background: var(--ui-surface);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.work-hours-days > button[aria-pressed="true"] {
+  border-color: var(--ui-accent);
+  color: #fff;
+  background: var(--ui-accent);
+}
+
+.work-hours-grid {
+  display: grid;
+  border: 1px solid var(--ui-control-line);
+  border-radius: 8px;
+  background: var(--ui-surface);
+}
+
+.work-hours-day {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.7fr) minmax(0, 3fr);
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.work-hours-day + .work-hours-day {
+  border-top: 1px solid var(--ui-control-line);
+}
+
+.work-hours-day-name {
+  padding-block: 5px;
+  font-weight: 600;
+}
+
+.work-hours-periods {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.work-hours-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) 30px;
+  align-items: center;
+  gap: 2px 8px;
+}
+
+.work-hours-time {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.shell.planning-console .work-hours-time input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background-color: var(--ui-subtle);
+  color: var(--ui-ink);
+  box-shadow: none;
+  font-size: 14px;
+}
+
+.shell.planning-console .work-hours-time input:hover {
+  border-color: var(--ui-control-line);
+}
+
+.work-hours-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.work-hours-row-icon,
+.work-hours-add,
+.work-hours-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 5px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--ui-accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.work-hours-row-icon {
+  height: 30px;
+}
+
+.work-hours-row-icon:hover,
+.work-hours-add:hover,
+.work-hours-copy:hover {
+  background: var(--ui-accent-soft);
+}
+
+.work-hours-row-icon svg,
+.work-hours-add svg,
+.work-hours-copy svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.work-hours-add,
+.work-hours-copy {
+  min-height: 30px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.work-hours-midnight {
+  grid-column: 2;
+}
+
+.work-hours-midnight,
+.work-hours-day-empty {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.work-hours-notice {
+  margin-top: 12px;
+  color: var(--ui-muted);
+  font-size: 13px;
+}
+
+.work-hours-notice:empty {
+  margin: 0;
+}
+
+.work-hours-card .work-hours-save {
+  justify-content: flex-end;
+}
+
+@container (max-width: 420px) {
+  .work-hours-day {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .work-hours-day-name small {
+    display: inline;
+    margin-inline-start: 6px;
+  }
+}
+
+@container (max-width: 320px) {
+  .work-hours-row {
+    align-items: end;
+  }
+
+  .work-hours-time {
+    display: grid;
+    gap: 2px;
+  }
+}

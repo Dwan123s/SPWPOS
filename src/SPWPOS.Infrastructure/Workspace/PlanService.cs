@@ -11,7 +11,12 @@ public sealed partial class WorkspaceService
     public Task<PlanView> GeneratePlanAsync(Guid uid, PlanInput input, CancellationToken ct) => RunJob(uid, "PLAN_GENERATION", () => Mutate(uid, async () =>
     {
         ValidPlan(input); var state = await State(uid, ct);
-        if (input.AffectedTaskIds is not null) Require(input.AffectedTaskIds.All(id => state.Tasks.Any(t => t.Id == id)), "NOT_FOUND", "Công việc không thuộc tài khoản.", 404);
+        if (input.AffectedTaskIds is { } selected)
+        {
+            Require(selected.All(id => state.Tasks.Any(t => t.Id == id)), "NOT_FOUND", "Công việc không thuộc tài khoản.", 404);
+            Require(!state.Tasks.Any(t => selected.Contains(t.Id) && ActiveWork(t) && !t.HasPlanningDetails),
+                "TASK_PLANNING_DETAILS_REQUIRED", "Bổ sung hạn chót và thời gian dự kiến cho công việc được chọn.", 409);
+        }
         // Leave time for review; an immediate start would already be in the past at Apply.
         var earliestStart = Now.AddMinutes(5);
         var candidate = input.PreserveExisting ? state with
@@ -122,6 +127,7 @@ public sealed partial class WorkspaceService
     {
         var task = state.Tasks.SingleOrDefault(x => x.Id == taskId);
         Require(task is not null && !task.IsDeleted && task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled, "INVALID_TASK", "Công việc không thể xếp lịch.");
+        Require(task!.HasPlanningDetails, "TASK_PLANNING_DETAILS_REQUIRED", "Bổ sung hạn chót và thời gian dự kiến để xếp lịch.", 409);
         Require(start >= Now && end > start && (!task!.IsHardDeadline || end <= task.Deadline), "DEADLINE_CONFLICT", "Phiên phải ở tương lai và không vượt deadline cứng.", 409);
         Require(PlanningEngine.InsideWorkWindow(task!, start, end), "TASK_WORK_WINDOW", "Phiên nằm ngoài khung giờ thực hiện đã yêu cầu cho công việc.", 409);
         var duration = (end - start).TotalMinutes;

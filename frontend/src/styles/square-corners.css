@@ -1,0 +1,60 @@
+/* Apply the workspace shape across shared and lazy-loaded components. */
+:root {
+  --surface-corner: 0px;
+  --control-corner: 3px;
+}
+
+:is(
+    .sidebar,
+    .topbar,
+    .page-header,
+    .card,
+    .focus-card,
+    .profile-hero-card,
+    .home-agenda,
+    .daily-schedule,
+    .task-smart-nav,
+    .workload-panel,
+    .workload-day,
+    .workload-day-inspect,
+    .workload-metrics > div,
+    .calendar-workspace,
+    .week-day,
+    .notes-library,
+    .note-paper,
+    .nora-studio,
+    .nora-plan-card,
+    .team-panel,
+    .team-task-card,
+    .team-group-card,
+
+    .notice-list,
+    .notice-sidebar,
+    .toast,
+    .reminder-popup,
+    .auth-card,
+    dialog,
+    [role="dialog"]
+  ) {
+  border-radius: var(--surface-corner) !important;
+}
+
+:is(
+    button,
+    .btn,
+    .badge,
+    .count-pill,
+    .workload-pill,
+    .workload-scope,
+    .view-switch,
+    .plan-task-picker summary,
+    input:not([type="radio"], [type="checkbox"], [type="range"]),
+    textarea,
+    select
+  ) {
+  border-radius: var(--control-corner) !important;
+}
+
+.avatar-button {
+  border-radius: 50% !important;
+}

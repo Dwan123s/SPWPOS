@@ -52,7 +52,7 @@ public sealed class DefenseConversationContractTests
             MaximumSessionMinutes = 240, MinimumSessionMinutes = 15 }, [task], [], [], [], [], [], [], []);
         var after = snapshot with { Sessions = scheduled == 0 ? [] : [new() { TaskId = task.Id,
             Start = now.AddHours(1), End = now.AddHours(1).AddMinutes(scheduled) }] };
-        var expected = new SandboxExpectation { Tasks = [new("Read", 120, task.Deadline.ToString("O"), ScheduledMinutes: 60)] };
+        var expected = new SandboxExpectation { Tasks = [new("Read", 120, task.Deadline!.Value.ToString("O"), ScheduledMinutes: 60)] };
         var checks = SandboxOracle.Evaluate(expected, null, null, snapshot, after, now);
         Assert.Equal(passes, Assert.Single(checks, check => check.Name == "scheduled-minutes:Read").Passed);
     }
@@ -66,7 +66,7 @@ public sealed class DefenseConversationContractTests
         var after = before with { Tasks = [wrong] };
         var pack = ConversationPack.Load(Root());
         var expected = ConversationRunner.Expectation(pack, "MUTATE", true, "APPLIED",
-            new() { Tasks = [new("Demo", 45, wrong.Deadline.ToString("O"))] });
+            new() { Tasks = [new("Demo", 45, wrong.Deadline!.Value.ToString("O"))] });
         var checks = SandboxOracle.Evaluate(expected, null, null, before, after, now);
         Assert.False(Assert.Single(checks, check => check.Name == "task-duration:Demo").Passed);
     }

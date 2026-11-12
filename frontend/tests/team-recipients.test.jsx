@@ -95,7 +95,7 @@ it("sends a named recipient only after confirming a single AI task draft", async
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao task mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
   fireEvent.change(
     screen.getByRole("textbox", { name: "Mô tả công việc và hạn chót" }),
     { target: { value: "Proposal hạn thứ Tư" } },
@@ -138,7 +138,7 @@ it("can select different recipients for separate tasks from a file brief, retain
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao task mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Chia việc cho cả nhóm" }),
   );
@@ -212,7 +212,7 @@ it("keeps all work packages visible while the leader clarifies a common deadline
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao task mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Chia việc cho cả nhóm" }),
   );
@@ -290,7 +290,7 @@ async function openEditableBrief({ pending = false } = {}) {
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao task mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Chia việc cho cả nhóm" }),
   );

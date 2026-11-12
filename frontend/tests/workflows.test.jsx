@@ -147,12 +147,20 @@ beforeEach(() => {
       if (url === "/api/tasks" && options.method === "POST") {
         const task = {
           ...currentWorkspace.tasks[0],
+          deadline: null,
+          estimatedMinutes: 0,
+          status: "Todo",
+          progress: 0,
           ...body,
           id: "created-task",
           dependencies: [],
         };
         currentWorkspace.tasks.push(task);
         data = task;
+      }
+      if (/^\/api\/tasks\/[^/]+\/status$/.test(url) && options.method === "PATCH") {
+        const task = currentWorkspace.tasks.find((item) => item.id === url.split("/")[3]);
+        if (task) Object.assign(task, body);
       }
       if (url.startsWith("/api/tasks/") && options.method === "DELETE") {
         if (failTaskDelete)
@@ -264,6 +272,25 @@ async function navigate(route, title) {
   await screen.findByRole("heading", { level: 1, name: title });
   await waitFor(() => expect(document.querySelector(".page-skeleton")).toBeNull());
 }
+
+it("opens a task's planned date in the calendar and can jump to another date", async () => {
+  const task = currentWorkspace.tasks[0];
+  currentWorkspace.sessions = [{
+    id: "planned-session",
+    taskId: task.id,
+    taskName: task.name,
+    status: "Scheduled",
+    start: "2099-01-15T08:00:00Z",
+    end: "2099-01-15T09:00:00Z",
+  }];
+  mount();
+  await navigate("tasks", "Công việc");
+  fireEvent.click(screen.getByRole("button", { name: `Mở lịch dự kiến của ${task.name}` }));
+  const date = await screen.findByLabelText("Đến ngày trên lịch");
+  expect(date.value).toBe("2099-01-15");
+  fireEvent.change(date, { target: { value: "2099-02-10" } });
+  await waitFor(() => expect(state.calendarStart).toBe("2099-02-10"));
+});
 
 it("accepts a username in the login field and keeps email recovery separate", async () => {
   mount(false);
@@ -720,7 +747,7 @@ it("navigates all workspace screens and renders the admin data", async () => {
   for (const [route, title] of Object.entries({
     tasks: "Công việc",
     calendar: "Lịch làm việc",
-    time: "Giờ rảnh",
+    time: "Giờ làm việc",
     insights: "Tiến độ",
     scenario: "Thử nhận thêm việc",
     notifications: "Thông báo",
@@ -927,23 +954,171 @@ it("keeps the task when the server rejects deletion", async () => {
 });
 it("creates a task and retains filters while updating the React result list", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   await navigate("tasks", "Công việc");
   const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Tìm kiếm" }));
   await user.type(screen.getByLabelText("Tìm công việc"), "Không tồn tại");
   expect(screen.getByText("Không có công việc phù hợp")).toBeTruthy();
   await user.clear(screen.getByLabelText("Tìm công việc"));
   await user.click(screen.getByRole("button", { name: "Thêm công việc" }));
   const name = screen.getByLabelText("Tên công việc");
   await user.type(name, "Kiểm tra React workflow");
-  fireEvent.change(screen.getByLabelText("Deadline"), { target: { value: "2026-11-16T17:00" } });
+  fireEvent.change(screen.getByLabelText("Ngày bắt đầu"), { target: { value: "2026-11-15" } });
+  fireEvent.change(screen.getByLabelText("Hạn chót (tùy chọn)"), { target: { value: "2026-11-16" } });
   await user.click(screen.getByRole("button", { name: "Lưu công việc", exact: true }));
   await screen.findByText("Kiểm tra React workflow");
   const request = calls.find((c) => c.url === "/api/tasks");
   expect(request.body.name).toBe("Kiểm tra React workflow");
+  expect(request.body.startDate).toBe("2026-11-15");
+  expect(request.body.deadline).toBe("2026-11-16T16:59:00.000Z");
   expect(request.body.splittable).toBe(true);
   expect(request.body.priority).toBe(2);
   expect(calls.some((c) => c.url === "/api/plans")).toBe(false);
+});
+
+it("uploads a document, reviews the order, and previews only the new project tasks", async () => {
+  const original = vi.mocked(fetch).getMockImplementation();
+  const batchCalls = [];
+  vi.mocked(fetch).mockImplementation(async (url, options = {}) => {
+    if (!url.startsWith("/api/tasks/batch")) return original(url, options);
+    batchCalls.push({ url, body: JSON.parse(options.body) });
+    const data = url.endsWith("/preview") ? {
+      projectName: "Báo cáo IoT", summary: "Chuẩn bị báo cáo", warnings: [],
+      projectDeadline: "2099-01-16T16:59:00Z",
+      tasks: [
+        { name: "Thu thập số liệu", estimatedMinutes: 30, checklist: [{ id: "step", text: "Đối chiếu số liệu", completed: false }] },
+        { name: "Viết báo cáo", estimatedMinutes: 60 },
+      ],
+    } : { projectId: "project-id", taskIds: ["collect", "report"] };
+    return { ok: true, status: 200, json: async () => ({ data }) };
+  });
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Thêm công việc", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Nhiều việc" }));
+  await user.upload(screen.getByLabelText(/Tải tài liệu/), new File(["brief"], "Bao cao.docx"));
+  await user.click(screen.getByRole("button", { name: "Phân tích bằng NORA" }));
+  await screen.findByRole("region", { name: "Công việc NORA đề xuất" });
+  expect(batchCalls[0].body.file.name).toBe("Bao cao.docx");
+  expect(batchCalls).toHaveLength(1);
+  expect(screen.getByLabelText("Hạn chót project").value).toBe("2099-01-16");
+  await user.type(screen.getByLabelText("Nội dung mục 1"), " gốc");
+  await user.click(screen.getByRole("button", { name: "Đưa việc 2 lên" }));
+  expect(screen.getByLabelText("Việc 1").value).toBe("Viết báo cáo");
+  await user.click(screen.getByRole("button", { name: "Lưu và xem lịch đề xuất" }));
+  await screen.findByRole("heading", { name: "Xem trước lịch" });
+  expect(batchCalls[1].body.tasks.map((task) => task.name)).toEqual(["Viết báo cáo", "Thu thập số liệu"]);
+  expect(batchCalls[1].body.projectDeadline).toBe("2099-01-16T16:59:00Z");
+  expect(batchCalls[1].body.tasks.map((task) => task.deadline)).toEqual([null, null]);
+  expect(batchCalls[1].body.tasks[1].checklist).toEqual([{ id: "step", text: "Đối chiếu số liệu gốc", completed: false }]);
+  expect(batchCalls[1].body.sequential).toBe(true);
+  expect(calls.find((call) => call.url === "/api/plans").body.affectedTaskIds).toEqual(["collect", "report"]);
+});
+
+it("saves from the Inbox dialog, keeps options across tabs, and opens the completed task", async () => {
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Thêm công việc", exact: true }));
+  const dialog = screen.getByRole("dialog", { name: "Thêm công việc vào Inbox" });
+  const form = within(dialog);
+  const title = form.getByRole("textbox", { name: "Tên công việc" });
+  expect(document.activeElement).toBe(title);
+  await user.type(title, "Gửi báo cáo cho Minh");
+  await user.type(form.getByLabelText("Mô tả"), "Kèm ghi chú");
+  await user.click(form.getByRole("button", { name: "Tùy chọn" }));
+  await user.selectOptions(form.getByLabelText("Loại công việc"), "WRITING");
+  await user.click(form.getByRole("button", { name: "Một việc" }));
+  expect(form.getByLabelText("Mô tả").value).toBe("Kèm ghi chú");
+  await user.click(form.getByRole("checkbox", { name: "Đánh dấu hoàn thành" }));
+  expect(form.getByRole("button", { name: "Lưu và xem lịch đề xuất" }).disabled).toBe(true);
+  await user.click(form.getByRole("button", { name: "Lưu và mở" }));
+  await screen.findByRole("dialog", { name: "Gửi báo cáo cho Minh" });
+  const created = calls.find((call) => call.url === "/api/tasks" && call.options.method === "POST");
+  expect(created.body).toMatchObject({
+    name: "Gửi báo cáo cho Minh",
+    description: "Kèm ghi chú",
+    taskType: "WRITING",
+    deadline: null,
+    estimatedMinutes: null,
+  });
+  expect(calls.find((call) => call.url === "/api/tasks/created-task/status")?.body)
+    .toEqual({ status: "Completed", progress: 100 });
+  expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
+});
+
+it("opens a project task and saves checklist completion separately", async () => {
+  const [template] = currentWorkspace.tasks;
+  const step = { id: "step-1", text: "Đối chiếu số liệu", completed: false };
+  currentWorkspace.tasks = [
+    { ...template, id: "project", name: "Báo cáo IoT", estimatedMinutes: 0, dependencies: [], parentId: null },
+    { ...template, id: "child", name: "Viết báo cáo", version: "child-v1", dependencies: [], parentId: "project", status: "Todo", checklist: [step] },
+  ];
+  const original = vi.mocked(fetch).getMockImplementation();
+  vi.mocked(fetch).mockImplementation(async (url, options = {}) => {
+    if (url === "/api/tasks/child/checklist") {
+      currentWorkspace.tasks[1] = { ...currentWorkspace.tasks[1], version: "child-v2", checklist: JSON.parse(options.body).items };
+    }
+    return original(url, options);
+  });
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Báo cáo IoT", exact: true }));
+  const project = await screen.findByRole("dialog", { name: "Báo cáo IoT" });
+  await user.click(within(project).getByRole("button", { name: "Viết báo cáo" }));
+  const task = await screen.findByRole("dialog", { name: "Viết báo cáo" });
+  await user.click(within(task).getByRole("checkbox", { name: "Hoàn thành mục 1" }));
+  await user.click(within(task).getByRole("button", { name: "Lưu checklist" }));
+  await screen.findByText("Đã lưu checklist.");
+  expect(calls.find((call) => call.url === "/api/tasks/child/checklist").body)
+    .toEqual({ version: "child-v1", items: [{ ...step, completed: true }] });
+  expect(calls.some((call) => call.url === "/api/tasks/child/status")).toBe(false);
+  await user.click(screen.getByRole("button", { name: "Về Báo cáo IoT" }));
+  expect(within(await screen.findByRole("dialog", { name: "Báo cáo IoT" })).getByRole("cell", { name: "1/1" })).toBeTruthy();
+});
+
+it("keeps the newly created task available if marking it complete fails", async () => {
+  const original = vi.mocked(fetch).getMockImplementation();
+  vi.mocked(fetch).mockImplementation(async (url, options = {}) => {
+    if (url === "/api/tasks/created-task/status") {
+      return { ok: false, status: 409, json: async () => ({ error: { message: "Hãy thử lại." } }) };
+    }
+    return original(url, options);
+  });
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Thêm công việc", exact: true }));
+  await user.type(screen.getByLabelText("Tên công việc"), "Công việc đã lưu");
+  await user.click(screen.getByRole("checkbox", { name: "Đánh dấu hoàn thành" }));
+  await user.click(screen.getByRole("button", { name: "Lưu công việc", exact: true }));
+  await screen.findByRole("dialog", { name: "Công việc đã lưu" });
+  expect(screen.getByText("Công việc đã lưu. Chưa đánh dấu hoàn thành: Hãy thử lại.")).toBeTruthy();
+  expect(calls.filter((call) => call.url === "/api/tasks" && call.options.method === "POST")).toHaveLength(1);
+});
+
+it("adds a title-only task from the table, checks it off, reopens it and adds a due date", async () => {
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Thêm công việc…" }));
+  const dialog = await screen.findByRole("dialog", { name: "Thêm công việc vào Inbox" });
+  await user.type(within(dialog).getByRole("textbox", { name: "Tên công việc" }), "Kiểm tra email{Enter}");
+  const unchecked = await screen.findByRole("checkbox", { name: "Hoàn thành Kiểm tra email" });
+  expect(calls.find((call) => call.url === "/api/tasks" && call.options.method === "POST").body)
+    .toMatchObject({ name: "Kiểm tra email", deadline: null, estimatedMinutes: null });
+  await user.click(unchecked);
+  const checked = await screen.findByRole("checkbox", { name: "Mở lại Kiểm tra email" });
+  expect(checked.getAttribute("aria-checked")).toBe("true");
+  await user.click(checked);
+  await screen.findByRole("checkbox", { name: "Hoàn thành Kiểm tra email" });
+  await user.click(screen.getByRole("button", { name: "Thêm hạn chót cho Kiểm tra email" }));
+  fireEvent.change(screen.getByLabelText("Hạn chót (tùy chọn)"), { target: { value: "2026-11-16T17:00" } });
+  await user.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+  await screen.findByRole("button", { name: "Sửa hạn chót cho Kiểm tra email" });
+  expect(calls.some((call) => call.url === "/api/plans")).toBe(false);
 });
 
 it("submits the version captured when opening the task editor", async () => {
@@ -1041,7 +1216,6 @@ it("keeps an unsaved stale task edit and requires an explicit reload before savi
 
 it("schedules a selected task and previews capacity warnings without applying them", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   await navigate("tasks", "Công việc");
   planWarnings = [
     {
@@ -1077,7 +1251,8 @@ it.each(["existing", "new"])("requires confirmation before applying urgent displ
   if (kind === "new") {
     await user.click(screen.getByRole("button", { name: "Thêm công việc" }));
     await user.type(screen.getByLabelText("Tên công việc"), "Báo cáo khẩn");
-    fireEvent.change(screen.getByLabelText("Deadline"), { target: { value: "2026-11-16T17:00" } });
+    fireEvent.change(screen.getByLabelText("Hạn chót (tùy chọn)"), { target: { value: "2026-11-16" } });
+    fireEvent.change(screen.getByLabelText("Thời gian dự kiến (phút, tùy chọn)"), { target: { value: "60" } });
     await user.click(screen.getByRole("button", { name: "Lưu và xem lịch đề xuất" }));
   } else {
     await user.click(screen.getByRole("button", { name: `Xếp lịch công việc ${currentWorkspace.tasks[1].name}` }));
@@ -1106,7 +1281,6 @@ it("previews deadline protection and waits for confirmation before applying a ne
 
 it("keeps the created task when preview generation fails", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   await navigate("tasks", "Công việc");
   failPlan = true;
   await userEvent.click(screen.getByRole("button", { name: "Thêm công việc" }));
@@ -1114,7 +1288,8 @@ it("keeps the created task when preview generation fails", async () => {
     screen.getByLabelText("Tên công việc"),
     "Saved despite planning failure",
   );
-  fireEvent.change(screen.getByLabelText("Deadline"), { target: { value: "2026-11-16T17:00" } });
+  fireEvent.change(screen.getByLabelText("Hạn chót (tùy chọn)"), { target: { value: "2026-11-16" } });
+  fireEvent.change(screen.getByLabelText("Thời gian dự kiến (phút, tùy chọn)"), { target: { value: "60" } });
   await userEvent.click(screen.getByRole("button", { name: "Lưu và xem lịch đề xuất" }));
   await screen.findByText(/Công việc đã lưu. Chưa xếp được lịch/);
   expect(
@@ -1124,30 +1299,121 @@ it("keeps the created task when preview generation fails", async () => {
     calls.filter((c) => c.url === "/api/tasks" && c.options.method === "POST"),
   ).toHaveLength(1);
 });
-it("adds and removes availability rows without losing unsaved time values", async () => {
+it("keeps exact saved periods and unsaved edits when toggling a workday", async () => {
+  currentWorkspace.availability = [
+    { dayOfWeek: 1, startMinute: 533, endMinute: 600 },
+    { dayOfWeek: 1, startMinute: 1355, endMinute: 1440 },
+  ];
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
-  await navigate("time", "Giờ rảnh");
+  await screen.findByRole("heading", { level: 1, name: "Hôm nay" });
+  await navigate("time", "Giờ làm việc");
   const user = userEvent.setup();
-  fireEvent.change(screen.getAllByLabelText("Bắt đầu")[1], {
+  expect(screen.getByLabelText("Kết thúc Thứ hai, khung 1").value).toBe("10:00");
+  expect(screen.getByLabelText("Kết thúc Thứ hai, khung 2").value).toBe("00:00");
+  fireEvent.change(screen.getByLabelText("Bắt đầu Thứ hai, khung 1"), {
     target: { value: "09:30" },
   });
-  await user.click(screen.getByRole("button", { name: "Thêm khoảng" }));
-  expect(screen.getAllByLabelText("Ngày trong tuần")).toHaveLength(6);
-  await user.click(
-    screen.getAllByRole("button", { name: "Xóa khoảng thời gian" })[0],
-  );
-  expect(screen.getAllByLabelText("Bắt đầu")[0].value).toBe("09:30");
-  await user.click(screen.getByRole("button", { name: "Lưu lịch rảnh" }));
+  const monday = screen.getByRole("button", { name: "Thứ hai", exact: true });
+  await user.click(monday);
+  expect(monday.getAttribute("aria-pressed")).toBe("false");
+  expect(screen.queryByLabelText("Bắt đầu Thứ hai, khung 1")).toBeNull();
+  await user.click(monday);
+  expect(screen.getByLabelText("Bắt đầu Thứ hai, khung 1").value).toBe("09:30");
+  await user.click(screen.getByRole("button", { name: "Thêm khung giờ cho Thứ hai" }));
+  await user.click(screen.getByRole("button", { name: "Xóa khung 3 của Thứ hai" }));
+  await user.click(screen.getByRole("button", { name: "Lưu giờ làm việc", exact: true }));
   await waitFor(() =>
     expect(
       calls.find((c) => c.url === "/api/time/availability")?.body.slots,
-    ).toHaveLength(5),
+    ).toEqual([
+      { dayOfWeek: 1, startMinute: 570, endMinute: 600 },
+      { dayOfWeek: 1, startMinute: 1355, endMinute: 1440 },
+    ]),
   );
-  expect(
-    calls.find((c) => c.url === "/api/time/availability").body.slots[0]
-      .startMinute,
-  ).toBe(570);
+});
+
+it("saves separate lunchtime and evening hours on enabled days", async () => {
+  currentWorkspace.availability = [
+    { dayOfWeek: 1, startMinute: 480, endMinute: 540 },
+    { dayOfWeek: 2, startMinute: 600, endMinute: 660 },
+  ];
+  mount();
+  await screen.findByRole("heading", { level: 1, name: "Hôm nay" });
+  await navigate("time", "Giờ làm việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Thêm khung giờ cho Chủ nhật" }));
+  expect(screen.getByLabelText("Bắt đầu Chủ nhật").value).toBe("");
+  fireEvent.change(screen.getByLabelText("Bắt đầu Chủ nhật"), { target: { value: "12:00" } });
+  fireEvent.change(screen.getByLabelText("Kết thúc Chủ nhật"), { target: { value: "13:00" } });
+  await user.click(screen.getByRole("button", { name: "Thêm khung giờ cho Chủ nhật" }));
+  fireEvent.change(screen.getByLabelText("Bắt đầu Chủ nhật, khung 2"), { target: { value: "19:00" } });
+  fireEvent.change(screen.getByLabelText("Kết thúc Chủ nhật, khung 2"), { target: { value: "21:00" } });
+  await user.click(screen.getByRole("button", { name: "Thứ ba", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Sao chép sang ngày đang bật" }));
+  expect(screen.getByLabelText("Kết thúc Thứ hai, khung 1").value).toBe("13:00");
+  expect(screen.getByLabelText("Bắt đầu Thứ hai, khung 2").value).toBe("19:00");
+  expect(screen.queryByLabelText("Bắt đầu Thứ ba")).toBeNull();
+  expect(calls.some((c) => c.url === "/api/time/availability")).toBe(false);
+  await user.click(screen.getByRole("button", { name: "Lưu giờ làm việc", exact: true }));
+  await waitFor(() =>
+    expect(
+      calls.find((c) => c.url === "/api/time/availability")?.body.slots,
+    ).toEqual([
+      { dayOfWeek: 0, startMinute: 720, endMinute: 780 },
+      { dayOfWeek: 0, startMinute: 1140, endMinute: 1260 },
+      { dayOfWeek: 1, startMinute: 720, endMinute: 780 },
+      { dayOfWeek: 1, startMinute: 1140, endMinute: 1260 },
+    ]),
+  );
+});
+
+it("saves a dated week separately from recurring hours and can reset that week", async () => {
+  const regular = [{ dayOfWeek: 1, startMinute: 540, endMinute: 1020 }];
+  currentWorkspace.availability = regular;
+  currentWorkspace.exceptions = [{
+    id: "dated-hours", date: "2026-12-14", startMinute: 780, endMinute: 900,
+    isAvailable: true, overridesWeeklyAvailability: true,
+  }];
+  mount();
+  await navigate("time", "Giờ làm việc");
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Theo từng tuần" }));
+  const date = screen.getByLabelText("Chọn ngày trong tuần");
+  fireEvent.change(date, { target: { value: "2026-12-17" } });
+  expect(date.value).toBe("2026-12-14");
+  expect(screen.getByLabelText("Bắt đầu Thứ hai").value).toBe("13:00");
+  await user.click(screen.getByRole("button", { name: "Thứ hai", exact: true }));
+  await user.click(screen.getByRole("button", { name: "Lưu giờ làm việc tuần này" }));
+  const url = "/api/time/availability/weeks/2026-12-14";
+  await waitFor(() => expect(calls.find((call) => call.url === url)?.body).toEqual({ slots: [] }));
+  await screen.findByText("Đã lưu giờ làm việc cho tuần đã chọn.");
+  await user.click(screen.getByRole("button", { name: "Dùng lại giờ làm việc thường lệ" }));
+  await waitFor(() => expect(calls.some((call) => call.url === url && call.options.method === "DELETE")).toBe(true));
+  expect(currentWorkspace.availability).toEqual(regular);
+});
+
+it("saves all 35 working intervals from an applied timetable week", async () => {
+  const week = "2099-01-05";
+  const slots = Array.from({ length: 7 }, (_, offset) => (offset + 1) % 7).flatMap((dayOfWeek) =>
+    Array.from({ length: 5 }, (_, period) => ({
+      dayOfWeek, startMinute: 420 + 120 * period, endMinute: 480 + 120 * period,
+    })),
+  );
+  currentWorkspace.availabilityPolicy = { confirmed: true, timetableWeeks: [week] };
+  const url = `/api/time/availability/weeks/${week}`;
+  const original = vi.mocked(fetch).getMockImplementation();
+  vi.mocked(fetch).mockImplementation((path, options) =>
+    path === url && options.method === "GET"
+      ? Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { slots } }) })
+      : original(path, options),
+  );
+  mount();
+  await navigate("time", "Giờ làm việc");
+  await userEvent.click(await screen.findByRole("button", { name: "Lưu giờ làm việc tuần này" }));
+  await waitFor(() => expect(calls.find((call) =>
+    call.url === url && call.options.method === "PUT",
+  )?.body).toEqual({ slots }));
+  await screen.findByText("Đã lưu giờ làm việc cho tuần đã chọn.");
 });
 
 it.each(["week", "agenda"])("deletes a fixed calendar occurrence after confirmation in secretary mode (%s)", async (view) => {
@@ -1367,9 +1633,9 @@ it("shows apply only for real proposals and keeps simulations read-only", async 
 });
 it("saves a captured draft as a note without creating a task or schedule", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
   await navigate("tasks", "Công việc");
   const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Ghi nháp", exact: true }));
   await user.click(screen.getByRole("button", { name: "Ghi nhanh" }));
   await user.type(
     screen.getByLabelText("Mô tả bằng câu tự nhiên"),
@@ -1403,19 +1669,20 @@ it("guides users to hours before generating a plan without changing saved tasks"
   currentWorkspace.availability = [];
   currentWorkspace.exceptions = [];
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
-  await userEvent.click(await screen.findByRole("button", { name: "Thiết lập giờ làm", exact: true }));
-  await screen.findByRole("heading", { level: 1, name: "Giờ rảnh" });
+  await screen.findByRole("heading", { level: 1, name: "Hôm nay" });
+  const next = await screen.findByRole("region", { name: "Bước tiếp theo" });
+  await userEvent.click(within(next).getByRole("button", { name: "Thiết lập giờ làm", exact: true }));
+  await screen.findByRole("heading", { level: 1, name: "Giờ làm việc" });
   expect(calls.some((c) => c.url === "/api/plans")).toBe(false);
   expect(currentWorkspace.tasks).toHaveLength(6);
 });
 it("saves hours and previews the schedule before any explicit apply", async () => {
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
-  await navigate("time", "Giờ rảnh");
+  await screen.findByRole("heading", { level: 1, name: "Hôm nay" });
+  await navigate("time", "Giờ làm việc");
   const user = userEvent.setup();
   await user.click(
-    screen.getByRole("button", { name: "Lưu giờ rảnh & xem lịch" }),
+    screen.getByRole("button", { name: "Lưu và xem lịch" }),
   );
   await screen.findByRole("heading", { name: "Tạo kế hoạch mới" });
   expect(
@@ -1442,11 +1709,11 @@ it("stays on hours when saving fails instead of proceeding to plan generation", 
     return original(url, options);
   });
   mount();
-  await screen.findByRole("heading", { name: /Một ngày có chủ đích/ });
-  await navigate("time", "Giờ rảnh");
+  await screen.findByRole("heading", { level: 1, name: "Hôm nay" });
+  await navigate("time", "Giờ làm việc");
   await userEvent
     .setup()
-    .click(screen.getByRole("button", { name: "Lưu giờ rảnh & xem lịch" }));
+    .click(screen.getByRole("button", { name: "Lưu và xem lịch" }));
   await screen.findByText("Các khoảng giờ bị trùng.");
   expect(
     screen.queryByRole("heading", { name: "Tạo kế hoạch mới" }),

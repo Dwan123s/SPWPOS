@@ -45,7 +45,7 @@ Frontend viết bằng JSX trong `frontend/`, build thành tài nguyên tĩnh v�
 
 ### Yêu cầu
 
-- .NET **SDK 8.0.425 trở lên trong nhánh 8.0**.
+- .NET **SDK 8.0.100 trở lên trong nhánh 8.0**, bản ổn định.
 - Có thể chạy `scripts/Install-Dotnet8.ps1` để cài SDK riêng cho dự án từ Microsoft và kiểm tra SHA-512. Script tìm SDK trong thư mục riêng của dự án, `%USERPROFILE%\.dotnet` và các đường dẫn trên PATH; có thể cài đồng thời các phiên bản .NET khác.
 - Docker Desktop với Linux containers; engine đang chạy.
 - Windows PowerShell 5.1 hoặc PowerShell 7.

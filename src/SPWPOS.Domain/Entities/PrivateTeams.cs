@@ -1,7 +1,8 @@
 namespace SPWPOS.Domain.Entities;
 
 public sealed record RoutineDay(DateOnly Date, int AwakeStart, int AwakeEnd, int LunchStart, int LunchEnd,
-    int DinnerStart, int DinnerEnd, int RestStart = 0, int RestEnd = 0, int BreakfastStart = 0, int BreakfastEnd = 0);
+    int DinnerStart, int DinnerEnd, int RestStart = 0, int RestEnd = 0, int BreakfastStart = 0, int BreakfastEnd = 0,
+    bool UseTimetableHours = false);
 
 public sealed class AvailabilityPolicy : OwnedRecord
 {
@@ -19,6 +20,9 @@ public sealed class AvailabilityPolicy : OwnedRecord
     private RoutineDay[]? routineDays;
     public string RoutineDaysJson { get => routineDaysJson; set { routineDaysJson = value; routineDays = null; } }
     public RoutineDay? ForDate(DateOnly date) => (routineDays ??= System.Text.Json.JsonSerializer.Deserialize<RoutineDay[]>(routineDaysJson) ?? []).FirstOrDefault(x => x.Date == date);
+    public DateOnly[] TimetableWeeks() => (routineDays ??= System.Text.Json.JsonSerializer.Deserialize<RoutineDay[]>(routineDaysJson) ?? [])
+        .Where(day => day.UseTimetableHours)
+        .Select(day => day.Date.AddDays(-(((int)day.Date.DayOfWeek + 6) % 7))).Distinct().Order().ToArray();
     public bool AppliesOn(DateOnly date) => (routineDays ??= System.Text.Json.JsonSerializer.Deserialize<RoutineDay[]>(routineDaysJson) ?? []).Length == 0 || routineDays.Any(x => x.Date == date);
 }
 public sealed class PrivatePlanningProposal : OwnedRecord

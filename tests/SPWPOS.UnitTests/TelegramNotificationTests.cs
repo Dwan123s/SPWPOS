@@ -121,7 +121,7 @@ public sealed class TelegramNotificationTests
         else await h.DbAsync(async db => {
             var t = await db.WorkTasks.SingleAsync(x => x.Id == taskId, Ct);
             if (change == "complete") t.Status = WorkTaskStatus.Completed;
-            if (change == "reschedule") t.Deadline = t.Deadline.AddDays(1);
+            if (change == "reschedule") t.Deadline = t.Deadline!.Value.AddDays(1);
             if (change == "delete") t.IsDeleted = true;
             if (change == "lock") (await db.Users.SingleAsync(Ct)).IsActive = false;
             await db.SaveChangesAsync(Ct);

@@ -20,7 +20,7 @@
 }
 .note-checklist-heading > span {
   font-size: 12px;
-  color: #54748a;
+  color: #000;
 }
 .note-checklist progress {
   appearance: none;
@@ -112,21 +112,21 @@
 }
 .note-check-meta {
   font-size: 11px;
-  color: #6a7d91;
+  color: #000;
 }
 .note-check-meta.is-overdue {
   color: #ad522b;
 }
 .note-check-row.is-done .note-check-name {
   text-decoration: line-through;
-  color: #788797;
+  color: #000;
 }
 .note-check-row.is-cancelled .note-check-name {
-  color: #788797;
+  color: #000;
 }
 .note-check-details {
   padding: 8px;
-  color: #536c84;
+  color: #000;
   font-size: 12px;
   line-height: 1.7;
 }
@@ -148,14 +148,14 @@
   width: fit-content;
   padding: 10px 0;
   cursor: pointer;
-  color: #64788c;
+  color: #000;
   font-size: 12px;
   font-weight: 600;
 }
 .note-check-progress,
 .note-check-running {
   margin: 4px 8px 8px;
-  color: #63788e;
+  color: #000;
   font-size: 11px;
   line-height: 1.7;
 }
@@ -171,7 +171,7 @@
 .note-check-empty {
   font-size: 12px;
   line-height: 1.7;
-  color: #63788e;
+  color: #000;
 }
 .note-check-notice {
   font-size: 12px;
@@ -198,7 +198,7 @@
   flex: 1 1 220px;
   font-size: 11px;
   line-height: 1.7;
-  color: #6b7e91;
+  color: #000;
 }
 :is(.planning-console, #modal)
   .note-studio.has-checklist

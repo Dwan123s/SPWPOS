@@ -1,6 +1,5 @@
 import { SessionTimer } from "./react-ui.jsx";
 import { Select, nodeList } from "./react-ui.jsx";
-import { availabilityEditor } from "./interactive.jsx";
 import { StartSessionButton } from "./session-start.jsx";
 import { CalendarClock, CalendarTimeTag, calendarPhase } from "./calendar-time.jsx";
 import { askNora, secretaryMode } from "./agent-handoff.js";
@@ -381,48 +380,6 @@ export function exceptionModal(e = {}) {
         </button>
       </div>
     </form>,
-  );
-}
-export function availabilityRow(
-  slot = {
-    dayOfWeek: 1,
-    startMinute: 480,
-    endMinute: 1080,
-  },
-) {
-  return (
-    <div className="availability-row">
-      <Select className="filter" name="day" aria-label="Ngày trong tuần">
-        <option value="1" selected={slot.dayOfWeek === 1}>
-          Thứ 2
-        </option>
-        {nodeList(
-          [2, 3, 4, 5, 6, 0].map((d) => (
-            <option value={d} selected={d === slot.dayOfWeek}>
-              {d === 0 ? "CN" : `Thứ ${d + 1}`}
-            </option>
-          )),
-        )}
-      </Select>
-      <input
-        className="filter"
-        name="start"
-        type="time"
-        defaultValue={timeValue(slot.startMinute)}
-        required={true}
-        aria-label="Bắt đầu"
-      />
-      <input
-        className="filter"
-        name="end"
-        type="text"
-        defaultValue={timeValue(slot.endMinute)}
-        required={true}
-        pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]|24:00"
-        aria-label="Kết thúc (HH:mm)"
-      />
-      {button("", "remove-slot", "icon-only ghost", "", "close")}
-    </div>
   );
 }
 export function planModal(plan, simulation = false) {

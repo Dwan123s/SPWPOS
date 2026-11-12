@@ -76,7 +76,7 @@ dialog.team-task-dialog[open] {
   align-items: center;
   gap: 6px;
   font-size: 10px;
-  color: #8a9eb8;
+  color: #000;
 }
 .team-task-dialog-facts .icon {
   width: 14px;
@@ -85,7 +85,7 @@ dialog.team-task-dialog[open] {
 .team-task-dialog-facts strong {
   font-size: 12px;
   font-weight: 600;
-  color: #4f7095;
+  color: #000;
   overflow-wrap: anywhere;
 }
 .team-task-dialog-progress > span {
@@ -93,7 +93,7 @@ dialog.team-task-dialog[open] {
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
-  color: #8a9eb8;
+  color: #000;
 }
 .team-task-dialog-progress strong {
   color: #5683ba;
@@ -116,7 +116,7 @@ dialog.team-task-dialog[open] {
   align-items: flex-start;
   gap: 8px;
   font-size: 11px;
-  color: #8a9eb8;
+  color: #000;
 }
 .team-task-dialog-privacy .icon {
   width: 14px;
@@ -170,7 +170,7 @@ dialog.team-task-dialog[open] {
 }
 .team-task-dialog .team-task-notes > header p {
   font-size: 11px;
-  color: #899db4;
+  color: #000;
 }
 .team-task-note-sections {
   display: grid;
@@ -197,7 +197,7 @@ dialog.team-task-dialog[open] {
   color: #3c628d;
 }
 .team-task-note-section h4 > span {
-  color: #7d9fc9;
+  color: #000;
   display: flex;
 }
 .team-task-note-section h4 .icon {
@@ -208,7 +208,7 @@ dialog.team-task-dialog[open] {
 .team-task-note-section li {
   font-size: 12px;
   line-height: 1.9;
-  color: #536e8b;
+  color: #000;
   overflow-wrap: anywhere;
 }
 .team-task-dialog .team-task-note-section p {
@@ -245,7 +245,7 @@ dialog.team-task-dialog[open] {
   align-items: flex-start;
   gap: 7px;
   padding-top: 13px;
-  color: #869ab2;
+  color: #000;
   font-size: 11px;
   line-height: 1.7;
 }
@@ -259,7 +259,7 @@ dialog.team-task-dialog[open] {
   border: 1px dashed #dce7f4;
   border-radius: 10px;
   font-size: 12px;
-  color: #8a9fb9;
+  color: #000;
 }
 .team-task-source-files {
   border-top: 1px solid #e8eff7;
@@ -287,7 +287,7 @@ dialog.team-task-dialog[open] {
 .team-task-source-files > header > span {
   flex-shrink: 0;
   background: #edf4fc;
-  color: #7496c1;
+  color: #000;
   padding: 4px 7px;
   border-radius: 6px;
   font-size: 10px;
@@ -336,7 +336,7 @@ dialog.team-task-dialog[open] {
 }
 .team-task-source-files li small {
   font-size: 10px;
-  color: #8b9fb7;
+  color: #000;
 }
 .team-task-dialog .team-task-source-files .btn {
   font-size: 11px;
@@ -346,7 +346,7 @@ dialog.team-task-dialog[open] {
 }
 .team-task-dialog .team-task-source-files > p {
   font-size: 11px;
-  color: #8b9fb7;
+  color: #000;
 }
 .team-source-attach {
   display: grid;
@@ -360,13 +360,13 @@ dialog.team-task-dialog[open] {
 }
 .team-source-attach > strong {
   font-size: 12px;
-  color: #4f7095;
+  color: #000;
   overflow-wrap: anywhere;
 }
 .team-source-attach > small {
   font-size: 10px;
   line-height: 1.7;
-  color: #8b9fb7;
+  color: #000;
 }
 .team-source-attach > div {
   display: flex;

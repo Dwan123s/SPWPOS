@@ -21,38 +21,16 @@
 .planning-console .workspace-orb {
   opacity: 0.45;
 }
-.workspace-ribbon-art,
-.workspace-bubble-art {
-  position: absolute;
-  display: block;
-  pointer-events: none;
-}
-.workspace-atmosphere picture img {
-  display: block;
-  width: 100%;
-  height: auto;
-}
 .workspace-ribbon-art {
-  width: clamp(380px, 43vw, 720px);
-  left: -240px;
-  bottom: -260px;
-  opacity: 0.14;
-  rotate: -20deg;
+  position: absolute;
+  width: clamp(360px, 43vw, 660px);
+  right: -82px;
+  bottom: 3%;
+  aspect-ratio: 3 / 1;
+  background: url("../assets/workspace/ribbon.webp") center / contain no-repeat;
+  opacity: 0.44;
+  rotate: -12deg;
   animation: workspace-art-drift 24s var(--planora-ambient-ease) infinite;
-}
-.workspace-bubble-art--one {
-  width: clamp(90px, 10vw, 155px);
-  right: -48px;
-  top: 10%;
-  opacity: 0.42;
-  animation: workspace-art-drift 17s var(--planora-ambient-ease) infinite;
-}
-.workspace-bubble-art--two {
-  width: 54px;
-  left: 39%;
-  bottom: 7%;
-  opacity: 0.25;
-  animation: workspace-art-drift 19s var(--planora-ambient-ease) -9s infinite;
 }
 .planning-console :is(.topbar, .sidebar) {
   border: 1px solid var(--workspace-edge);
@@ -168,7 +146,7 @@
     0 5px 16px #1476d214;
 }
 .planning-console .nav button:not(.active) {
-  color: #526e90;
+  color: #000;
 }
 .planning-console:not([data-route="today"]) .page-header {
   position: relative;
@@ -250,7 +228,7 @@
     0 2px 5px #2468b805;
 }
 :is(.planning-console, #modal) :is(input, textarea)::placeholder {
-  color: #7185a4;
+  color: #000;
   opacity: 1;
 }
 :is(.planning-console, #modal)
@@ -314,7 +292,7 @@
   box-shadow: inset 0 1px 0 #fff;
 }
 .planning-console :is(.empty, .runway-empty) {
-  color: #526e90;
+  color: #000;
 }
 .planning-console
   :is(
@@ -333,7 +311,7 @@
     .deadline-info small,
     .workspace-footer
   ) {
-  color: #526b8a;
+  color: #000;
 }
 #modal {
   border-radius: 26px;
@@ -383,19 +361,6 @@
   }
 }
 @media (max-width: 800px) {
-  .workspace-ribbon-art {
-    width: 430px;
-    left: -310px;
-    bottom: -160px;
-    opacity: 0.1;
-  }
-  .workspace-bubble-art--one {
-    width: 100px;
-    right: -70px;
-  }
-  .workspace-bubble-art--two {
-    display: none;
-  }
   .planning-console
     :is(
       .card,

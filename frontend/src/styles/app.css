@@ -42,7 +42,7 @@
   --cyan: #087eaf;
   --cyan-dark: #06668f;
   --cyan-tint: #ecf8ff;
-  --muted: #62748b;
+  --muted: #000;
   --line: #e0edf6;
   --panel: #fff;
   --nav: #fff;
@@ -221,7 +221,7 @@ svg {
   font-weight: 700;
   white-space: nowrap;
   background: #eff6fb;
-  color: #5a7c95;
+  color: #000;
 }
 .badge.purple {
   background: #edf7fe;
@@ -358,7 +358,7 @@ svg {
   background: transparent;
   border: 0;
   padding: 6px;
-  color: #5a7c95;
+  color: #000;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -487,7 +487,7 @@ svg {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #8daabf;
+  color: #000;
   padding-bottom: 10px;
 }
 .task-row .title-button {
@@ -592,7 +592,7 @@ svg {
 .reason {
   font-size: 12px;
   line-height: 1.7;
-  color: #405c70;
+  color: #000;
 }
 .session-card {
   border: 1px solid var(--line);
@@ -826,7 +826,7 @@ td {
 }
 .availability-row span {
   font-size: 12px;
-  color: #405c70;
+  color: #000;
 }
 .bias-item {
   display: flex;
@@ -862,7 +862,7 @@ td {
 }
 .explanation-list {
   padding-left: 18px;
-  color: #405c70;
+  color: #000;
   font-size: 12px;
   line-height: 1.8;
 }
@@ -885,7 +885,7 @@ td {
   fill: #508ab4;
 }
 .chart text {
-  fill: #869eaf;
+  fill: #000;
   stroke: none;
   font-size: 11px;
 }
@@ -1112,7 +1112,7 @@ td {
   padding: 12px 18px;
   font-size: 13px;
   font-weight: 600;
-  color: #5a7c95;
+  color: #000;
   border-radius: 8px 8px 0 0;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1214,7 +1214,7 @@ td {
 }
 .category-card-info small {
   font-size: 11px;
-  color: #5a7c95;
+  color: #000;
 }
 .category-card-actions {
   display: flex;
@@ -1280,7 +1280,7 @@ td {
 .switch-content p {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #5a7c95;
+  color: #000;
 }
 
 .danger-card {
@@ -1338,7 +1338,7 @@ td {
 .avatar-cropper-controls label {
   font-size: 13px;
   font-weight: 600;
-  color: #405c70;
+  color: #000;
   white-space: nowrap;
 }
 .avatar-cropper-zoom-slider {
@@ -1360,7 +1360,7 @@ td {
 }
 .avatar-crop-preview-wrap small {
   font-size: 12px;
-  color: #5a7c95;
+  color: #000;
 }
 .avatar-crop-preview-circle {
   width: 48px;
@@ -1373,7 +1373,7 @@ td {
 }
 .avatar-cropper-hint {
   font-size: 12px;
-  color: #5a7c95;
+  color: #000;
   text-align: center;
   margin: 0;
 }

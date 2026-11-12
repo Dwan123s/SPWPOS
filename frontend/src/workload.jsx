@@ -1,64 +1,37 @@
-import { useEffect, useState } from "react";
+import { useId, useState } from "react";
 import { api } from "./api.js";
 import {
   button,
   closeModal,
   dateFmt,
+  dayKey,
+  icon,
   minutes,
   modal,
   state,
   timeFmt,
 } from "./ui.jsx";
 import { planModal } from "./calendar.jsx";
+import {
+  isWorkloadWeekday,
+  useWorkloadRequest,
+  workloadDayLabel,
+} from "./workload-data.js";
+import { TeamWorkload } from "./workload-team.jsx";
+import { calendarDayBounds } from "./nora-schedule.js";
 import "./workload.css";
 
-function useWorkload() {
-  const [value, setValue] = useState(null);
-  const [error, setError] = useState("");
-  const account = state.workspace?.profile?.id;
-  useEffect(() => {
-    let alive = true,
-      request = 0,
-      timer;
-    async function refresh() {
-      const current = ++request;
-      clearTimeout(timer);
-      try {
-        const data = await api("/api/intelligence/workload");
-        if (!alive || current !== request) return;
-        if (
-          !data?.next ||
-          !Array.isArray(data.days) ||
-          !Array.isArray(data.tasks)
-        )
-          throw new Error("Chưa tải được dữ liệu khối lượng công việc.");
-        setValue(data);
-        setError("");
-        const boundary = Date.parse(data.refreshAt);
-        if (Number.isFinite(boundary))
-          timer = setTimeout(
-            refresh,
-            Math.max(1000, boundary - Date.now() + 100),
-          );
-      } catch (failure) {
-        if (alive && current === request) setError(failure.message);
-      }
-    }
-    const onVisible = () => {
-      if (!document.hidden) refresh();
-    };
-    refresh();
-    window.addEventListener("workspace-updated", refresh);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-      window.removeEventListener("workspace-updated", refresh);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [account]);
-  return { value, error };
-}
+const isPersonalWorkload = (value) =>
+  !!value?.next && Array.isArray(value.days) && Array.isArray(value.tasks);
+const useWorkload = (week = 0) =>
+  useWorkloadRequest(
+    week == null
+      ? null
+      : week === 0
+        ? "/api/intelligence/workload"
+        : `/api/intelligence/workload?week=${week}`,
+    isPersonalWorkload,
+  );
 
 const statusText = {
   PAST: "Đã qua",
@@ -71,12 +44,12 @@ const statusText = {
 const timeText = (value) => (value == null ? "—" : minutes(value));
 const windowText = (row) =>
   `${dateFmt(row.start)} · ${timeFmt(row.start)}–${timeFmt(row.end)}`;
-async function previewRecovery(taskId) {
+async function previewRecovery(taskId, triggerEvent = "SESSION_MISSED") {
   const plan = await api("/api/plans/reschedule", "POST", {
     start: new Date().toISOString(),
     horizonDays: 30,
     affectedTaskIds: [taskId],
-    triggerEvent: "SESSION_MISSED",
+    triggerEvent,
     useCapacityFactor: false,
     useEstimateBias: false,
     strict: true,
@@ -309,166 +282,525 @@ export function TodayWorkload({ onWorkspaceChanged }) {
   );
 }
 
-export function WorkloadWeek({ onWorkspaceChanged }) {
-  const { value, error } = useWorkload();
-  if (!value)
-    return (
-      <section className="card" aria-label="Tải công việc">
-        <p role="status">{error || "Đang tải công việc…"}</p>
-      </section>
-    );
+function TeamWorkloadPicker({ week, renderToolbar, showHours, showWeekends }) {
+  const { value, error, retry } = useWorkloadRequest(
+    "/api/teams",
+    Array.isArray,
+  );
+  const [teamId, setTeamId] = useState("");
+  const teams = value?.filter((team) => team.role === "Leader") ?? [];
+  const selected = teams.find((team) => team.id === teamId) || teams[0];
   return (
-    <section className="card workload-week" aria-label="Tải công việc">
-      <h2>Tải công việc trong tuần</h2>
-      <p>
-        {value.start} – {value.end} · Hoàn thành {value.completedTasks}/
-        {value.tasks.length} công việc
-      </p>
+    <>
+      {!selected && renderToolbar()}
       {error && (
-        <p className="warning" role="status">
-          Số liệu chưa được làm mới: {error}
+        <p className="warning" role="alert">
+          {error}{" "}
+          <button type="button" className="btn ghost small" onClick={retry}>
+            Thử lại
+          </button>
         </p>
       )}
-      <p>{value.next.reason}</p>
-      <div className="workload-grid">
-        {value.days.map((day) => (
-          <article key={day.date} className="workload-day">
-            <div className="workload-capacity">
-              <header>
-                <strong>
-                  {day.date.slice(5).split("-").reverse().join("/")}
-                </strong>
-                <br />
-                {statusText[day.status]}
-              </header>
-              {day.status !== "PAST" &&
-                day.workingMinutes > 0 &&
-                day.reservedMinutes != null && (
-                  <progress
-                    aria-label="Giờ đã giữ chỗ"
-                    max={day.workingMinutes}
-                    value={day.reservedMinutes}
-                  />
+      {!value && !error && (
+        <p className="workload-message" role="status">
+          Đang tải danh sách nhóm…
+        </p>
+      )}
+      {value && !selected && (
+        <p className="workload-message">
+          Bảng điều phối công suất dành cho trưởng nhóm.{" "}
+          {button("Mở Nhóm", "nav", "ghost small", "teams")}
+        </p>
+      )}
+      {selected && (
+        <TeamWorkload
+          key={selected.id}
+          teamId={selected.id}
+          week={week}
+          showHours={showHours}
+          showWeekends={showWeekends}
+          renderToolbar={(range, personFilter) =>
+            renderToolbar(
+              range,
+              <>
+                <label className="workload-team-picker">
+                  <select
+                    aria-label="Chọn nhóm"
+                    value={selected.id}
+                    onChange={(event) => setTeamId(event.target.value)}
+                  >
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {personFilter}
+              </>,
+            )
+          }
+        />
+      )}
+    </>
+  );
+}
+
+export function WorkloadWeek({ onWorkspaceChanged }) {
+  const [scope, setScope] = useState("personal");
+  const [week, setWeek] = useState(0);
+  const [showHours, setShowHours] = useState(true);
+  const [showWeekends, setShowWeekends] = useState(true);
+  const renderToolbar = (range, filters) => (
+    <header className="workload-toolbar">
+      <h2 className="workload-visually-hidden">Tải công việc trong tuần</h2>
+      <div
+        className="workload-scope"
+        role="group"
+        aria-label="Phạm vi công việc"
+      >
+        <button
+          type="button"
+          aria-pressed={scope === "personal"}
+          onClick={() => setScope("personal")}
+        >
+          Cá nhân
+        </button>
+        <button
+          type="button"
+          aria-pressed={scope === "team"}
+          onClick={() => setScope("team")}
+        >
+          Nhóm
+        </button>
+      </div>
+      {filters}
+      <div className="workload-weeks" role="group" aria-label="Chọn tuần">
+        <button
+          className="btn ghost small"
+          type="button"
+          onClick={() => setWeek(0)}
+        >
+          Hôm nay
+        </button>
+        <button
+          className="btn ghost small"
+          type="button"
+          aria-label="Tuần trước"
+          disabled={week <= -4}
+          onClick={() => setWeek(week - 1)}
+        >
+          ‹
+        </button>
+        <button
+          className="btn ghost small"
+          type="button"
+          aria-label="Tuần sau"
+          disabled={week >= 3}
+          onClick={() => setWeek(week + 1)}
+        >
+          ›
+        </button>
+        {range && <span className="workload-range">{range}</span>}
+      </div>
+      <div className="workload-capacity-filters">
+        <label>
+          Hiện số giờ
+          <input
+            type="checkbox"
+            checked={showHours}
+            onChange={(event) => setShowHours(event.target.checked)}
+          />
+        </label>
+        <label>
+          Hiện cuối tuần
+          <input
+            type="checkbox"
+            checked={showWeekends}
+            onChange={(event) => setShowWeekends(event.target.checked)}
+          />
+        </label>
+      </div>
+    </header>
+  );
+  const viewOptions = { week, showHours, showWeekends, renderToolbar };
+  return (
+    <section className="workload-week" aria-label="Tải công việc">
+      {scope === "personal" ? (
+        <PersonalWorkload
+          {...viewOptions}
+          onWorkspaceChanged={onWorkspaceChanged}
+        />
+      ) : (
+        <TeamWorkloadPicker {...viewOptions} />
+      )}
+    </section>
+  );
+}
+
+function WorkloadGroupCell({ group, day, cell, showHours, showName }) {
+  const popupId = useId();
+  const date = workloadDayLabel.format(new Date(day.date));
+  const duration = cell && timeText(Math.round(cell.seconds / 60));
+  return (
+    <>
+      <button
+        type="button"
+        className="workload-group-slot"
+        data-inbox={group.inbox || undefined}
+        popoverTarget={popupId}
+        aria-label={`${group.name}, ${date}${duration ? `, ${duration} dự kiến` : ""}`}
+        onClick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const popup = document.getElementById(popupId);
+          const width = Math.min(320, window.innerWidth - 24);
+          popup.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+          popup.style.top = `${Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - 296))}px`;
+        }}
+      >
+        <span className="workload-group-hours">{showHours && duration}</span>
+        {showName && <span className="workload-group-name">{group.name}</span>}
+      </button>
+      <div id={popupId} popover="auto" className="workload-group-popup"
+        role="group" aria-label={`${group.name} · ${date}`}>
+        <header><strong>{group.name}</strong><span>{date}</span></header>
+        <ul>
+          {Array.from(cell?.tasks ?? [], ([id, task]) => (
+            <li key={id}>
+              <button type="button" data-action="task-detail" data-id={id}
+                onClick={() => document.getElementById(popupId).hidePopover()}>
+                {icon(task.status === "Completed" ? "check" : "tasks")}
+                <span>{task.name}<small className="workload-group-times">{task.times.join(" · ")}</small></span>
+                <small>{timeText(Math.round(task.seconds / 60))}</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {!cell && <p>Chưa có công việc được xếp trong ngày này.</p>}
+        {group.inbox && (
+          <button type="button" className="btn secondary small" data-action="new-task"
+            onClick={() => document.getElementById(popupId).hidePopover()}>
+            {icon("plus")} Thêm công việc vào Inbox
+          </button>
+        )}
+        {group.projectId && (
+          <button type="button" className="btn secondary small" data-action="task-detail" data-id={group.projectId}
+            onClick={() => document.getElementById(popupId).hidePopover()}>
+            Xem project
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+function PersonalWorkload({
+  week,
+  onWorkspaceChanged,
+  showHours,
+  showWeekends,
+  renderToolbar,
+}) {
+  const { value, error, retry } = useWorkload(week);
+  const following = useWorkload(value && week < 3 ? week + 1 : null);
+  const [selection, setSelection] = useState(null);
+  function toggleSelection(date) {
+    setSelection((current) => current === date ? null : date);
+  }
+  if (!value)
+    return (
+      <>
+        {renderToolbar()}
+        <div className="workload-message" role="status">
+          {error || "Đang tải công việc…"}
+          {error && (
+            <button type="button" className="btn ghost small" onClick={retry}>
+              Thử lại
+            </button>
+          )}
+        </div>
+      </>
+    );
+  const nextWeek = following.value?.start > value.end ? following.value : null;
+  const days = [...value.days, ...(nextWeek?.days ?? [])].filter(
+    (day) => showWeekends || isWorkloadWeekday(day),
+  );
+  const today = dayKey(value.asOf || Date.now());
+  const groups = new Map([["inbox", { name: "Inbox", inbox: true, days: new Map() }]]);
+  const tasksById = new Map(state.workspace.tasks.map((task) => [task.id, task]));
+  const projectIds = new Set(state.workspace.tasks.map((task) => task.parentId).filter(Boolean));
+  for (const day of days) {
+    if (!day.sessions.length) continue;
+    const zone = value.timeZoneId || state.workspace?.preference?.timeZoneId || "Asia/Ho_Chi_Minh";
+    let bounds;
+    try {
+      bounds = calendarDayBounds(day.date, zone);
+    } catch {
+      // Some time zones skip local midnight on clock changes.
+    }
+    for (const session of day.sessions) {
+      const id = session.taskId || session.id;
+      const task = tasksById.get(id);
+      const project = tasksById.get(task?.parentId) || (projectIds.has(id) ? task : null);
+      const isTeam = session.teamTask || task?.isTeamTask;
+      const key = project ? project.id : isTeam ? "team" : "inbox";
+      const group = groups.get(key) ?? {
+        name: project?.name || (isTeam ? "Công việc nhóm" : "Inbox"),
+        projectId: project?.id,
+        inbox: key === "inbox",
+        days: new Map(),
+      };
+      groups.set(key, group);
+      const cell = group.days.get(day.date) ?? { seconds: 0, tasks: new Map() };
+      const start = Date.parse(session.start);
+      const end = Date.parse(session.end);
+      const seconds = bounds
+        ? (Math.min(end, bounds[1]) - Math.max(start, bounds[0])) / 1000
+        : Math.min((end - start) / 1000, day.plannedSeconds);
+      const duration = Math.max(0, seconds);
+      const entry = cell.tasks.get(id) ?? { name: session.name, seconds: 0, status: task?.status, times: [] };
+      entry.seconds += duration;
+      entry.times.push(`${timeFmt(Math.max(start, bounds?.[0] ?? start))}–${timeFmt(Math.min(end, bounds?.[1] ?? end))}`);
+      cell.tasks.set(id, entry);
+      cell.seconds += duration;
+      group.days.set(day.date, cell);
+    }
+  }
+  return (
+    <>
+      {renderToolbar(`${value.start} – ${nextWeek?.end ?? value.end}`)}
+      {error && (
+        <p className="warning" role="status">
+          Số liệu chưa được làm mới: {error}{" "}
+          <button type="button" className="btn ghost small" onClick={retry}>
+            Thử lại
+          </button>
+        </p>
+      )}
+      {following.error && (
+        <p className="warning" role="status">
+          Chưa tải được tuần tiếp theo.{" "}
+          <button
+            type="button"
+            className="btn ghost small"
+            onClick={following.retry}
+          >
+            Thử lại
+          </button>
+        </p>
+      )}
+      <div
+        className="workload-scroll workload-matrix-scroll"
+        role="region"
+        tabIndex={0}
+        aria-label="Lịch công việc theo ngày"
+      >
+        <table className="workload-table workload-matrix">
+          <thead>
+            <tr>
+              <th scope="col">Tên</th>
+              {days.map((day) => (
+                <th
+                  key={day.date}
+                  scope="col"
+                  aria-current={day.date === today ? "date" : undefined}
+                >
+                  {workloadDayLabel.format(new Date(day.date))}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="workload-total-row">
+              <th scope="row">Cá nhân</th>
+              {days.map((day) => {
+                const plannedMinutes = day.plannedSeconds / 60;
+                const room = day.schedulableMinutes;
+                const full = day.status === "FULL" || day.status === "SHORTFALL";
+                const capacity = room > 0 ? `Trống ${timeText(room)}` : statusText[day.status];
+                const fill =
+                  day.workingMinutes > 0
+                    ? Math.min(100, (100 * plannedMinutes) / day.workingMinutes)
+                    : 100;
+                return (
+                  <td
+                    key={day.date}
+                    data-today={day.date === today || undefined}
+                  >
+                    <button
+                      type="button"
+                      className="workload-matrix-day"
+                      data-load={full ? "full" : undefined}
+                      aria-label={`${workloadDayLabel.format(new Date(day.date))}, ${timeText(plannedMinutes)} dự kiến, ${capacity}`}
+                      aria-expanded={
+                        selection === day.date
+                      }
+                      onClick={() => toggleSelection(day.date)}
+                    >
+                      {plannedMinutes > 0 && (
+                        <span
+                          className="workload-matrix-bar"
+                          style={{ width: `${fill}%` }}
+                        />
+                      )}
+                      {showHours &&
+                        plannedMinutes > 0 &&
+                        <strong>{timeText(Math.round(plannedMinutes))}</strong>}
+                      {day.status !== "PAST" && (
+                        <small>{showHours || !(room > 0) ? capacity : "Còn chỗ"}</small>
+                      )}
+                    </button>
+                  </td>
+                );
+              })}
+            </tr>
+            {Array.from(groups, ([id, group]) => {
+              const first = group.days.keys().next().value ?? days[0]?.date;
+              const last = Array.from(group.days.keys()).at(-1) ?? days.at(-1)?.date;
+              return (
+              <tr key={id} className="workload-group-row">
+                <th scope="row"><span className="workload-visually-hidden">{group.name}</span></th>
+                {days.map((day) => {
+                  const cell = group.days.get(day.date);
+                  const inRange = day.date >= first && day.date <= last;
+                  return (
+                    <td
+                      key={day.date}
+                      data-today={day.date === today || undefined}
+                      data-band={inRange ? group.inbox ? "inbox" : "project" : undefined}
+                    >
+                      {inRange && (
+                        <WorkloadGroupCell group={group} day={day} cell={cell} showHours={showHours} showName={day.date === first} />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {week === 0 && value.next.kind === "SETUP" && (
+        <p className="workload-message">
+          {value.next.reason}{" "}
+          {button("Thiết lập giờ làm", "nav", "secondary small", "time")}
+        </p>
+      )}
+      <div
+        className="workload-grid"
+        hidden={!days.some((day) => day.date === selection)}
+      >
+        {days.map((day) => {
+          const active = day.date === selection;
+          const sessions = day.sessions;
+          return (
+            <article
+              key={day.date}
+              className="workload-day"
+              hidden={!active}
+            >
+              <div className="workload-capacity">
+                <header>
+                  <strong>
+                    {day.date.slice(5).split("-").reverse().join("/")}
+                  </strong>
+                  <br />
+                  {statusText[day.status]}
+                </header>
+                {day.status !== "PAST" &&
+                  day.workingMinutes > 0 &&
+                  day.reservedMinutes != null && (
+                    <progress
+                      aria-label="Giờ đã giữ chỗ"
+                      max={day.workingMinutes}
+                      value={day.reservedMinutes}
+                    />
+                  )}
+                {day.advice && <p>{day.advice}</p>}
+                {day.status === "PAST" ? (
+                  <dl>
+                    <dt>Dự kiến</dt>
+                    <dd>{timeText(day.plannedSeconds / 60)}</dd>
+                    <dt>Thực làm</dt>
+                    <dd>
+                      {timeText(
+                        day.recordedActualSeconds == null
+                          ? null
+                          : day.recordedActualSeconds / 60,
+                      )}
+                    </dd>
+                  </dl>
+                ) : (
+                  <dl>
+                    <dt>Giờ làm</dt>
+                    <dd>{timeText(day.workingMinutes)}</dd>
+                    <dt>Đã giữ chỗ</dt>
+                    <dd>{timeText(day.reservedMinutes)}</dd>
+                    <dt>Còn xếp thêm</dt>
+                    <dd>{timeText(day.schedulableMinutes)}</dd>
+                  </dl>
                 )}
-              {day.advice && <p>{day.advice}</p>}
-              {day.status === "PAST" ? (
-                <dl>
-                  <dt>Dự kiến</dt>
-                  <dd>{timeText(day.plannedSeconds / 60)}</dd>
-                  <dt>Thực làm</dt>
-                  <dd>
+              </div>
+              <details open={active}>
+                <summary>
+                  Phiên làm việc ({sessions.length})
+                </summary>
+                  <p>
+                    Dự kiến {timeText(day.plannedSeconds / 60)} · Thực làm{" "}
                     {timeText(
                       day.recordedActualSeconds == null
                         ? null
                         : day.recordedActualSeconds / 60,
                     )}
-                  </dd>
-                </dl>
-              ) : (
-                <dl>
-                  <dt>Giờ làm</dt>
-                  <dd>{timeText(day.workingMinutes)}</dd>
-                  <dt>Đã giữ chỗ</dt>
-                  <dd>{timeText(day.reservedMinutes)}</dd>
-                  <dt>Còn xếp thêm</dt>
-                  <dd>{timeText(day.schedulableMinutes)}</dd>
-                </dl>
-              )}
-            </div>
-            <details>
-              <summary>Phiên làm việc ({day.sessions.length})</summary>
-              <p>
-                Dự kiến {timeText(day.plannedSeconds / 60)} · Thực làm{" "}
-                {timeText(
-                  day.recordedActualSeconds == null
-                    ? null
-                    : day.recordedActualSeconds / 60,
-                )}
-              </p>
-              {day.sessions.map((session) => (
-                <div key={session.id} className="workload-entry">
-                  <strong>{session.name}</strong>
-                  <p>
-                    {windowText(session)} · Thực làm{" "}
-                    {timeText(
-                      session.actualSeconds == null
-                        ? null
-                        : session.actualSeconds / 60,
-                    )}
                   </p>
-                  {session.outcome && (
+                {sessions.map((session) => (
+                  <div key={session.id} className="workload-entry">
+                    <strong>{session.name}</strong>
                     <p>
-                      {
-                        {
-                          COMPLETED: "Xong phiên",
-                          PARTIAL: "Làm một phần",
-                          MISSED: "Chưa làm",
-                        }[session.outcome]
-                      }
+                      {windowText(session)} · Thực làm{" "}
+                      {timeText(
+                        session.actualSeconds == null
+                          ? null
+                          : session.actualSeconds / 60,
+                      )}
                     </p>
-                  )}
-                  {session.needsOutcome ? (
-                    <button
-                      className="btn secondary small"
-                      onClick={() =>
-                        openSessionOutcome(session, onWorkspaceChanged)
-                      }
-                    >
-                      Ghi kết quả
-                    </button>
-                  ) : (
-                    button(
-                      "Mở phiên",
-                      "session-detail",
-                      "ghost small",
-                      session.id,
-                    )
-                  )}
-                </div>
-              ))}
-            </details>
-          </article>
-        ))}
+                    {session.outcome && (
+                      <p>
+                        {
+                          {
+                            COMPLETED: "Xong phiên",
+                            PARTIAL: "Làm một phần",
+                            MISSED: "Chưa làm",
+                          }[session.outcome]
+                        }
+                      </p>
+                    )}
+                    {session.needsOutcome ? (
+                      <button
+                        className="btn secondary small"
+                        onClick={() =>
+                          openSessionOutcome(session, onWorkspaceChanged)
+                        }
+                      >
+                        Ghi kết quả
+                      </button>
+                    ) : (
+                      button(
+                        "Mở phiên",
+                        "session-detail",
+                        "ghost small",
+                        session.id,
+                      )
+                    )}
+                  </div>
+                ))}
+              </details>
+            </article>
+          );
+        })}
       </div>
-      <details>
-        <summary>Khối lượng theo công việc</summary>
-        <ul>
-          {value.tasks.map((task) => (
-            <li key={task.id}>
-              <strong>{task.name}</strong> · Dự kiến {minutes(task.estimate)} ·
-              Còn {minutes(task.remainingMinutes)} · Chưa xếp{" "}
-              {minutes(task.unscheduledMinutes)}
-              {task.shortfallMinutes > 0 && (
-                <> · Thiếu trước hạn {minutes(task.shortfallMinutes)}</>
-              )}
-              {task.shortfallMinutes == null && task.remainingMinutes > 0 && (
-                <>
-                  {" "}
-                  ·{" "}
-                  {task.deadlineAssessment === "OUTSIDE_HORIZON"
-                    ? "Ngoài phạm vi tính"
-                    : "Chưa đủ dữ liệu để đánh giá trước hạn"}
-                </>
-              )}
-              {task.checklistTotal > 0 && (
-                <>
-                  {" "}
-                  · Checklist {task.checklistDone}/{task.checklistTotal}
-                </>
-              )}
-              {task.overdue && <> · Quá hạn</>}
-              {task.teamStatus === "PendingReview" && (
-                <> · Chờ trưởng nhóm duyệt</>
-              )}
-              {task.status === "Completed" &&
-                task.teamStatus !== "PendingReview" && (
-                  <> · Hoàn thành công việc</>
-                )}
-            </li>
-          ))}
-        </ul>
-      </details>
-    </section>
+    </>
   );
 }
 

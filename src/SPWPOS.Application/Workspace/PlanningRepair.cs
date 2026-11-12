@@ -65,8 +65,8 @@ public sealed partial class PlanningEngine
         // soft deadline, or finishes even later than the previous proposal.
         var oldEnds = before.Sessions.ToLookup(x => x.TaskId);
         var newEnds = after.Sessions.ToLookup(x => x.TaskId);
-        return state.Tasks.All(task =>
-            newEnds[task.Id].Select(x => x.End).Append(task.Deadline).Max() <=
-            oldEnds[task.Id].Select(x => x.End).Append(task.Deadline).Max());
+        return state.Tasks.All(task => task.Deadline is not { } deadline ||
+            newEnds[task.Id].Select(x => x.End).Append(deadline).Max() <=
+            oldEnds[task.Id].Select(x => x.End).Append(deadline).Max());
     }
 }

@@ -157,7 +157,9 @@ public sealed partial class WorkspaceService
                     if (singleCallStep && understanding?.Intent == "TaskQuery")
                     {
                         var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
-                        var lines = tasks.Take(30).Select(t => $"- {t.Name}: {t.EstimatedMinutes} phút, hạn {TimeZoneInfo.ConvertTime(t.Deadline, zone):dd/MM/yyyy HH:mm}, tiến độ {t.Progress}%.");
+                        var lines = tasks.Take(30).Select(t => $"- {t.Name}: " +
+                            (t.EstimatedMinutes > 0 ? $"{t.EstimatedMinutes} phút" : "chưa ước lượng") +
+                            (t.Deadline is { } due ? $", hạn {TimeZoneInfo.ConvertTime(due, zone):dd/MM/yyyy HH:mm}" : ", chưa có hạn") + $", tiến độ {t.Progress}%.");
                         var reply = tasks.Length == 0 ? "Mình chưa tìm thấy công việc đang hoạt động khớp yêu cầu."
                             : $"Mình tìm thấy {tasks.Length} công việc" + (tasks.Length > 30 ? " (hiển thị 30 việc đầu)" : "") + ":\n" + string.Join("\n", lines);
                         return new("TERMINAL", new NoraTerminal("ANSWER", reply));

@@ -25,7 +25,7 @@
     opacity: 1;
     width: 36px;
     height: 44px;
-    color: #526b85;
+    color: #000;
   }
   .nora-chat-item .nora-menu-popover {
     position: fixed;
@@ -121,7 +121,7 @@
   }
   .nora-history-group h2 {
     font-size: 12px;
-    color: #526b85;
+    color: #000;
   }
   .nora-history-tabs [role="tab"] {
     min-height: 40px;
@@ -141,7 +141,7 @@
     padding: 0 8px;
     border-radius: 8px;
     font-size: 12px;
-    color: #486482;
+    color: #000;
   }
   .nora-composer-help {
     left: 0;
@@ -159,7 +159,7 @@
     justify-content: space-between;
     gap: 12px;
     margin-top: 8px;
-    color: #526b85;
+    color: #000;
     font-size: 11px;
     line-height: 1.5;
   }
@@ -300,7 +300,7 @@
     max-height: 28dvh;
     overflow: auto;
     scrollbar-width: thin;
-    color: #526980;
+    color: #000;
   }
   .nora-usage > summary {
     cursor: pointer;

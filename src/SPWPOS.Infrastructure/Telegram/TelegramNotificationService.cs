@@ -151,7 +151,7 @@ public sealed class TelegramNotificationService(ApplicationDbContext db, ITelegr
         {
             var task = await db.WorkTasks.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == uid && x.Id == n.TaskId, ct);
             if (task is null || task.IsDeleted || task.Status is WorkTaskStatus.Completed or WorkTaskStatus.Cancelled) return null;
-            if (n.Kind == "DEADLINE") return task.Deadline > now && n.DedupeKey == $"deadline:{task.Id}:{task.Deadline.UtcTicks}"
+            if (n.Kind == "DEADLINE") return task.Deadline is { } deadline && deadline > now && n.DedupeKey == $"deadline:{task.Id}:{deadline.UtcTicks}"
                 ? new(task.Name, Deadline: task.Deadline) : null;
             var s = await db.WorkSessions.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == uid && x.Id == n.SessionId, ct);
             var current = s is not null && (n.Kind == "SESSION_REMINDER"

@@ -1,5 +1,11 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { TeamsPage, PrivateClaimPreview } from "../src/teams.jsx";
 import { AvailabilityPolicyCard } from "../src/availability-policy.jsx";
 import { state } from "../src/ui.jsx";
@@ -55,6 +61,79 @@ function routes(extra = {}) {
     return {};
   });
 }
+it("filters the team directory by role and unaccented name, and keeps the filters on return", async () => {
+  const leader = { id: "project", name: "Đồ án phần mềm", role: "Leader" };
+  routes({
+    "/api/teams": () => [team, leader],
+    "/api/teams/project": () => ({
+      team: leader,
+      members: [],
+      tasks: [],
+      activity: [],
+    }),
+  });
+  render(<TeamsPage />);
+  await screen.findByRole("button", { name: team.name });
+  fireEvent.change(screen.getByRole("textbox", { name: "Tìm nhóm theo tên" }), {
+    target: { value: "do an" },
+  });
+  fireEvent.change(
+    screen.getByRole("combobox", { name: "Lọc nhóm theo vai trò" }),
+    {
+      target: { value: "Member" },
+    },
+  );
+  expect(screen.getByText("Không tìm thấy nhóm phù hợp")).toBeTruthy();
+  fireEvent.change(
+    screen.getByRole("combobox", { name: "Lọc nhóm theo vai trò" }),
+    {
+      target: { value: "Leader" },
+    },
+  );
+  fireEvent.click(screen.getByRole("button", { name: leader.name }));
+  await screen.findByRole("heading", { name: leader.name });
+  fireEvent.click(screen.getByRole("button", { name: "Tất cả nhóm" }));
+  expect(screen.getByRole("button", { name: leader.name })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: team.name })).toBeNull();
+  fireEvent.change(screen.getByRole("textbox", { name: "Tìm nhóm theo tên" }), {
+    target: { value: "không khớp" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Xóa bộ lọc" }));
+  expect(screen.getByRole("button", { name: team.name })).toBeTruthy();
+});
+it("summarizes active deadlines and opens the same task again after closing it", async () => {
+  const due = new Date(Date.now() + 86400000).toISOString();
+  routes({
+    "/api/teams/team": () => ({
+      team,
+      members: [],
+      activity: [],
+      tasks: [
+        { ...shared, deadline: due },
+        {
+          ...shared,
+          id: "done",
+          name: "Đã nộp",
+          status: "Completed",
+          deadline: due,
+        },
+        { ...shared, id: "no-date", name: "Chưa có hạn", deadline: null },
+      ],
+    }),
+  });
+  render(<TeamsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: team.name }));
+  expect(await screen.findByText("1/3 công việc hoàn thành")).toBeTruthy();
+  const deadlines = screen.getByRole("region", { name: "Hạn chót" });
+  expect(within(deadlines).getByText("1 trong 7 ngày tới")).toBeTruthy();
+  const open = within(deadlines).getByRole("button", { name: /Báo cáo chung/ });
+  fireEvent.click(open);
+  const dialog = await screen.findByRole("dialog", { name: shared.name });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Đóng cửa sổ" }));
+  expect(screen.queryByRole("dialog", { name: shared.name })).toBeNull();
+  fireEvent.click(open);
+  expect(await screen.findByRole("dialog", { name: shared.name })).toBeTruthy();
+});
 it("members cannot create tasks and viewing a private proposal never claims automatically", async () => {
   routes();
   render(<TeamsPage />);
@@ -62,7 +141,7 @@ it("members cannot create tasks and viewing a private proposal never claims auto
   fireEvent.click(
     await screen.findByRole("button", { name: "Nhận task · NORA xếp lịch" }),
   );
-  expect(screen.queryByRole("button", { name: "Giao task mới" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Giao việc mới" })).toBeNull();
   expect(
     await screen.findByRole("region", { name: "Phương án riêng tư" }),
   ).toBeTruthy();
@@ -192,7 +271,7 @@ it("a member sees pending approval without leader controls or task creation", as
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
   expect(await screen.findByText("Chờ trưởng nhóm xác nhận")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Kiểm tra & duyệt" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Giao task mới" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Giao việc mới" })).toBeNull();
   expect(
     screen.queryByRole("button", { name: "Báo hoàn thành · Gửi duyệt" }),
   ).toBeNull();
@@ -482,8 +561,12 @@ it("directs a member to working hours without automatically claiming", async () 
     await screen.findByText("Còn một bước: xác nhận giờ có thể làm việc"),
   ).toBeTruthy();
   expect(screen.queryByText(/Cho phép thử dời phiên/)).toBeNull();
-  expect(screen.getByRole("link", { name: "Mở Giờ rảnh" }).getAttribute("href")).toBe("#time");
-  expect(api.mock.calls.some(([p]) => p === "/api/time/policy/preview")).toBe(false);
+  expect(
+    screen.getByRole("link", { name: "Mở Giờ làm việc" }).getAttribute("href"),
+  ).toBe("#time");
+  expect(api.mock.calls.some(([p]) => p === "/api/time/policy/preview")).toBe(
+    false,
+  );
   expect(
     api.mock.calls.some(([p]) => p === "/api/teams/claims/proposal/confirm"),
   ).toBe(false);

@@ -131,7 +131,7 @@ public sealed partial class WorkspaceService
         var occupied = Occupied(state);
         var completion = engine.CompletionTimes(state, occupied, bias, Now);
         var deadlineLookahead = query.Start <= Now && query.End > Now && Now.AddHours(48) > query.End ? Now.AddHours(48) : query.End;
-        var relevant = state.Tasks.Where(x => !x.IsDeleted && engine.Remaining(x, bias) > 0 &&
+        var relevant = state.Tasks.Where(x => x.HasPlanningDetails && engine.Remaining(x, bias) > 0 &&
             !state.Tasks.Any(child => child.ParentId == x.Id && !child.IsDeleted) &&
             (x.Deadline <= deadlineLookahead || entries.Any(e => e.TaskId == x.Id)))
             .OrderBy(x => x.Deadline).ThenByDescending(x => x.Priority).ToArray();
@@ -158,7 +158,7 @@ public sealed partial class WorkspaceService
                 : allocated < remaining || !task.Splittable && !valid.Any(s => (s.End - s.Start).TotalMinutes >= remaining)
                     ? "Chưa có đủ thời lượng trong các phiên phù hợp trước hạn."
                     : "Đã có thời lượng trước hạn trong lịch; đây không phải xác nhận công việc đã hoàn thành.";
-            return new ReviewTask(task.Id, task.Name, task.Deadline, remaining, allocated, concern);
+            return new ReviewTask(task.Id, task.Name, task.Deadline!.Value, remaining, allocated, concern);
         }).ToArray();
         var suggestions = new List<ReviewSuggestion>();
         var blocks = state.Sessions.Select(x => new TimeSlot(x.Start.AddMinutes(-state.Preference.BreakMinutes), x.End.AddMinutes(state.Preference.BreakMinutes)));

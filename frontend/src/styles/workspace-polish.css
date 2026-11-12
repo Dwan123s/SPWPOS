@@ -79,7 +79,7 @@
 }
 .calendar-task-queue span {
   font-size: 10px;
-  color: #526980;
+  color: #000;
   line-height: 1.6;
 }
 .calendar-task-context .form-actions {
@@ -171,7 +171,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  color: #526980;
+  color: #000;
   font-size: 12px;
   margin-bottom: 24px;
 }
@@ -234,7 +234,7 @@
   margin-top: 0;
 }
 .page-load-error p {
-  color: #526980;
+  color: #000;
   max-width: 54ch;
 }
 .glass-workspace
@@ -282,7 +282,7 @@
   gap: 10px;
   padding: 12px 14px;
   border-radius: 12px;
-  color: #526980;
+  color: #000;
   background: #edf5fc;
 }
 .inline-feedback.is-error {
@@ -302,13 +302,13 @@
 }
 .pagination > span {
   font-size: 12px;
-  color: #526980;
+  color: #000;
   font-variant-numeric: tabular-nums;
 }
 .compact-empty {
   padding: 24px 16px;
   text-align: center;
-  color: #526980;
+  color: #000;
   border: 1px dashed #cedfeb;
   border-radius: 12px;
   margin: 16px 0 0;
@@ -354,7 +354,7 @@
 }
 .recovery-empty p {
   margin: 3px 0 0;
-  color: #526980;
+  color: #000;
   font-size: 12px;
 }
 .recovery-settings {
@@ -365,7 +365,7 @@
   display: list-item;
   cursor: pointer;
   width: fit-content;
-  color: #526980;
+  color: #000;
   font-size: 12px;
 }
 .recovery-settings > summary > span {
@@ -447,7 +447,7 @@
 .analytics-date-range summary {
   cursor: pointer;
   font-size: 12px;
-  color: #526980;
+  color: #000;
 }
 .analytics-range-form {
   display: flex;
@@ -472,7 +472,7 @@
   min-height: 116px;
 }
 .analytics-metrics > div > span {
-  color: #526980;
+  color: #000;
   font-size: 11px;
 }
 .analytics-metrics h3 {
@@ -484,7 +484,7 @@
 }
 .analytics-metrics p {
   font-size: 11px;
-  color: #526980;
+  color: #000;
   margin: 0;
 }
 .analytics-panel table {
@@ -492,7 +492,7 @@
 }
 .analytics-panel table caption {
   text-align: left;
-  color: #526980;
+  color: #000;
   font-size: 12px;
   padding: 14px 0;
 }

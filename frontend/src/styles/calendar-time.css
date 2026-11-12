@@ -3,7 +3,7 @@
   --calendar-time-hover: #e8eef5;
   --calendar-time-border: #cbd5e1;
   --calendar-time-accent: #64748b;
-  --calendar-time-text: #475569;
+  --calendar-time-text: #000;
   --calendar-time-tag: #e0e7ef;
 }
 .calendar-time-current {

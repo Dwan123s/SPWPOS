@@ -13,7 +13,7 @@
   margin: 5px 0 7px;
 }
 .eis-board .eis-heading p {
-  color: #73859c;
+  color: #000;
 }
 .eis-board .eis-toolbar {
   display: flex;
@@ -62,7 +62,7 @@
   font: inherit;
   font-size: 12px;
   background: transparent;
-  color: #6f8096;
+  color: #000;
   cursor: pointer;
 }
 .eis-board-tabs button[aria-pressed="true"] {
@@ -75,7 +75,7 @@
   padding: 1px 6px;
   font-size: 10px;
   background: #eaf0f7;
-  color: #6c829e;
+  color: #000;
 }
 .eis-board-tabs button[aria-pressed="true"] span {
   background: #dcecff;
@@ -91,7 +91,7 @@
   max-width: 100%;
   font: inherit;
   font-size: 11px;
-  color: #566c87;
+  color: #000;
   background: #fff;
   border: 1px solid #e0e8f1;
   border-radius: 7px;
@@ -144,7 +144,7 @@
 }
 .eis-board .eis-quadrant header p {
   font-size: 10px;
-  color: #7a8ca3;
+  color: #000;
 }
 .eis-column-count {
   font-size: 10px;
@@ -234,7 +234,7 @@
 .eis-dialog .eis-drag-handle {
   border: 0;
   background: transparent;
-  color: #a1afbf;
+  color: #000;
   padding: 2px;
   flex: 0 0 18px;
   border-radius: 5px;
@@ -252,7 +252,7 @@
   padding: 0;
   display: grid;
   place-items: center;
-  color: #9aacc2;
+  color: #000;
 }
 .eis-task-complete {
   border: 1.5px solid #bbcadd;
@@ -281,7 +281,7 @@
 .eis-board .eis-facts {
   gap: 5px 10px;
   font-size: 10px;
-  color: #798ba2;
+  color: #000;
   align-items: center;
 }
 .eis-check-toggle {
@@ -291,7 +291,7 @@
   padding: 0 4px;
   border: 0;
   border-radius: 4px;
-  color: #6d859f;
+  color: #000;
   background: #eef3fa;
   font: inherit;
   cursor: pointer;
@@ -302,11 +302,11 @@
   height: 11px;
 }
 .eis-board .eis-user-mark {
-  color: #8b9bb0;
+  color: #000;
   font-size: 9px;
 }
 .eis-source-label {
-  color: #6a82a0;
+  color: #000;
 }
 .eis-board .eis-signals {
   margin-top: 5px;
@@ -319,7 +319,7 @@
 .eis-row-more {
   border: 0;
   background: transparent;
-  color: #8196af;
+  color: #000;
   font-size: 19px;
   letter-spacing: 1px;
   line-height: 1;
@@ -351,7 +351,7 @@
   gap: 8px;
   font-size: 11px;
   line-height: 1.6;
-  color: #496383;
+  color: #000;
 }
 .eis-card-checklist input,
 .eis-dialog input[type="checkbox"] {
@@ -412,7 +412,7 @@
 .eis-move-select select {
   width: 100%;
   max-width: 200px;
-  color: #587799;
+  color: #000;
   background: #fff;
   border: 1px solid #dce7f6;
   border-radius: 6px;
@@ -451,7 +451,7 @@
   gap: 8px;
   padding: 24px 18px;
   font-size: 11px;
-  color: #899bb0;
+  color: #000;
 }
 .eis-empty-symbol {
   display: grid;
@@ -469,7 +469,7 @@
 .eis-empty strong {
   font-size: 12px;
   font-weight: 500;
-  color: #7289a4;
+  color: #000;
 }
 .eis-empty > span:last-of-type {
   max-width: 260px;
@@ -572,7 +572,7 @@
     border: 1px solid #dfe8f5;
     border-radius: 8px;
     background: #fff;
-    color: #7690ad;
+    color: #000;
     font: inherit;
     font-size: 10px;
     padding: 10px 8px;
@@ -659,7 +659,7 @@
   font-size: 10px;
   letter-spacing: 0.12em;
   font-weight: 700;
-  color: #6685ab;
+  color: #000;
 }
 .eis-dialog h2 {
   margin: 8px 0 0;
@@ -669,7 +669,7 @@
 .eis-dialog > header button {
   border: 1px solid #dee8f5;
   background: #fff;
-  color: #7695ba;
+  color: #000;
   border-radius: 10px;
   padding: 9px;
   cursor: pointer;
@@ -687,7 +687,7 @@
   display: grid;
   gap: 7px;
   font-size: 12px;
-  color: #617fa4;
+  color: #000;
 }
 .eis-dialog input:not([type="checkbox"]),
 .eis-dialog textarea,
@@ -740,13 +740,13 @@
   font-size: 14px;
 }
 .eis-section-title > span {
-  color: #7890ad;
+  color: #000;
   font-size: 11px;
 }
 .eis-check-editor > p,
 .eis-dialog .eis-editor-note {
   font-size: 11px;
-  color: #8193ac;
+  color: #000;
   line-height: 1.8;
   margin: 7px 0 12px;
 }
@@ -767,7 +767,7 @@
 .eis-check-row > button:last-child {
   border: 0;
   background: transparent;
-  color: #8ba0ba;
+  color: #000;
   cursor: pointer;
   padding: 3px;
 }
@@ -809,7 +809,7 @@
 .eis-dialog footer button:not(.primary) {
   background: transparent;
   border: 0;
-  color: #577da6;
+  color: #000;
   font: inherit;
   font-size: 11px;
   cursor: pointer;
@@ -850,7 +850,7 @@
 }
 .eis-plan-section span {
   display: block;
-  color: #7891ad;
+  color: #000;
 }
 @media (max-width: 760px) {
   .eis-board .eis-toolbar {

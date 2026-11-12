@@ -40,11 +40,15 @@ const paths = {
     "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2",
   bell: "M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 20h4",
   plus: "M12 5v14 M5 12h14",
+  expand: "M14 4h6v6 M20 4l-6 6 M10 20H4v-6 M4 20l6-6",
+  panelToggle: "M9 6l-6 6 6 6 M3 12h18 M13 6h8 M13 18h8",
+  collapse: "M20 4l-6 6 M14 4v6h6 M4 20l6-6 M4 14h6v6",
   arrow: "M5 12h14 M13 6l6 6-6 6",
   close: "M6 6l12 12 M18 6L6 18",
   alertCircle: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v6 M12 16h.01",
   check: "M5 12l4 4L19 6",
   clock: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v5l4 2",
+  flag: "M5 21V4m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0",
   play: "M7 4l13 8-13 8z",
   pause: "M8 5v14 M16 5v14",
   edit: "M15 4l5 5 M4 20l2-6L17 3l4 4-11 11z",
@@ -213,7 +217,6 @@ export function button(text, action, extra = "", id = "", glyph = "") {
   const labels = {
     "week-prev": "Tuần trước",
     "week-next": "Tuần sau",
-    "remove-slot": "Xóa khoảng thời gian",
     "edit-category": "Chỉnh sửa danh mục",
     "delete-category": "Xóa danh mục",
   };

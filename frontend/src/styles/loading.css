@@ -1,7 +1,7 @@
 /* NORA leads the loading experience; the surrounding scene stays quiet. */
 .planora-loading {
   --loading-ink: #183650;
-  --loading-muted: #718799;
+  --loading-muted: #000;
   --loading-ease: cubic-bezier(0.22, 1, 0.36, 1);
   color: var(--loading-ink);
 }
@@ -47,7 +47,7 @@
   border: 1px solid #dbe8f0;
   border-radius: 50%;
   background: #ffffffa8;
-  color: #6e91aa;
+  color: #000;
   cursor: pointer;
   transition:
     background 0.2s,
@@ -151,7 +151,7 @@
   left: 16px;
   top: 91px;
   rotate: -12deg;
-  color: #7ea9cb;
+  color: #000;
 }
 .loading-token--check {
   right: 13px;
@@ -189,7 +189,7 @@
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.22em;
-  color: #6c9ab2;
+  color: #000;
 }
 .planora-loading .loading-copy h1 {
   margin: 0;
@@ -206,7 +206,7 @@
   margin: 20px 0 0;
   font-size: 12px;
   line-height: 1.7;
-  color: #637f93;
+  color: #000;
 }
 .loading-progress-track {
   position: relative;
@@ -227,7 +227,7 @@
 }
 .loading-note {
   margin: 19px 0 0;
-  color: #8a9ead;
+  color: #000;
   font-size: 10px;
   line-height: 1.8;
 }
@@ -241,7 +241,7 @@
   gap: 10px;
   font-size: 9px;
   letter-spacing: 0.04em;
-  color: #8ca1af;
+  color: #000;
 }
 .loading-footer-dot {
   width: 5px;

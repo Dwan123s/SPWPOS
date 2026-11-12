@@ -30,7 +30,7 @@ public sealed partial class NoraAgentRuntimeTests
         });
         var draft = JsonNode.Parse(Draft)!; var task = draft["tasks"]![0]!;
         task["taskId"] = report.Id.ToString(); task["name"] = report.Name;
-        task["deadline"] = report.Deadline.ToString("O"); task["estimatedMinutes"] = 240;
+        task["deadline"] = report.Deadline!.Value.ToString("O"); task["estimatedMinutes"] = 240;
         task["splittable"] = true; task["durationEvidence"] = "4 tiếng"; task["deadlineEvidence"] = "";
         draft["horizonDays"] = 7;
         model.Decision = (request, n) => {

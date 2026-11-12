@@ -61,7 +61,7 @@ export function NoteLibrary({
         </button>
         <button
           type="button"
-          className="note-create"
+          className="btn primary note-create"
           aria-label="Ghi chú mới"
           disabled={!!busy}
           onClick={create}

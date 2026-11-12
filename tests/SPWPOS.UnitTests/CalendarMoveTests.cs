@@ -69,7 +69,7 @@ public sealed class CalendarMoveTests
     public async Task Resizing_and_moving_preserve_task_constraints(string restriction){
         await using var h=await ServiceHarness.CreateAsync();var x=await Setup(h);var start=x.Session.Start.AddDays(1);var end=start.AddHours(1);
         if(restriction=="soft-deadline")await h.DbAsync(async db=>{(await db.WorkTasks.SingleAsync(Ct)).IsHardDeadline=false;await db.SaveChangesAsync(Ct);});
-        if(restriction is "deadline" or "soft-deadline"){start=x.Task.Deadline.AddDays(1);end=start.AddHours(1);}if(restriction=="availability"){start=new(start.Date.AddHours(2),TimeSpan.Zero);end=start.AddHours(1);}if(restriction=="length")end=start.AddHours(4);
+        if(restriction is "deadline" or "soft-deadline"){start=x.Task.Deadline!.Value.AddDays(1);end=start.AddHours(1);}if(restriction=="availability"){start=new(start.Date.AddHours(2),TimeSpan.Zero);end=start.AddHours(1);}if(restriction=="length")end=start.AddHours(4);
         var input=await Input(h,x.User,"Session",x.Session.Id,x.Session.Start,x.Session.End,start,end);
         await Assert.ThrowsAsync<AuthException>(()=>Work(h,s=>s.MoveCalendarItemAsync(x.User,input,Ct)));Assert.Equal(x.Session.Start,(await h.DbAsync(db=>db.WorkSessions.SingleAsync(Ct))).Start);
     }

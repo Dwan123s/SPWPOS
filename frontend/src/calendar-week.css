@@ -54,7 +54,7 @@
   left: 0;
   z-index: 8;
   background: #fff;
-  color: #8499b2;
+  color: #000;
   font-size: 10px;
 }
 .calendar-hour-corner {
@@ -271,7 +271,7 @@
   justify-content: space-between;
   gap: 8px;
   margin: 0 0 9px;
-  color: #7b8fa8;
+  color: #000;
   font-size: 11px;
   line-height: 1.6;
 }

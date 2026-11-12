@@ -1,6 +1,6 @@
 .social-workspace {
   --social-ink: #193b5d;
-  --social-muted: #526a81;
+  --social-muted: #000;
   --social-line: #d5e4f2;
   color: var(--social-ink);
   width: 100%;
@@ -127,7 +127,7 @@
   padding-top: 18px;
 }
 .social-eyebrow {
-  color: #526f8d;
+  color: #000;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -522,7 +522,7 @@
   width: 36px;
   height: 36px;
   margin-bottom: 18px;
-  color: #7295ba;
+  color: #000;
 }
 .social-empty h3 {
   margin: 0 0 9px;

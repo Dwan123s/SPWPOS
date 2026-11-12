@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import { state, icon, dateFmt, timeFmt } from "./ui.jsx";
 import { askNora } from "./agent-handoff.js";
+import { openTeamTask } from "./team-task-link.js";
 import "./eisenhower.css";
 import { EisenhowerBoard } from "./eisenhower-board.jsx";
 
@@ -118,12 +119,6 @@ function useEisenhower() {
     },
   };
 }
-let pendingTeamTask = null;
-export function takeEisenhowerTeamTask() {
-  const task = pendingTeamTask;
-  pendingTeamTask = null;
-  return task;
-}
 function OpenTask({ task }) {
   if (!task.teamTaskId)
     return (
@@ -134,11 +129,7 @@ function OpenTask({ task }) {
   return (
     <button
       type="button"
-      onClick={() => {
-        pendingTeamTask = { teamId: task.teamId, taskId: task.teamTaskId };
-        location.hash = "teams";
-        window.dispatchEvent(new Event("eisenhower-open-team"));
-      }}
+      onClick={() => openTeamTask(task.teamId, task.teamTaskId)}
     >
       {task.name}
     </button>
@@ -192,9 +183,7 @@ export function EisenhowerMatrix() {
       }}
       onOpenTeam={(task) => {
         if (!task.teamTaskId) return;
-        pendingTeamTask = { teamId: task.teamId, taskId: task.teamTaskId };
-        location.hash = "teams";
-        window.dispatchEvent(new Event("eisenhower-open-team"));
+        openTeamTask(task.teamId, task.teamTaskId);
       }}
     />
   );

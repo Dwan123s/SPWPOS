@@ -165,41 +165,6 @@ export function TaskInbox({
   );
   return (
     <div className="task-inbox-content">
-      <form className="task-inbox-capture" onSubmit={save}>
-        <label className="sr-only" htmlFor="inbox-capture">
-          Ý tưởng hoặc nhiệm vụ mới
-        </label>
-        <textarea
-          id="inbox-capture"
-          value={content}
-          maxLength={8000}
-          rows={2}
-          disabled={busy}
-          placeholder="Ghi nhanh một ý tưởng hoặc việc cần nhớ…"
-          onChange={(event) => setContent(event.target.value)}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing &&
-              event.nativeEvent.keyCode !== 229
-            )
-              save(event);
-          }}
-        />
-        <div>
-          <span>
-            Enter để lưu · Shift + Enter để xuống dòng
-          </span>
-          <button
-            type="submit"
-            className="btn primary small"
-            disabled={busy || !content.trim()}
-          >
-            {icon("plus")} Lưu vào Inbox
-          </button>
-        </div>
-      </form>
       {saveError && (
         <p className="form-error" role="alert">
           {saveError}
@@ -263,6 +228,39 @@ export function TaskInbox({
           </div>
         )
       )}
+      <form className="task-inbox-capture" onSubmit={save}>
+        <label className="sr-only" htmlFor="inbox-capture">
+          Ý tưởng hoặc nhiệm vụ mới
+        </label>
+        <textarea
+          id="inbox-capture"
+          value={content}
+          maxLength={8000}
+          rows={2}
+          disabled={busy}
+          placeholder="Ghi nhanh một ý tưởng hoặc việc cần nhớ…"
+          onChange={(event) => setContent(event.target.value)}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing &&
+              event.nativeEvent.keyCode !== 229
+            )
+              save(event);
+          }}
+        />
+        <div>
+          <span>Enter để lưu · Shift + Enter để xuống dòng</span>
+          <button
+            type="submit"
+            className="btn primary small"
+            disabled={busy || !content.trim()}
+          >
+            {icon("plus")} Lưu vào Inbox
+          </button>
+        </div>
+      </form>
       {deleting && (
         <ConversationDeleteDialog
           title={deleting.title}

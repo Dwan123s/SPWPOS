@@ -39,11 +39,13 @@ public sealed partial class WorkspaceService
                 MatchText(x.Name) == MatchText(original.Name)).ToArray();
             if (sameName.Length < 2 || request.Contains(original.Id.ToString(), StringComparison.OrdinalIgnoreCase) ||
                 ChatMatch(request, @"\b(?:tat ca|ca hai|both|all)\b").Success) continue;
-            var date = LocalDate(original.Deadline, state.Preference);
+            if (original.Deadline is not { } deadline)
+                return $"Có nhiều công việc tên “{original.Name}”. Bạn mở chi tiết và chọn đúng công việc cần đổi nhé.";
+            var date = LocalDate(deadline, state.Preference);
             var dates = RequestMatches(text, @"\b\d{1,2}/\d{1,2}/\d{4}\b|\b\d{4}-\d{2}-\d{2}\b")
                 .Select(m => DateOnly.TryParseExact(m.Value, ["d/M/yyyy", "dd/MM/yyyy", "d/MM/yyyy", "dd/M/yyyy", "yyyy-MM-dd"],
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) ? (DateOnly?)parsed : null).ToArray();
-            if (!dates.Contains(date) || sameName.Count(x => LocalDate(x.Deadline, state.Preference) == date) != 1)
+            if (!dates.Contains(date) || sameName.Count(x => x.Deadline is { } due && LocalDate(due, state.Preference) == date) != 1)
                 return $"Có nhiều công việc tên “{original.Name}”. Bạn muốn đổi công việc có hạn chót ngày nào?";
         }
         if (intent.Events.Length == 0) return null;

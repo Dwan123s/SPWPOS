@@ -18,7 +18,32 @@ public sealed partial class WorkspaceService
         session.End <= task.Deadline && PlanningEngine.InsideWorkWindow(task, session.Start, session.End) &&
         engine.FreeSlots(state, session.Start, session.End).Any(g => g.Start <= session.Start && g.End >= session.End);
 
-    public async Task<WorkloadView> GetWorkloadAsync(Guid uid, CancellationToken ct)
+    private static DateOnly WorkloadWeekStart(DateTimeOffset now, TimeZoneInfo zone, int week)
+    {
+        Require(week is >= -4 and <= 3, "WORKLOAD_WEEK_RANGE", "Chọn trong phạm vi 4 tuần trước và 3 tuần tới.");
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
+        return today.AddDays(-((int)today.DayOfWeek + 6) % 7 + week * 7);
+    }
+
+    private PlanView ForecastWorkload(PlanningState state, DateTimeOffset now) => engine.Generate(state,
+        new(now, 30, UseCapacityFactor: false, UseEstimateBias: false) { AllowDeadlineRescue = false }, now);
+
+    private static int WorkloadShortfall(PlanView plan, WorkTask task, PlanWarning[] warnings)
+    {
+        var shortfall = warnings.FirstOrDefault(w => w.UnscheduledMinutes > 0)?.UnscheduledMinutes ?? 0;
+        if (task.Deadline is { } deadline && warnings.Any(w => w.Code == "SOFT_DEADLINE_EXCEEDED"))
+            shortfall += plan.Sessions.Where(s => s.TaskId == task.Id && !s.Preserved && s.End > task.Deadline)
+                .Sum(s => (int)(s.End - (s.Start > deadline ? s.Start : deadline)).TotalMinutes);
+        return shortfall;
+    }
+
+    private int WorkloadRemaining(WorkTask task) => ActiveWork(task) ? engine.Remaining(task, [new("All", 0, 1, false)]) : 0;
+
+    private int WorkloadCoverage(PlanningState state, WorkTask task, IEnumerable<WorkSession> sessions, DateTimeOffset now) =>
+        sessions.Where(s => s.TaskId == task.Id && ValidWorkReservation(state, task, s))
+            .Sum(s => Math.Max(0, (int)(s.End - (s.Start < now ? now : s.Start)).TotalMinutes));
+
+    public async Task<WorkloadView> GetWorkloadAsync(Guid uid, CancellationToken ct, int week = 0)
     {
         var now = Now;
         await using var snapshot = db.Database.CurrentTransaction is null
@@ -28,12 +53,12 @@ public sealed partial class WorkspaceService
         DateOnly Day(DateTimeOffset at) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, zone).DateTime);
         DateTimeOffset Midnight(DateOnly day) => PlanningEngine.At(day, 0, zone);
         var today = Day(now);
-        var first = today.AddDays(-((int)today.DayOfWeek + 6) % 7);
+        var first = WorkloadWeekStart(now, zone, week);
         var last = first.AddDays(6);
         var weekStart = Midnight(first);
         var weekEnd = Midnight(last.AddDays(1));
         var hasHours = HasWorkHours(state);
-        var capacity = engine.CapacityDays(state, now, weekEnd, now, false).ToDictionary(x => x.Date);
+        var capacity = engine.CapacityDays(state, weekStart > now ? weekStart : now, weekEnd, now, false).ToDictionary(x => x.Date);
         var tasks = state.Tasks.ToDictionary(t => t.Id);
         var upcoming = state.Sessions.Where(s => s.End > now &&
             s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).ToArray();
@@ -46,28 +71,23 @@ public sealed partial class WorkspaceService
         var closed = await Mine<SessionExecution>(uid).AsNoTracking().Where(e => e.EndedAt >= weekStart && e.EndedAt < weekEnd)
             .Select(e => new { e.SessionId, e.EndedAt, e.ActualSeconds }).ToArrayAsync(ct);
         var executions = closed.ToDictionary(e => e.SessionId);
-        var active = state.Tasks.Where(ActiveWork).ToArray();
-        var checkedPlan = hasHours && active.Length > 0 ? engine.Generate(state,
-            new(now, 30, UseCapacityFactor: false, UseEstimateBias: false) { AllowDeadlineRescue = false }, now) : null;
+        var active = state.Tasks.Where(t => t.HasPlanningDetails && ActiveWork(t)).ToArray();
+        var checkedPlan = hasHours && active.Length > 0 ? ForecastWorkload(state, now) : null;
         var warnings = (checkedPlan?.Warnings ?? []).ToLookup(w => w.TaskId);
         var conflicts = TimeConflictTaskIds(state).ToHashSet();
         var parentIds = state.Tasks.Where(t => t.ParentId != null).Select(t => t.ParentId!.Value).ToHashSet();
-        var work = state.Tasks.Where(t => !t.IsDeleted && !parentIds.Contains(t.Id) && t.Status != WorkTaskStatus.Cancelled)
+        var work = state.Tasks.Where(t => t.HasPlanningDetails && !t.IsDeleted && !parentIds.Contains(t.Id) && t.Status != WorkTaskStatus.Cancelled)
             .Select(t =>
             {
-                var remaining = ActiveWork(t) ? engine.Remaining(t, [new("All", 0, 1, false)]) : 0;
-                var covered = upcoming.Where(s => s.TaskId == t.Id && ValidWorkReservation(state, t, s))
-                    .Sum(s => Math.Max(0, (int)(s.End - (s.Start < now ? now : s.Start)).TotalMinutes));
+                var remaining = WorkloadRemaining(t);
+                var covered = WorkloadCoverage(state, t, upcoming, now);
                 var taskWarnings = warnings[t.Id].ToArray();
                 var warning = taskWarnings.FirstOrDefault(w => w.UnscheduledMinutes > 0 || w.Code == "SOFT_DEADLINE_EXCEEDED");
-                var shortfall = warning?.UnscheduledMinutes ?? 0;
-                if (checkedPlan != null && taskWarnings.Any(w => w.Code == "SOFT_DEADLINE_EXCEEDED"))
-                    shortfall += checkedPlan.Sessions.Where(s => s.TaskId == t.Id && !s.Preserved && s.End > t.Deadline)
-                        .Sum(s => (int)(s.End - (s.Start > t.Deadline ? s.Start : t.Deadline)).TotalMinutes);
+                var shortfall = checkedPlan is not null ? WorkloadShortfall(checkedPlan, t, taskWarnings) : 0;
                 var checklist = ReadTaskChecklist(t);
                 return new WorkloadTask(t.Id, t.Name, t.EstimatedMinutes, remaining, Math.Max(0, remaining - covered),
                     hasHours && t.Deadline <= now.AddDays(30) ? shortfall : null,
-                    t.Deadline, ActiveWork(t) && t.IsHardDeadline && t.Deadline < now, t.Status.ToString(),
+                    t.Deadline!.Value, ActiveWork(t) && t.IsHardDeadline && t.Deadline < now, t.Status.ToString(),
                     team.GetValueOrDefault(t.Id), conflicts.Contains(t.Id) ? "Phiên đã xếp bị xung đột." : warning?.Message,
                     !hasHours ? "UNKNOWN" : t.Deadline > now.AddDays(30) ? "OUTSIDE_HORIZON" : "ASSESSED",
                     checklist.Count(item => item.Completed), checklist.Length);
@@ -120,7 +140,7 @@ public sealed partial class WorkspaceService
             work.All(t => t.UnscheduledMinutes == 0) ? new("OPEN_CALENDAR", "Các công việc đã có thời gian. Mở lịch để xem phiên tiếp theo.") :
             new("PLAN", "Xem phương án cho công việc chưa xếp đủ thời gian.");
         var refresh = ordered.SelectMany(s => new[] { s.Start.AddMinutes(-15), s.Start, s.End }).Where(t => t > now)
-            .Concat(active.Select(t => t.Deadline.AddSeconds(1)).Where(t => t > now))
+            .Concat(active.Select(t => t.Deadline!.Value.AddSeconds(1)).Where(t => t > now))
             .Concat(state.Events.Select(e => e.End).Where(t => t > now))
             .Append(Midnight(today.AddDays(1))).Min();
         if (snapshot is not null) await snapshot.CommitAsync(ct);

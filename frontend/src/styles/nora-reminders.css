@@ -29,7 +29,7 @@
 }
 .nora-reminders-dialog p {
   font-size: 13px;
-  color: #54708c;
+  color: #000;
 }
 .nora-reminders-dialog ul {
   list-style: none;
@@ -55,7 +55,7 @@
 .nora-reminders-dialog li span {
   display: block;
   font-size: 12px;
-  color: #5b7590;
+  color: #000;
   margin-top: 5px;
 }
 .nora-reminders-dialog footer {
@@ -121,7 +121,7 @@
 .nora-alarm-caption {
   display: block;
   font-size: 12px;
-  color: #5d7791;
+  color: #000;
   margin-bottom: 14px;
 }
 @keyframes nora-alarm-pulse {

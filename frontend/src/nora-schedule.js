@@ -89,13 +89,15 @@ function midnight(date, zone) {
     throw new Error("Invalid local midnight");
   return candidate;
 }
-// Gaps are intervals without loaded calendar entries, not promises of availability.
-export function timelineForDay(workspace, date) {
+export function calendarDayBounds(date, zone) {
   const next = new Date(`${date}T12:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
+  return [midnight(date, zone), midnight(next.toISOString().slice(0, 10), zone)];
+}
+// Gaps are intervals without loaded calendar entries, not promises of availability.
+export function timelineForDay(workspace, date) {
   const zone = workspace?.preference?.timeZoneId || "Asia/Ho_Chi_Minh";
-  const start = midnight(date, zone),
-    end = midnight(next.toISOString().slice(0, 10), zone);
+  const [start, end] = calendarDayBounds(date, zone);
   const taskNames = new Map(
     (workspace?.tasks || []).map((task) => [task.id, task.name]),
   );

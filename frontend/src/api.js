@@ -84,7 +84,11 @@ export async function api(
         code: json.error?.code ?? "RATE_LIMITED",
         message: json.error?.message || "Vui lòng chờ một chút rồi thử lại.",
       };
-      requestCooldowns.set(cooldownKey, entry);
+      if (entry.code === "AI_CONCURRENT_LIMIT") {
+        entry.until = Date.now() + (retryAfter ? Math.max(1, seconds || 1) : 1) * 1000;
+      } else {
+        requestCooldowns.set(cooldownKey, entry);
+      }
       throw cooldownError(entry);
     }
     const e = new Error(

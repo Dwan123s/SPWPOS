@@ -29,6 +29,7 @@ public sealed partial class WorkspaceService
         var hasWorkHours = state.Policy != null || state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable &&
             x.Date >= first && x.Date <= LocalDate(end.AddTicks(-1), state.Preference));
         var proposedPolicy = !hasWorkHours ? ProposeTimetableRoutine(state, first) : null;
+        var usesTimetableHours = state.Policy?.ForDate(first)?.UseTimetableHours == true;
         var slots = remainingStart < end ? AgentFreeTimeSlots(proposedPolicy is null ? state : state with { Policy = proposedPolicy }, remainingStart, end) : [];
         string Hours(DateTimeOffset from, DateTimeOffset to) =>
             $"{TimeZoneInfo.ConvertTime(from, zone):HH:mm}–" +
@@ -36,7 +37,8 @@ public sealed partial class WorkspaceService
         var lines = new List<string> {
             applied ? "Đã lưu thời khóa biểu làm lịch cố định để sắp xếp công việc quanh các giờ bận. Bạn có thể hoàn tác yêu cầu này."
                 : "Đã phân tích thời khóa biểu. Đây là lịch sau khi áp dụng đề xuất; chưa lưu thay đổi.",
-            hasWorkHours ? "Dùng giờ làm việc bạn đã cung cấp, trừ lịch học, sự kiện, phiên làm việc và các khoảng bận."
+            usesTimetableHours ? "Giờ làm việc theo thời khóa biểu đã được tính quanh lịch học, các sự kiện và giờ sinh hoạt."
+                : hasWorkHours ? "Dùng giờ làm việc bạn đã cung cấp, trừ lịch học, sự kiện, phiên làm việc và các khoảng bận."
                 : "Mình đã tự chuẩn bị lịch sinh hoạt và giờ rảnh đề xuất: trừ lịch cố định, giờ ngủ, bữa trưa/tối 30 phút, nghỉ ngơi và di chuyển. Đây là đề xuất để bạn xem và áp dụng, chưa lưu thành giờ làm việc.",
             $"Phân tích từ {first:dd/MM/yyyy} đến {LocalDate(end.AddTicks(-1), state.Preference):dd/MM/yyyy} ({state.Preference.TimeZoneId}); chỉ tính thời gian còn lại:" };
         for (var day = first; PlanningEngine.At(day, 0, zone) < end; day = day.AddDays(1))
@@ -74,7 +76,9 @@ public sealed partial class WorkspaceService
             lines.Add($"Khoảng dài nhất: {LocalDate(longest.Start, state.Preference):dd/MM} {Hours(longest.Start, longest.End)} ({(int)(longest.End - longest.Start).TotalMinutes} phút).");
         }
         lines.Add($"Thời gian trống không đồng nghĩa làm việc liên tục: tối đa {state.Preference.MaximumDailyMinutes} phút/ngày, mỗi phiên {state.Preference.MinimumSessionMinutes}–{state.Preference.MaximumSessionMinutes} phút, nghỉ {state.Preference.BreakMinutes} phút giữa các phiên.");
-        lines.Add($"Lịch sinh hoạt và các khoảng rảnh được đề xuất tự động ở thẻ bên dưới cho đúng tuần {first:dd/MM}–{first.AddDays(6):dd/MM} của thời khóa biểu vừa gửi. Bạn chỉ cần xem và bấm áp dụng; có thể chỉnh giờ ngủ, bữa ăn hoặc thêm hoạt động riêng sau đó, không cần tự khai báo các khung giờ rảnh.");
+        lines.Add(usesTimetableHours
+            ? "Mở Lịch → Giờ làm việc để xem các khung theo từng tuần đã nhập."
+            : $"Lịch sinh hoạt và các khoảng rảnh được đề xuất tự động ở thẻ bên dưới cho đúng tuần {first:dd/MM}–{first.AddDays(6):dd/MM} của thời khóa biểu vừa gửi. Bạn chỉ cần xem và bấm áp dụng; có thể chỉnh giờ ngủ, bữa ăn hoặc thêm hoạt động riêng sau đó, không cần tự khai báo các khung giờ rảnh.");
         return string.Join("\n", lines);
     }
 

@@ -12,6 +12,13 @@ public sealed class TimeController(IWorkspaceService service) : WorkspaceControl
     public async Task<IActionResult> Export(CancellationToken ct) => File(System.Text.Encoding.UTF8.GetBytes(await service.ExportCalendarAsync(UserId, ct)), "text/calendar; charset=utf-8", "planora.ics");
     [HttpGet("calendar")] public async Task<IActionResult> Calendar(CancellationToken ct) { var state = await service.GetAsync(UserId, ct); return Data(new { state.Events, state.Sessions }); }
     [HttpPut("availability")] public async Task<IActionResult> Weekly(WeeklyInput input, CancellationToken ct) { await service.SetAvailabilityAsync(UserId, input, ct); return Done(); }
+    [HttpGet("availability/weeks/{weekStart}")]
+    public async Task<IActionResult> EffectiveWeek(DateOnly weekStart, CancellationToken ct) =>
+        Data(await service.GetEffectiveAvailabilityForWeekAsync(UserId, weekStart, ct));
+    [HttpPut("availability/weeks/{weekStart}")] public async Task<IActionResult> SaveWeek(DateOnly weekStart, DatedWeekInput input, CancellationToken ct)
+    { await service.SetAvailabilityForWeekAsync(UserId, weekStart, input, ct); return Done(); }
+    [HttpDelete("availability/weeks/{weekStart}")] public async Task<IActionResult> ResetWeek(DateOnly weekStart, CancellationToken ct)
+    { await service.SetAvailabilityForWeekAsync(UserId, weekStart, null, ct); return Done(); }
     [HttpPost("exceptions")] public async Task<IActionResult> AddException(ExceptionInput input, CancellationToken ct) => Data(new { id = await service.SaveExceptionAsync(UserId, null, input, ct) });
     [HttpPut("exceptions/{id:guid}")] public async Task<IActionResult> UpdateException(Guid id, ExceptionInput input, CancellationToken ct) { await service.SaveExceptionAsync(UserId, id, input, ct); return Done(); }
     [HttpDelete("exceptions/{id:guid}")] public async Task<IActionResult> DeleteException(Guid id, CancellationToken ct) { await service.DeleteExceptionAsync(UserId, id, ct); return Done(); }

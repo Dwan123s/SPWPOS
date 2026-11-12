@@ -332,7 +332,7 @@ export async function handleAuthSubmit(form) {
             </p>
             <p
               style={{
-                color: "#64748b",
+                color: "#000",
                 fontSize: "0.875rem",
                 marginTop: "0.75rem",
                 lineHeight: "1.5",

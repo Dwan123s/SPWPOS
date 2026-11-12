@@ -104,7 +104,7 @@ export function NoteChecklist({
         ["Scheduled", "Running", "Paused"].includes(session.status),
       )
       .sort((a, b) => new Date(a.start) - new Date(b.start));
-    const overdue = !done && !cancelled && new Date(task.deadline) < new Date();
+    const overdue = !done && !cancelled && Date.parse(task.deadline) < Date.now();
     return (
       <li
         key={task.id}
@@ -136,7 +136,9 @@ export function NoteChecklist({
                   ? "Đã hủy"
                   : done
                     ? "Đã hoàn thành"
-                    : `${overdue ? "Quá hạn · " : "Hạn "}${dateFmt(task.deadline, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
+                    : task.deadline
+                      ? `${overdue ? "Quá hạn · " : "Hạn "}${dateFmt(task.deadline, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                      : "Chưa có hạn"}
               </span>
             </summary>
             <div className="note-check-details">
@@ -144,7 +146,7 @@ export function NoteChecklist({
                 <p className="note-check-description">{task.description}</p>
               )}
               <p>
-                Dự kiến {minutes(task.estimatedMinutes)} · Đã làm{" "}
+                {task.estimatedMinutes > 0 ? `Dự kiến ${minutes(task.estimatedMinutes)}` : "Chưa ước lượng"} · Đã làm{" "}
                 {minutes(task.actualMinutes || 0)} · Tiến độ{" "}
                 {task.progress || 0}%
               </p>

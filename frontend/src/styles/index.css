@@ -1,4 +1,4 @@
-@layer theme, base, components, utilities;
+@layer corners, theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source("../");
 @import "./app.css" layer(components);
@@ -21,6 +21,7 @@
 @import "./notifications.css" layer(components);
 @import "./workspace-polish.css" layer(components);
 @import "./calendar-workspace.css" layer(components);
+@import "./square-corners.css" layer(corners);
 
 @theme {
   --color-planora-50: #effbff;
@@ -31,6 +32,10 @@
 
 /* Shared primitives inherit the existing glass design and Tailwind utilities. */
 @layer components {
+  ::placeholder {
+    color: #000;
+    opacity: 1;
+  }
   .actions {
     @apply flex flex-wrap items-center gap-2;
   }

@@ -31,8 +31,8 @@ public sealed class ReminderNotificationService(ApplicationDbContext db, IEmailS
                 current &= session is { Status: WorkSessionStatus.Scheduled } && session.Start > now &&
                     notification.DedupeKey == $"session:{session.Id}:{session.Start.UtcTicks}";
             }
-            else current &= notification.Kind == "DEADLINE" && task is not null && task.Deadline > now &&
-                notification.DedupeKey == $"deadline:{task.Id}:{task.Deadline.UtcTicks}";
+            else current &= notification.Kind == "DEADLINE" && task?.Deadline is { } deadline && deadline > now &&
+                notification.DedupeKey == $"deadline:{task.Id}:{deadline.UtcTicks}";
             if (!current) { notification.EmailPending = false; continue; }
             notification.EmailAttempts++;
             try

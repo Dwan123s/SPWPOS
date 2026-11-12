@@ -9,8 +9,13 @@ export function AvailabilityPolicyCard({
   embedded = false,
   autoPreview = false,
   timetableTurnId,
+  useTimetableHours = false,
+  onConfirmed,
 }) {
-  const query = timetableTurnId ? `?timetableTurnId=${encodeURIComponent(timetableTurnId)}` : "";
+  const params = new URLSearchParams();
+  if (timetableTurnId) params.set("timetableTurnId", timetableTurnId);
+  if (useTimetableHours) params.set("useTimetableHours", "true");
+  const query = params.size ? `?${params}` : "";
   const [current, setCurrent] = useState(state.workspace?.availabilityPolicy);
   const [preview, setPreview] = useState(null),
     [text, setText] = useState("");
@@ -124,7 +129,7 @@ export function AvailabilityPolicyCard({
             )
           }
         >
-          Xem đề xuất giờ sinh hoạt
+          {useTimetableHours ? "Tính giờ làm việc từ lịch đã lưu" : "Xem đề xuất giờ sinh hoạt"}
         </button>
       )}
       {autoPreview && error && (
@@ -256,8 +261,9 @@ export function AvailabilityPolicyCard({
       {preview && (
         <div className="stack">
           <p>
-            Đây là đề xuất; lịch chưa thay đổi. Giờ rảnh bạn đã xác nhận trước
-            đó được giữ lại.
+            {useTimetableHours
+              ? "Khi áp dụng, tuần này sẽ dùng các khung giờ tính từ thời khóa biểu. Các giờ riêng bạn đã đặt theo ngày vẫn được ưu tiên."
+              : "Đây là đề xuất; lịch chưa thay đổi. Giờ rảnh bạn đã xác nhận trước đó được giữ lại."}
           </p>
           {preview.warnings.map((warning, i) => (
             <p role="status" key={i}>
@@ -286,10 +292,11 @@ export function AvailabilityPolicyCard({
                   setCurrent({ ...preview.policy, confirmed: true });
                   setPreview(null);
                   await onWorkspaceChanged?.();
+                  onConfirmed?.(preview.weekStart);
                 })
               }
             >
-              Xác nhận chính sách và lịch
+              {useTimetableHours ? "Áp dụng giờ làm việc tuần này" : "Xác nhận chính sách và lịch"}
             </button>
             <button
               className="btn secondary"

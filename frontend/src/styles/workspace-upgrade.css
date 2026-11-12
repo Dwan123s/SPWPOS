@@ -21,7 +21,7 @@
   font-size: 13px;
 }
 .catch-up-card small {
-  color: #526b88;
+  color: #000;
 }
 .nora-inventory {
   margin: 18px 0;
@@ -61,7 +61,7 @@
 }
 .pet-rule-note,
 .pet-payment-notice {
-  color: #526b88;
+  color: #000;
   font-size: 13px;
   line-height: 1.7;
 }
@@ -78,7 +78,7 @@
   padding: 14px 8px;
   border: 1px dashed #d1dae5;
   border-radius: 16px;
-  color: #60778e;
+  color: #000;
 }
 .pet-evolution-grid .pet-artwork {
   width: min(100%, 120px);

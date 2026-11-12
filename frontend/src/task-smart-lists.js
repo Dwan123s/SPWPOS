@@ -31,6 +31,7 @@ export function smartTaskLists(workspace, now = Date.now()) {
   const today = dayOf(now),
     lastDay = addCalendarDays(today, 6);
   const sessions = new Map();
+  const plannedDays = new Map();
   for (const session of workspace.sessions || []) {
     if (!activeStatuses.has(session.status)) continue;
     const start = dayOf(session.start),
@@ -38,6 +39,11 @@ export function smartTaskLists(workspace, now = Date.now()) {
     if (!start || !end) continue;
     if (!sessions.has(session.taskId)) sessions.set(session.taskId, []);
     sessions.get(session.taskId).push({ start, end });
+    if (Date.parse(session.end) > now && session.status !== "NeedsReview") {
+      const date = start < today ? today : start;
+      const previous = plannedDays.get(session.taskId);
+      if (!previous || date < previous) plannedDays.set(session.taskId, date);
+    }
   }
   function taskDay(task, endDay) {
     const deadline = dayOf(task.deadline);
@@ -80,5 +86,6 @@ export function smartTaskLists(workspace, now = Date.now()) {
     weekGroups: groups(lastDay),
     all: tasks,
     dayOf,
+    plannedDays,
   };
 }

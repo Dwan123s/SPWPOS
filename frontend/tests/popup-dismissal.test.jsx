@@ -42,7 +42,7 @@ it("deadline filters keep input values and inline sections when dismissed by an 
       <div onClick={(event) => event.stopPropagation()}>Outside</div>
     </>,
   );
-  const trigger = screen.getByText("Khoảng deadline");
+  const trigger = screen.getByLabelText(/^Lọc danh sách/);
   fireEvent.click(trigger);
   const date = screen.getByLabelText("Từ ngày");
   fireEvent.change(date, { target: { value: "2026-10-20" } });

@@ -4,11 +4,7 @@ import { adminRoutes, isAdminRoute } from "./admin-navigation.js";
 import { ConnectionState } from "./connection-state.jsx";
 import { Loading } from "./loading.jsx";
 import { setScreen, setSlot } from "./store.js";
-import {
-  editAvailability,
-  setAvatar,
-  openAvatarCropper,
-} from "./interactive.jsx";
+import { setAvatar, openAvatarCropper } from "./interactive.jsx";
 import {
   workspaceShell,
   setMobileMenu,
@@ -57,6 +53,7 @@ import {
 import {
   filterTasks,
   taskById,
+  hasPlanningDetails,
   openTask,
   openDetail,
   taskInput,
@@ -84,7 +81,7 @@ const routes = {
     "users",
   ],
   teams: [
-    "Quản lí nhóm",
+    "Nhóm",
     "Cùng nhận việc, giữ lịch cá nhân riêng tư.",
     "users",
   ],
@@ -114,13 +111,13 @@ const routes = {
     "calendar",
   ],
   time: [
-    "Giờ rảnh",
-    "Chọn ngày, giờ bạn có thể làm việc rồi bấm Lưu lịch rảnh.",
+    "Giờ làm việc",
+    "Đặt giờ làm việc thường lệ hoặc chọn một tuần cụ thể để chỉnh.",
     "clock",
   ],
   insights: [
     "Tiến độ",
-    "So sánh thời gian dự kiến với thực tế sau khi bạn đã ghi nhận các lượt làm.",
+    "Theo dõi công suất, hạn chót và thời gian thực làm của cá nhân và nhóm.",
     "insights",
   ],
   scenario: [
@@ -175,7 +172,8 @@ async function load(renderPage = true) {
       api("/api/plans/conflicts", "POST", input),
       api("/api/agent/capabilities"),
     ]);
-    state.noraAvailable = agent.status === "fulfilled" && agent.value?.aiAvailable === true;
+    state.noraAvailable =
+      agent.status === "fulfilled" && agent.value?.aiAvailable === true;
     state.insights = insights.status === "fulfilled" ? insights.value : null;
     state.conflicts = conflicts.status === "fulfilled" ? conflicts.value : null;
     state.analysisError =
@@ -304,8 +302,14 @@ async function loadAdmin(search = "") {
     setSlot("system-status", adminStatus({ ...status, ...metrics, health }));
 }
 async function scheduleTask(id, triggerEvent = "MANUAL") {
+  const task = taskById(id);
+  if (task && !hasPlanningDetails(task)) {
+    openTask(task);
+    return;
+  }
   if (
-    !state.workspace.availabilityPolicy?.confirmed && !state.workspace.availability.length &&
+    !state.workspace.availabilityPolicy?.confirmed &&
+    !state.workspace.availability.length &&
     !state.workspace.exceptions.some((item) => item.isAvailable)
   ) {
     planOptions([id]);
@@ -326,14 +330,21 @@ function planOptions(affected = []) {
     closeModal();
     navigation(route);
   };
+  if (affected.length === 1) {
+    const task = taskById(affected[0]);
+    if (task && !hasPlanningDetails(task)) {
+      openTask(task);
+      return;
+    }
+  }
   if (
     !state.workspace.tasks.some(
-      (task) => !["Completed", "Cancelled"].includes(task.status),
+      (task) => hasPlanningDetails(task) && !["Completed", "Cancelled"].includes(task.status),
     )
   ) {
     modal(
       "Nhập việc trước khi tạo lịch",
-      "Bạn chưa có công việc cần làm. Thêm một việc hoặc ghi nháp để xem lại sau.",
+      "Thêm công việc hoặc bổ sung hạn chót và thời gian dự kiến cho một việc đã lưu.",
       <div className="form-actions">
         <button
           type="button"
@@ -357,14 +368,15 @@ function planOptions(affected = []) {
     return;
   }
   if (
-    !state.workspace.availabilityPolicy?.confirmed && !state.workspace.availability.length &&
+    !state.workspace.availabilityPolicy?.confirmed &&
+    !state.workspace.availability.length &&
     !state.workspace.exceptions.some((item) => item.isAvailable)
   ) {
     modal(
       "Thiết lập giờ làm",
       "Xác nhận giờ bạn có thể làm việc trước khi xếp lịch.",
       <button type="button" className="btn primary" onClick={() => go("time")}>
-        Mở Giờ rảnh
+        Mở Giờ làm việc
       </button>,
     );
     return;
@@ -413,7 +425,19 @@ function planOptions(affected = []) {
         <button className="btn primary" type="submit">
           Tạo đề xuất
         </button>
-        {state.noraAvailable && <button type="button" className="btn ghost" onClick={() => askNora("Giúp tôi xem phương án sắp xếp công việc. Chưa thay đổi lịch.")}>Nhờ NORA</button>}
+        {state.noraAvailable && (
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() =>
+              askNora(
+                "Giúp tôi xem phương án sắp xếp công việc. Chưa thay đổi lịch.",
+              )
+            }
+          >
+            Nhờ NORA
+          </button>
+        )}
       </div>
     </form>,
   );
@@ -445,12 +469,26 @@ async function action(name, id, element) {
     case "nav":
       navigation(id);
       break;
+    case "calendar-date":
+      if (/^\d{4}-\d{2}-\d{2}$/.test(id) && Number.isFinite(Date.parse(id))) {
+        state.calendarStart = id;
+        navigation("calendar");
+      }
+      break;
+    case "open-task-list":
+      state.taskScope = id;
+      navigation("tasks");
+      break;
     case "reload-workspace":
       await load();
       break;
     case "settings-tab":
       state.settingsTab = id;
       render();
+      break;
+    case "calendar-connections":
+      state.settingsTab = "connections";
+      navigation("settings");
       break;
     case "mobile-menu":
       setMobileMenu(!$(".sidebar")?.classList.contains("open"));
@@ -507,6 +545,18 @@ async function action(name, id, element) {
       });
       await refreshAfter("Đã đánh dấu hoàn thành cả công việc.");
       break;
+    case "toggle-task-completion": {
+      const task = taskById(id);
+      if (!task || task.isTeamTask || task.status === "Cancelled") break;
+      const completed = task.status === "Completed";
+      await api(`/api/tasks/${id}/status`, "PATCH", {
+        status: completed ? "Todo" : "Completed",
+        progress: completed ? 0 : 100,
+      });
+      await refreshAfter(completed ? "Đã mở lại công việc." : "Đã hoàn thành công việc.");
+      if (element?.dataset.returnProject) openDetail(element.dataset.returnProject);
+      break;
+    }
     case "edit-task":
       openTask(taskById(id));
       break;
@@ -628,7 +678,10 @@ async function action(name, id, element) {
       eventModal({}, { manual: true });
       break;
     case "edit-event":
-      eventModal(state.workspace.events.find((e) => e.id === id), { manual: true });
+      eventModal(
+        state.workspace.events.find((e) => e.id === id),
+        { manual: true },
+      );
       break;
     case "event-detail":
       eventDetail(id);
@@ -673,15 +726,6 @@ async function action(name, id, element) {
       await api(`/api/time/exceptions/${id}`, "DELETE");
       await refreshAfter();
       break;
-    case "add-slot":
-      editAvailability("add");
-      break;
-    case "remove-slot":
-      editAvailability(
-        "remove",
-        element.closest(".availability-row").dataset.rowKey,
-      );
-      break;
     case "week-prev":
     case "week-next": {
       const d = new Date(`${state.calendarStart}T12:00:00Z`);
@@ -713,16 +757,26 @@ async function action(name, id, element) {
         if (!["PLAN_STALE", "PLAN_EXPIRED"].includes(error.code)) throw error;
         const request = state.plan?.id === id ? state.plan.request : null;
         await load(false);
-        modal("Cần xem lại lịch", error.message, <>
-          <div className="form-error" />
-          <div className="form-actions">
-            {button("Đóng", "close-modal", "ghost")}
-            {request ? <form data-form="regenerate-plan">
-              <button type="submit" className="btn primary">Tạo đề xuất mới</button>
-              <div className="form-error" />
-            </form> : button("Mở tùy chọn lập lịch", "generate-plan", "primary")}
-          </div>
-        </>);
+        modal(
+          "Cần xem lại lịch",
+          error.message,
+          <>
+            <div className="form-error" />
+            <div className="form-actions">
+              {button("Đóng", "close-modal", "ghost")}
+              {request ? (
+                <form data-form="regenerate-plan">
+                  <button type="submit" className="btn primary">
+                    Tạo đề xuất mới
+                  </button>
+                  <div className="form-error" />
+                </form>
+              ) : (
+                button("Mở tùy chọn lập lịch", "generate-plan", "primary")
+              )}
+            </div>
+          </>,
+        );
         break;
       }
       await refreshAfter("Đã áp dụng kế hoạch.");
@@ -994,8 +1048,16 @@ async function formAction(form, data, nextAction = null) {
   switch (form.dataset.form) {
     case "regenerate-plan": {
       const request = state.plan.request;
-      const start = new Date(Math.max(Date.parse(request.start), Date.now())).toISOString();
-      planModal(await api(request.isReschedule ? "/api/plans/reschedule" : "/api/plans", "POST", { ...request, start }));
+      const start = new Date(
+        Math.max(Date.parse(request.start), Date.now()),
+      ).toISOString();
+      planModal(
+        await api(
+          request.isReschedule ? "/api/plans/reschedule" : "/api/plans",
+          "POST",
+          { ...request, start },
+        ),
+      );
       break;
     }
     case "admin-lock": {
@@ -1007,15 +1069,60 @@ async function formAction(form, data, nextAction = null) {
       toast("Đã khóa tài khoản thành công.", "success");
       break;
     }
+    case "task-batch": {
+      const raw = data.get("batch");
+      if (!raw) throw new Error("Phân tích tài liệu để có danh sách công việc.");
+      const batch = JSON.parse(raw);
+      const deadlineValue = (value) => value && !value.includes("T") ? toUtc(`${value}T23:59`) : value || null;
+      const projectDeadline = deadlineValue(batch.projectDeadline);
+      const tasks = batch.tasks.map((task) => ({
+        ...task,
+        deadline: deadlineValue(task.deadline),
+      }));
+      if (nextAction === "preview" && tasks.some((task) => !hasPlanningDetails({ ...task, deadline: task.deadline || projectDeadline })))
+        throw new Error("Nhập hạn chót của project và thời lượng từng việc trước khi xếp lịch, hoặc chọn Lưu project.");
+      const saved = await api("/api/tasks/batch", "POST", { ...batch, projectDeadline, tasks });
+      completeGuideStep(0);
+      await refreshAfter("Đã lưu project và các công việc.");
+      if (nextAction === "preview") {
+        try {
+          const plan = await api("/api/plans", "POST", {
+            start: new Date().toISOString(),
+            horizonDays: state.workspace.preference.planningHorizonDays || 14,
+            affectedTaskIds: saved.taskIds,
+            triggerEvent: "NEW_TASK",
+            strict: true,
+            preserveExisting: true,
+          });
+          planModal(plan);
+        } catch (error) {
+          toast(`Project đã lưu. Chưa tạo được lịch: ${error.message}`, "error");
+        }
+      }
+      break;
+    }
+    case "task-checklist":
+      await api(`/api/tasks/${id}/checklist`, "PUT", {
+        version: data.get("version"),
+        items: JSON.parse(data.get("items")),
+      });
+      await load();
+      openDetail(id);
+      toast("Đã lưu checklist.", "success");
+      break;
     case "task": {
       if (form.dataset.stale === "true")
         throw new Error("Tải lại bản mới trước khi chỉnh sửa công việc.");
+      const input = taskInput(data);
+      if (nextAction === "preview" && !hasPlanningDetails(input))
+        throw new Error("Bổ sung hạn chót và thời gian dự kiến để xếp lịch, hoặc chọn Lưu công việc.");
+      const markComplete = !id && data.has("markComplete");
       let saved;
       try {
         saved = await api(
           `/api/tasks${id ? `/${id}` : ""}`,
           id ? "PUT" : "POST",
-          taskInput(data),
+          input,
         );
       } catch (error) {
         if (id && ["TASK_STALE", "DATA_STALE"].includes(error.code)) {
@@ -1041,8 +1148,28 @@ async function formAction(form, data, nextAction = null) {
         }
         throw error;
       }
-      if (!id) completeGuideStep(0);
-      await refreshAfter("Đã lưu công việc.");
+      if (!id) {
+        completeGuideStep(0);
+        if (state.route === "tasks" && state.taskScope !== "all") state.taskScope = "personal";
+      }
+      let completionError;
+      if (markComplete) {
+        try {
+          await api(`/api/tasks/${saved.id}/status`, "PATCH", {
+            status: "Completed",
+            progress: 100,
+          });
+        } catch (error) {
+          completionError = error;
+        }
+      }
+      await refreshAfter(markComplete && !completionError
+        ? "Đã lưu và đánh dấu hoàn thành."
+        : "Đã lưu công việc.");
+      if (completionError) {
+        toast(`Công việc đã lưu. Chưa đánh dấu hoàn thành: ${completionError.message}`, "error");
+      }
+      if (!id && (nextAction === "open" || completionError)) openDetail(saved.id);
       if (!id && nextAction === "preview") {
         try {
           await scheduleTask(saved.id, "NEW_TASK");
@@ -1076,7 +1203,10 @@ async function formAction(form, data, nextAction = null) {
     case "capture": {
       const content = String(data.get("text")).trim();
       if (!content) throw new Error("Nhập nội dung công việc.");
-      const note = await api("/api/notes", "POST", { title: content.split("\n")[0].slice(0, 120), content });
+      const note = await api("/api/notes", "POST", {
+        title: content.split("\n")[0].slice(0, 120),
+        content,
+      });
       closeModal();
       openInboxNote(note.id);
       break;
@@ -1115,19 +1245,41 @@ async function formAction(form, data, nextAction = null) {
       await refreshAfter();
       break;
     case "availability": {
-      const slots = [...form.querySelectorAll(".availability-row")].map(
-        (row) => ({
-          dayOfWeek: Number(row.querySelector('[name="day"]').value),
-          startMinute: minuteValue(row.querySelector('[name="start"]').value),
-          endMinute: minuteValue(row.querySelector('[name="end"]').value),
-        }),
-      );
-      await api("/api/time/availability", "PUT", {
+      const weekStart = data.get("weekStart");
+      const url = weekStart
+        ? `/api/time/availability/weeks/${encodeURIComponent(weekStart)}`
+        : "/api/time/availability";
+      if (weekStart && nextAction === "reset") {
+        await api(url, "DELETE");
+        await refreshAfter(
+          state.workspace.availabilityPolicy?.timetableWeeks?.includes(weekStart)
+            ? "Đã dùng lại giờ làm việc theo thời khóa biểu."
+            : "Tuần đã chọn đã quay về giờ làm việc thường lệ.",
+        );
+        break;
+      }
+      const starts = data.getAll("start");
+      const ends = data.getAll("end");
+      const slots = data.getAll("day").map((day, index) => {
+        if (!starts[index] || !ends[index])
+          throw new Error("Nhập giờ bắt đầu và giờ kết thúc cho mỗi khung.");
+        const startMinute = minuteValue(String(starts[index]));
+        const endMinute = ends[index] === "00:00" ? 1440 : minuteValue(String(ends[index]));
+        if (!(startMinute < endMinute && endMinute <= 1440))
+          throw new Error("Giờ kết thúc phải sau giờ bắt đầu trong cùng ngày.");
+        return { dayOfWeek: Number(day), startMinute, endMinute };
+      });
+      if (!weekStart && slots.length > 28)
+        throw new Error("Bạn có thể lưu tối đa 28 khoảng giờ làm việc thường lệ.");
+      await api(url, "PUT", {
         slots,
       });
       if (slots.length) completeGuideStep(1);
-      await refreshAfter("Đã lưu thời gian rảnh.");
-      if (nextAction === "plan" && slots.length) planOptions();
+      await refreshAfter(weekStart ? "Đã lưu giờ làm việc cho tuần đã chọn." : "Đã lưu giờ làm việc.");
+      if (nextAction === "plan") {
+        if (weekStart) await action("calendar-date", weekStart);
+        else if (slots.length) planOptions();
+      }
       break;
     }
     case "preferences":
@@ -1175,12 +1327,23 @@ async function formAction(form, data, nextAction = null) {
         isUrgent: data.get("isUrgent") === "on",
       };
       try {
-        await api(`/api/time/events${id ? `/${id}` : ""}`, id ? "PUT" : "POST", input);
+        await api(
+          `/api/time/events${id ? `/${id}` : ""}`,
+          id ? "PUT" : "POST",
+          input,
+        );
       } catch (error) {
-        if (id || input.repeatWeeks !== 1 || error.code !== "SESSION_OVERLAP") throw error;
-        modal("Sự kiện trùng phiên làm việc", error.message,
-          <EventConflictReview input={input} onBack={() => eventModal(input, { manual: true })}
-            onSaved={() => refreshAfter("Đã lưu sự kiện và lịch làm việc.")} />);
+        if (id || input.repeatWeeks !== 1 || error.code !== "SESSION_OVERLAP")
+          throw error;
+        modal(
+          "Sự kiện trùng phiên làm việc",
+          error.message,
+          <EventConflictReview
+            input={input}
+            onBack={() => eventModal(input, { manual: true })}
+            onSaved={() => refreshAfter("Đã lưu sự kiện và lịch làm việc.")}
+          />,
+        );
         return;
       }
       await refreshAfter();
@@ -1315,7 +1478,8 @@ export async function onSubmit(event) {
         formAction(
           form,
           data,
-          event.nativeEvent?.submitter?.dataset.nextAction ?? event.submitter?.dataset.nextAction,
+          event.nativeEvent?.submitter?.dataset.nextAction ??
+            event.submitter?.dataset.nextAction,
         ),
       );
   } catch {
@@ -1329,6 +1493,10 @@ export function onInput(event) {
   if (event.target.id === "workspace-search") filterSearch();
 }
 export function onChange(event) {
+  if (event.target.id === "calendar-jump-date") {
+    if (event.target.value) void action("calendar-date", event.target.value);
+    return;
+  }
   if (
     event.target.id === "avatar-file-input" ||
     event.target.classList.contains("avatar-file-trigger")

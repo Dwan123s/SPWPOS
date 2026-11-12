@@ -33,6 +33,22 @@ public sealed class WorkspaceFlowTests
         (await Send(client, HttpMethod.Post, "/api/tasks", new TaskInput(name, "", now.AddDays(1), 60))).GetProperty("data").GetProperty("id").GetGuid();
     internal static async Task SetupTime(HttpClient client) => _ = await Send(client, HttpMethod.Put, "/api/time/availability",
         new WeeklyInput(Enumerable.Range(0, 7).Select(day => new AvailabilityInput(day, 0, 1440)).ToArray()));
+    [Fact] public async Task Dated_week_can_save_more_intervals_than_recurring_hours()
+    {
+        await using var factory = new ApiFactory();
+        using var client = await factory.ClientAsync();
+        await Authorize(factory, client);
+        var slots = Enumerable.Range(0, 7).SelectMany(day => Enumerable.Range(0, 5)
+            .Select(period => new AvailabilityInput(day, 420 + 120 * period, 480 + 120 * period))).ToArray();
+        var input = new DatedWeekInput(slots);
+        const string url = "/api/time/availability/weeks/2026-12-14";
+
+        await Send(client, HttpMethod.Put, url, input);
+        var actual = (await Send(client, HttpMethod.Get, url)).GetProperty("data")
+            .Deserialize<DatedWeekInput>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.Equal(slots, actual.Slots.OrderBy(slot => slot.DayOfWeek).ThenBy(slot => slot.StartMinute));
+        await Send(client, HttpMethod.Put, "/api/time/availability", input, HttpStatusCode.BadRequest);
+    }
     [Theory] [InlineData("task")] [InlineData("event")]
     public async Task Work_category_is_available_through_the_manual_creation_api(string kind)
     {

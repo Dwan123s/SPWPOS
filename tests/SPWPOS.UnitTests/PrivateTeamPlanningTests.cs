@@ -127,7 +127,7 @@ public sealed partial class PrivateTeamPlanningTests
     {
         await using var h = await Setup(); var preview = await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct)); await Use(h, s => s.ConfirmTeamClaimAsync(Member, preview.Id, new(), Ct));
         var personal = await h.DbAsync(db => db.WorkTasks.AsNoTracking().SingleAsync(Ct));
-        await Assert.ThrowsAsync<AuthException>(() => Workspace(h, s => s.SaveTaskAsync(Member, personal.Id, new(personal.Name, personal.Description, personal.Deadline.AddDays(1), personal.EstimatedMinutes, Version: personal.Version), Ct)));
+        await Assert.ThrowsAsync<AuthException>(() => Workspace(h, s => s.SaveTaskAsync(Member, personal.Id, new(personal.Name, personal.Description, personal.Deadline!.Value.AddDays(1), personal.EstimatedMinutes, Version: personal.Version), Ct)));
         await using var scope = h.Provider.CreateAsyncScope(); await scope.ServiceProvider.GetRequiredService<IWorkspaceService>().SetStatusAsync(Member, personal.Id, new("Completed", 100), Ct);
         Assert.Equal("PendingReview", (await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks[0].Status);
     }

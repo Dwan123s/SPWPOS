@@ -18,14 +18,17 @@ import {
 import { workflowSteps } from "./workflow.js";
 import { CalendarWeek } from "./calendar-week.jsx";
 import { eventModal } from "./calendar.jsx";
+import { atMinute, wallMinute } from "./calendar-drag.js";
+import { PopupDetails } from "./popup-dismissal.jsx";
+import "./styles/plan-board.css";
 export function weekStart(key) {
   const date = new Date(`${key}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
   return date.toISOString().slice(0, 10);
 }
 export function calendarPage({ onWorkspaceChanged } = {}) {
-  const base = weekStart(state.calendarStart || dayKey(Date.now()));
-  state.calendarStart = base;
+  state.calendarStart ||= dayKey(Date.now());
+  const base = weekStart(state.calendarStart);
   const dates = Array.from(
     {
       length: 7,
@@ -38,7 +41,9 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
   );
   const view =
     state.calendarView ||
-    (globalThis.matchMedia?.("(max-width: 800px)").matches ? "agenda" : "week");
+    (globalThis.matchMedia?.("(max-width: 800px)").matches
+      ? "agenda"
+      : "board");
   const sessions = state.workspace.sessions.filter(
     (s) =>
       dayKey(s.start) <= dates[6] &&
@@ -116,69 +121,63 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
   );
   const tasks = (state.workspace.tasks || [])
     .filter((task) => !["Completed", "Cancelled"].includes(task.status))
-    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+    .sort((a, b) => (Date.parse(a.deadline) || Infinity) - (Date.parse(b.deadline) || Infinity));
   return (
-    <div className="calendar-planning-layout">
-      <aside
-        className="card calendar-task-context"
-        aria-label="Công việc cạnh lịch"
+    <div className="calendar-schedule-main">
+      <CalendarClock
+        boundaries={[...sessions, ...state.workspace.events].flatMap(
+          (entry) => [Date.parse(entry.start), Date.parse(entry.end)],
+        )}
       >
-        <details open={!globalThis.matchMedia?.("(max-width: 800px)").matches}>
-          <summary>
-            <span>Công việc cần làm</span>
-            <span>{tasks.length}</span>
-          </summary>
-          <p className="reason">
-            Xem việc cùng lịch để biết thời gian đang dành cho từng việc.
-          </p>
-          <div className="calendar-task-queue">
-            {tasks.slice(0, 8).map((task) => (
-              <button
-                type="button"
-                key={task.id}
-                data-action="task-detail"
-                data-id={task.id}
+        {(now) =>
+          calendarMarkup(
+            dates,
+            view,
+            sessions,
+            entries,
+            block,
+            fixed,
+            now,
+            onWorkspaceChanged,
+            <PopupDetails className="plan-task-picker">
+              <summary>
+                {icon("tasks")} Công việc <span>{tasks.length}</span>
+              </summary>
+              <div
+                className="card plan-task-popup"
+                aria-label="Công việc cạnh lịch"
               >
-                <strong>{task.name}</strong>
-                <span>
-                  {minutes(task.remainingMinutes)} còn lại · Hạn{" "}
-                  {dateFmt(task.deadline)}
-                </span>
-              </button>
-            ))}
-          </div>
-          {!tasks.length && (
-            <p className="reason">
-              Chưa có công việc. Viết một ghi chú để bắt đầu.
-            </p>
-          )}
-          <div className="form-actions">
-            {button("Nhập việc", "nav", "small primary", "notes", "edit")}
-            {tasks.length > 0 &&
-              button("Xem tất cả", "nav", "small ghost", "tasks")}
-          </div>
-        </details>
-      </aside>
-      <div className="calendar-schedule-main">
-        <CalendarClock
-          boundaries={[...sessions, ...state.workspace.events].flatMap(
-            (entry) => [Date.parse(entry.start), Date.parse(entry.end)],
-          )}
-        >
-          {(now) =>
-            calendarMarkup(
-              dates,
-              view,
-              sessions,
-              entries,
-              block,
-              fixed,
-              now,
-              onWorkspaceChanged,
-            )
-          }
-        </CalendarClock>
-      </div>
+                <div className="calendar-task-queue">
+                  {tasks.slice(0, 8).map((task) => (
+                    <button
+                      type="button"
+                      key={task.id}
+                      data-action="task-detail"
+                      data-id={task.id}
+                    >
+                      <strong>{task.name}</strong>
+                      <span>
+                        {task.estimatedMinutes > 0 && `${minutes(task.remainingMinutes)} còn lại · `}
+                        {task.deadline ? `Hạn ${dateFmt(task.deadline)}` : "Chưa có hạn"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {!tasks.length && (
+                  <p className="reason">
+                    Chưa có công việc. Viết một ghi chú để bắt đầu.
+                  </p>
+                )}
+                <div className="form-actions">
+                  {button("Nhập việc", "nav", "small primary", "notes", "edit")}
+                  {tasks.length > 0 &&
+                    button("Xem tất cả", "nav", "small ghost", "tasks")}
+                </div>
+              </div>
+            </PopupDetails>,
+          )
+        }
+      </CalendarClock>
     </div>
   );
 }
@@ -191,6 +190,7 @@ function calendarMarkup(
   fixed,
   now,
   onWorkspaceChanged,
+  taskPicker,
 ) {
   return (
     <>
@@ -222,10 +222,47 @@ function calendarMarkup(
       )}
       <section className="card calendar-workspace">
         <div className="calendar-toolbar">
+          <div
+            className="view-switch"
+            role="group"
+            aria-label="Chế độ xem lịch"
+          >
+            {Object.entries({
+              board: "Theo ngày",
+              week: "Khung giờ",
+              agenda: "Danh sách",
+            }).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                data-action="calendar-view"
+                data-id={key}
+                className={view === key ? "active" : ""}
+                aria-pressed={view === key}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="calendar-period">
+            {button("Hôm nay", "week-today", "small ghost")}
             <div className="actions">
-              {button("", "week-prev", "icon-only ghost", "", "back")}
-              {button("", "week-next", "icon-only ghost", "", "arrow")}
+              <button
+                className="btn icon-only ghost"
+                type="button"
+                data-action="week-prev"
+                aria-label="Tuần trước"
+              >
+                {icon("back")}
+              </button>
+              <button
+                className="btn icon-only ghost"
+                type="button"
+                data-action="week-next"
+                aria-label="Tuần sau"
+              >
+                {icon("arrow")}
+              </button>
             </div>
             <h2>
               {dateFmt(`${dates[0]}T12:00:00Z`, {
@@ -237,28 +274,17 @@ function calendarMarkup(
                 timeZone: "UTC",
               })}
             </h2>
-            {button("Hôm nay", "week-today", "small secondary")}
+            <input
+              id="calendar-jump-date"
+              className="calendar-jump-date"
+              type="date"
+              aria-label="Đến ngày trên lịch"
+              key={state.calendarStart}
+              defaultValue={state.calendarStart}
+            />
           </div>
           <div className="actions">
-            <div
-              className="view-switch"
-              role="group"
-              aria-label="Chế độ xem lịch"
-            >
-              {nodeList(
-                ["week", "agenda"].map((v) => (
-                  <button
-                    type="button"
-                    data-action="calendar-view"
-                    data-id={v}
-                    className={v === view ? "active" : ""}
-                    aria-pressed={v === view}
-                  >
-                    {v === "week" ? "Tuần" : "Danh sách"}
-                  </button>
-                )),
-              )}
-            </div>
+            {taskPicker}
             <button
               type="button"
               className="btn small secondary"
@@ -305,13 +331,83 @@ function calendarMarkup(
             )}
           </span>
         </div>
-        {view === "week" ? (
+        {view === "board" ? (
+          <div
+            className="plan-day-scroll"
+            role="region"
+            aria-label="Lịch theo cột ngày"
+            tabIndex={0}
+          >
+            <div className="plan-day-board">
+              {dates.map((date) => {
+                const dayEntries = entries(date);
+                const today = dayKey(now);
+                const label = dateFmt(`${date}T12:00:00Z`, {
+                  weekday: "short",
+                  timeZone: "UTC",
+                });
+                const minute =
+                  date === today
+                    ? Math.max(8 * 60, wallMinute(now) + 1)
+                    : 8 * 60;
+                return (
+                  <section key={date} className="plan-day" aria-label={label}>
+                    <header
+                      aria-current={date === today ? "date" : undefined}
+                      data-selected-date={
+                        date === state.calendarStart || undefined
+                      }
+                    >
+                      <strong>
+                        {date === today ? "Hôm nay · " : ""}
+                        {label}
+                      </strong>
+                      {date >= today && minute < 1440 && (
+                        <button
+                          className="btn ghost icon-only"
+                          type="button"
+                          aria-label={`Thêm sự kiện ${label}`}
+                          onClick={() =>
+                            eventModal(
+                              {
+                                start: atMinute(date, minute),
+                                end: atMinute(date, minute + 30),
+                              },
+                              { manual: true },
+                            )
+                          }
+                        >
+                          {icon("plus")}
+                        </button>
+                      )}
+                    </header>
+                    <div className="plan-day-entries">
+                      {dayEntries.length ? (
+                        dayEntries.map((entry) =>
+                          entry.session
+                            ? block(entry.session, now)
+                            : fixed(entry.event, date, true, now),
+                        )
+                      ) : (
+                        <div className="plan-day-empty">
+                          {icon("calendar")}
+                          <span>Chưa có lịch</span>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </div>
+        ) : view === "week" ? (
           <CalendarWeek
             dates={dates}
             entries={entries}
             block={block}
             fixed={fixed}
             now={now}
+            selectedDate={state.calendarStart}
             onWorkspaceChanged={onWorkspaceChanged}
             onCreateEvent={(range) => eventModal(range, { manual: true })}
           />
@@ -327,6 +423,7 @@ function calendarMarkup(
                 <section key={date} className="agenda-day">
                   <div
                     className={`agenda-day-label ${date === dayKey(now) ? "today" : ""}`}
+                    data-selected-date={date === state.calendarStart || undefined}
                   >
                     <strong>{date.slice(8)}</strong>
                     <span>
@@ -354,14 +451,12 @@ function calendarMarkup(
             )}
           </div>
         )}
-        <p className="calendar-hint">
-          {icon("clock")}
-          Cuộn trong khung lịch để xem thêm. Bấm một mục để xem chi tiết và các
-          thao tác với lịch.
-          {view === "week" && " Bấm hoặc kéo ô trống để thêm lịch thủ công."}
-          {" Múi giờ "}
-          {state.workspace.preference.timeZoneId}.
-        </p>
+        {view !== "board" && (
+          <p className="calendar-hint">
+            {icon("clock")} Cuộn trong khung lịch để xem thêm.
+            {view === "week" && " Bấm hoặc kéo ô trống để thêm sự kiện."}
+          </p>
+        )}
       </section>
       <div className="calendar-bottom">
         {icon("shield")}

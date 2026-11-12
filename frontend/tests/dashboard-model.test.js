@@ -53,6 +53,33 @@ it("uses the workspace timezone and clips sessions crossing midnight", () => {
   expect(model.scheduledMinutes).toBe(60);
   expect(model.timeline[0].span).toEqual([0, 30]);
 });
+
+it("summarizes today's work hours and planned task time separately", () => {
+  const w = workspace();
+  w.exceptions = [
+    {
+      date: "2026-10-12",
+      startMinute: 720,
+      endMinute: 780,
+      isAvailable: false,
+    },
+  ];
+  w.events = [session("meeting", "15:00", "16:00")];
+  w.sessions = [
+    session("done", "09:00", "09:30", "Completed"),
+    session("pending", "14:00", "15:00"),
+    session("review", "13:30", "14:00", "NeedsReview"),
+    session("cancelled", "16:00", "17:00", "Cancelled"),
+  ];
+  const afternoon = Date.parse("2026-10-12T14:00:00+07:00");
+  expect(dashboardModel(w, null, afternoon).daySummary).toEqual({
+    work: 540,
+    elapsed: 300,
+    capacity: 180,
+    completed: 30,
+    remaining: 90,
+  });
+});
 it("counts scheduled occupancy once and excludes skipped and missed sessions", () => {
   const w = workspace();
   w.sessions = [

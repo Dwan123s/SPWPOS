@@ -72,7 +72,7 @@ function Dialog({ title, children, onClose, busy }) {
     document.body,
   );
 }
-function Checklist({ items, onChange, disabled }) {
+export function Checklist({ items, onChange, disabled, showCompletion = true }) {
   const list = useRef(null);
   const { drag, start } = useEisenhowerDrag(
     (element) => {
@@ -91,14 +91,14 @@ function Checklist({ items, onChange, disabled }) {
     <section className="eis-check-editor" aria-label="Checklist của task">
       <div className="eis-section-title">
         <h3>Checklist</h3>
-        <span>
+        {showCompletion && <span>
           {items.filter((i) => i.completed).length}/{items.length} xong
-        </span>
+        </span>}
       </div>
-      <p>
+      {showCompletion && <p>
         Các bước nhỏ để hoàn thành việc. Tích checklist không tự hoàn thành cả
         task.
-      </p>
+      </p>}
       <div ref={list} className="eis-check-list" data-check-list>
         {items.map((item, index) => (
           <div
@@ -126,13 +126,13 @@ function Checklist({ items, onChange, disabled }) {
             >
               {icon("menu")}
             </button>
-            <input
+            {showCompletion && <input
               type="checkbox"
               aria-label={`Hoàn thành mục ${index + 1}`}
               checked={item.completed}
               disabled={disabled}
               onChange={(e) => update(item.id, { completed: e.target.checked })}
-            />
+            />}
             <input
               aria-label={`Nội dung mục ${index + 1}`}
               value={item.text}

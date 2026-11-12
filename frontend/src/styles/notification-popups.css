@@ -42,7 +42,7 @@
   margin: 6px 0 10px;
   font-size: 13px;
   line-height: 1.6;
-  color: #48647e;
+  color: #000;
 }
 .reminder-popup a {
   display: inline-flex;
@@ -59,7 +59,7 @@
 .reminder-popup-close {
   border: 0;
   background: transparent;
-  color: #526b82;
+  color: #000;
   cursor: pointer;
   padding: 4px;
   flex-shrink: 0;
@@ -96,7 +96,7 @@
 }
 .notice-sound-settings p {
   margin: 6px 0 10px;
-  color: #607b91;
+  color: #000;
   font-size: 12px;
   line-height: 1.5;
 }

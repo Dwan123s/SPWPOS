@@ -9,7 +9,7 @@
   gap: 7px;
   font-size: 12px;
   font-weight: 600;
-  color: #537498;
+  color: #000;
 }
 .team-recipient-field > label .icon {
   width: 15px;
@@ -33,7 +33,7 @@
 .team-recipient-field > small {
   font-size: 10px;
   line-height: 1.7;
-  color: #849bb5;
+  color: #000;
 }
 .team-recipient-editor {
   display: grid;

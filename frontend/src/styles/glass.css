@@ -3,7 +3,7 @@
   --glass-blue: #0866dc;
   --glass-blue-dark: #0753bc;
   --glass-ink: #122941;
-  --glass-muted: #526a81;
+  --glass-muted: #000;
   --glass-edge: #ffffffed;
   --glass-line: #ccdeee;
   --glass-surface: #f9fcfff2;
@@ -95,7 +95,7 @@ html::-webkit-scrollbar {
 .glass-workspace .workspace-label {
   margin: 24px 8px 16px;
   border-color: #ccdeee99;
-  color: #486581;
+  color: #000;
 }
 .glass-workspace .workspace-dot {
   background: #2597df;
@@ -116,12 +116,12 @@ html::-webkit-scrollbar {
 .glass-workspace .quick-search kbd {
   border-color: #d1e0ee;
   border-radius: 5px;
-  color: #56718b;
+  color: #000;
   background: #ffffffb3;
 }
 .glass-workspace .nav-label {
   padding-left: 12px;
-  color: #5d748b;
+  color: #000;
   letter-spacing: 1.4px;
   font-size: 10px;
 }
@@ -132,14 +132,14 @@ html::-webkit-scrollbar {
   border: 1px solid transparent;
   border-radius: 13px;
   min-height: 43px;
-  color: #45617b;
+  color: #000;
   transition:
     background 0.18s,
     border-color 0.18s,
     box-shadow 0.18s;
 }
 .glass-workspace .nav button .icon {
-  color: #62809d;
+  color: #000;
 }
 .glass-workspace .nav button:hover {
   background: #ffffffa6;
@@ -207,7 +207,7 @@ html::-webkit-scrollbar {
   background: #ffffff80;
   border: 1px solid #ffffffb3;
   border-radius: 12px;
-  color: #456887;
+  color: #000;
   width: 36px;
   height: 36px;
 }
@@ -220,7 +220,7 @@ html::-webkit-scrollbar {
   height: 6px;
 }
 .glass-workspace .breadcrumb {
-  color: #5d748b;
+  color: #000;
 }
 .glass-workspace .breadcrumb strong {
   color: #365573;
@@ -245,7 +245,7 @@ html::-webkit-scrollbar {
 }
 .glass-workspace .workspace-footer {
   border-color: #ccdeee99;
-  color: #536d87;
+  color: #000;
 }
 
 /* Keep controls crisp on the translucent panels. */
@@ -289,7 +289,7 @@ html::-webkit-scrollbar {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
-  color: #456581;
+  color: #000;
 }
 :is(.glass-workspace, #modal) .btn.ghost:hover:not(:disabled) {
   background: #ffffffb3;
@@ -329,7 +329,7 @@ html::-webkit-scrollbar {
   box-shadow: 0 0 0 3px #0866dc12;
 }
 :is(.glass-workspace, #modal) :is(input, textarea)::placeholder {
-  color: #647c94;
+  color: #000;
   opacity: 1;
 }
 :is(.glass-workspace, #modal) select option {
@@ -344,7 +344,7 @@ html::-webkit-scrollbar {
 }
 :is(.glass-workspace, #modal) input:disabled {
   background: #eef4fad9;
-  color: #61768a;
+  color: #000;
 }
 :is(.glass-workspace, #modal) .text-btn {
   color: #0759c8;
@@ -352,7 +352,7 @@ html::-webkit-scrollbar {
 :is(.glass-workspace, #modal) .badge {
   border: 1px solid #d0dfec;
   background: #f0f6fccc;
-  color: #486581;
+  color: #000;
   border-radius: 999px;
   padding: 3px 8px;
 }
@@ -406,7 +406,7 @@ html::-webkit-scrollbar {
   border: 1px solid #d3e4f3;
   background: #f3f8ffd9;
   border-radius: 8px;
-  color: #466580;
+  color: #000;
 }
 
 /* Dashboard, cards and execution sessions. */
@@ -419,7 +419,7 @@ html::-webkit-scrollbar {
 }
 .glass-workspace
   :is(.stat-label, .stat-note, .task-meta, .session-time, .reason) {
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace :is(.stat-value, .day-count, .reflection-metrics strong) {
   color: #153a5e;
@@ -455,7 +455,7 @@ html::-webkit-scrollbar {
   font-weight: 600;
 }
 .glass-workspace :is(.focus-card p, .focus-status, .focus-duration) {
-  color: #456581;
+  color: #000;
 }
 .glass-workspace .focus-status .badge {
   border-color: #fff;
@@ -490,7 +490,7 @@ html::-webkit-scrollbar {
   color: #0759c8;
 }
 .glass-workspace .priority-task-deadline {
-  color: #486581;
+  color: #000;
 }
 .glass-workspace .priority-task-deadline.overdue,
 .glass-workspace .priority-task-deadline.overdue small {
@@ -532,7 +532,7 @@ html::-webkit-scrollbar {
   border-radius: 13px;
   min-height: 38px;
   padding: 8px 14px;
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .task-tabs button.active {
   border-color: #fff;
@@ -558,20 +558,20 @@ html::-webkit-scrollbar {
   background: #ffffff99;
 }
 .glass-workspace .task-heading {
-  color: #4f6c87;
+  color: #000;
 }
 .glass-workspace .task-name {
   color: #173852;
 }
 .glass-workspace .task-list-footer {
   border-color: #ccdeee99;
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .date-filters summary {
   background: #ffffffb3;
   border-color: #bed3e7;
   border-radius: 12px;
-  color: #456581;
+  color: #000;
 }
 .glass-workspace .date-filters > div {
   border-color: #fff;
@@ -583,7 +583,7 @@ html::-webkit-scrollbar {
 }
 .glass-workspace table th {
   background: #eff6ff80;
-  color: #4e6984;
+  color: #000;
   border-color: #ccdeee;
   font-weight: 600;
 }
@@ -601,7 +601,7 @@ html::-webkit-scrollbar {
   color: #173852;
 }
 .glass-workspace .notification.read h3 {
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .notification-dot {
   background: #0866dc;
@@ -633,7 +633,7 @@ html::-webkit-scrollbar {
 }
 .glass-workspace .week-day-header {
   border-color: #ccdeee99;
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .week-day-header strong {
   color: #365573;
@@ -660,13 +660,13 @@ html::-webkit-scrollbar {
 .glass-workspace .calendar-block.completed {
   background: #f1f8ffd9;
   border-left-color: #7faacc;
-  color: #486581;
+  color: #000;
 }
 .glass-workspace .calendar-block.fixed-event {
   background: #f4f8fcd9;
   border-color: #d4e3f0;
   border-left-color: #829ab3;
-  color: #486581;
+  color: #000;
 }
 .glass-workspace .calendar-block.active-session {
   background: #ddebfff2;
@@ -680,10 +680,10 @@ html::-webkit-scrollbar {
 .glass-workspace .calendar-block.inactive {
   background: #eff4f8;
   border-left-color: #afbfce;
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .block-meta {
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .view-switch {
   border-color: #d5e5f3;
@@ -694,7 +694,7 @@ html::-webkit-scrollbar {
 .glass-workspace .view-switch button {
   border-radius: 999px;
   padding: 6px 14px;
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .view-switch button.active {
   background: #ffffffed;
@@ -721,10 +721,10 @@ html::-webkit-scrollbar {
 .glass-workspace .calendar-hint {
   border-color: #ccdeee99;
   background: #ffffff4d;
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .calendar-bottom {
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .availability-row {
   border-bottom: 1px solid #d4e3f099;
@@ -741,7 +741,7 @@ html::-webkit-scrollbar {
   fill: #69b5ed;
 }
 .glass-workspace .chart text {
-  fill: #526a81;
+  fill: #000;
 }
 .glass-workspace .chart line {
   stroke: #ccdeee;
@@ -769,11 +769,11 @@ html::-webkit-scrollbar {
   color: #153a5e;
 }
 .glass-workspace .profile-hero-email {
-  color: #456581;
+  color: #000;
   overflow-wrap: anywhere;
 }
 .glass-workspace .profile-hero-bio {
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .profile-hero-info .badge {
   background: #ffffffa6;
@@ -800,7 +800,7 @@ html::-webkit-scrollbar {
 .glass-workspace .settings-tab-btn {
   border: 1px solid transparent;
   border-radius: 13px;
-  color: #526a81;
+  color: #000;
   padding: 10px 14px;
 }
 .glass-workspace .settings-tab-btn:hover {
@@ -835,7 +835,7 @@ html::-webkit-scrollbar {
 }
 .glass-workspace .category-card-info small,
 .glass-workspace .switch-content p {
-  color: #526a81;
+  color: #000;
 }
 .glass-workspace .security-steps-banner {
   background: #eaf4ffcc;
@@ -880,7 +880,7 @@ html::-webkit-scrollbar {
   color: #153a5e;
 }
 #modal .modal-head p {
-  color: #526a81;
+  color: #000;
 }
 #modal :is(.list-line, .form-section, .search-result) {
   border-color: #ccdeee;
@@ -890,7 +890,7 @@ html::-webkit-scrollbar {
   background: #eaf4ff;
 }
 #modal :is(.detail-list dt, .reason, .muted, .search-result small) {
-  color: #526a81;
+  color: #000;
 }
 #modal .search-result strong {
   color: #173852;
@@ -969,7 +969,7 @@ html::-webkit-scrollbar {
   background: #ffffffb3;
   border: 1px solid #fff;
   border-radius: 12px;
-  color: #456581;
+  color: #000;
 }
 .auth-facebook.is-account .text-btn {
   color: #0759c8;

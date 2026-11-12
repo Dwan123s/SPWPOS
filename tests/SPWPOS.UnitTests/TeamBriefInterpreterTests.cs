@@ -22,6 +22,25 @@ public sealed partial class VertexAiInterpreterTests
         Assert.Contains("exactly taskCount", instructions);
     }
 
+    [Fact] public async Task Personal_brief_reads_project_deadline_and_checkable_steps()
+    {
+        var response = JsonSerializer.Deserialize<TeamBriefAnalysis>(BriefResponse, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        var deadline = DateTimeOffset.Parse("2026-11-07T23:59:00+07:00");
+        var personal = response with
+        {
+            ProjectDeadline = deadline,
+            Tasks = [response.Tasks.Single() with { Deadline = null, DeadlineEvidence = "" }]
+        };
+        using var provider = new Provider(JsonSerializer.Serialize(personal, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        using var http = new HttpClient(provider);
+        var result = await Interpreter(http).AnalyzeTeamBriefAsync(BriefContext with { Personal = true }, TestContext.Current.CancellationToken);
+        Assert.Equal(deadline, result.ProjectDeadline);
+        var task = Assert.Single(result.Tasks);
+        Assert.Null(task.Deadline);
+        Assert.Equal("Yêu cầu 1", Assert.Single(task.Requirements));
+        Assert.Equal("Đủ thực thể", Assert.Single(task.AcceptanceCriteria));
+    }
+
     [Theory] [InlineData("VertexAI")] [InlineData("Gemini")]
     public async Task Team_brief_uses_configured_flash_model_and_native_pdf_with_structured_work_notes(string providerName)
     {

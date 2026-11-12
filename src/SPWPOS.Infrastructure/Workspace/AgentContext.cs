@@ -15,7 +15,7 @@ public sealed partial class WorkspaceService
         var weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
         var active = state.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled).ToArray();
         var matches = state.Tasks.Where(x => MatchText(x.Name.Trim()).Length >= 2 && search.Contains(MatchText(x.Name.Trim()), StringComparison.Ordinal) || request.Contains(x.Id.ToString(), StringComparison.OrdinalIgnoreCase)).ToArray();
-        var tasks = matches.Concat(active.OrderBy(x=>x.Deadline).ThenByDescending(x=>x.Priority)).DistinctBy(x=>x.Id).Take(100).ToArray();
+        var tasks = matches.Concat(active.OrderBy(x => x.Deadline ?? DateTimeOffset.MaxValue).ThenByDescending(x => x.Priority)).DistinctBy(x => x.Id).Take(100).ToArray();
         var events = state.Events.Where(x=>x.End > Now && x.Start < Now.AddDays(30)).OrderBy(x=>x.Start).ToArray();
         var sessions = state.Sessions.Where(x=>x.End > Now && x.Start < Now.AddDays(30) && x.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).OrderBy(x=>x.Start).ToArray();
         var notices = new List<string>();
@@ -48,7 +48,7 @@ public sealed partial class WorkspaceService
                 events=new { total=events.Length,included=Math.Min(100,events.Length),truncated=events.Length>100 },
                 sessions=new { total=sessions.Length,included=Math.Min(100,sessions.Length),truncated=sessions.Length>100 },
                 history=new { maximumTurns=8, truncatedPossible=true } },
-            tasks=tasks.Select(x=>new {x.Id,x.Name,Deadline=Local(x.Deadline),WorkWindowStart=LocalOrNull(x.WorkWindowStart),WorkWindowEnd=LocalOrNull(x.WorkWindowEnd),x.EstimatedMinutes,x.Progress,x.Splittable,x.MinimumSessionMinutes,x.Priority,x.TaskType,importance=ImportanceDto(x),status=x.Status.ToString()}),
+            tasks=tasks.Select(x=>new {x.Id,x.Name,Deadline=LocalOrNull(x.Deadline),WorkWindowStart=LocalOrNull(x.WorkWindowStart),WorkWindowEnd=LocalOrNull(x.WorkWindowEnd),x.EstimatedMinutes,x.Progress,x.Splittable,x.MinimumSessionMinutes,x.Priority,x.TaskType,importance=ImportanceDto(x),status=x.Status.ToString()}),
             availability=state.Availability.Select(x=>new AvailabilityInput(x.DayOfWeek,x.StartMinute,x.EndMinute)),
             availabilityPolicy=state.Policy is { } policy ? PolicyDto(policy) : null,
             dailyRoutine=CurrentRoutineDays(state),

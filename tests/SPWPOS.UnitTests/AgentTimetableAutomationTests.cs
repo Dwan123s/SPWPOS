@@ -13,6 +13,40 @@ public sealed partial class AgentFreeTimeTests
             new("Lập trình", At(840), At(960), EventType: "CLASS")] } };
 
     [Fact]
+    public async Task Timetable_setup_replaces_regular_hours_for_its_week_and_can_be_undone()
+    {
+        await using var h = await Harness(AutomaticTimetable());
+        var user = await h.RegisterAsync();
+        var weekday = (int)Day.DayOfWeek;
+        var week = Day.AddDays(-((weekday + 6) % 7));
+        await using (var scope = h.Provider.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<IWorkspaceService>()
+                .SetAvailabilityAsync(user.Id, new([new(weekday, 540, 1020)]), Ct);
+        async Task<DatedWeekInput> ReadHours(DateOnly monday)
+        {
+            await using var scope = h.Provider.CreateAsyncScope();
+            return await scope.ServiceProvider.GetRequiredService<IWorkspaceService>()
+                .GetEffectiveAvailabilityForWeekAsync(user.Id, monday, Ct);
+        }
+
+        var result = await Send(h, user.Id, "Nhập thời khóa biểu ngày mai và thiết lập giờ làm việc theo thời khóa biểu.");
+        Assert.Equal("APPLIED", result.Status);
+        Assert.False(result.SuggestRoutine);
+        var hours = await ReadHours(week);
+        var day = hours.Slots.Where(slot => slot.DayOfWeek == weekday).ToArray();
+        Assert.Contains(day, slot => slot.StartMinute <= 1140 && slot.EndMinute >= 1260);
+        Assert.DoesNotContain(day, slot => slot.StartMinute < 600 && slot.EndMinute > 480);
+        Assert.DoesNotContain(day, slot => slot.StartMinute < 960 && slot.EndMinute > 840);
+        var following = await ReadHours(week.AddDays(7));
+        Assert.Equal(new AvailabilityInput(weekday, 540, 1020), Assert.Single(following.Slots));
+
+        var undone = await UseAgent(h, s => s.UndoAgentTurnAsync(user.Id, result.Id, Ct));
+        Assert.Equal("UNDONE", undone.Status);
+        var restored = await ReadHours(week);
+        Assert.Equal(new AvailabilityInput(weekday, 540, 1020), Assert.Single(restored.Slots));
+    }
+
+    [Fact]
     public async Task A_week_reply_after_a_read_only_lookup_keeps_the_same_conversations_uploaded_timetable()
     {
         var ai = new AgentAiTestDouble { Response = _ => AgentAiTestDouble.Empty() with { Question = "Áp dụng thời khóa biểu cho tuần nào?" } };

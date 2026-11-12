@@ -3,7 +3,7 @@
   overflow-anchor: none;
   --login-motion-amplitude: 1;
   --login-ink: var(--planora-ink);
-  --login-muted: #677b9f;
+  --login-muted: #000;
   --login-blue: var(--planora-blue);
   --login-cyan: var(--planora-cyan);
   --login-line: #bbd5f5;

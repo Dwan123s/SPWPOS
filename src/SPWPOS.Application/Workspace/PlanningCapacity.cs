@@ -111,7 +111,7 @@ public sealed partial class PlanningEngine
                 else
                 {
                     var work = planned[task.Id].ToArray();
-                    if (work.Length == 0 || work.Sum(x => (x.End - x.Start).TotalMinutes) < Remaining(task, biases) ||
+                    if (!task.HasPlanningDetails || work.Length == 0 || work.Sum(x => (x.End - x.Start).TotalMinutes) < Remaining(task, biases) ||
                         prerequisites.Length > 0 && work.Any(x => x.Start < earliest)) continue;
                     finish = work.Max(x => x.End);
                 }

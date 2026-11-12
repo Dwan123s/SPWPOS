@@ -32,10 +32,11 @@ import {
   TeamActivity,
 } from "./team-components.jsx";
 import "./team-workspace.css";
+import "./team-overview.css";
 import "./team-task-board.css";
 import "./team-task-detail.css";
 import "./team-recipient-select.css";
-import { takeEisenhowerTeamTask } from "./eisenhower.jsx";
+import { takeTeamTask } from "./team-task-link.js";
 import {
   pendingTeamJoinReview,
   finishTeamJoinReview,
@@ -167,7 +168,7 @@ export function PrivateClaimPreview({
   );
 }
 export function TeamsPage({ onWorkspaceChanged }) {
-  const [eisenhowerTaskId, setEisenhowerTaskId] = useState(null);
+  const [taskToOpen, setTaskToOpen] = useState(null);
   const [teams, setTeams] = useState([]),
     [detail, setDetail] = useState(null),
     [loadingTeams, setLoadingTeams] = useState(true);
@@ -269,23 +270,23 @@ export function TeamsPage({ onWorkspaceChanged }) {
   useEffect(() => {
     let live = true;
     const open = async () => {
-      const requested = takeEisenhowerTeamTask();
+      const requested = takeTeamTask();
       if (!requested) return;
       try {
         const next = await api(`/api/teams/${requested.teamId}`);
         if (live) {
           setDetail(next);
-          setEisenhowerTaskId(requested.taskId);
+          setTaskToOpen(requested);
         }
       } catch (failure) {
         if (live) setError(failure.message);
       }
     };
     open();
-    window.addEventListener("eisenhower-open-team", open);
+    window.addEventListener("open-team-task", open);
     return () => {
       live = false;
-      window.removeEventListener("eisenhower-open-team", open);
+      window.removeEventListener("open-team-task", open);
     };
   }, []);
   useEffect(() => {
@@ -460,6 +461,11 @@ export function TeamsPage({ onWorkspaceChanged }) {
         selected={detail?.team.id}
         busy={busy}
         error={error}
+        onBack={() => {
+          setDetail(null);
+          setTaskToOpen(null);
+          setError("");
+        }}
         onSelect={(id) =>
           run(async () => {
             setDetail(await api(`/api/teams/${id}`));
@@ -530,13 +536,19 @@ export function TeamsPage({ onWorkspaceChanged }) {
             }
             onRefresh={() => run(() => reload())}
             onCompose={() => openComposer()}
+            onOpenTask={(taskId) =>
+              setTaskToOpen({ teamId: detail.team.id, taskId })
+            }
           />
           <div className="team-workspace-columns">
             <div className="team-work-main">
               <TaskBoard
                 key={detail.team.id}
                 detail={detail}
-                openTaskId={eisenhowerTaskId}
+                taskToOpen={
+                  taskToOpen?.teamId === detail.team.id ? taskToOpen : null
+                }
+                onTaskOpened={() => setTaskToOpen(null)}
                 onImportanceChanged={() => run(() => reload())}
                 error={error}
                 onDialogChange={setTaskDetailOpen}
@@ -1201,7 +1213,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
                 }
               />
               {claim.failure?.needsAvailability && (
-                <a className="btn secondary" href="#time" onClick={cancelClaim}>Mở Giờ rảnh</a>
+                <a className="btn secondary" href="#time" onClick={cancelClaim}>Mở Giờ làm việc</a>
               )}
               {claim.canUndo !== false &&
                 !claim.failure?.needsAvailability &&

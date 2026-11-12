@@ -57,7 +57,7 @@ beforeEach(() => {
 async function open() {
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: team.name }));
-  fireEvent.click(await screen.findByRole("button", { name: "Giao task mới" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Giao việc mới" }));
 }
 it("attaches a document, automatically splits for the current team and requires leader confirmation before publishing", async () => {
   await open();

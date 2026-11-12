@@ -123,7 +123,7 @@ public sealed class TelegramApiTests
             var connection = new TelegramConnection { UserId = uid, Enabled = true, ChatId = 123, ConnectedAt = f.Clock.GetUtcNow() };
             db.TelegramConnections.Add(connection);
             var task = await db.WorkTasks.SingleAsync(x => x.Id == taskId, Ct);
-            db.InAppNotifications.Add(new() { UserId = uid, Kind = "DEADLINE", TaskId = taskId, DedupeKey = $"deadline:{task.Id}:{task.Deadline.UtcTicks}",
+            db.InAppNotifications.Add(new() { UserId = uid, Kind = "DEADLINE", TaskId = taskId, DedupeKey = $"deadline:{task.Id}:{task.Deadline!.Value.UtcTicks}",
                 Title = "Deadline", Message = "Private fixture", CreatedAt = f.Clock.GetUtcNow(), TelegramPending = true,
                 TelegramBindingId = connection.BindingId, NextTelegramAttemptAt = f.Clock.GetUtcNow() });
             await db.SaveChangesAsync(Ct);

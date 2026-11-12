@@ -35,7 +35,7 @@ public sealed partial class WorkspaceService
         // Durable per-task flag survives reopening and retries. Completion dates
         // come from the server, including a recorded catch-up session's end.
         if (task.TaskExperienceAwarded || task.IsDeleted || task.Status != WorkTaskStatus.Completed ||
-            completedAt > task.Deadline || await Mine<WorkTask>(uid).AnyAsync(x => x.ParentId == task.Id && !x.IsDeleted, ct)) return;
+            (task.Deadline is not { } deadline || completedAt > deadline) || await Mine<WorkTask>(uid).AnyAsync(x => x.ParentId == task.Id && !x.IsDeleted, ct)) return;
         var user = await db.Users.SingleAsync(x => x.Id == uid, ct);
         task.TaskExperienceAwarded = true;
         user.ExperiencePoints = checked(user.ExperiencePoints + 25);

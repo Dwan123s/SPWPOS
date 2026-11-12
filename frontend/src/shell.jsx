@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { Slot, attrs, nodeList } from "./react-ui.jsx";
 import { setSlot } from "./store.js";
-import { CapacityRibbon } from "./capacity-ribbon.jsx";
 import { PetProgress } from "./pet-appearance.jsx";
 import { FocusLauncher } from "./focus-timer.jsx";
 import { PageTransition } from "./page-transition.jsx";
+import { PopupDetails } from "./popup-dismissal.jsx";
 import {
   WorkspaceAtmosphere,
   WorkspaceMotionControl,
@@ -15,8 +15,19 @@ import {
   NotificationBell,
   NotificationUnreadCount,
 } from "./notification-popups.jsx";
+import "./styles/workspace-rail.css";
 
 const menuKey = "planora.menu.compact";
+const railLabels = {
+  today: "Hôm nay",
+  calendar: "Lịch",
+  tasks: "Việc",
+  teams: "Nhóm",
+  insights: "Tiến độ",
+  agent: "NORA AI",
+};
+const workRoutes = ["notes", "tasks"];
+const planRoutes = ["calendar", "time"];
 function readStorage(key) {
   try {
     return localStorage.getItem(key);
@@ -33,7 +44,8 @@ function writeStorage(key, value) {
 }
 export function MenuLabelsControl() {
   const host = useRef(null);
-  const [compact, setCompact] = useState(() => readStorage(menuKey) === "true");
+  const [saved, setSaved] = useState(() => readStorage(menuKey));
+  const compact = saved !== "false";
   useLayoutEffect(() => {
     const consoleEl = host.current?.closest(".planning-console");
     if (consoleEl) {
@@ -51,7 +63,7 @@ export function MenuLabelsControl() {
       aria-controls="workspace-menu"
       onClick={() => {
         const value = !compact;
-        setCompact(value);
+        setSaved(String(value));
         writeStorage(menuKey, String(value));
       }}
     >
@@ -59,8 +71,82 @@ export function MenuLabelsControl() {
     </button>
   );
 }
+function RailAccount({ profile }) {
+  const popup = useRef(null);
+  const name =
+    profile.displayName ||
+    [profile.firstName, profile.lastName].filter(Boolean).join(" ") ||
+    "Tài khoản";
+  const close = () => {
+    if (popup.current) popup.current.open = false;
+  };
+  return (
+    <PopupDetails className="rail-account" ref={popup}>
+      <summary
+        className="rail-account-trigger"
+        aria-label="Menu tài khoản"
+        title="Tài khoản"
+      >
+        {userAvatar(profile)}
+      </summary>
+      <div className="rail-account-panel">
+        <button
+          className="rail-account-identity"
+          type="button"
+          data-action="nav"
+          data-id="profile"
+          onClick={close}
+        >
+          {userAvatar(profile)}
+          <span>
+            <strong>{name}</strong>
+            {profile.email && <small>{profile.email}</small>}
+          </span>
+        </button>
+        <div className="rail-account-section">
+          <button
+            type="button"
+            data-action="nav"
+            data-id="settings"
+            onClick={close}
+          >
+            {icon("settings")} Cài đặt
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              modal(
+                "Trợ giúp PLANORA",
+                "",
+                <ul>
+                  <li>Nhấn Ctrl + K để tìm nhanh công việc.</li>
+                  <li>Dùng dấu + trong Lịch để thêm sự kiện cho một ngày.</li>
+                  <li>Mở Công việc → Inbox để ghi nhanh việc cần làm.</li>
+                </ul>,
+              );
+            }}
+          >
+            {icon("alertCircle")} Trợ giúp
+          </button>
+        </div>
+        <div className="rail-account-section">
+          <button type="button" data-action="logout" onClick={close}>
+            {icon("logout")} Đăng xuất
+          </button>
+        </div>
+      </div>
+    </PopupDetails>
+  );
+}
+
 export function workspaceShell(routes, title, description, body) {
   const p = state.workspace.profile || {};
+  const home = state.route === "today";
+  const work = workRoutes.includes(state.route);
+  const plan = planRoutes.includes(state.route);
+  const sectionRoutes = work && state.route !== "tasks" ? workRoutes : plan ? planRoutes : [];
+  const railCurrent = work ? "tasks" : plan ? "calendar" : state.route;
   const nav = (keys) =>
     nodeList(
       keys
@@ -71,6 +157,8 @@ export function workspaceShell(routes, title, description, body) {
             className={`nav-link${state.route === key ? " active" : ""}`}
             data-action="nav"
             data-id={key}
+            data-rail-label={railLabels[key]}
+            data-rail-current={railCurrent === key ? "true" : undefined}
             title={routes[key][0]}
             aria-label={routes[key][0]}
             {...attrs(state.route === key ? 'aria-current="page"' : "")}
@@ -81,21 +169,6 @@ export function workspaceShell(routes, title, description, body) {
           </button>
         )),
     );
-  const actions =
-    state.route === "tasks" ? (
-      <>
-        {button("Ghi nhanh", "capture", "secondary", "", "spark")}
-        {button("Thêm công việc", "new-task", "primary", "", "plus")}
-      </>
-    ) : state.route === "today" ? (
-      button("Thêm sự kiện", "new-event", "secondary", "", "calendar")
-    ) : (
-      ""
-    );
-  const headline =
-    state.route === "today"
-      ? `Một ngày có chủ đích${p.firstName ? `, ${p.firstName}` : ""}.`
-      : title;
   return (
     <>
       <a
@@ -147,9 +220,29 @@ export function workspaceShell(routes, title, description, body) {
             </div>
           </div>
           <nav className="nav" aria-label="Điều hướng chính">
+            <button
+              type="button"
+              className="btn primary icon-only workspace-rail-add"
+              data-action="new-task"
+              aria-label="Tạo nhanh công việc"
+              title="Tạo nhanh công việc"
+            >
+              {icon("plus")}
+            </button>
             <section className="nav-group" aria-label="Không gian cá nhân">
               <div className="nav-label">Không gian cá nhân</div>
-              {nav(["today", "agent", "notes", "calendar", "tasks", "teams"])}
+              {nav([
+                "today",
+                "calendar",
+                "tasks",
+                "insights",
+                "agent",
+                "notes",
+              ])}
+            </section>
+            <section className="nav-group" aria-label="Cộng tác">
+              <div className="nav-label">Cộng tác</div>
+              {nav(["teams"])}
             </section>
             <section className="nav-group" aria-label="Kết nối bạn bè">
               <div className="nav-label">Kết nối</div>
@@ -157,7 +250,7 @@ export function workspaceShell(routes, title, description, body) {
             </section>
             <section className="nav-group" aria-label="Theo dõi và thiết lập">
               <div className="nav-label">Theo dõi & thiết lập</div>
-              {nav(["insights", "time"])}
+              {nav(["time"])}
             </section>
             <section className="nav-group" aria-label="Quản lý">
               <div className="nav-label">Quản lý</div>
@@ -171,6 +264,31 @@ export function workspaceShell(routes, title, description, body) {
             )}
           </nav>
           <div className="sidebar-bottom">
+            <div
+              className="workspace-rail-tools"
+              role="group"
+              aria-label="Lối tắt"
+            >
+              <button
+                type="button"
+                data-action="search"
+                aria-label="Tìm kiếm từ thanh bên"
+                title="Tìm kiếm"
+              >
+                {icon("search")}
+              </button>
+              <button
+                type="button"
+                data-action="nav"
+                data-id="notifications"
+                aria-label="Mở thông báo từ thanh bên"
+                title="Thông báo"
+              >
+                {icon("bell")}
+                <NotificationUnreadCount />
+              </button>
+              <RailAccount profile={p} />
+            </div>
             <div className="user-mini">
               <button
                 className="user-link"
@@ -264,32 +382,39 @@ export function workspaceShell(routes, title, description, body) {
               </button>
             </div>
           </header>
-          {state.route === "today" && <CapacityRibbon />}
+          {sectionRoutes.length > 0 && (
+            <nav
+              className={`workspace-section-links${plan ? " workspace-section-links--plan" : ""}`}
+              aria-label={work ? "Khu vực công việc" : "Khu vực lập lịch"}
+            >
+              {sectionRoutes.map((key) => (
+                <a
+                  key={key}
+                  href={`#${key}`}
+                  aria-current={state.route === key ? "page" : undefined}
+                >
+                  {plan && icon(routes[key][2])}
+                  {routes[key][0]}
+                </a>
+              ))}
+            </nav>
+          )}
           <main className="content" id="main-content" tabIndex="-1">
             <PageTransition route={state.route}>
-              {["calendar", "teams"].includes(state.route) ? (
+              {home ? null : ["calendar", "teams", "profile", "admin-revenue"].includes(
+                  state.route,
+                ) ? (
                 <h1 className="sr-only" tabIndex="-1">
-                  {headline}
+                  {title}
                 </h1>
               ) : (
                 <div className="page-header">
                   <div>
-                    <div className="eyebrow">
-                      {state.route === "today"
-                        ? dateFmt(Date.now(), {
-                            weekday: "long",
-                            month: "long",
-                          })
-                        : "KHÔNG GIAN CỦA BẠN"}
-                    </div>
-                    <h1 tabIndex="-1">{headline}</h1>
-                    <p>
-                      {state.route === "today"
-                        ? "Nhìn rõ việc cần làm. Dành thời gian để hoàn thành."
-                        : description}
-                    </p>
+                    <h1 tabIndex="-1">{title}</h1>
+                    <p>{description}</p>
                   </div>
-                  <div className="actions">{actions}</div>
+                  {state.route === "tasks" &&
+                    button("Thêm công việc", "new-task", "primary", "", "plus")}
                 </div>
               )}
               {state.analysisError ? (
@@ -400,8 +525,7 @@ export function filterSearch() {
           <span>
             <strong>{t.name}</strong>
             <small>
-              {"Deadline "}
-              {dateFmt(t.deadline)}
+              {t.deadline ? `Hạn ${dateFmt(t.deadline)}` : "Chưa có hạn"}
               {" · "}
               {t.progress}% hoàn thành
             </small>

@@ -10,30 +10,18 @@ function TasksWorkspace() {
   const matrix = view === "matrix" && eisenhowerEnabled();
   return (
     <>
-      {eisenhowerEnabled() && (
-        <div
-          className="eis-view-switch"
-          role="group"
-          aria-label="Bố cục công việc"
-        >
+      {matrix && (
+        <div className="eis-view-switch">
           <button
             type="button"
-            aria-pressed={!matrix}
             onClick={() => setView("list")}
           >
             {icon("tasks")} Danh sách
           </button>
-          <button
-            type="button"
-            aria-pressed={matrix}
-            onClick={() => setView("matrix")}
-          >
-            {icon("spark")} Eisenhower
-          </button>
         </div>
       )}
       <div hidden={matrix}>
-        <TaskSmartList />
+        <TaskSmartList onShowMatrix={eisenhowerEnabled() ? () => setView("matrix") : undefined} />
       </div>
       {matrix && <EisenhowerMatrix />}
     </>

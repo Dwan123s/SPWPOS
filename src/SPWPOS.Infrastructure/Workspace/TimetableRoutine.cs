@@ -10,7 +10,7 @@ public sealed partial class WorkspaceService
     // These are reviewable proposals, not inferred personal habits. Only the
     // confirmed policy is used by the real scheduler.
     private static DateOnly RoutineWeekStart(DateOnly date) => date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
-    private AvailabilityPolicy ProposeTimetableRoutine(PlanningState state, DateOnly? weekStart = null)
+    private AvailabilityPolicy ProposeTimetableRoutine(PlanningState state, DateOnly? weekStart = null, bool useTimetableHours = false)
     {
         var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
         var first = weekStart ?? RoutineWeekStart(LocalDate(state.Events.Where(x => x.End > Now).Select(x => x.Start).DefaultIfEmpty(Now).Min(), state.Preference));
@@ -50,7 +50,8 @@ public sealed partial class WorkspaceService
             var breakfast = Place(wake + 15, wake, Math.Min(660, wake + 120), 30);
             var lunch = Place(720, 660, 900, 30); var dinner = Place(1080, 1020, 1260, 30);
             var rest = Place(900, Math.Max(840, lunch.End), Math.Min(1260, bedtime), 15);
-            days.Add(new(date, wake, bedtime, lunch.Start, lunch.End, dinner.Start, dinner.End, rest.Start, rest.End, breakfast.Start, breakfast.End));
+            days.Add(new(date, wake, bedtime, lunch.Start, lunch.End, dinner.Start, dinner.End, rest.Start, rest.End, breakfast.Start, breakfast.End,
+                useTimetableHours || state.Policy?.ForDate(date)?.UseTimetableHours == true));
         }
         var previous = state.Policy is null ? [] : JsonSerializer.Deserialize<RoutineDay[]>(state.Policy.RoutineDaysJson) ?? [];
         policy.RoutineDaysJson = JsonSerializer.Serialize(days.Concat(previous.Where(x => x.Date < first || x.Date >= first.AddDays(7))));

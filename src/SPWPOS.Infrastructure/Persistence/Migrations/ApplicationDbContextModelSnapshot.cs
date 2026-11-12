@@ -3106,7 +3106,7 @@ namespace SPWPOS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)");
 
-                    b.Property<DateTimeOffset>("Deadline")
+                    b.Property<DateTimeOffset?>("Deadline")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<DateTimeOffset?>("DeletedAt")

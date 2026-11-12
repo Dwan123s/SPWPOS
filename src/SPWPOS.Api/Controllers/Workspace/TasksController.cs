@@ -16,7 +16,19 @@ public sealed class TasksController(IWorkspaceService service) : WorkspaceContro
     }
     [HttpGet("{id:guid}")] public async Task<IActionResult> Detail(Guid id, CancellationToken ct) => Data((await service.GetAsync(UserId, ct)).Tasks.SingleOrDefault(x => x.Id == id) ?? throw new AuthException("NOT_FOUND", "Không tìm thấy công việc.", 404));
     [HttpPost] public async Task<IActionResult> Create(TaskInput input, CancellationToken ct) => Data(new { id = await service.SaveTaskAsync(UserId, null, input, ct) });
+    [HttpPost("preview-text")] public async Task<IActionResult> PreviewText(CaptureInput input, CancellationToken ct) =>
+        Data(await service.PreviewTaskTextAsync(UserId, input, ct));
+    [HttpPost("batch/preview"), RequestSizeLimit(12000000)]
+    public async Task<IActionResult> PreviewBatch(TeamBriefInput input, CancellationToken ct) =>
+        Data(await service.PreviewTaskBatchAsync(UserId, input, ct));
+    [HttpPost("batch")] public async Task<IActionResult> SaveBatch(TaskBatchInput input, CancellationToken ct) =>
+        Data(await service.SaveTaskBatchAsync(UserId, input, ct));
     [HttpPut("{id:guid}")] public async Task<IActionResult> Update(Guid id, TaskInput input, CancellationToken ct) { await service.SaveTaskAsync(UserId, id, input, ct); return Done(); }
+    [HttpPut("{id:guid}/checklist")] public async Task<IActionResult> Checklist(Guid id, MatrixChecklistInput input, CancellationToken ct)
+    {
+        await service.UpdateTaskChecklistAsync(UserId, id, input, ct);
+        return Done();
+    }
     [HttpDelete("{id:guid}")] public async Task<IActionResult> Delete(Guid id, CancellationToken ct) { await service.DeleteTaskAsync(UserId, id, ct); return Done(); }
     [HttpPatch("{id:guid}/status")] public async Task<IActionResult> Status(Guid id, StatusInput input, CancellationToken ct) { await service.SetStatusAsync(UserId, id, input, ct); return Done(); }
     [HttpPatch("{id:guid}/progress")] public async Task<IActionResult> Progress(Guid id, ProgressInput input, CancellationToken ct)

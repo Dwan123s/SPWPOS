@@ -12,6 +12,48 @@ public sealed class TaskVersionTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     public static bool SqlServerAvailable => SqlServerConcurrencyTests.SqlServerAvailable;
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Name_only_task_can_be_completed_reopened_and_given_planning_details(bool sendNullDescription)
+    {
+        await using var factory = new ApiFactory();
+        using var client = await factory.ClientAsync();
+        await Authorize(factory, client);
+        var now = factory.Clock.GetUtcNow();
+        const string name = "  Kiểm tra email  ";
+        object input = sendNullDescription ? new { name, description = (string?)null } : new { name };
+        var created = await Send(client, HttpMethod.Post, "/api/tasks", input);
+        var id = created.GetProperty("data").GetProperty("id").GetGuid();
+        var path = $"/api/tasks/{id}";
+        var task = (await Send(client, HttpMethod.Get, path)).GetProperty("data");
+        Assert.Equal("Kiểm tra email", task.GetProperty("name").GetString());
+        Assert.Equal("", task.GetProperty("description").GetString());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, task.GetProperty("deadline").ValueKind);
+        Assert.Equal(0, task.GetProperty("estimatedMinutes").GetInt32());
+
+        var noPlan = (await Send(client, HttpMethod.Post, "/api/plans", new PlanInput(now, 7))).GetProperty("data");
+        Assert.Empty(noPlan.GetProperty("sessions").EnumerateArray());
+        await Send(client, HttpMethod.Post, "/api/plans", new PlanInput(now, 7, [id]), HttpStatusCode.Conflict);
+        await Send(client, HttpMethod.Patch, $"{path}/status", new StatusInput("Completed", 100));
+        task = (await Send(client, HttpMethod.Get, path)).GetProperty("data");
+        Assert.Equal("Completed", task.GetProperty("status").GetString());
+        await Send(client, HttpMethod.Patch, $"{path}/status", new StatusInput("Todo", 0));
+        task = (await Send(client, HttpMethod.Get, path)).GetProperty("data");
+
+        var due = now.AddDays(2);
+        await Send(client, HttpMethod.Put, path, new TaskInput("Kiểm tra email", Deadline: due,
+            Version: task.GetProperty("version").GetGuid()));
+        task = (await Send(client, HttpMethod.Get, path)).GetProperty("data");
+        Assert.Equal("Todo", task.GetProperty("status").GetString());
+        Assert.Equal(due, task.GetProperty("deadline").GetDateTimeOffset());
+        Assert.Equal(0, task.GetProperty("estimatedMinutes").GetInt32());
+        await Send(client, HttpMethod.Put, path, new TaskInput("Kiểm tra email", Deadline: due, EstimatedMinutes: 15,
+            Version: task.GetProperty("version").GetGuid()));
+        task = (await Send(client, HttpMethod.Get, path)).GetProperty("data");
+        Assert.Equal(15, task.GetProperty("estimatedMinutes").GetInt32());
+    }
+
     [Fact]
     public async Task Two_tabs_cannot_overwrite_each_other_and_can_retry_after_loading_the_new_version()
     {

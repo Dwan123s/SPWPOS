@@ -1,10 +1,6 @@
 .planning-console .daily-schedule {
   padding: 18px;
 }
-.daily-schedule .runway-toolbar {
-  font-size: 12px;
-  padding-bottom: 12px;
-}
 .daily-schedule-scroll {
   max-height: clamp(280px, 58dvh, 560px);
   overflow-y: auto;
@@ -19,34 +15,6 @@
   outline: 2px solid #2878d8;
   outline-offset: 2px;
   border-radius: 8px;
-}
-.daily-schedule-views {
-  display: flex;
-  padding: 4px;
-  gap: 4px;
-  background: #e5f0fb;
-  border: 1px solid #cde1f5;
-  border-radius: 12px;
-  margin-bottom: 18px;
-}
-.daily-schedule-views button {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid transparent;
-  background: transparent;
-  font: inherit;
-  font-size: 11px;
-  color: #496b8b;
-  cursor: pointer;
-  border-radius: 9px;
-  padding: 8px 5px;
-}
-.daily-schedule-views button[aria-pressed="true"] {
-  background: #fff;
-  color: #075dcc;
-  border-color: #c5ddf6;
-  box-shadow: 0 2px 5px #175fa510;
-  font-weight: 600;
 }
 .daily-agenda-row {
   display: grid;
@@ -65,7 +33,7 @@
   color: #284a70;
 }
 .daily-agenda-time span {
-  color: #68829f;
+  color: #000;
   font-size: 10px;
 }
 .daily-agenda-session {
@@ -124,7 +92,7 @@
   justify-content: space-between;
   gap: 8px;
   font-size: 10px;
-  color: #6482a1;
+  color: #000;
 }
 .daily-agenda-session-bottom .icon {
   width: 14px;
@@ -140,13 +108,6 @@
   color: #067991;
   font-weight: 600;
 }
-.is-completed .daily-agenda-session {
-  border-left-color: #40a58b;
-  background: #f0fbf8dc;
-}
-.is-completed .daily-agenda-status {
-  color: #267660;
-}
 .daily-agenda-rest {
   display: flex;
   align-items: center;
@@ -156,7 +117,7 @@
   padding: 6px 10px;
   border: 1px dashed #c9dbe9;
   border-radius: 9px;
-  color: #6a839c;
+  color: #000;
   font-size: 10px;
 }
 .daily-agenda-rest .icon {
@@ -170,7 +131,7 @@
 .daily-agenda-empty {
   text-align: center;
   padding: 45px 12px;
-  color: #567a98;
+  color: #000;
 }
 .daily-agenda-empty > span {
   display: inline-grid;

@@ -24,7 +24,7 @@ public sealed partial class PrivateTeamPlanningTests
         var personal = await h.DbAsync(db => db.WorkTasks.SingleAsync(Ct));
         Assert.Equal(0, personal.Progress); Assert.Equal(WorkTaskStatus.Todo, personal.Status);
         Assert.Equal("TEAM_CONTRACT_PROTECTED", (await Assert.ThrowsAsync<AuthException>(() => Eisenhower(h,
-            s => s.SaveMatrixTaskAsync(Member, personal.Id, new("Đổi yêu cầu", "", personal.Deadline, 120, "Q1", personal.Version), Ct)))).Code);
+            s => s.SaveMatrixTaskAsync(Member, personal.Id, new("Đổi yêu cầu", "", personal.Deadline!.Value, 120, "Q1", personal.Version), Ct)))).Code);
         Assert.Equal("NOT_FOUND", (await Assert.ThrowsAsync<AuthException>(() => Eisenhower(h, async s => {
             await s.UpdateMatrixChecklistAsync(Leader,personal.Id,new(personal.Version,[]),Ct); return true;
         }))).Code);

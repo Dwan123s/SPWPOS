@@ -9,3 +9,13 @@ public sealed record WorkloadTask(Guid Id, string Name, int Estimate, int Remain
 public sealed record WorkloadAction(string Kind, string Reason, Guid? TaskId = null, Guid? SessionId = null);
 public sealed record WorkloadView(DateTimeOffset AsOf, DateTimeOffset RefreshAt, Guid Revision, string TimeZoneId,
     DateOnly Start, DateOnly End, WorkloadDay[] Days, WorkloadTask[] Tasks, int CompletedTasks, WorkloadAction Next);
+
+public sealed record TeamWorkloadDay(DateOnly Date, int? WorkingMinutes, int? BusyMinutes, int? ReservedMinutes,
+    int? SchedulableMinutes, long? RecordedActualSeconds);
+public sealed record TeamWorkloadMember(Guid UserId, string Name, string TimeZoneId, TeamWorkloadDay[] Days);
+public sealed record TeamWorkloadTask(Guid Id, string Name, Guid Version, string Status, Guid? AssigneeId,
+    Guid? DesignatedUserId, DateTimeOffset Deadline, int RemainingMinutes, int? UnscheduledMinutes, int? ShortfallMinutes,
+    string Risk);
+public sealed record TeamWorkloadView(DateTimeOffset AsOf, DateTimeOffset RefreshAt, DateOnly Start, DateOnly End,
+    TeamWorkloadMember[] Members, TeamWorkloadTask[] Tasks);
+public sealed record TeamWorkloadCandidate(Guid UserId, string Status, int? SchedulableMinutes);

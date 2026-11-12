@@ -29,6 +29,18 @@ function merge(intervals) {
   }
   return result;
 }
+export function availabilityWindows(weekly, exceptions, dayOfWeek) {
+  const overrides = exceptions.filter(
+    (item) => item.isAvailable && item.overridesWeeklyAvailability,
+  );
+  const windows = overrides.length
+    ? overrides
+    : [
+        ...weekly.filter((slot) => slot.dayOfWeek === dayOfWeek),
+        ...exceptions.filter((item) => item.isAvailable),
+      ];
+  return merge(windows.map((item) => [item.startMinute, item.endMinute]));
+}
 function subtract(intervals, blocked) {
   return intervals.flatMap(([start, end]) => {
     const [from, to] = blocked;
@@ -104,20 +116,14 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
   const days = Array.from({ length: 7 }, (_, index) => {
     const key = nextDay(today, index);
     const weekday = new Date(`${key}T12:00:00Z`).getUTCDay();
-    let available = merge(
-      (workspace.availability || [])
-        .filter((slot) => slot.dayOfWeek === weekday)
-        .map((slot) => [slot.startMinute, slot.endMinute]),
-    );
     const exceptions = (workspace.exceptions || []).filter(
       (exception) => exception.date === key,
     );
-    available = merge([
-      ...available,
-      ...exceptions
-        .filter((exception) => exception.isAvailable)
-        .map((exception) => [exception.startMinute, exception.endMinute]),
-    ]);
+    let available = availabilityWindows(
+      workspace.availability || [],
+      exceptions,
+      weekday,
+    );
     for (const exception of exceptions.filter(
       (exception) => !exception.isAvailable,
     ))
@@ -125,6 +131,7 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
         exception.startMinute,
         exception.endMinute,
       ]);
+    const working = available;
     for (const event of workspace.events || []) {
       const span = interval(event, key, calendar);
       if (span) available = subtract(available, span);
@@ -180,6 +187,19 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
     );
     return {
       key,
+      workingMinutes: duration(working),
+      elapsedWorkingMinutes: duration(
+        working.map(([start, end]) => [
+          start,
+          Math.max(start, Math.min(end, minuteNow)),
+        ]),
+      ),
+      remainingWorkCapacity: duration(
+        available.map(([start, end]) => [
+          Math.min(end, Math.max(start, minuteNow)),
+          end,
+        ]),
+      ),
       free: capacityDay?.calendarFreeMinutes ?? free,
       planned,
       calendarBusy,
@@ -233,6 +253,24 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
         calendar.minute(item.end, today) > 0,
     ).length,
     horizonRemaining: days.reduce((sum, day) => sum + day.calendarRemaining, 0),
+  };
+  const completedTaskMinutes = duration(
+    timeline
+      .filter((item) => item.kind === "session" && item.status === "Completed")
+      .map((item) => item.span),
+  );
+  const remainingTaskMinutes = duration(
+    timeline
+      .filter((item) => item.kind === "session" && item.status !== "Completed")
+      .map((item) => item.span),
+  );
+  const todayCapacity = days[0];
+  const daySummary = {
+    work: todayCapacity.workingMinutes,
+    elapsed: todayCapacity.elapsedWorkingMinutes,
+    capacity: todayCapacity.remainingWorkCapacity,
+    completed: completedTaskMinutes,
+    remaining: remainingTaskMinutes,
   };
   const calendarMilestones = calendarEntries
     .filter(
@@ -292,6 +330,7 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
     now,
     hasAvailability,
     calendarStats,
+    daySummary,
     calendarMilestones,
     availableMinutes: days[0].free,
     capacityMinutes: days[0].capacity,

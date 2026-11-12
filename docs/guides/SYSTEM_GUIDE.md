@@ -2,7 +2,7 @@
 
 ## Chạy trên máy Windows
 
-Yêu cầu .NET **SDK 8.0.425 trở lên trong nhánh 8.0**, Docker Desktop engine đang chạy và HTTPS development certificate được tin cậy. Workspace hiện dùng SDK riêng trong `%LOCALAPPDATA%\SPWPOS\dotnet8`; script tự nhận diện SDK này. Solution dùng `SPWPOS.sln` để tương thích SDK 8.
+Yêu cầu .NET **SDK 8.0.100 trở lên trong nhánh 8.0** (bản ổn định), Docker Desktop engine đang chạy và HTTPS development certificate được tin cậy. Workspace hiện dùng SDK riêng trong `%LOCALAPPDATA%\SPWPOS\dotnet8`; script tự nhận diện SDK này. Solution dùng `SPWPOS.sln` để tương thích SDK 8.
 
 ```powershell
 cd D:\SWP

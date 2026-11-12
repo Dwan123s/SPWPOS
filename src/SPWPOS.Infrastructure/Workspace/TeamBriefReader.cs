@@ -28,9 +28,9 @@ internal static class TeamBriefReader
         try
         {
             string text;
-            if (extension is ".txt" or ".md") text = new UTF8Encoding(false, true).GetString(bytes).TrimStart('\uFEFF');
+            if (extension is ".txt" or ".md" or ".csv") text = new UTF8Encoding(false, true).GetString(bytes).TrimStart('\uFEFF');
             else if (extension == ".docx") text = ReadWord(bytes);
-            else throw Error("Hỗ trợ PDF, Word (.docx), TXT và Markdown (.md). Hãy chuyển file sang một trong các định dạng này.");
+            else throw Error("Hỗ trợ PDF, Word (.docx), TXT, Markdown (.md) và CSV.");
             if (text.Length > MaxText) throw Error("Nội dung tài liệu vượt quá 60.000 ký tự. Hãy tách tài liệu theo phần công việc để NORA đọc đầy đủ.");
             if (string.IsNullOrWhiteSpace(text) || text.Contains('\0')) throw Error("Không tìm thấy nội dung văn bản trong file. Với Word dạng ảnh, hãy xuất PDF rồi gửi lại.");
             return new(name, text, null);

@@ -19,7 +19,7 @@ public sealed partial class PlanningEngine
         if (duration <= 0 || !task.CanSplit && duration < remaining)
             return new(start, start, double.MaxValue / 10000, 0, 0, 0);
         var end = start.AddMinutes(duration);
-        var slack = (task.Deadline - end).TotalMinutes;
+        var slack = (task.Deadline.GetValueOrDefault(end) - end).TotalMinutes;
         // Strong lateness cost; a small reciprocal cost also discourages finishing
         // immediately against a deadline. No soft score can relax a hard deadline.
         var lateness = Math.Max(0, -slack) + (slack >= 0 ? 1 / (slack + 1) : 1);

@@ -99,7 +99,7 @@
   margin: -22px 0 26px;
   font-size: 15px;
   line-height: 1.6;
-  color: #61758a;
+  color: #000;
 }
 .auth-facebook .auth-card .field {
   position: relative;
@@ -123,7 +123,7 @@
   box-shadow: none;
 }
 .auth-facebook .auth-card .field input::placeholder {
-  color: #67727e;
+  color: #000;
   opacity: 1;
 }
 .auth-facebook .auth-card .field input:focus {
@@ -138,7 +138,7 @@
   width: 44px;
   height: 44px;
   right: 8px;
-  color: #66788a;
+  color: #000;
 }
 .auth-facebook .auth-submit {
   display: flex;
@@ -225,7 +225,7 @@
   margin: 20px 0 4px;
   text-align: center;
   font-size: 14px;
-  color: #61758a;
+  color: #000;
 }
 .auth-facebook .auth-site-footer {
   background: #fff;
@@ -237,7 +237,7 @@
   margin: auto;
   padding: 24px 0 28px;
   font-size: 12px;
-  color: #65768a;
+  color: #000;
 }
 .auth-facebook .auth-footer-language {
   padding-bottom: 12px;

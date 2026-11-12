@@ -51,12 +51,26 @@ public sealed partial class WorkspaceService
         return taskId;
     }, ct, false);
 
-    public Task UpdateMatrixChecklistAsync(Guid uid, Guid id, MatrixChecklistInput input, CancellationToken ct) => Mutate(uid, async () => {
-        var task = await MatrixTask(uid, id, input.Version, ct);
+    private async Task SaveTaskChecklist(Guid uid, WorkTask task, MatrixChecklistInput input, CancellationToken ct)
+    {
         task.ChecklistJson = JsonSerializer.Serialize(ValidateTaskChecklist(input.Items), AgentJson);
         task.Version = Guid.NewGuid(); task.UpdatedAt = Now;
         (await Preference(uid, ct)).Revision = Guid.NewGuid();
-        // Checklist completion is not task completion/progress or a team report.
+    }
+
+    public Task UpdateMatrixChecklistAsync(Guid uid, Guid id, MatrixChecklistInput input, CancellationToken ct) => Mutate(uid, async () => {
+        var task = await MatrixTask(uid, id, input.Version, ct);
+        await SaveTaskChecklist(uid, task, input, ct);
+    }, ct, false);
+
+    public Task UpdateTaskChecklistAsync(Guid uid, Guid id, MatrixChecklistInput input, CancellationToken ct) => Mutate(uid, async () => {
+        var task = await Find<WorkTask>(uid, id, ct);
+        Require(!task.IsDeleted, "NOT_FOUND", "Không tìm thấy công việc.", 404);
+        Require(input.Version != Guid.Empty && task.Version == input.Version,
+            "TASK_STALE", "Công việc vừa thay đổi. Mở lại trước khi chỉnh sửa.", 409);
+        Require(!await db.TeamTaskAssignments.AnyAsync(a => a.WorkTaskId == id && a.Active, ct),
+            "TEAM_CONTRACT_PROTECTED", "Mở checklist của việc nhóm trong ma trận Eisenhower.", 409);
+        await SaveTaskChecklist(uid, task, input, ct);
     }, ct, false);
 
     public Task MoveMatrixTaskAsync(Guid uid, Guid id, MatrixMoveInput input, CancellationToken ct) => Mutate(uid, async () => {
@@ -84,6 +98,7 @@ public sealed partial class WorkspaceService
         var preference = await Preference(uid, ct);
         Require(preference.Revision == input.Revision, "MATRIX_STALE", "Lịch vừa thay đổi. Xem lại ma trận trước khi đề xuất.", 409);
         await ValidateExtraTimeTask(uid, task, ct);
+        Require(task.HasPlanningDetails, "TASK_PLANNING_DETAILS_REQUIRED", "Bổ sung hạn chót và thời gian dự kiến để xếp lịch.", 409);
         var row = await GetTaskEisenhowerAsync(uid, id, false, ct);
         Require(row.Quadrant is "Q1" or "Q2" || input.ExplicitRequest, "SCHEDULE_ON_DEMAND",
             "Task này chỉ đề xuất lịch khi bạn chủ động yêu cầu.", 409);

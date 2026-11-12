@@ -128,7 +128,8 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
                 (int)(sessionsByTask[t.Id].Sum(s => s.ActualSeconds) / 60),
                 (int)sessionsByTask[t.Id].Where(s => s.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.Running or WorkSessionStatus.Paused).Sum(s => (s.End - s.Start).TotalMinutes),
                 t.Priority, t.TaskType, t.CanSplit, t.MinimumSessionMinutes, t.CategoryId, t.ParentId, t.Status.ToString(), t.Progress, t.CreatedAt, t.CompletedAt,
-                dependenciesByTask[t.Id].Select(d => d.PredecessorId).ToArray(), t.IsHardDeadline, t.CreationSource, t.WorkWindowStart, t.WorkWindowEnd, t.Version, ImportanceDto(t), t.RequiresContinuousSession)).ToArray(),
+                dependenciesByTask[t.Id].Select(d => d.PredecessorId).ToArray(), t.IsHardDeadline, t.CreationSource, t.WorkWindowStart, t.WorkWindowEnd, t.Version, ImportanceDto(t), t.RequiresContinuousSession,
+                IsTeamTask: t.InheritedImportance is not null, Checklist: ReadTaskChecklist(t))).ToArray(),
             state.Availability.Select(x => new AvailabilityInput(x.DayOfWeek, x.StartMinute, x.EndMinute)).ToArray(),
             state.Exceptions.Select(x => new ExceptionView(x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note, x.OverridesWeeklyAvailability)).ToArray(),
             state.Events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),
@@ -150,19 +151,22 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         profile.AvatarUrl = (input.AvatarUrl ?? "").Trim();
         profile.UpdatedAt = Now;
     }, ct, false);
-    private static void ValidTask(TaskInput input)
+    private static void ValidTask(TaskInput input, bool requirePlanningDetails = true)
     {
         Require(!string.IsNullOrWhiteSpace(input.Name) && !string.IsNullOrWhiteSpace(input.TaskType), "VALIDATION_ERROR", "Nhập tên và loại công việc.");
-        Require(input.EstimatedMinutes is >= 1 and <= 43200 && input.Priority is >= 1 and <= 4 && input.MinimumSessionMinutes is >= 5 and <= 480,
+        Require(input.EstimatedMinutes is null or (>= 1 and <= 43200) && input.Priority is >= 1 and <= 4 && input.MinimumSessionMinutes is >= 5 and <= 480,
             "VALIDATION_ERROR", "Thời lượng hoặc mức ưu tiên không hợp lệ.");
         Require(input.Name.Length <= 200 && (input.Description?.Length ?? 0) <= 4000 && input.TaskType.Length <= 60, "VALIDATION_ERROR", "Nội dung quá dài.");
-        Require(input.Deadline != default, "VALIDATION_ERROR", "Deadline là bắt buộc.");
+        Require(input.Deadline != DateTimeOffset.MinValue && (!input.IsHardDeadline || input.Deadline.HasValue),
+            "VALIDATION_ERROR", "Nhập hạn chót hợp lệ khi chọn hạn cứng.");
+        Require(!requirePlanningDetails || input.Deadline.HasValue && input.EstimatedMinutes.HasValue,
+            "TASK_PLANNING_DETAILS_REQUIRED", "Bổ sung hạn chót và thời gian dự kiến để xếp lịch.");
         Require(input.CreationSource is "MANUAL" or "NATURAL_LANGUAGE" or "AI_BREAKDOWN", "VALIDATION_ERROR", "Nguồn công việc không hợp lệ.");
     }
     private static WorkTask NewTask(Guid uid, TaskInput input, DateTimeOffset now) => new()
     {
         UserId = uid, Name = input.Name.Trim(), Description = input.Description ?? "", Deadline = input.Deadline,
-        EstimatedMinutes = input.EstimatedMinutes, Priority = input.Priority, TaskType = NormalizeTaskType(input.TaskType), Splittable = ActivityContinuity.CanSplit(input.Name, input.TaskType, input.Splittable),
+        EstimatedMinutes = input.EstimatedMinutes ?? 0, Priority = input.Priority, TaskType = NormalizeTaskType(input.TaskType), Splittable = ActivityContinuity.CanSplit(input.Name, input.TaskType, input.Splittable),
         IsHardDeadline = input.IsHardDeadline, CreationSource = input.CreationSource,
         MinimumSessionMinutes = input.MinimumSessionMinutes, CategoryId = input.CategoryId, ParentId = input.ParentId, CreatedAt = now, UpdatedAt = now
     };

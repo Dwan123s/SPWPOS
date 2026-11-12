@@ -20,13 +20,13 @@
 .team-draft-task-editor header p {
   font-size: 12px;
   line-height: 1.7;
-  color: #627d9d;
+  color: #000;
   margin: 6px 0 0;
 }
 .team-draft-options small,
 .team-draft-task-editor small {
   font-size: 11px;
-  color: #6e86a2;
+  color: #000;
   line-height: 1.6;
 }
 .team-draft-options form {
@@ -79,7 +79,7 @@
 }
 .team-draft-source-hint {
   font-size: 11px;
-  color: #7287a3;
+  color: #000;
 }
 @media (max-width: 599px) {
   .team-draft-options form,

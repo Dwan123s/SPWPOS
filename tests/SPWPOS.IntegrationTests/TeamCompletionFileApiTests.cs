@@ -25,7 +25,7 @@ public sealed class TeamCompletionFileApiTests
             db.TeamMemberships.Add(new() { TeamId = team.Id, UserId = uid, Role = "Leader" });
             db.WorkPreferences.Add(new() { UserId = uid });
             var personal = new WorkTask { UserId = uid, Name = "Report", Deadline = f.Clock.GetUtcNow().AddDays(2), EstimatedMinutes = 60 };
-            db.WorkTasks.Add(personal); db.TeamTasks.Add(new() { Id = taskId, TeamId = team.Id, AssigneeId = uid, Status = "Assigned", Version = version, Name = "Report", Deadline = personal.Deadline, EstimatedMinutes = 60 });
+            db.WorkTasks.Add(personal); db.TeamTasks.Add(new() { Id = taskId, TeamId = team.Id, AssigneeId = uid, Status = "Assigned", Version = version, Name = "Report", Deadline = personal.Deadline!.Value, EstimatedMinutes = 60 });
             db.TeamTaskAssignments.Add(new() { TeamTaskId = taskId, WorkTaskId = personal.Id, UserId = uid, ProposalId = Guid.NewGuid() }); await db.SaveChangesAsync(ct);
         }
         var content = new byte[3 * 1024 * 1024]; Encoding.ASCII.GetBytes("%PDF-1.4").CopyTo(content, 0);

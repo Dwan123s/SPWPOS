@@ -49,6 +49,7 @@ export function App({ initialize = true }) {
   useLayoutEffect(() => {
     if (snapshot.modal && !dialog.current.open) dialog.current.showModal();
     if (!snapshot.modal && dialog.current.open) dialog.current.close();
+    if (snapshot.modal) dialog.current.querySelector("[data-dialog-autofocus]")?.focus();
   }, [snapshot.modal]);
   useEffect(() => {
     if (!snapshot.modal) return;
@@ -67,6 +68,7 @@ export function App({ initialize = true }) {
         onChange={onChange}
         onPointerOver={prefetchNavigation}
         onFocusCapture={prefetchNavigation}
+        data-workspace-ui={snapshot.screenGroup === "workspace" ? "" : undefined}
         className="min-h-dvh text-slate-900 antialiased"
       >
         <Fragment

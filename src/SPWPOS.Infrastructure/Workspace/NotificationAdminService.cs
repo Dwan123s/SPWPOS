@@ -50,7 +50,10 @@ public sealed partial class WorkspaceService
         await EnsureTimeReviewNotifications(uid,ct);
         if (missed) (await Preference(uid, ct)).Revision = Guid.NewGuid();
         foreach (var task in state.Tasks.Where(x => x.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled && x.Deadline < Now.AddHours(settings.DeadlineLeadHours)))
-            await AddNotification(uid, "DEADLINE", "Công việc sắp đến hạn", task.Name + " · Hạn: " + TimeZoneInfo.ConvertTime(task.Deadline, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"deadline:{task.Id}:{task.Deadline.UtcTicks}", task.Id, ct);
+        {
+            var deadline = task.Deadline!.Value;
+            await AddNotification(uid, "DEADLINE", "Công việc sắp đến hạn", task.Name + " · Hạn: " + TimeZoneInfo.ConvertTime(deadline, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"deadline:{task.Id}:{deadline.UtcTicks}", task.Id, ct);
+        }
         foreach (var session in state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && x.Start > Now && x.Start <= Now.AddMinutes(settings.SessionReminderLeadMinutes)))
             await AddNotification(uid, "SESSION_REMINDER", "Sắp đến phiên làm việc", (state.Tasks.FirstOrDefault(x => x.Id == session.TaskId)?.Name ?? "Phiên làm việc") + " · Bắt đầu: " + TimeZoneInfo.ConvertTime(session.Start, PlanningEngine.Zone(state.Preference.TimeZoneId)).ToString("dd'/'MM'/'yyyy HH:mm") + " (" + state.Preference.TimeZoneId + ").", $"session:{session.Id}:{session.Start.UtcTicks}", session.TaskId, ct, sessionId: session.Id);
         // Timetables imported from images are FixedEvents, not WorkSessions.

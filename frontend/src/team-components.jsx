@@ -12,6 +12,17 @@ import {
 import { TeamDialog } from "./team-dialog.jsx";
 export { TeamDialog } from "./team-dialog.jsx";
 
+const teamRoleLabel = (role) =>
+  role === "Leader" ? "Trưởng nhóm" : "Thành viên";
+
+const normalizeTeamName = (name) =>
+  name
+    .toLocaleLowerCase("vi")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/đ/g, "d")
+    .trim();
+
 export function GroupHub({
   teams,
   selected,
@@ -20,12 +31,15 @@ export function GroupHub({
   error,
   onDialogChange,
   onSelect,
+  onBack,
   onCreate,
   onJoin,
   onCreateLink,
 }) {
   const [mode, setMode] = useState(null),
     [value, setValue] = useState("");
+  const [query, setQuery] = useState("");
+  const [role, setRole] = useState("");
   useEffect(() => {
     onDialogChange?.(!!mode);
   }, [mode, onDialogChange]);
@@ -35,37 +49,76 @@ export function GroupHub({
     );
     setMode(next);
   };
+  const leading = teams.filter((team) => team.role === "Leader").length;
+  const search = normalizeTeamName(query);
+  const visibleTeams = teams
+    .filter(
+      (team) =>
+        (!role || team.role === role) &&
+        normalizeTeamName(team.name).includes(search),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, "vi"));
   return (
     <>
-      {!selected && (
-        <section className="team-hub-hero">
-          <div className="team-hub-intro">
-            <span className="team-eyebrow">CỘNG TÁC CÙNG NORA</span>
-            <h2>
-              Cùng một mục tiêu.
-              <br />
-              <span>Mỗi người một lịch phù hợp.</span>
-            </h2>
-            <p>
-              Giao việc cho cả nhóm. Để NORA tìm thời gian thực hiện phù hợp với
-              lịch học, công việc và deadline của từng thành viên.
-            </p>
-            <div className="team-actions">
-              <button
-                className="btn primary"
-                disabled={busy}
-                onClick={() => open("create")}
-              >
-                {icon("plus")} Tạo nhóm mới
-              </button>
-              <button
-                className="btn secondary"
-                disabled={busy}
-                onClick={() => open("join")}
-              >
-                {icon("users")} Tham gia bằng link hoặc mã
-              </button>
-              {teams.some((t) => t.role === "Leader") && (
+      {selected ? (
+        <button
+          type="button"
+          className="team-directory-back"
+          disabled={busy}
+          onClick={onBack}
+        >
+          {icon("back")} Tất cả nhóm
+        </button>
+      ) : (
+        <>
+          <header className="team-directory-hero">
+            <div>
+              <span className="team-directory-emblem">{icon("users")}</span>
+              <h1>Nhóm của bạn</h1>
+              <p>
+                Theo dõi công việc, hạn chót và trao đổi với các thành viên.
+              </p>
+              <div className="team-actions">
+                <button
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => open("create")}
+                >
+                  {icon("plus")} Tạo nhóm mới
+                </button>
+                <button
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={() => open("join")}
+                >
+                  {icon("userPlus")} Tham gia bằng link hoặc mã
+                </button>
+              </div>
+            </div>
+            {!loading && teams.length > 0 && (
+              <dl className="team-directory-stats">
+                <div>
+                  <dt>Tổng số nhóm</dt>
+                  <dd>{teams.length}</dd>
+                </div>
+                <div>
+                  <dt>Nhóm bạn dẫn dắt</dt>
+                  <dd>{leading}</dd>
+                </div>
+                <div>
+                  <dt>Nhóm bạn tham gia</dt>
+                  <dd>{teams.length - leading}</dd>
+                </div>
+              </dl>
+            )}
+          </header>
+          <section
+            className="team-directory"
+            aria-labelledby="team-directory-title"
+          >
+            <div className="team-directory-heading">
+              <h2 id="team-directory-title">Danh sách nhóm</h2>
+              {leading > 0 && (
                 <button
                   className="btn secondary"
                   disabled={busy}
@@ -75,132 +128,93 @@ export function GroupHub({
                 </button>
               )}
             </div>
-            <span className="team-privacy-caption">
-              {icon("shield")} Nhóm thấy tiến độ. Lịch cá nhân chỉ bạn thấy.
-            </span>
-          </div>
-          <div
-            className="team-flow-visual"
-            aria-label="Leader giao việc, thành viên nhận task, NORA xếp lịch riêng"
-          >
-            <div className="team-flow-orbit" />
-            <div className="team-flow-card flow-task">
-              <span className="team-tile-icon">{icon("tasks")}</span>
-              <div>
-                <strong>Task từ nhóm</strong>
-                <small>Một mục tiêu, một deadline</small>
+            {loading ? (
+              <p role="status" className="team-loading">
+                Đang tải các nhóm của bạn…
+              </p>
+            ) : teams.length ? (
+              <>
+                <div className="team-directory-filters">
+                  <label>
+                    {icon("search")}
+                    <input
+                      aria-label="Tìm nhóm theo tên"
+                      placeholder="Tìm nhóm theo tên…"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                    />
+                  </label>
+                  <select
+                    aria-label="Lọc nhóm theo vai trò"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  >
+                    <option value="">Mọi vai trò</option>
+                    <option value="Leader">Trưởng nhóm</option>
+                    <option value="Member">Thành viên</option>
+                  </select>
+                </div>
+                {visibleTeams.length ? (
+                  <ul className="team-directory-grid">
+                    {visibleTeams.map((team) => (
+                      <li key={team.id}>
+                        <button
+                          type="button"
+                          className="team-directory-card"
+                          data-role={team.role}
+                          aria-label={team.name}
+                          disabled={busy}
+                          onClick={() => onSelect(team.id)}
+                        >
+                          <span className="team-directory-card-icon">
+                            {icon("folder")}
+                          </span>
+                          <span className="team-directory-card-body">
+                            <strong>{team.name}</strong>
+                            <small>{teamRoleLabel(team.role)}</small>
+                          </span>
+                          <span className="team-directory-card-arrow">
+                            {icon("arrow")}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="team-directory-empty">
+                    {icon("search")}
+                    <h3>Không tìm thấy nhóm phù hợp</h3>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() => {
+                        setQuery("");
+                        setRole("");
+                      }}
+                    >
+                      Xóa bộ lọc
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="team-directory-empty">
+                {icon("folder")}
+                <h3>
+                  {error
+                    ? "Chưa tải được danh sách nhóm"
+                    : "Bạn chưa tham gia nhóm nào"}
+                </h3>
+                {!error && (
+                  <p>
+                    Tạo nhóm cho dự án của bạn hoặc dùng link mời để tham gia.
+                  </p>
+                )}
               </div>
-            </div>
-            <div className="team-flow-card flow-ai">
-              <span className="team-tile-icon">{icon("spark")}</span>
-              <div>
-                <strong>NORA phân tích</strong>
-                <small>Dựa trên lịch của chính bạn</small>
-              </div>
-              <i>AI</i>
-            </div>
-            <div className="team-flow-card flow-calendar">
-              <span className="team-tile-icon">{icon("calendar")}</span>
-              <div>
-                <strong>Lịch làm việc riêng</strong>
-                <small>Bạn xem và xác nhận</small>
-              </div>
-              <span className="team-flow-check">{icon("check")}</span>
-            </div>
-            <span className="team-flow-dot dot-one" />
-            <span className="team-flow-dot dot-two" />
-          </div>
-        </section>
+            )}
+          </section>
+        </>
       )}
-      <section className={`team-group-section${selected ? " compact" : ""}`}>
-        <div className="team-section-heading">
-          <div>
-            <h2>
-              Nhóm của bạn <span className="team-count">{teams.length}</span>
-            </h2>
-            <p>
-              {teams.length
-                ? "Chọn không gian làm việc để theo dõi và nhận task."
-                : "Bắt đầu bằng một nhóm mới hoặc mã mời từ trưởng nhóm."}
-            </p>
-          </div>
-          {selected && (
-            <div className="team-actions">
-              <button
-                className="btn secondary"
-                disabled={busy}
-                onClick={() => open("join")}
-              >
-                Nhập mã mời
-              </button>
-              <button
-                className="btn primary"
-                disabled={busy}
-                onClick={() => open("create")}
-              >
-                {icon("plus")} Tạo nhóm
-              </button>
-            </div>
-          )}
-        </div>
-        {loading ? (
-          <p role="status" className="team-loading">
-            Đang tải các nhóm của bạn…
-          </p>
-        ) : teams.length ? (
-          <div className="team-group-grid">
-            {teams.map((t, i) => (
-              <button
-                key={t.id}
-                className={`team-group-card${selected === t.id ? " selected" : ""}`}
-                aria-label={t.name}
-                aria-pressed={selected === t.id}
-                disabled={busy}
-                onClick={() => onSelect(t.id)}
-              >
-                <span className={`team-group-symbol tone-${i % 3}`}>
-                  {icon("folder")}
-                </span>
-                <span>
-                  <strong>{t.name}</strong>
-                  <small>
-                    {t.role === "Leader"
-                      ? "Bạn là trưởng nhóm"
-                      : "Không gian thành viên"}
-                  </small>
-                </span>
-                <span className="team-group-arrow">
-                  {icon(selected === t.id ? "check" : "arrow")}
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="team-start-guide">
-            <article>
-              <span className="team-step-number">01</span>
-              <div>
-                <h3>Tạo hoặc tham gia nhóm</h3>
-                <p>Kết nối các thành viên trong cùng một không gian đồ án.</p>
-              </div>
-            </article>
-            <article>
-              <span className="team-step-number">02</span>
-              <div>
-                <h3>Giao việc, cùng nhận task</h3>
-                <p>Task có nội dung, thời lượng và deadline rõ ràng.</p>
-              </div>
-            </article>
-            <article>
-              <span className="team-step-number">03</span>
-              <div>
-                <h3>NORA sắp xếp lịch riêng</h3>
-                <p>Mỗi người nhận một phương án theo lịch cá nhân của mình.</p>
-              </div>
-            </article>
-          </div>
-        )}
-      </section>
       {mode && (
         <TeamDialog
           title={
@@ -308,19 +322,20 @@ export function GroupHub({
     </>
   );
 }
-export function TeamHeader({ detail, busy, onInvite, onRefresh, onCompose }) {
+export function TeamHeader({
+  detail,
+  busy,
+  onInvite,
+  onRefresh,
+  onCompose,
+  onOpenTask,
+}) {
   const { team, members, tasks } = detail;
   const complete = tasks.filter((t) => t.status === "Completed").length;
   const metrics = [
     {
-      label: "Tổng công việc",
-      value: tasks.length,
-      glyph: "tasks",
-      tone: "blue",
-    },
-    {
       label: "Đang chờ nhận",
-      value: tasks.filter((t) => !t.assigneeId).length,
+      value: tasks.filter((t) => t.status === "Open").length,
       glyph: "clock",
       tone: "amber",
     },
@@ -331,13 +346,26 @@ export function TeamHeader({ detail, busy, onInvite, onRefresh, onCompose }) {
       tone: "violet",
     },
     {
-      label: "Chờ trưởng nhóm duyệt",
+      label: "Chờ duyệt",
       value: tasks.filter((t) => t.status === "PendingReview").length,
       glyph: "clock",
       tone: "amber",
     },
     { label: "Đã hoàn thành", value: complete, glyph: "check", tone: "green" },
   ];
+  const percent = tasks.length
+    ? Math.round((complete / tasks.length) * 100)
+    : 0;
+  const now = Date.now();
+  const deadlines = tasks
+    .filter((task) => task.status === "Open" || task.status === "Assigned")
+    .map((task) => ({ task, due: Date.parse(task.deadline) }))
+    .filter(({ due }) => Number.isFinite(due))
+    .sort((a, b) => a.due - b.due);
+  const overdue = deadlines.filter(({ due }) => due < now).length;
+  const soon = deadlines.filter(
+    ({ due }) => due >= now && due <= now + 7 * 86400000,
+  ).length;
   return (
     <>
       <header className="team-workspace-header">
@@ -345,15 +373,11 @@ export function TeamHeader({ detail, busy, onInvite, onRefresh, onCompose }) {
           <span className="team-group-symbol">{icon("folder")}</span>
           <div>
             <div className="team-eyebrow">
-              KHÔNG GIAN NHÓM{" "}
-              <span className="team-role-pill">
-                {team.role === "Leader" ? "Trưởng nhóm" : "Thành viên"}
-              </span>
+              <span className="team-role-pill">{teamRoleLabel(team.role)}</span>
             </div>
-            <h2>{team.name}</h2>
+            <h1>{team.name}</h1>
             <p>
-              {members.length} thành viên · {complete}/{tasks.length} công việc
-              hoàn thành
+              {icon("users")} {members.length} thành viên
             </p>
           </div>
         </div>
@@ -378,21 +402,78 @@ export function TeamHeader({ detail, busy, onInvite, onRefresh, onCompose }) {
           )}
           {team.role === "Leader" && (
             <button className="btn primary" disabled={busy} onClick={onCompose}>
-              {icon("plus")} Giao task mới
+              {icon("plus")} Giao việc mới
             </button>
           )}
         </div>
       </header>
-      <div className="team-metrics">
-        {metrics.map((m) => (
-          <div className={`team-metric ${m.tone}`} key={m.label}>
-            <span className="team-metric-icon">{icon(m.glyph)}</span>
-            <div>
-              <strong>{m.value}</strong>
-              <span>{m.label}</span>
-            </div>
+      <div className="team-overview">
+        <section
+          className="team-panel team-overview-progress"
+          aria-labelledby="team-progress-heading"
+        >
+          <div className="team-panel-heading">
+            <h2 id="team-progress-heading">Tiến độ nhóm</h2>
+            <strong>{percent}%</strong>
           </div>
-        ))}
+          <p>
+            {complete}/{tasks.length} công việc hoàn thành
+          </p>
+          <progress
+            aria-labelledby="team-progress-heading"
+            value={complete}
+            max={tasks.length || 1}
+          />
+          <div className="team-metrics">
+            {metrics.map((m) => (
+              <div className={`team-metric ${m.tone}`} key={m.label}>
+                <span className="team-metric-icon">{icon(m.glyph)}</span>
+                <div>
+                  <strong>{m.value}</strong>
+                  <span>{m.label}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section
+          className="team-panel team-overview-deadlines"
+          aria-labelledby="team-deadlines-heading"
+        >
+          <div className="team-panel-heading">
+            <h2 id="team-deadlines-heading">Hạn chót</h2>
+            {icon("calendar")}
+          </div>
+          {deadlines.length ? (
+            <>
+              <div className="team-deadline-counts">
+                <span data-overdue={overdue > 0}>{overdue} quá hạn</span>
+                <span>{soon} trong 7 ngày tới</span>
+              </div>
+              <ul className="team-deadline-list">
+                {deadlines.slice(0, 3).map(({ task, due }) => (
+                  <li key={task.id}>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onOpenTask(task.id)}
+                    >
+                      <span>{task.name}</span>
+                      <time dateTime={task.deadline} data-overdue={due < now}>
+                        {dateFmt(due, { year: "numeric" })} · {timeFmt(due)}
+                      </time>
+                      {icon("arrow")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="team-deadline-empty">
+              Chưa có hạn chót cho công việc đang chờ nhận hoặc đang làm.
+            </p>
+          )}
+        </section>
       </div>
     </>
   );

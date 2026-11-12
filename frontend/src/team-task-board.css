@@ -30,7 +30,7 @@
 }
 .team-board-toolbar .team-board-tabs button {
   padding: 8px 10px;
-  color: #647b96;
+  color: #000;
 }
 .team-board-toolbar .team-board-tabs button.active {
   color: #2164be;
@@ -40,7 +40,7 @@
   align-items: center;
   gap: 7px;
   font-size: 11px;
-  color: #778ba3;
+  color: #000;
 }
 .team-board-sort select {
   max-width: 150px;
@@ -50,7 +50,7 @@
   border-radius: 7px;
   background: #fff;
   font: inherit;
-  color: #476481;
+  color: #000;
 }
 .team-status-filters {
   display: flex;
@@ -66,7 +66,7 @@
   border-radius: 7px;
   padding: 7px 9px;
   background: #fff;
-  color: #71839b;
+  color: #000;
   font: inherit;
   font-size: 11px;
   cursor: pointer;
@@ -162,7 +162,7 @@
   align-items: center;
   gap: 5px;
   font-size: 11px;
-  color: #788ca4;
+  color: #000;
 }
 .team-task-row-facts .icon {
   width: 12px;
@@ -174,7 +174,7 @@
   display: grid;
   gap: 8px;
   font-size: 11px;
-  color: #7489a1;
+  color: #000;
 }
 .team-task-row-owner > span {
   overflow: hidden;
@@ -193,7 +193,7 @@
 .team-row-progress strong {
   font-size: 10px;
   font-weight: 500;
-  color: #6b88aa;
+  color: #000;
 }
 .team-task-row-actions {
   display: grid;
@@ -221,7 +221,7 @@
   border: 0;
   padding: 6px 9px;
   border-radius: 7px;
-  color: #748ba8;
+  color: #000;
   background: transparent;
   font: inherit;
   font-size: 11px;
@@ -252,18 +252,18 @@
 }
 .team-row-requirements > strong {
   font-size: 12px;
-  color: #49698e;
+  color: #000;
 }
 .team-row-requirements > p {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 12px;
-  color: #617c9b;
+  color: #000;
   line-height: 1.8;
   margin: 10px 0;
 }
 .team-row-requirements > small {
-  color: #8b9db2;
+  color: #000;
   font-size: 10px;
 }
 .team-row-review-note {
@@ -279,7 +279,7 @@
   flex-wrap: wrap;
   gap: 10px;
   font-size: 11px;
-  color: #8396af;
+  color: #000;
 }
 .team-row-secondary-actions > p {
   display: flex;
@@ -305,12 +305,12 @@
   display: grid;
   justify-items: center;
   gap: 12px;
-  color: #8a9eb7;
+  color: #000;
   text-align: center;
 }
 .team-board-no-results > strong {
   font-size: 13px;
-  color: #5b789b;
+  color: #000;
 }
 .team-board-no-results > p {
   margin: 0;
@@ -324,7 +324,7 @@
   gap: 12px;
   padding-top: 16px;
   font-size: 11px;
-  color: #8296af;
+  color: #000;
 }
 .team-board-pagination > div {
   display: flex;

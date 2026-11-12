@@ -1,0 +1,302 @@
+.planning-console .workspace-rail-add {
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  margin-left: 3px;
+  border-radius: 50%;
+}
+
+.workspace-section-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 10px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.workspace-section-links :is(a, button) {
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workspace-section-links
+  :is(a, button):is(:hover, [aria-current="page"], [aria-pressed="true"]) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.report-tabs {
+  margin-bottom: 12px;
+}
+
+.workspace-rail-tools {
+  display: none;
+}
+
+.planning-console:is(
+    [data-route="tasks"],
+    [data-route="insights"],
+    [data-route="time"]
+  )
+  .page-header p {
+  display: none;
+}
+
+@media (min-width: 801px) {
+  .planning-console {
+    --nav-rail-width: 66px;
+  }
+
+  .planning-console[data-nav-mode="compact"] {
+    padding: 0;
+    column-gap: 0;
+  }
+
+  .planning-console[data-nav-mode="compact"] .topbar {
+    top: 0;
+    background: #fff;
+    border-width: 0 0 1px;
+    border-color: var(--line);
+    box-shadow: none;
+  }
+
+  .planning-console[data-nav-mode="compact"]:not([data-route="agent"])
+    .content {
+    padding-inline: 14px;
+  }
+
+  .planning-console[data-nav-mode="compact"] .sidebar {
+    top: 0;
+    height: 100dvh;
+    border-width: 0 1px 0 0;
+    background: #fff;
+    color: #000;
+    border-color: var(--line);
+    box-shadow: none;
+  }
+
+  .planning-console[data-nav-mode="compact"] .workspace-rail-tools {
+    display: grid;
+    justify-content: center;
+    gap: 4px;
+    padding-block: 5px;
+  }
+
+  .workspace-rail-tools > button,
+  .rail-account-trigger {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 40px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .workspace-rail-tools > button:is(:hover, :focus-visible),
+  .rail-account-trigger:is(:hover, :focus-visible) {
+    background: var(--accent-soft);
+  }
+
+  .workspace-rail-tools > button:focus-visible,
+  .rail-account-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .workspace-rail-tools .icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .planning-console[data-nav-mode="compact"] .sidebar:has(.rail-account[open]) {
+    overflow: visible;
+    z-index: 60;
+  }
+
+  .rail-account {
+    position: relative;
+  }
+
+  .rail-account-trigger {
+    list-style: none;
+    border-radius: 3px;
+  }
+
+  .rail-account-trigger::-webkit-details-marker {
+    display: none;
+  }
+
+  .rail-account-panel {
+    position: absolute;
+    inset: auto auto 0 calc(100% + 10px);
+    width: 280px;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: #000;
+    box-shadow: 0 5px 18px #12294126;
+  }
+
+  .rail-account-section {
+    padding-block: 4px;
+    border-top: 1px solid var(--line);
+  }
+
+  .rail-account-panel button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 14px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .rail-account-panel button:is(:hover, :focus-visible) {
+    background: var(--accent-soft);
+  }
+
+  .rail-account-panel .rail-account-identity {
+    min-height: 64px;
+  }
+
+  .rail-account-identity .avatar,
+  .rail-account-panel .icon {
+    flex-shrink: 0;
+  }
+
+  .rail-account-identity :is(strong, small) {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  .workspace-rail-tools .notification-number {
+    position: absolute;
+    top: 3px;
+    right: 2px;
+    margin: 0;
+    background: #c92a42;
+    color: white;
+  }
+
+  .planning-console[data-nav-mode="compact"] .user-mini {
+    display: none;
+  }
+
+  .planning-console[data-nav-mode="compact"] .sidebar-bottom {
+    margin-top: auto;
+    padding-top: 4px;
+    border: 0;
+  }
+
+  .planning-console[data-nav-mode="compact"] .sidebar .nav-label,
+  .planning-console[data-nav-mode="compact"]
+    .sidebar
+    .nav-group:not(:has([data-rail-label])),
+  .planning-console[data-nav-mode="compact"]
+    .sidebar
+    .nav-link:not([data-rail-label]),
+  .planning-console[data-nav-mode="compact"] .sidebar .nav-text {
+    display: none;
+  }
+
+  .planning-console[data-nav-mode="compact"]
+    .sidebar
+    .nav-link[data-rail-label] {
+    display: grid;
+    justify-items: center;
+    justify-content: center;
+    gap: 2px;
+    height: auto;
+    min-height: 45px;
+    padding: 5px 0;
+    color: inherit;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .planning-console[data-nav-mode="compact"]
+    .sidebar
+    .nav-link[data-rail-label]::after {
+    content: attr(data-rail-label);
+    font-size: 9px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+
+  .planning-console[data-nav-mode="compact"]
+    .sidebar
+    .nav-link[data-rail-current] {
+    background: var(--accent-soft);
+    border-inline-start-color: var(--accent);
+    color: #000;
+  }
+
+  .planning-console[data-nav-mode="compact"]
+    .sidebar
+    .nav-link[data-rail-label]:hover {
+    background: var(--accent-soft);
+  }
+}
+
+@media (max-width: 800px) {
+  .planning-console .topbar .menu-labels-control {
+    display: none;
+  }
+}
+.planned-date-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.planned-date-link:hover {
+  text-decoration: underline;
+}
+
+.planned-date-link .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.planning-console
+  :is(.timesheet-summary, .team-task-summary)
+  > summary {
+  width: fit-content;
+  padding: 6px 0;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.planning-console
+  .analytics-panel
+  .analytics-metrics
+  > div {
+  background: #fff;
+  border-color: var(--line);
+  border-radius: 0;
+}

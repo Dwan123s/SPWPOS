@@ -15,7 +15,7 @@ public sealed partial class PlanningEngine
         var end = input.WindowEnd ?? start.AddDays(input.HorizonDays);
         var bias = input.UseEstimateBias ? Biases(state) : [new BiasView("All", 0, 1, false)];
         var selected = input.AffectedTaskIds is null ? null : AffectedClosure(state, input.AffectedTaskIds);
-        var urgent = state.Tasks.Where(x => x.Priority == 4 && Remaining(x, bias) > 0 &&
+        var urgent = state.Tasks.Where(x => x.HasPlanningDetails && x.Priority == 4 && Remaining(x, bias) > 0 &&
             (selected is null || selected.Contains(x.Id)) &&
             (protection?.RequestedUrgentTaskIds is null || protection.RequestedUrgentTaskIds.Contains(x.Id))).Select(x => x.Id).ToHashSet();
         if (urgent.Count == 0) return GenerateCore(state, input, now, protection);
@@ -35,7 +35,7 @@ public sealed partial class PlanningEngine
         var tasks = state.Tasks.ToDictionary(x => x.Id);
         var movable = state.Sessions.Where(x => x.Status == WorkSessionStatus.Scheduled && !x.IsLocked &&
             x.Start >= start && x.Start < end && !prerequisites.Contains(x.TaskId) && protection?.RetainedSessionIds.Contains(x.Id) != true &&
-            tasks.ContainsKey(x.TaskId)).ToArray();
+            tasks.TryGetValue(x.TaskId, out var task) && task.HasPlanningDetails).ToArray();
         if (movable.Length == 0) return GenerateCore(state, input, now, protection);
         var movableIds = movable.Select(x => x.Id).ToHashSet();
         var trial = GenerateCore(state with { Sessions = state.Sessions.Where(x => !movableIds.Contains(x.Id)).ToArray() },
@@ -63,9 +63,10 @@ public sealed partial class PlanningEngine
         var moves = released.GroupBy(x => x.TaskId).ToDictionary(group => group.Key, group =>
         {
             var task = tasks[group.Key];
-            var near = task.Deadline - now <= NearDeadlineWindow;
-            var latest = near ? task.Deadline : group.Min(x => Shift(x.End, Math.Clamp(input.UrgentDisplacementDays, 2, 30)));
-            if (latest > task.Deadline) latest = task.Deadline;
+            var deadline = task.Deadline!.Value;
+            var near = deadline - now <= NearDeadlineWindow;
+            var latest = near ? deadline : group.Min(x => Shift(x.End, Math.Clamp(input.UrgentDisplacementDays, 2, 30)));
+            if (latest > deadline) latest = deadline;
             var successors = state.Dependencies.Where(x => x.PredecessorId == task.Id).Select(x => x.TaskId).ToHashSet();
             foreach (var dependent in state.Sessions.Where(x => retained.Contains(x.Id) && successors.Contains(x.TaskId) && x.Start >= start))
                 if (dependent.Start < latest) latest = dependent.Start;

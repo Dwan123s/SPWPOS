@@ -28,7 +28,8 @@ export function TaskBoard({
   onCompose,
   error,
   onDialogChange,
-  openTaskId,
+  taskToOpen,
+  onTaskOpened,
   ...actions
 }) {
   const [scope, setScope] = useState("all");
@@ -37,7 +38,11 @@ export function TaskBoard({
   const [sort, setSort] = useState("deadline");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState(null);
-  useEffect(() => { if (openTaskId) setSelectedId(openTaskId); }, [openTaskId]);
+  useEffect(() => {
+    if (!taskToOpen) return;
+    setSelectedId(taskToOpen.taskId);
+    onTaskOpened();
+  }, [taskToOpen, onTaskOpened]);
   const selectedTask = detail.tasks.find((task) => task.id === selectedId);
   const dialogOpen = !!selectedTask;
   useEffect(() => {

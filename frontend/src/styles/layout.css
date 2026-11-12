@@ -84,7 +84,7 @@ textarea:focus-visible {
   font-weight: 500;
   border-radius: 5px;
   background: #eef2f5;
-  color: #546673;
+  color: #000;
   padding: 3px 7px;
 }
 .badge.purple {
@@ -236,7 +236,7 @@ textarea:focus-visible {
   gap: 9px;
   align-items: center;
   font-size: 12px;
-  color: #4c606e;
+  color: #000;
   margin: 30px 8px 18px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
@@ -277,7 +277,7 @@ textarea:focus-visible {
   margin-left: auto;
   font-family: inherit;
   font-size: 10px;
-  color: #738693;
+  color: #000;
   border: 1px solid #dee6eb;
   border-radius: 4px;
   background: white;
@@ -293,7 +293,7 @@ textarea:focus-visible {
   font-size: 10px;
   letter-spacing: 1.2px;
   font-weight: 600;
-  color: #728695;
+  color: #000;
   padding: 0 12px;
   margin: 22px 0 7px;
 }
@@ -304,7 +304,7 @@ textarea:focus-visible {
   width: 100%;
   background: transparent;
   border: 0;
-  color: #5a6d7a;
+  color: #000;
   padding: 11px 12px;
   border-radius: 7px;
   font-size: 12px;
@@ -315,7 +315,7 @@ textarea:focus-visible {
 .nav button .icon {
   width: 17px;
   height: 17px;
-  color: #708695;
+  color: #000;
 }
 .nav button:hover {
   background: #f2f6f9;
@@ -351,13 +351,13 @@ textarea:focus-visible {
   width: 27px;
   height: 27px;
   background: #e5eef4;
-  color: #4e6b7f;
+  color: #000;
   border-radius: 7px;
   margin-bottom: 10px;
 }
 .side-note strong {
   display: block;
-  color: #455a69;
+  color: #000;
   font-size: 11px;
   line-height: 1.6;
 }
@@ -371,7 +371,7 @@ textarea:focus-visible {
   padding: 0;
   min-height: 24px;
   font-size: 11px;
-  color: #4d677a;
+  color: #000;
 }
 .user-mini {
   display: flex;
@@ -447,11 +447,11 @@ textarea:focus-visible {
   font-size: 11px;
 }
 .breadcrumb span {
-  color: #b1bdc6;
+  color: #000;
 }
 .breadcrumb strong {
   font-weight: 500;
-  color: #3c5261;
+  color: #000;
 }
 .topbar-right {
   display: flex;
@@ -532,7 +532,7 @@ textarea:focus-visible {
   justify-content: space-between;
   gap: 16px;
   font-size: 11px;
-  color: #748795;
+  color: #000;
   margin-top: 32px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
@@ -565,7 +565,7 @@ textarea:focus-visible {
 }
 .stat-icon.green {
   background: #e6f0f8;
-  color: #527c9a;
+  color: #000;
 }
 .stat-icon.amber {
   background: #fbf2e4;
@@ -639,7 +639,7 @@ textarea:focus-visible {
   gap: 12px;
   position: relative;
   z-index: 1;
-  color: #4a667a;
+  color: #000;
   font-size: 11px;
 }
 .focus-status .badge {
@@ -662,7 +662,7 @@ textarea:focus-visible {
 .focus-card p {
   font-size: 12px;
   line-height: 1.8;
-  color: #586e7e;
+  color: #000;
   margin: 0;
   max-width: 540px;
 }
@@ -678,7 +678,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 7px;
   font-size: 11px;
-  color: #536b7c;
+  color: #000;
 }
 .focus-duration .icon {
   width: 15px;
@@ -700,14 +700,14 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #556876;
+  color: #000;
   font-size: 11px;
 }
 .summary-icon {
   display: grid;
   place-items: center;
   background: #ebf2f7;
-  color: #5984a3;
+  color: #000;
   width: 28px;
   height: 28px;
   border-radius: 8px;
@@ -719,7 +719,7 @@ textarea:focus-visible {
 .day-count {
   font-size: 38px;
   font-weight: 600;
-  color: #314452;
+  color: #000;
   letter-spacing: -1.5px;
   margin: 20px 0 14px;
   line-height: 1;
@@ -808,7 +808,7 @@ textarea:focus-visible {
   font-size: 11px;
   text-align: right;
   white-space: nowrap;
-  color: #506472;
+  color: #000;
 }
 .priority-task-deadline small {
   display: block;
@@ -854,7 +854,7 @@ textarea:focus-visible {
 }
 .reflection-metrics small {
   font-size: 13px;
-  color: #80919d;
+  color: #000;
   font-weight: 400;
 }
 .reflection-card > .reason {
@@ -900,12 +900,12 @@ textarea:focus-visible {
 }
 .session-time {
   font-size: 11px;
-  color: #627888;
+  color: #000;
   margin: 7px 0;
 }
 .session-card .reason {
   font-size: 11px;
-  color: #6f8594;
+  color: #000;
   line-height: 1.7;
 }
 .session-card .badge {
@@ -963,7 +963,7 @@ textarea:focus-visible {
   background: #e7eef3;
   border-radius: 5px;
   padding: 1px 6px;
-  color: #728694;
+  color: #000;
 }
 .task-workspace {
   padding: 0;
@@ -1043,7 +1043,7 @@ textarea:focus-visible {
 .task-heading {
   font-size: 10px;
   letter-spacing: 0.9px;
-  color: #677d8c;
+  color: #000;
   min-height: 45px;
   padding: 12px 0;
 }
@@ -1197,12 +1197,12 @@ textarea:focus-visible {
   font-size: 24px;
   line-height: 1.25;
   letter-spacing: -0.5px;
-  color: #4b5d69;
+  color: #000;
   font-weight: 500;
 }
 .week-day-header small {
   font-size: 10px;
-  color: #7d8f9c;
+  color: #000;
 }
 .week-day.today .week-day-header strong {
   display: grid;
@@ -1263,7 +1263,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  color: #667f91;
+  color: #000;
   margin-top: auto;
 }
 .block-meta .icon {
@@ -1274,21 +1274,21 @@ textarea:focus-visible {
   background: #f1f6f9;
   border-color: #dee7ee;
   border-left-color: #99b0c0;
-  color: #577285;
+  color: #000;
 }
 .calendar-block.fixed-event .block-meta {
-  color: #7c95a7;
+  color: #000;
 }
 .calendar-block.completed {
   background: #edf5fa;
   border-left-color: #7ba6c5;
-  color: #4f748f;
+  color: #000;
 }
 .calendar-block.active-session {
   background: #edf5fa;
   border-color: #d6e6f2;
   border-left-color: #8eafc6;
-  color: #6187a2;
+  color: #000;
 }
 .calendar-block.inactive {
   opacity: 0.7;
@@ -1296,7 +1296,7 @@ textarea:focus-visible {
   background: #f3f6f8;
 }
 .calendar-empty {
-  color: #c0cbd2;
+  color: #000;
   text-align: center;
   font-size: 26px;
   margin-top: 50px;
@@ -1304,7 +1304,7 @@ textarea:focus-visible {
 .calendar-empty span {
   display: block;
   font-size: 11px;
-  color: #8193a0;
+  color: #000;
 }
 .calendar-hint {
   display: flex;
@@ -1353,7 +1353,7 @@ textarea:focus-visible {
 .agenda-day-label strong {
   display: block;
   font-size: 28px;
-  color: #5e7484;
+  color: #000;
   font-weight: 500;
 }
 .agenda-day-label span {
@@ -1373,7 +1373,7 @@ textarea:focus-visible {
 }
 .field {
   font-size: 12px;
-  color: #405665;
+  color: #000;
   gap: 8px;
   font-weight: 500;
 }
@@ -1394,7 +1394,7 @@ textarea:focus-visible {
 }
 .field input:disabled {
   background: #f4f6f8;
-  color: #8293a0;
+  color: #000;
 }
 .form-actions {
   flex-wrap: wrap;
@@ -1444,11 +1444,11 @@ textarea:focus-visible {
 .empty svg {
   width: 30px;
   height: 30px;
-  color: #859eb0;
+  color: #000;
 }
 .empty h3 {
   font-size: 13px;
-  color: #445b6c;
+  color: #000;
   font-weight: 500;
 }
 .empty p {
@@ -1477,17 +1477,17 @@ textarea:focus-visible {
   overflow-wrap: anywhere;
 }
 .profile-hero-bio {
-  color: #5e7586;
+  color: #000;
 }
 .profile-hero-info .badge {
   background: #d6e5ef;
   border: 0;
-  color: #46657b;
+  color: #000;
   font-size: 11px;
 }
 .verified-tag {
   background: #d3e3ef;
-  color: #446780;
+  color: #000;
   font-size: 11px;
 }
 .avatar.profile-hero-avatar {
@@ -1497,7 +1497,7 @@ textarea:focus-visible {
   border: 3px solid #fff;
 }
 .avatar.profile-hero-avatar .avatar-initials {
-  color: #4f748f;
+  color: #000;
   font-size: 28px;
 }
 .settings-tabs-bar {
@@ -1525,7 +1525,7 @@ textarea:focus-visible {
 }
 .tab-count {
   background: #dee8ef;
-  color: #627b8d;
+  color: #000;
   font-size: 10px;
 }
 .settings-content-card {
@@ -1552,11 +1552,11 @@ textarea:focus-visible {
 }
 .step-box strong {
   font-size: 13px;
-  color: #456276;
+  color: #000;
 }
 .step-box p {
   font-size: 11px;
-  color: #637b8d;
+  color: #000;
 }
 .step-num {
   background: #6e8fa6;
@@ -1585,7 +1585,7 @@ textarea:focus-visible {
   opacity: 1;
 }
 .notification.read h3 {
-  color: #657988;
+  color: #000;
   font-weight: 500;
 }
 .notification.read .notification-dot {
@@ -1617,7 +1617,7 @@ td {
   fill: #7ba6c5;
 }
 .chart text {
-  fill: #677d8c;
+  fill: #000;
   font-size: 12px;
 }
 .chart line {
@@ -1630,7 +1630,7 @@ td {
   stroke: #8aa6ba;
 }
 .capacity-visual strong {
-  color: #3f596b;
+  color: #000;
 }
 .admin-grid {
   display: grid;
@@ -1744,7 +1744,7 @@ dialog::backdrop {
 }
 .auth-story-content > .eyebrow {
   font-size: 11px;
-  color: #5a778c;
+  color: #000;
   margin-bottom: 18px;
 }
 .auth-story h1 {
@@ -1755,12 +1755,12 @@ dialog::backdrop {
   margin: 0 0 22px;
 }
 .auth-story h1 span {
-  color: #5d88a6;
+  color: #000;
 }
 .auth-story-content > p {
   font-size: 13px;
   line-height: 1.9;
-  color: #607788;
+  color: #000;
   max-width: 385px;
   margin: 0 0 33px;
 }
@@ -1784,7 +1784,7 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #495f6e;
+  color: #000;
   font-size: 12px;
   font-weight: 600;
 }
@@ -1795,7 +1795,7 @@ dialog::backdrop {
 .preview-header > small {
   font-size: 10px;
   letter-spacing: 1px;
-  color: #869aa9;
+  color: #000;
 }
 .preview-slot {
   display: grid;
@@ -1807,7 +1807,7 @@ dialog::backdrop {
 .preview-slot time {
   font-size: 11px;
   padding-top: 14px;
-  color: #7b91a1;
+  color: #000;
 }
 .preview-session {
   background: #e7f0f7;
@@ -1820,7 +1820,7 @@ dialog::backdrop {
   font-size: 10px;
   letter-spacing: 1px;
   font-weight: 600;
-  color: #6889a1;
+  color: #000;
 }
 .preview-session strong {
   display: block;
@@ -1830,16 +1830,16 @@ dialog::backdrop {
 }
 .preview-session small {
   font-size: 10px;
-  color: #6c879b;
+  color: #000;
 }
 .preview-session.secondary {
   background: #e9f1f6;
   border-left-color: #7da3bf;
-  color: #496a82;
+  color: #000;
 }
 .preview-session.secondary > span,
 .preview-session.secondary small {
-  color: #7290a5;
+  color: #000;
 }
 .preview-break {
   align-items: center;
@@ -1852,7 +1852,7 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #879dad;
+  color: #000;
   font-size: 11px;
   padding-left: 15px;
 }
@@ -1865,7 +1865,7 @@ dialog::backdrop {
   align-items: center;
   gap: 7px;
   font-size: 10px;
-  color: #758b9a;
+  color: #000;
   padding-top: 14px;
   border-top: 1px solid #e6ecf1;
   margin-top: 18px;
@@ -1873,13 +1873,13 @@ dialog::backdrop {
 .preview-footer .icon {
   width: 14px;
   height: 14px;
-  color: #7d9bb1;
+  color: #000;
 }
 .auth-benefits {
   display: flex;
   gap: 23px;
   margin-top: 26px;
-  color: #728a9c;
+  color: #000;
   font-size: 11px;
   flex-wrap: wrap;
 }
@@ -1893,7 +1893,7 @@ dialog::backdrop {
   height: 14px;
 }
 .story-bottom {
-  color: #7a92a3;
+  color: #000;
   font-size: 11px;
 }
 .auth-area {
@@ -1911,7 +1911,7 @@ dialog::backdrop {
 }
 .auth-card > .eyebrow {
   margin-bottom: 14px;
-  color: #72899a;
+  color: #000;
   font-size: 11px;
 }
 .fb-header-row {
@@ -1995,7 +1995,7 @@ dialog::backdrop {
   justify-content: center;
   gap: 6px;
   font-size: 11px;
-  color: #8193a0;
+  color: #000;
   margin-top: 33px;
 }
 .auth-security .icon {
@@ -2005,7 +2005,7 @@ dialog::backdrop {
 .auth-area-footer {
   font-size: 10px;
   letter-spacing: 1.7px;
-  color: #90a1ad;
+  color: #000;
   padding-top: 38px;
 }
 .auth-mobile-brand {
@@ -2796,24 +2796,24 @@ dialog::backdrop {
 .preview-header > small,
 .preview-break > span,
 .preview-footer {
-  color: #5c6f7d;
+  color: #000;
 }
 .preview-session > span,
 .preview-session small {
-  color: #4e6b7f;
+  color: #000;
 }
 .preview-session.secondary > span,
 .preview-session.secondary small {
-  color: #446278;
+  color: #000;
 }
 .calendar-block.fixed-event .block-meta {
-  color: #5c7587;
+  color: #000;
 }
 .priority-task-deadline small {
-  color: #5c6f7d;
+  color: #000;
 }
 .reflection-metrics small {
-  color: #5c6f7d;
+  color: #000;
 }
 .auth-story h1 span {
   color: #0789bd;

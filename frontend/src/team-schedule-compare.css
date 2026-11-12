@@ -21,7 +21,7 @@
 .team-claim-option-readable .team-plan-reasons {
   font-size: 13px;
   line-height: 1.7;
-  color: #526783;
+  color: #000;
 }
 .team-schedule-comparison {
   min-width: 0;
@@ -46,7 +46,7 @@
   border: 1px solid #dde5f0;
   border-radius: 9px;
   background: #f4f7fb;
-  color: #425776;
+  color: #000;
   font-size: 12px;
 }
 .team-compare-stats > .is-proposed {
@@ -94,7 +94,7 @@
   margin: 12px 0;
   font-size: 13px;
   line-height: 1.6;
-  color: #526783;
+  color: #000;
 }
 .team-compare-scroll {
   max-height: min(64dvh, 650px);
@@ -129,7 +129,7 @@
 .team-compare-columns > div > .icon {
   width: 22px;
   height: 22px;
-  color: #536f90;
+  color: #000;
   flex-shrink: 0;
 }
 .team-compare-columns > div + div > .icon {
@@ -144,7 +144,7 @@
 .team-compare-columns p {
   margin: 3px 0 0;
   font-size: 12px;
-  color: #4a6382;
+  color: #000;
 }
 .team-compare-day > header {
   display: flex;
@@ -166,7 +166,7 @@
 }
 .team-compare-day > header > span {
   font-size: 11px;
-  color: #526783;
+  color: #000;
 }
 .team-compare-day-columns {
   display: grid;
@@ -236,7 +236,7 @@
   width: 16px;
   height: 16px;
   margin-right: 2px;
-  color: #607998;
+  color: #000;
 }
 .team-compare-badge {
   display: inline-flex;
@@ -246,7 +246,7 @@
   border: 1px solid #d7e0eb;
   border-radius: 7px;
   background: #f1f5f9;
-  color: #4a607c;
+  color: #000;
   font-size: 10px;
   font-weight: 650;
   white-space: nowrap;
@@ -276,7 +276,7 @@
 .team-compare-duration,
 .team-compare-previous {
   display: block;
-  color: #526783;
+  color: #000;
   font-size: 12px;
   line-height: 1.6;
 }
@@ -290,7 +290,7 @@
   gap: 8px;
   margin: 0;
   padding: 18px 10px;
-  color: #62748c;
+  color: #000;
   font-size: 13px;
   line-height: 1.7;
 }
@@ -304,7 +304,7 @@
   display: block;
   margin-top: 9px;
   font-size: 11px;
-  color: #526783;
+  color: #000;
 }
 @media (max-width: 680px) {
   .team-dialog.team-claim-dialog {

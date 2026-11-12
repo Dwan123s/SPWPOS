@@ -4,16 +4,27 @@ import {
   button,
   icon,
   dateFmt,
+  dayKey,
   timeFmt,
   minutes,
   riskLabels,
 } from "./ui.jsx";
-import { dashboardModel } from "./dashboard-model.js";
+import { dashboardModel, nextDay } from "./dashboard-model.js";
 import { TodayWorkload } from "./workload.jsx";
+import { CapacityRibbon } from "./capacity-ribbon.jsx";
+import { useWorkloadRequest } from "./workload-data.js";
+import { openTeamTask } from "./team-task-link.js";
 import { ScheduledFocus } from "./scheduled-focus.jsx";
 import { UpcomingFocus } from "./focus-timer.jsx";
 import { EisenhowerFocus } from "./eisenhower.jsx";
+import { PopupDetails } from "./popup-dismissal.jsx";
+import availabilityArt from "./assets/home-setup/availability.webp";
+import calendarArt from "./assets/home-setup/google-calendar.webp";
+import tasksArt from "./assets/home-setup/tasks.webp";
+import planArt from "./assets/home-setup/plan.webp";
+import teamsArt from "./assets/home-setup/teams.webp";
 import "./styles/dashboard-insights.css";
+import "./styles/today-home.css";
 import {
   CalendarClock,
   calendarPhase,
@@ -43,7 +54,77 @@ function ToolButton({
     </button>
   );
 }
-export { CapacityRibbon } from "./capacity-ribbon.jsx";
+function DaySummary({ summary, hasAvailability, now, progress }) {
+  const { work, elapsed, capacity, completed, remaining } = summary;
+  const planned = completed + remaining;
+  const difference = capacity - remaining;
+  return (
+    <PopupDetails className="home-day-summary">
+      <summary
+        className="home-day-date"
+        aria-label="Tóm tắt lịch hôm nay"
+        title="Tóm tắt lịch hôm nay"
+      >
+        <span>
+          <strong>Hôm nay</strong>, {dateFmt(now)}
+        </span>
+        <progress
+          className="home-day-progress"
+          aria-label="Tỷ lệ thời gian đã trôi qua trong lịch hôm nay"
+          max={100}
+          value={progress}
+        />
+      </summary>
+      <div className="home-day-summary-panel">
+        <section aria-label="Giờ làm việc">
+          <header>
+            <strong>Giờ làm việc</strong>
+            <strong>{minutes(work)}</strong>
+          </header>
+          <progress
+            aria-label="Giờ làm đã qua"
+            value={elapsed}
+            max={work || 1}
+          />
+          <div className="home-day-summary-legend">
+            <span>{minutes(elapsed)} đã qua</span>
+            <span>{minutes(work - elapsed)} còn lại</span>
+          </div>
+        </section>
+        <section aria-label="Công việc đã xếp lịch">
+          <header>
+            <strong>Việc đã xếp lịch</strong>
+            <strong>{minutes(planned)}</strong>
+          </header>
+          <progress
+            aria-label="Thời lượng phiên đã hoàn thành"
+            value={completed}
+            max={planned || 1}
+          />
+          <div className="home-day-summary-legend">
+            <span>{minutes(completed)} đã hoàn thành</span>
+            <span>{minutes(remaining)} còn lại</span>
+          </div>
+        </section>
+        <div className="home-day-summary-note">
+          {hasAvailability ? (
+            <>
+              <p>Còn {minutes(capacity)} để làm việc sau khi trừ sự kiện.</p>
+              <strong data-shortfall={difference < 0 || undefined}>
+                {difference < 0
+                  ? `Thiếu ${minutes(-difference)} cho các phiên chưa xong.`
+                  : `Còn trống ${minutes(difference)} sau khi tính các phiên chưa xong.`}
+              </strong>
+            </>
+          ) : (
+            button("Thiết lập giờ làm", "nav", "secondary small", "time")
+          )}
+        </div>
+        {button("Mở lịch làm việc", "nav", "ghost small", "calendar")}
+      </div>
+    </PopupDetails>
+  );
+}
 function DayRunway({ model, now }) {
   const [view, setView] = useState("agenda");
   const preference = state.workspace.preference;
@@ -71,40 +152,34 @@ function DayRunway({ model, now }) {
     return { ...item, lane };
   });
   const laneCount = Math.max(1, lanes.length);
+  const planned = timeline.filter((item) => item.status !== "Completed");
+  const completed = timeline.filter((item) => item.status === "Completed");
+  const deadlines = new Map(
+    state.workspace.tasks.map((task) => [task.id, task.deadline]),
+  );
   return (
     <section className="runway-card daily-schedule" aria-label="Lịch hôm nay">
-      <div className="runway-toolbar">
-        <span>
-          {icon("calendar")} {dateFmt(now, { weekday: "long" })}
-        </span>
-        <span>{model.timeline.length} lịch</span>
-        <ToolButton
-          label="Mở lịch làm việc"
-          id="calendar"
-          symbol="calendar"
-          text="Mở lịch"
+      <header className="home-agenda-heading">
+        <ToolButton label="Thêm sự kiện" action="new-event" symbol="plus" />
+        <DaySummary
+          summary={model.daySummary}
+          hasAvailability={model.hasAvailability}
+          now={now}
+          progress={model.calendarStats.percent}
         />
-      </div>
-      <div
-        className="daily-schedule-views"
-        role="group"
-        aria-label="Cách xem lịch hôm nay"
-      >
         <button
+          className="console-icon-button home-agenda-expand"
           type="button"
-          aria-pressed={view === "agenda"}
-          onClick={() => setView("agenda")}
-        >
-          Danh sách lịch
-        </button>
-        <button
-          type="button"
+          aria-label="Dòng thời gian"
+          title={
+            view === "timeline" ? "Về danh sách lịch" : "Mở dòng thời gian"
+          }
           aria-pressed={view === "timeline"}
-          onClick={() => setView("timeline")}
+          onClick={() => setView(view === "timeline" ? "agenda" : "timeline")}
         >
-          Dòng thời gian
+          {icon(view === "timeline" ? "collapse" : "expand")}
         </button>
-      </div>
+      </header>
       <div
         className="daily-schedule-scroll"
         role="region"
@@ -117,17 +192,46 @@ function DayRunway({ model, now }) {
       >
         {view === "agenda" && (
           <div className="daily-agenda">
-            {timeline.map((item) => {
+            {[...planned, ...completed].map((item, index) => {
+              if (item.status === "Completed") {
+                const deadline = deadlines.get(item.taskId);
+                return (
+                  <Fragment key={`${item.kind}-${item.id}`}>
+                    {index === planned.length && (
+                      <h3 className="home-agenda-divider">Đã hoàn thành</h3>
+                    )}
+                    <button
+                      type="button"
+                      className="home-completed-session"
+                      data-action="session-detail"
+                      data-id={item.id}
+                    >
+                      <span className="home-completed-check">
+                        {icon("check")}
+                      </span>
+                      <span className="home-completed-info">
+                        <span>{item.taskName || item.name}</span>
+                        {Number.isFinite(Date.parse(deadline)) && (
+                          <time
+                            className="home-completed-due"
+                            dateTime={deadline}
+                          >
+                            Hạn {dateFmt(deadline)}
+                          </time>
+                        )}
+                      </span>
+                    </button>
+                  </Fragment>
+                );
+              }
               const rest = model.breaks.find(
                 (rest) => rest.span[0] === item.span[1],
               );
               const phase = calendarPhase(item.start, item.end, now);
-              const status =
-                item.status === "Completed" ? "Đã xong" : calendarPhases[phase];
               return (
                 <Fragment key={`${item.kind}-${item.id}`}>
                   <div
-                    className={`daily-agenda-row calendar-time-${phase} ${phase === "current" ? "is-active" : ""} ${item.status === "Completed" ? "is-completed" : ""}`}
+                    className={`daily-agenda-row calendar-time-${phase} ${phase === "current" ? "is-active" : ""}`}
                   >
                     <div className="daily-agenda-time">
                       <strong>{timeFmt(item.start)}</strong>
@@ -145,14 +249,8 @@ function DayRunway({ model, now }) {
                         <span
                           className={`daily-agenda-status status-${item.status || "event"}`}
                         >
-                          {icon(
-                            item.status === "Completed"
-                              ? "check"
-                              : item.kind === "event"
-                                ? "calendar"
-                                : "clock",
-                          )}
-                          {status}
+                          {icon(item.kind === "event" ? "calendar" : "clock")}
+                          {calendarPhases[phase]}
                         </span>
                         <span className="daily-agenda-duration">
                           {minutes(item.span[1] - item.span[0])}
@@ -447,7 +545,7 @@ function CapacityHorizon({ model }) {
               : "Chưa đặt giờ rảnh để tính khả năng xếp thêm."}
           </span>
           {!model.hasAvailability &&
-            button("Đặt giờ rảnh", "nav", "small ghost", "time", "clock")}
+            button("Đặt giờ làm việc", "nav", "small ghost", "time", "clock")}
         </div>
       )}
     </section>
@@ -563,177 +661,392 @@ function LiveIntelligence() {
     </CalendarClock>
   );
 }
-export function todayPage({ onWorkspaceChanged } = {}) {
-  const model = dashboardModel(state.workspace, state.insights);
-  const insights = state.insights;
+const setupSteps = [
+  {
+    title: "Giờ làm việc",
+    artwork: availabilityArt,
+    label: "Thiết lập",
+    action: "nav",
+    id: "time",
+  },
+  {
+    title: "Lịch Google",
+    artwork: calendarArt,
+    label: "Kết nối",
+    action: "calendar-connections",
+  },
+  {
+    title: "Công việc",
+    artwork: tasksArt,
+    label: "Thêm việc",
+    action: "new-task",
+  },
+  {
+    title: "Kế hoạch",
+    artwork: planArt,
+    label: "Lập lịch",
+    action: "generate-plan",
+  },
+  {
+    title: "Nhóm",
+    artwork: teamsArt,
+    label: "Mở nhóm",
+    action: "nav",
+    id: "teams",
+  },
+];
+
+function HomeSetup({ workspace, hasAvailability, onClose }) {
+  const readySteps = {
+    time: hasAvailability,
+    "new-task": workspace.tasks.length > 0,
+    "generate-plan": workspace.sessions.some(
+      (session) =>
+        session.status === "Scheduled" || session.status === "Completed",
+    ),
+  };
   return (
-    <>
-      <TodayWorkload onWorkspaceChanged={onWorkspaceChanged} />
-      <details className="today-overview" open>
-        <summary>Công việc, lịch và phân tích</summary>
-        <EisenhowerFocus />
-        <div className="planning-dashboard">
-        <section
-          className="console-column backlog-column"
-          aria-label="Danh sách công việc"
+    <section className="card home-panel" aria-labelledby="home-setup-heading">
+      <header className="home-panel-heading">
+        <h2 id="home-setup-heading">Bắt đầu</h2>
+        <button
+          className="btn ghost icon-only"
+          type="button"
+          onClick={onClose}
+          aria-label="Ẩn hướng dẫn"
+          title="Ẩn hướng dẫn"
         >
-          <div className="console-column-heading">
-            <div>
-              <h2>Công việc & ý tưởng</h2>
-            </div>
-            <ToolButton
-              label="Thêm công việc"
-              action="new-task"
-              symbol="plus"
-              text="Thêm việc"
-            />
-          </div>
-          <div className="backlog-panel">
-            <div className="backlog-toolbar">
-              <span>
-                <strong>{model.queue.length}</strong> công việc đang mở
-              </span>
-              <ToolButton
-                label="Mở danh sách công việc"
-                id="tasks"
-                symbol="tasks"
-                text="Xem tất cả"
+          {icon("close")}
+        </button>
+      </header>
+      <ul className="home-steps">
+        {setupSteps.map((step) => {
+          const ready = readySteps[step.id || step.action];
+          return (
+            <li key={step.title}>
+              <img
+                className="home-step-art"
+                src={step.artwork}
+                width={60}
+                height={60}
+                alt=""
+                decoding="async"
               />
+              <strong>{step.title}</strong>
+              {ready ? (
+                <span
+                  className="home-step-ready"
+                  role="img"
+                  aria-label="Đã hoàn thành"
+                >
+                  {icon("check")}
+                </span>
+              ) : (
+                button(step.label, step.action, "secondary small", step.id)
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function HomeDeadlines({ model, sessions }) {
+  const [range, setRange] = useState("week");
+  const end = nextDay(model.today, range === "day" ? 1 : 7);
+  const tasks = model.due.filter(
+    (task) =>
+      task.deadline &&
+      Number.isFinite(Date.parse(task.deadline)) &&
+      dayKey(task.deadline) < end,
+  );
+  const nextSession = new Map();
+  for (const session of sessions) {
+    if (!["Scheduled", "Running", "Paused"].includes(session.status)) continue;
+    if (!(Date.parse(session.end) > model.now)) continue;
+    const previous = nextSession.get(session.taskId);
+    if (!previous || Date.parse(session.start) < Date.parse(previous.start)) {
+      nextSession.set(session.taskId, session);
+    }
+  }
+  return (
+    <section
+      className="card home-panel"
+      aria-labelledby="home-deadlines-heading"
+    >
+      <header className="home-panel-heading">
+        <h2 id="home-deadlines-heading">Công việc sắp đến hạn</h2>
+        <select
+          aria-label="Khoảng thời gian đến hạn"
+          value={range}
+          onChange={(event) => setRange(event.target.value)}
+        >
+          <option value="week">7 ngày tới</option>
+          <option value="day">Hôm nay</option>
+        </select>
+      </header>
+      {tasks.length ? (
+        <div
+          className="home-table-wrap"
+          role="region"
+          aria-label="Lịch và hạn công việc"
+          tabIndex={0}
+        >
+          <table
+            className="home-table"
+            aria-labelledby="home-deadlines-heading"
+          >
+            <thead>
+              <tr>
+                <th scope="col">Công việc</th>
+                <th scope="col">Dự kiến</th>
+                <th scope="col">Thời lượng</th>
+                <th scope="col">Hạn chót</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.slice(0, 5).map((task) => {
+                const overdue = Date.parse(task.deadline) < model.now;
+                const dueToday = dayKey(task.deadline) === model.today;
+                const scheduled = nextSession.get(task.id);
+                return (
+                  <tr key={task.id}>
+                    <td>
+                      <button
+                        type="button"
+                        className="home-table-link"
+                        data-action="task-detail"
+                        data-id={task.id}
+                      >
+                        {icon("tasks")} {task.name}
+                      </button>
+                    </td>
+                    <td>
+                      {scheduled ? (
+                        <button
+                          type="button"
+                          className="planned-date-link"
+                          data-action="calendar-date"
+                          data-id={dayKey(scheduled.start)}
+                          aria-label={`Mở lịch dự kiến của ${task.name}`}
+                        >
+                          {dayKey(scheduled.start) === model.today
+                            ? "Hôm nay"
+                            : dateFmt(scheduled.start)}
+                        </button>
+                      ) : (
+                        "Chưa xếp"
+                      )}
+                    </td>
+                    <td>
+                      {task.estimatedMinutes
+                        ? minutes(task.estimatedMinutes)
+                        : "—"}
+                    </td>
+                    <td
+                      title={`${dateFmt(task.deadline)} · ${timeFmt(task.deadline)}`}
+                    >
+                      {overdue || dueToday ? (
+                        <span className="home-due-label" data-overdue={overdue}>
+                          {overdue ? "Quá hạn" : "Hôm nay"}
+                        </span>
+                      ) : (
+                        dateFmt(task.deadline)
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="home-empty">
+          <p>Không có việc đến hạn trong khoảng này.</p>
+        </div>
+      )}
+      <div className="home-panel-footer">
+        {button("Thêm công việc", "new-task", "ghost small", "", "plus")}
+        {button("Xem tất cả công việc", "open-task-list", "ghost small", "all")}
+      </div>
+    </section>
+  );
+}
+
+function HomeTeams() {
+  const { value, error, retry } = useWorkloadRequest(
+    "/api/teams",
+    Array.isArray,
+  );
+  return (
+    <section className="card home-panel" aria-labelledby="home-teams-heading">
+      <header className="home-panel-heading">
+        <h2 id="home-teams-heading">Nhóm của bạn</h2>
+      </header>
+      {error && (
+        <div className="home-empty" role="status">
+          <p>Chưa tải được danh sách nhóm.</p>
+          <button type="button" className="btn secondary small" onClick={retry}>
+            Thử lại
+          </button>
+        </div>
+      )}
+      {!error &&
+        (value?.length ? (
+          <>
+            <div className="home-table-wrap">
+              <table
+                className="home-table"
+                aria-labelledby="home-teams-heading"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">Nhóm</th>
+                    <th scope="col">Vai trò</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {value.slice(0, 4).map((team) => (
+                    <tr key={team.id}>
+                      <td>
+                        <button
+                          type="button"
+                          className="home-table-link"
+                          onClick={() => openTeamTask(team.id, null)}
+                        >
+                          {icon("users")} {team.name}
+                        </button>
+                      </td>
+                      <td>
+                        {team.role === "Leader" ? "Trưởng nhóm" : "Thành viên"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="backlog-queue">
-              {model.queue.length ? (
-                model.queue.slice(0, 12).map((task) => (
+            <div className="home-panel-footer">
+              {button("Quản lý nhóm", "nav", "secondary small", "teams")}
+            </div>
+          </>
+        ) : (
+          <div className="home-empty">
+            {value ? (
+              <>
+                <p>Bạn chưa tham gia nhóm nào.</p>
+                {button("Mở quản lý nhóm", "nav", "secondary small", "teams")}
+              </>
+            ) : (
+              <p role="status">Đang tải nhóm…</p>
+            )}
+          </div>
+        ))}
+    </section>
+  );
+}
+
+function TodayHome({ onWorkspaceChanged }) {
+  const [showSetup, setShowSetup] = useState(true);
+  const [showAgenda, setShowAgenda] = useState(true);
+  const workspace = state.workspace;
+  const boundaries = [
+    ...[...workspace.sessions, ...workspace.events].flatMap((item) => [
+      Date.parse(item.start),
+      Date.parse(item.end),
+    ]),
+    ...workspace.tasks.map((task) => Date.parse(task.deadline)),
+  ];
+  return (
+    <CalendarClock boundaries={boundaries}>
+      {(now) => {
+        const model = dashboardModel(workspace, state.insights, now);
+        return (
+          <div className="today-home" data-agenda-open={showAgenda}>
+            <header className="home-main-heading">
+              <div className="home-main-title">
+                <button
+                  type="button"
+                  className="console-icon-button home-agenda-toggle"
+                  aria-expanded={showAgenda}
+                  aria-controls="today-agenda"
+                  aria-label={
+                    showAgenda ? "Ẩn lịch trong ngày" : "Hiện lịch trong ngày"
+                  }
+                  title={
+                    showAgenda ? "Ẩn lịch trong ngày" : "Hiện lịch trong ngày"
+                  }
+                  onClick={() => setShowAgenda((open) => !open)}
+                >
+                  {icon("panelToggle")}
+                </button>
+                <h1 tabIndex="-1">Hôm nay</h1>
+              </div>
+              <div className="actions">
+                {!showSetup && (
                   <button
                     type="button"
-                    className="queue-card"
-                    key={task.id}
-                    data-action="task-detail"
-                    data-id={task.id}
+                    className="btn ghost small"
+                    onClick={() => setShowSetup(true)}
                   >
-                    <div className="queue-card-top">
-                      <span
-                        className={`queue-status ${task.status === "InProgress" ? "is-in-progress" : ""}`}
-                      />
-                      <strong>{task.name}</strong>
-                      {icon("arrow")}
-                    </div>
-                    <div className="queue-chips">
-                      <span>{minutes(task.remainingMinutes)}</span>
-                      <span
-                        className={`queue-priority priority-${task.priority}`}
-                      >
-                        {["", "Thấp", "Vừa", "Cao", "Khẩn"][task.priority]}
-                      </span>
-                      {task.dependencies?.length > 0 && <span>Phụ thuộc</span>}
-                    </div>
-                    <div className="queue-card-bottom">
-                      <span>
-                        {state.workspace.categories.find(
-                          (category) => category.id === task.categoryId,
-                        )?.name || "Chưa phân loại"}
-                      </span>
-                      <span>{dateFmt(task.deadline)}</span>
-                    </div>
-                    <div
-                      className="queue-progress"
-                      aria-label={`${task.progress}% hoàn thành`}
-                    >
-                      <span
-                        style={{
-                          width: `${Math.max(0, Math.min(100, task.progress))}%`,
-                        }}
-                      />
-                    </div>
+                    Hiện hướng dẫn
                   </button>
-                ))
-              ) : (
-                <div className="console-empty">
-                  <h3>Bắt đầu từ việc bạn cần làm</h3>
-                  <p>
-                    Viết vài dòng để AI giúp nhận diện công việc, hoặc tự thêm
-                    từng việc.
-                  </p>
+                )}
+                <ToolButton label="Thêm việc" action="new-task" symbol="plus" />
+              </div>
+            </header>
+            <div className="home-agenda-track" inert={!showAgenda}>
+              <aside
+                id="today-agenda"
+                className="home-agenda"
+                aria-label="Lịch trong ngày"
+              >
+                <DayRunway model={model} now={now} />
+                <div className="home-agenda-footer">
                   {button(
-                    "Nhập việc cần làm",
-                    "nav",
-                    "small primary",
-                    "notes",
-                    "edit",
-                  )}
-                  {button(
-                    "Thêm việc thủ công",
-                    "new-task",
-                    "small secondary",
+                    "Kết nối lịch Google",
+                    "calendar-connections",
+                    "secondary small",
                     "",
-                    "plus",
+                    "clock",
                   )}
                 </div>
+              </aside>
+            </div>
+            <div className="home-main">
+              {showSetup && (
+                <HomeSetup
+                  workspace={workspace}
+                  hasAvailability={model.hasAvailability}
+                  onClose={() => setShowSetup(false)}
+                />
               )}
-            </div>
-            <button
-              type="button"
-              className="queue-capture"
-              data-action="capture"
-            >
-              {icon("spark")}Ghi nhanh một ý tưởng<span>+</span>
-            </button>
-          </div>
-          <button
-            type="button"
-            className="console-note-link"
-            data-action="nav"
-            data-id="notes"
-          >
-            {icon("edit")}
-            <span>
-              <strong>Nhập việc</strong>
-              <small>Nhập việc cần làm, để AI giúp tạo lịch</small>
-            </span>
-            {icon("arrow")}
-          </button>
-        </section>
-        <section
-          className="console-column runway-column"
-          aria-label="Lịch và phiên tập trung"
-        >
-          <div className="console-column-heading">
-            <div>
-              <h2>Lịch hôm nay & tập trung</h2>
-            </div>
-            <ToolButton label="Mở lịch làm việc" id="calendar" symbol="calendar" text="Mở lịch" />
-          </div>
-          <ScheduledFocus
-            workspace={state.workspace}
-            onWorkspaceChanged={onWorkspaceChanged}
-          />
-          <UpcomingFocus workspace={state.workspace} />
-          <CalendarClock
-            boundaries={[
-              ...state.workspace.sessions,
-              ...state.workspace.events,
-            ].flatMap((item) => [Date.parse(item.start), Date.parse(item.end)])}
-          >
-            {(now) => (
-              <DayRunway
-                model={dashboardModel(state.workspace, state.insights, now)}
-                now={now}
-              />
-            )}
-          </CalendarClock>
-        </section>
-        <aside
-          className="console-column intelligence-column"
-          aria-label="Phân tích khối lượng công việc"
-        >
-          <div className="console-column-heading">
-            <div>
-              <h2>Phân tích & khả năng</h2>
+              <HomeDeadlines model={model} sessions={workspace.sessions} />
+              <HomeTeams />
+              <TodayWorkload onWorkspaceChanged={onWorkspaceChanged} />
+              <details className="card home-panel home-analysis">
+                <summary>Tập trung và phân tích</summary>
+                <div className="home-analysis-content">
+                  <CapacityRibbon />
+                  <ScheduledFocus
+                    workspace={workspace}
+                    onWorkspaceChanged={onWorkspaceChanged}
+                  />
+                  <UpcomingFocus workspace={workspace} />
+                  <EisenhowerFocus />
+                  <div className="home-analysis-grid">
+                    <LiveIntelligence />
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
-          <LiveIntelligence />
-        </aside>
-        </div>
-      </details>
-    </>
+        );
+      }}
+    </CalendarClock>
   );
+}
+
+export function todayPage({ onWorkspaceChanged } = {}) {
+  return <TodayHome onWorkspaceChanged={onWorkspaceChanged} />;
 }

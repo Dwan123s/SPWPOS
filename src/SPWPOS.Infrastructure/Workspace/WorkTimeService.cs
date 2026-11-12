@@ -71,6 +71,7 @@ public sealed partial class WorkspaceService
     public Task<ExtraTimePreview> PreviewExtraTimeAsync(Guid uid,Guid id,ExtraTimeInput input,CancellationToken ct) => Mutate(uid,async()=>{
         Require(input.Minutes is >=5 and <=480,"VALIDATION_ERROR","Chọn từ 5 đến 480 phút bổ sung.");
         var source=await Find<WorkSession>(uid,id,ct);var task=await Find<WorkTask>(uid,source.TaskId,ct);await ValidateExtraTimeTask(uid,task,ct);
+        Require(task.HasPlanningDetails,"TASK_PLANNING_DETAILS_REQUIRED","Bổ sung hạn chót và thời gian dự kiến để xếp thêm thời gian.",409);
         Require(source.End<=Now && source.Status is WorkSessionStatus.Scheduled or WorkSessionStatus.NeedsReview or WorkSessionStatus.Running or WorkSessionStatus.Paused or WorkSessionStatus.Completed,
             "SESSION_NOT_DUE","Chỉ thêm thời gian sau khi phiên đã hết giờ.",409);
         Require(!await TimeReviewAnswered(uid,id,ct),"TIME_REVIEW_ANSWERED","Phiên này đã được xử lý. Hãy tải lại lịch.",409);

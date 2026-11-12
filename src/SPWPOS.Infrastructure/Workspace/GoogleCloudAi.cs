@@ -73,14 +73,15 @@ public sealed partial class TaskInterpreter
         }
     }
 
-    private HttpContent GoogleContent(string instructions, string prompt, JsonElement schema, int maxTokens, bool includeStore = false, object[]? contentParts = null)
+    private HttpContent GoogleContent(string instructions, string prompt, JsonElement schema, int maxTokens, bool includeStore = false, object[]? contentParts = null, string? modelOverride = null)
     {
         // Gemini 3.8 counts thinking and the structured answer in the same
         // output budget. The earlier 6,000-token cap truncated real agent turns.
-        var outputLimit = UsesGemini38 ? Math.Max(maxTokens, 16384) : maxTokens;
+        var usesGemini38 = modelOverride is null ? UsesGemini38 : modelOverride is "gemini-3.8-flash" or "models/gemini-3.8-flash";
+        var outputLimit = usesGemini38 ? Math.Max(maxTokens, 16384) : maxTokens;
         // Vertex v1 uses responseJsonSchema. Developer API uses responseFormat.
         var generation = new Dictionary<string, object> { ["maxOutputTokens"] = outputLimit };
-        if (!UsesGemini38) generation["candidateCount"] = 1;
+        if (!usesGemini38) generation["candidateCount"] = 1;
         if (Provider == "VertexAI")
         {
             generation["responseMimeType"] = "application/json";
@@ -91,7 +92,10 @@ public sealed partial class TaskInterpreter
         // the server. Avoid unbounded deliberation over feasibility in the model.
         // Scheduling decisions are deterministic in PlanningEngine. Bound the
         // interpreter's reasoning overhead; 3.8 supports LOW, not MINIMAL.
-        if (GoogleThinkingLevel is { } thinking) generation["thinkingConfig"] = new { thinkingLevel = thinking };
+        var thinking = modelOverride is null ? GoogleThinkingLevel
+            : modelOverride.Contains("flash-lite", StringComparison.Ordinal) && modelOverride.Contains("gemini-3.", StringComparison.Ordinal) ? "MINIMAL"
+            : modelOverride.Contains("gemini-3", StringComparison.Ordinal) ? "LOW" : null;
+        if (thinking is not null) generation["thinkingConfig"] = new { thinkingLevel = thinking };
         var body = new Dictionary<string, object> {
             ["systemInstruction"] = new { parts = new[] { new { text = instructions } } },
             ["contents"] = new[] { new { role = "user", parts = contentParts ?? [new { text = prompt }] } },

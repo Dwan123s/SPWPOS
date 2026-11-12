@@ -1,7 +1,7 @@
 .getting-started {
   --login-motion-amplitude: 1;
   --login-ink: #15304e;
-  --login-muted: #597695;
+  --login-muted: #000;
   --login-blue: #0768ef;
   --login-cyan: #08c5de;
   --login-white: #fff;
@@ -63,7 +63,7 @@
   border: 0;
   font: inherit;
   font-size: 11px;
-  color: #46617e;
+  color: #000;
   cursor: pointer;
   padding: 10px 0;
 }
@@ -176,7 +176,7 @@
 .start-hero-copy > p {
   font-size: 15px;
   line-height: 1.95;
-  color: #52708f;
+  color: #000;
   max-width: 480px;
   margin: 0 0 26px;
 }
@@ -190,7 +190,7 @@
   flex-wrap: wrap;
   gap: 17px;
   font-size: 10px;
-  color: #62809d;
+  color: #000;
   margin-top: 22px;
 }
 .start-hero-caption span {
@@ -285,7 +285,7 @@
 .start-floating-note p {
   font-size: 10px;
   margin: 13px 0;
-  color: #4d7595;
+  color: #000;
 }
 .start-floating-note small {
   display: flex;
@@ -326,7 +326,7 @@
 .start-floating-plan small {
   display: block;
   font-size: 9px;
-  color: #5b7b96;
+  color: #000;
   margin-top: 5px;
 }
 .start-art-caption {
@@ -378,7 +378,7 @@
   align-items: center;
   gap: 7px;
   font-size: 10px;
-  color: #6092ba;
+  color: #000;
 }
 .start-entry-note .icon {
   width: 13px;
@@ -395,7 +395,7 @@
   align-items: center;
   gap: 5px;
   font-size: 9px;
-  color: #609bb1;
+  color: #000;
 }
 .start-entry-slot {
   right: 0;
@@ -457,7 +457,7 @@
 .start-entry-hint > small {
   display: block;
   font-size: 8px;
-  color: #7da0bb;
+  color: #000;
 }
 .start-entry.is-placed .start-entry-note {
   opacity: 0;
@@ -490,7 +490,7 @@
   display: block;
   margin-top: 6px;
   font-size: 9px;
-  color: #5691a7;
+  color: #000;
 }
 .start-portal-overlay {
   position: fixed;
@@ -601,10 +601,10 @@ html[data-start-transition="login"]::view-transition-new(root) {
   gap: 22px;
   padding-block: 24px;
   border-block: 1px solid #c4dff180;
-  color: #4e7496;
+  color: #000;
 }
 .start-principles > span {
-  color: #7b93ad;
+  color: #000;
   font-size: 10px;
 }
 .start-principles > div {
@@ -634,11 +634,11 @@ html[data-start-transition="login"]::view-transition-new(root) {
   margin: 16px 0;
 }
 .getting-started h2 span {
-  color: #6382a4;
+  color: #000;
 }
 .start-section-heading > p {
   font-size: 13px;
-  color: #5b7b96;
+  color: #000;
   line-height: 1.8;
   margin: 0;
 }
@@ -665,7 +665,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   font: inherit;
   font-size: 12px;
   font-weight: 600;
-  color: #61819f;
+  color: #000;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -712,14 +712,14 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-demo-copy p {
   font-size: 13px;
-  color: #587795;
+  color: #000;
   line-height: 1.9;
 }
 .start-demo-copy > small {
   display: block;
   margin-top: 22px;
   font-size: 9px;
-  color: #718aa4;
+  color: #000;
   line-height: 1.7;
 }
 .start-text-button {
@@ -774,7 +774,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-sample-note {
   font-size: 10px;
-  color: #587d9b;
+  color: #000;
 }
 .start-sample-note textarea {
   width: 100%;
@@ -809,7 +809,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-sample-hours > span {
   font-size: 11px;
-  color: #537c99;
+  color: #000;
 }
 .start-week-days {
   display: flex;
@@ -825,7 +825,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   font-size: 10px;
   border: 1px solid #d1e6f7;
   border-radius: 9px;
-  color: #7e9bb5;
+  color: #000;
 }
 .start-week-days > span.is-selected {
   background: #0877ec;
@@ -840,7 +840,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-sample-hours > strong span {
   font-size: 12px;
-  color: #8ca3ba;
+  color: #000;
   padding-inline: 15px;
   font-weight: 400;
 }
@@ -857,7 +857,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   border-radius: inherit;
 }
 .start-sample-hours > p {
-  color: #718da7;
+  color: #000;
   font-size: 10px;
 }
 .start-sample-calendar > div {
@@ -878,7 +878,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   margin-top: 5px;
   font-size: 9px;
   font-weight: 400;
-  color: #89a5bc;
+  color: #000;
 }
 .start-sample-session {
   background: #d6f5fa;
@@ -895,13 +895,13 @@ html[data-start-transition="login"]::view-transition-new(root) {
   display: block;
   font-size: 9px;
   margin-top: 6px;
-  color: #5b85a3;
+  color: #000;
 }
 .start-sample-break {
   grid-column: 2;
   font-size: 9px;
   text-align: center;
-  color: #97adbd;
+  color: #000;
   margin: 0;
 }
 .start-sample-focus {
@@ -924,7 +924,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-sample-focus > span {
   font-size: 9px;
-  color: #6588a4;
+  color: #000;
 }
 .start-sample-focus > strong {
   display: block;
@@ -940,7 +940,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-sample-focus p {
   font-size: 9px;
-  color: #718eab;
+  color: #000;
 }
 .start-feature-grid {
   display: grid;
@@ -981,7 +981,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   letter-spacing: -0.03em;
 }
 .start-feature-card p {
-  color: #5a7995;
+  color: #000;
   font-size: 12px;
   line-height: 1.85;
   max-width: 400px;
@@ -995,7 +995,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   grid-template-columns: 45px 1fr;
   gap: 9px;
   margin-top: 30px;
-  color: #7799b3;
+  color: #000;
   font-size: 10px;
 }
 .start-time-visual > div {
@@ -1036,7 +1036,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   font-size: clamp(26px, 3vw, 37px);
 }
 .start-tutorial-banner p {
-  color: #5b7d98;
+  color: #000;
   font-size: 12px;
   line-height: 1.9;
   max-width: 460px;
@@ -1086,14 +1086,14 @@ html[data-start-transition="login"]::view-transition-new(root) {
 .start-faq-list summary > span {
   font-size: 20px;
   font-weight: 400;
-  color: #6b9cc5;
+  color: #000;
 }
 .start-faq-list details[open] summary > span {
   rotate: 45deg;
 }
 .start-faq-list details p {
   font-size: 12px;
-  color: #5e7c99;
+  color: #000;
   line-height: 1.9;
   margin: 0 24px 22px 0;
 }
@@ -1110,7 +1110,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-final-cta p {
   font-size: 11px;
-  color: #6b87a2;
+  color: #000;
   margin-top: 20px;
 }
 .start-final-cta p a {
@@ -1129,12 +1129,12 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-footer p {
   font-size: 9px;
-  color: #7b97ae;
+  color: #000;
   margin: 8px 0 0;
 }
 .start-footer > small {
   font-size: 9px;
-  color: #7993ac;
+  color: #000;
 }
 .start-motion-toggle {
   display: inline-flex;
@@ -1144,7 +1144,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   background: #ffffff70;
   border: 1px solid #c6ddf1;
   border-radius: 12px;
-  color: #577a99;
+  color: #000;
   font: inherit;
   font-size: 10px;
   cursor: pointer;
@@ -1170,7 +1170,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   align-items: center;
   gap: 6px;
   font-size: 10px;
-  color: #5f82a8;
+  color: #000;
   text-decoration: none;
   margin-top: 16px;
 }
@@ -1632,7 +1632,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   pointer-events: none;
 }
 .start-world-title > p {
-  color: #6b94b5;
+  color: #000;
   font-size: 9px;
   letter-spacing: 0.22em;
   margin: 0 0 20px;
@@ -1804,7 +1804,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   padding: 10px;
   border: 0;
   background: transparent;
-  color: #5b80a0;
+  color: #000;
   font: inherit;
   font-size: 11px;
 }
@@ -1843,7 +1843,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   align-items: center;
 }
 .start-about-intro > p {
-  color: #547493;
+  color: #000;
   font-size: 14px;
   line-height: 1.95;
   max-width: 480px;
@@ -1863,7 +1863,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   align-items: center;
   justify-content: space-between;
   font-size: 10px;
-  color: #76a1bf;
+  color: #000;
 }
 .start-about-points .icon {
   width: 20px;
@@ -1878,7 +1878,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 .start-about-points p {
   font-size: 12px;
   line-height: 1.85;
-  color: #587a95;
+  color: #000;
   margin: 0;
 }
 .start-tutorial-note {
@@ -1890,7 +1890,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   border: 1px solid #ffffffc9;
   border-radius: 16px;
   background: #ffffff66;
-  color: #567894;
+  color: #000;
   font-size: 12px;
   line-height: 1.8;
 }
@@ -1901,7 +1901,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   height: 18px;
 }
 .start-scroll .start-footer {
-  color: #7796af;
+  color: #000;
   font-size: 10px;
 }
 @keyframes start-scroll-nudge {
@@ -2058,7 +2058,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-world-copy > p,
 .start-world-invite > p {
-  color: #597e9e;
+  color: #000;
   font-size: 11px;
   line-height: 1.8;
   margin: 12px 0;
@@ -2088,7 +2088,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
   justify-content: space-between;
   gap: 20px;
   z-index: 5;
-  color: #7e9bb4;
+  color: #000;
   font-size: 9px;
 }
 .start-world-footer a {
@@ -2181,7 +2181,7 @@ html[data-start-transition="login"]::view-transition-new(root) {
 .start-about-body li {
   font-size: 12px;
   line-height: 1.85;
-  color: #557796;
+  color: #000;
 }
 .start-about-body ul {
   padding-left: 20px;

@@ -8,6 +8,14 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct) => Data(await service.ListTeamsAsync(UserId, ct));
     [HttpPost] public async Task<IActionResult> Create(TeamNameInput input, CancellationToken ct) => Data(new { id = await service.CreateTeamAsync(UserId, input, ct) });
     [HttpGet("{id:guid}")] public async Task<IActionResult> Get(Guid id, CancellationToken ct) => Data(await service.GetTeamAsync(UserId, id, ct));
+    [HttpGet("{id:guid}/workload")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> Workload(Guid id, CancellationToken ct, [FromQuery] int week = 0) =>
+        Data(await service.GetTeamWorkloadAsync(UserId, id, week, ct));
+    [HttpGet("{id:guid}/workload/{taskId:guid}/candidates")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> WorkloadCandidates(Guid id, Guid taskId, CancellationToken ct) =>
+        Data(await service.GetTeamWorkloadCandidatesAsync(UserId, id, taskId, ct));
     [HttpGet("{id:guid}/messages")] public async Task<IActionResult> Messages(Guid id, [FromQuery] long? after, [FromQuery] long? before, CancellationToken ct) => Data(await service.GetTeamChatAsync(UserId, id, after, before, ct));
     [HttpPost("{id:guid}/messages")] public async Task<IActionResult> SendMessage(Guid id, TeamChatInput input, CancellationToken ct) => Data(await service.SendTeamChatAsync(UserId, id, input, ct));
     [HttpPost("{id:guid}/invites")] public async Task<IActionResult> Invite(Guid id, CancellationToken ct) => Data(await service.CreateTeamInviteAsync(UserId, id, ct));
@@ -68,7 +76,7 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
     [HttpPost("tasks/{id:guid}/changes/reject")] public async Task<IActionResult> Reject(Guid id, TeamVersionInput input, CancellationToken ct) { await service.RejectTeamTaskChangeAsync(UserId, id, input.Version, ct); return Done(); }
     [HttpGet("/api/time/policy")] public async Task<IActionResult> Policy(CancellationToken ct) => Data(await service.GetAvailabilityPolicyAsync(UserId, ct));
     [HttpGet("/api/time/policy/slots")] public async Task<IActionResult> PolicySlots(CancellationToken ct) => Data(await service.GetPolicySlotsAsync(UserId, ct));
-    [HttpPost("/api/time/policy/preview")] public async Task<IActionResult> PreviewPolicy(CancellationToken ct, [FromQuery] Guid? timetableTurnId = null) => Data(await service.PreviewAvailabilityPolicyAsync(UserId, ct, timetableTurnId));
-    [HttpPost("/api/time/policy/draft")] public async Task<IActionResult> DraftPolicy(TeamTextInput input, CancellationToken ct, [FromQuery] Guid? timetableTurnId = null) => Data(await service.DraftAvailabilityPolicyAsync(UserId, input, ct, timetableTurnId));
+    [HttpPost("/api/time/policy/preview")] public async Task<IActionResult> PreviewPolicy(CancellationToken ct, [FromQuery] Guid? timetableTurnId = null, [FromQuery] bool useTimetableHours = false) => Data(await service.PreviewAvailabilityPolicyAsync(UserId, ct, timetableTurnId, useTimetableHours));
+    [HttpPost("/api/time/policy/draft")] public async Task<IActionResult> DraftPolicy(TeamTextInput input, CancellationToken ct, [FromQuery] Guid? timetableTurnId = null, [FromQuery] bool useTimetableHours = false) => Data(await service.DraftAvailabilityPolicyAsync(UserId, input, ct, timetableTurnId, useTimetableHours));
     [HttpPost("/api/time/policy/{id:guid}/confirm")] public async Task<IActionResult> ConfirmPolicy(Guid id, CancellationToken ct) { await service.ConfirmAvailabilityPolicyAsync(UserId, id, ct); return Done(); }
 }

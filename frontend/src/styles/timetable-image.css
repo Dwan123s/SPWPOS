@@ -65,7 +65,7 @@
   top: 6px;
   background: transparent;
   border: 0;
-  color: #425d7c;
+  color: #000;
   cursor: pointer;
 }
 .nora-image-button:hover {
@@ -108,13 +108,13 @@
 }
 .nora-timetable-heading small,
 .nora-timetable-attachment > small {
-  color: #5d7391;
+  color: #000;
   font-size: 12px;
 }
 .nora-timetable-heading > button {
   border: 0;
   background: transparent;
-  color: #59718e;
+  color: #000;
   padding: 6px;
   cursor: pointer;
 }

@@ -1,8 +1,8 @@
 param()
 $ErrorActionPreference = 'Stop'
 $taskRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
-$taskSdkVersion = (Get-Content -LiteralPath (Join-Path $taskRoot 'global.json') -Raw | ConvertFrom-Json).sdk.version
-if ($taskSdkVersion -notmatch '^8\.0\.\d+$') { throw 'The project does not select a stable .NET 8 SDK.' }
+# Provision a patched SDK independently of the minimum in global.json.
+$taskSdkVersion = '8.0.425'
 $taskSdkRoot = Join-Path $taskRoot 'artifacts\dotnet8'
 $taskSdkExe = Join-Path $taskSdkRoot 'dotnet.exe'
 if (Test-Path -LiteralPath (Join-Path $taskSdkRoot ('sdk\' + $taskSdkVersion))) { Write-Host "SDK $taskSdkVersion is already installed for this project."; return }

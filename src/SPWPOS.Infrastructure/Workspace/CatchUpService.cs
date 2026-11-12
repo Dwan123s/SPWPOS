@@ -60,7 +60,7 @@ public sealed partial class WorkspaceService
     private async Task<WorkSession?> AutoHealScheduleAsync(Guid uid, WorkTask task, WorkSession missed, CancellationToken ct)
     {
         var state = await State(uid, ct); var now = Now; var start = now.AddMinutes(5); var until = now.AddHours(48);
-        if (task.IsHardDeadline && task.Deadline < until) until = task.Deadline;
+        if (task.IsHardDeadline && task.Deadline is { } deadline && deadline < until) until = deadline;
         if (until <= start) return null;
         var bias = new[] { new BiasView("All", 0, 1, false) };
         var occupied = Occupied(state);

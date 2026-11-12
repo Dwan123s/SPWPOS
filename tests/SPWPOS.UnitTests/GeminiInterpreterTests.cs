@@ -14,7 +14,7 @@ public sealed class GeminiInterpreterTests
     [{"name":"Báo cáo","description":"Viết báo cáo","deadline":"2026-10-15T10:00:00Z","estimatedMinutes":120,"priority":3,"taskType":"WRITING","isHardDeadline":true},
      {"name":"Ôn bài","description":"Chương 4","deadline":"2026-10-16T10:00:00Z","estimatedMinutes":60,"priority":2,"taskType":"STUDY","isHardDeadline":false}]
     """;
-    private sealed class Provider(string tasks = Tasks, string finish = "STOP", HttpStatusCode status = HttpStatusCode.OK, bool needsReview = false, bool omitReview = false) : HttpMessageHandler
+    private sealed class Provider(string tasks = Tasks, string finish = "STOP", HttpStatusCode status = HttpStatusCode.OK, bool needsReview = false, bool omitReview = false, string? activities = null) : HttpMessageHandler
     {
         public string Body { get; private set; } = "";
         public Uri? Url { get; private set; }
@@ -27,6 +27,7 @@ public sealed class GeminiInterpreterTests
             Key = request.Headers.GetValues("x-goog-api-key").Single();
             Body = await request.Content!.ReadAsStringAsync(ct);
             var payloadData = new Dictionary<string, object> { ["tasks"] = JsonSerializer.Deserialize<JsonElement>(tasks) };
+            if (activities is not null) payloadData["activities"] = JsonSerializer.Deserialize<JsonElement>(activities);
             if (!omitReview) payloadData["needsReview"] = needsReview;
             var text = JsonSerializer.Serialize(payloadData);
             var payload = JsonSerializer.Serialize(new { candidates = new[] { new { finishReason = finish,
@@ -65,6 +66,21 @@ public sealed class GeminiInterpreterTests
         using var provider = new Provider(); using var http = new HttpClient(provider);
         var result = await Interpreter(http).AnalyzeNoteAsync("Viết báo cáo 60 phút", false, "Asia/Ho_Chi_Minh", DateTimeOffset.UtcNow, TestContext.Current.CancellationToken);
         Assert.Equal("Gemini", result.Source); Assert.Equal(1, provider.Calls);
+    }
+
+    [Fact] public async Task Task_autofill_uses_flash_lite_and_a_small_output_budget()
+    {
+        using var provider = new Provider(activities: "[]");
+        using var http = new HttpClient(provider);
+        var interpreter = Interpreter(http, model: "gemini-3.8-flash");
+        var result = await interpreter.PreviewTaskTextAsync("Kiểm tra email lúc 14h", "Asia/Ho_Chi_Minh",
+            DateTimeOffset.UtcNow, TestContext.Current.CancellationToken);
+        Assert.NotNull(result.Activities);
+        Assert.EndsWith("/models/gemini-3.5-flash-lite:generateContent", provider.Url!.AbsolutePath);
+        using var request = JsonDocument.Parse(provider.Body);
+        var generation = request.RootElement.GetProperty("generationConfig");
+        Assert.Equal(800, generation.GetProperty("maxOutputTokens").GetInt32());
+        Assert.Equal("MINIMAL", generation.GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString());
     }
 
     [Theory]

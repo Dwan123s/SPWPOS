@@ -64,7 +64,7 @@ public sealed class ReminderDeliveryTests
             var task = await db.WorkTasks.SingleAsync(Ct);
             if (change == "complete") task.Status = WorkTaskStatus.Completed;
             if (change == "delete") task.IsDeleted = true;
-            if (change == "deadline") task.Deadline = task.Deadline.AddDays(2);
+            if (change == "deadline") task.Deadline = task.Deadline!.Value.AddDays(2);
             if (change == "disable") (await db.NotificationSettings.SingleAsync(Ct)).EmailEnabled = false;
             await db.SaveChangesAsync(Ct);
         });

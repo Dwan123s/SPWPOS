@@ -21,6 +21,7 @@ export function CalendarWeek({
   block,
   fixed,
   now,
+  selectedDate,
   onWorkspaceChanged = async () => {},
   onCreateEvent = () => {},
 }) {
@@ -412,7 +413,7 @@ export function CalendarWeek({
               key={date}
               className={`week-day ${date === dayKey(now) ? "today" : ""}`}
             >
-              <div className="week-day-header">
+              <div className="week-day-header" data-selected-date={date === selectedDate || undefined}>
                 <span>
                   {new Intl.DateTimeFormat("vi-VN", {
                     weekday: "short",

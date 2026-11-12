@@ -4,22 +4,23 @@ namespace SPWPOS.Application.Workspace;
 
 public sealed record TaskInput(
     [Required, StringLength(200)] string Name,
-    [StringLength(4000)] string Description,
-    DateTimeOffset Deadline,
-    [Range(1, 43200)] int EstimatedMinutes,
+    [StringLength(4000)] string? Description = null,
+    DateTimeOffset? Deadline = null,
+    [Range(1, 43200)] int? EstimatedMinutes = null,
     [Range(1, 4)] int Priority = 2,
     [StringLength(60), Required] string TaskType = "General",
     bool Splittable = true,
     [Range(5, 480)] int MinimumSessionMinutes = 25,
     Guid? CategoryId = null, Guid? ParentId = null, bool IsHardDeadline = false,
     [RegularExpression("^(MANUAL|NATURAL_LANGUAGE|AI_BREAKDOWN)$")] string CreationSource = "MANUAL",
-    Guid? Version = null);
-public sealed record TaskView(Guid Id, string Name, string Description, DateTimeOffset Deadline, int EstimatedMinutes,
+    Guid? Version = null, DateTimeOffset? WorkWindowStart = null, DateOnly? StartDate = null);
+public sealed record TaskView(Guid Id, string Name, string Description, DateTimeOffset? Deadline, int EstimatedMinutes,
     int AdjustedMinutes, int RemainingMinutes, int ActualMinutes, int PlannedMinutes, int Priority, string TaskType,
     bool Splittable, int MinimumSessionMinutes, Guid? CategoryId, Guid? ParentId, string Status, int Progress,
     DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, Guid[] Dependencies, bool IsHardDeadline = false, string CreationSource = "MANUAL",
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default,
-    ImportanceView? Importance = null, bool RequiresContinuousSession = false);
+    ImportanceView? Importance = null, bool RequiresContinuousSession = false, bool IsTeamTask = false,
+    TaskChecklistItem[]? Checklist = null);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
 public sealed record CategoryView(Guid Id, string Name, string Color);
@@ -29,6 +30,7 @@ public sealed record ProfileInput([Required, StringLength(100)] string FirstName
 public sealed record ProfileView(Guid Id, string Email, string FirstName, string LastName, string DisplayName = "", string Bio = "", string AvatarUrl = "");
 public sealed record AvailabilityInput([Range(0, 6)] int DayOfWeek, [Range(0, 1439)] int StartMinute, [Range(1, 1440)] int EndMinute);
 public sealed record WeeklyInput([Required, MaxLength(28)] AvailabilityInput[] Slots);
+public sealed record DatedWeekInput([Required, MaxLength(7 * 1440)] AvailabilityInput[] Slots);
 public sealed record ExceptionInput(DateOnly Date, [Range(0, 1439)] int StartMinute,
     [Range(1, 1440)] int EndMinute, bool IsAvailable, [StringLength(300)] string Note = "");
 public sealed record ExceptionView(Guid Id, DateOnly Date, int StartMinute, int EndMinute, bool IsAvailable, string Note, bool OverridesWeeklyAvailability = false);
@@ -101,6 +103,13 @@ public sealed record AccountStatusLogView(Guid Id, Guid UserId, Guid AdminId, st
 public sealed record JobRunView(Guid Id, Guid? UserId, string JobType, string Status, string? ErrorMessage, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt);
 public sealed record TaskSuggestion(TaskInput Task, string Source, string[] Notes);
 public sealed record CaptureInput([Required, StringLength(2000)] string Text, bool UseAi = false);
+public sealed record TaskBatchTaskInput([Required, StringLength(200)] string Name,
+    [StringLength(4000)] string? Description = null, DateTimeOffset? Deadline = null,
+    [Range(1, 43200)] int? EstimatedMinutes = null, [MaxLength(100)] TaskChecklistItem[]? Checklist = null);
+public sealed record TaskBatchPreview(string ProjectName, string Summary, TaskBatchTaskInput[] Tasks, string[] Warnings, DateTimeOffset? ProjectDeadline = null);
+public sealed record TaskBatchInput(Guid RequestId, [Required, StringLength(200)] string ProjectName,
+    [Required, MinLength(1), MaxLength(12)] TaskBatchTaskInput[] Tasks, bool Sequential = true, DateTimeOffset? ProjectDeadline = null);
+public sealed record TaskBatchResult(Guid ProjectId, Guid[] TaskIds);
 public sealed record BreakdownView(TaskInput[] Subtasks, string Source);
 public sealed record AdminUserView(Guid Id, string Email, string FirstName, string LastName, bool IsActive, bool EmailConfirmed, DateTimeOffset? LastLoginAt,
     string? UserName = null, DateTimeOffset? CreatedAt = null,
@@ -117,7 +126,7 @@ public interface IWorkspaceService
     Task<WorkTimeReview[]> GetWorkTimeReviewsAsync(Guid userId, CancellationToken ct);
     Task<SessionOutcomeResult> RecordSessionOutcomeAsync(Guid userId, Guid sessionId, SessionOutcomeInput input, CancellationToken ct);
     Task<EventReplanPreview> PreviewEventReplanAsync(Guid userId, EventInput input, CancellationToken ct);
-    Task<WorkloadView> GetWorkloadAsync(Guid userId, CancellationToken ct);
+    Task<WorkloadView> GetWorkloadAsync(Guid userId, CancellationToken ct, int week = 0);
     Task<Guid> ConfirmEventReplanAsync(Guid userId, Guid id, CancellationToken ct);
     Task<ExtraTimePreview> PreviewExtraTimeAsync(Guid userId, Guid sessionId, ExtraTimeInput input, CancellationToken ct);
     Task<WorkTimeResult> ConfirmExtraTimeAsync(Guid userId, Guid proposalId, ExtraTimeConfirm input, CancellationToken ct);
@@ -151,10 +160,13 @@ public interface IWorkspaceService
     Task<Guid> SaveTaskAsync(Guid userId, Guid? id, TaskInput input, CancellationToken ct);
     Task DeleteTaskAsync(Guid userId, Guid id, CancellationToken ct);
     Task SetStatusAsync(Guid userId, Guid id, StatusInput input, CancellationToken ct);
+    Task UpdateTaskChecklistAsync(Guid userId, Guid id, MatrixChecklistInput input, CancellationToken ct);
     Task<Guid> SaveCategoryAsync(Guid userId, Guid? id, CategoryInput input, CancellationToken ct);
     Task DeleteCategoryAsync(Guid userId, Guid id, CancellationToken ct);
     Task SetDependencyAsync(Guid userId, Guid id, Guid predecessor, bool remove, CancellationToken ct);
     Task SetAvailabilityAsync(Guid userId, WeeklyInput input, CancellationToken ct);
+    Task SetAvailabilityForWeekAsync(Guid userId, DateOnly weekStart, DatedWeekInput? input, CancellationToken ct);
+    Task<DatedWeekInput> GetEffectiveAvailabilityForWeekAsync(Guid userId, DateOnly weekStart, CancellationToken ct);
     Task<Guid> SaveExceptionAsync(Guid userId, Guid? id, ExceptionInput input, CancellationToken ct);
     Task DeleteExceptionAsync(Guid userId, Guid id, CancellationToken ct);
     Task<Guid> SaveEventAsync(Guid userId, Guid? id, EventInput input, CancellationToken ct);
@@ -182,6 +194,9 @@ public interface IWorkspaceService
     Task EnsureNotificationsAsync(Guid userId, CancellationToken ct);
     Task EnsureStartedNotificationsAsync(Guid userId, CancellationToken ct);
     Task<TaskSuggestion> CaptureAsync(Guid userId, CaptureInput input, CancellationToken ct);
+    Task<NoteAnalysis> PreviewTaskTextAsync(Guid userId, CaptureInput input, CancellationToken ct);
+    Task<TaskBatchPreview> PreviewTaskBatchAsync(Guid userId, TeamBriefInput input, CancellationToken ct);
+    Task<TaskBatchResult> SaveTaskBatchAsync(Guid userId, TaskBatchInput input, CancellationToken ct);
     Task<BreakdownView> BreakdownAsync(Guid userId, Guid taskId, bool useAi, CancellationToken ct);
     Task<AdminUserView[]> SearchUsersAsync(string? search, CancellationToken ct);
     Task SetUserActiveAsync(Guid adminId, Guid targetId, bool active, CancellationToken ct, string? reason = null);
@@ -192,6 +207,8 @@ public interface IWorkspaceService
 public interface ITaskInterpreter
 {
     NoteAgentCapabilities Capabilities => new(false);
+    Task<NoteAnalysis> PreviewTaskTextAsync(string text, string timeZoneId, DateTimeOffset now, CancellationToken ct)
+        => Task.FromResult(new NoteAnalysis([], "Unavailable", [], Activities: []));
     Task<NoteAnalysis> AnalyzeNoteAsync(string text, bool useAi, string timeZoneId, DateTimeOffset now, CancellationToken ct);
     Task<NoteAnalysis> AnalyzeNoteChangesAsync(string text, NoteAnalysisContext context, string timeZoneId, DateTimeOffset now, CancellationToken ct)
         => AnalyzeNoteAsync(text, true, timeZoneId, now, ct);

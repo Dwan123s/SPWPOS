@@ -24,7 +24,7 @@ public sealed class PlanningObjectiveTests
         var task = Task; var preference = Preference; preference.PreferredPeriod = "NONE";
         var shortSlot = engine.ScoreCandidate(task, new(Now, Now.AddMinutes(30)), 60, preference, Now, 480);
         var complete = engine.ScoreCandidate(task, new(Now.AddHours(1), Now.AddHours(2)), 60, preference, Now, 480);
-        var late = engine.ScoreCandidate(task, new(task.Deadline, task.Deadline.AddHours(1)), 60, preference, Now, 480);
+        var late = engine.ScoreCandidate(task, new(task.Deadline!.Value, task.Deadline.Value.AddHours(1)), 60, preference, Now, 480);
         Assert.True(complete.PenaltyScore < shortSlot.PenaltyScore); Assert.True(late.PenaltyScore > shortSlot.PenaltyScore);
     }
     [Fact] public void Hard_deadline_overrides_productive_hours()
