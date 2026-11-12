@@ -131,14 +131,31 @@ public sealed partial class PrivateTeamPlanningTests
         await using var scope = h.Provider.CreateAsyncScope(); await scope.ServiceProvider.GetRequiredService<IWorkspaceService>().SetStatusAsync(Member, personal.Id, new("Completed", 100), Ct);
         Assert.Equal("PendingReview", (await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks[0].Status);
     }
-    [Fact] public async Task Leader_change_keeps_effective_deadline_until_private_acceptance()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Leader_change_keeps_effective_deadline_until_private_acceptance(bool manual)
     {
         await using var h = await Setup(); var preview = await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct)); await Use(h, s => s.ConfirmTeamClaimAsync(Member, preview.Id, new(), Ct));
-        var draft = await Use(h, s => s.ProposeTeamTaskChangeAsync(Leader, TaskId, new("Đổi báo cáo"), Ct)); Assert.NotNull(draft.Task);
+        var original = (await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks.Single();
+        var input = new ManualTeamTaskChangeInput(original.Version,
+            new("Báo cáo cập nhật", "", 60, original.Deadline.AddDays(1)));
+        if (manual)
+        {
+            await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ProposeManualTeamTaskChangeAsync(Member, TaskId, input, Ct)));
+            await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ProposeManualTeamTaskChangeAsync(Leader, TaskId, input with { Version = Guid.NewGuid() }, Ct)));
+        }
+        var draft = manual
+            ? await Use(h, s => s.ProposeManualTeamTaskChangeAsync(Leader, TaskId, input, Ct))
+            : await Use(h, s => s.ProposeTeamTaskChangeAsync(Leader, TaskId, new("Đổi báo cáo"), Ct));
+        Assert.NotNull(draft.Task);
         await Use(h, s => s.ConfirmTeamTaskDraftAsync(Leader, Team, draft.ProposalId, Ct));
-        Assert.True((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks[0].HasPendingChange);
+        var pending = (await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks.Single();
+        Assert.True(pending.HasPendingChange);
+        Assert.Equal(original.Deadline, pending.Deadline);
         var change = await Use(h, s => s.PreviewTeamTaskChangeAsync(Member, TaskId, Ct)); await Use(h, s => s.ConfirmTeamClaimAsync(Member, change.Id, new(), Ct));
         Assert.False((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks[0].HasPendingChange); Assert.Equal(1, await h.DbAsync(db => db.WorkTasks.CountAsync(Ct)));
+        Assert.Equal(draft.Task.Deadline, (await h.DbAsync(db => db.WorkTasks.SingleAsync(Ct))).Deadline);
     }
     [Fact] public async Task Invite_hashes_codes_revocation_and_role_checks_are_enforced()
     {

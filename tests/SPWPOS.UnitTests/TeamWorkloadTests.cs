@@ -7,6 +7,33 @@ namespace SPWPOS.UnitTests;
 
 public sealed partial class PrivateTeamPlanningTests
 {
+    [Theory]
+    [InlineData(false, "NEEDS_REPLAN")]
+    [InlineData(true, "FITS")]
+    public async Task Equal_capacity_candidates_are_distinguished_by_continuous_time(bool splittable, string fragmentedStatus)
+    {
+        await using var h = await Setup(hours: false);
+        h.Clock.Advance(TimeSpan.FromDays(1));
+        await h.DbAsync(async db =>
+        {
+            var task = await db.TeamTasks.SingleAsync(Ct);
+            task.EstimatedMinutes = 90;
+            task.Splittable = splittable;
+            db.WeeklyAvailability.Add(new() { UserId = Leader, DayOfWeek = 1, StartMinute = 1140, EndMinute = 1260 });
+            foreach (var start in new[] { 1140, 1185, 1230, 1275 })
+                db.WeeklyAvailability.Add(new() { UserId = Member, DayOfWeek = 1, StartMinute = start, EndMinute = start + 30 });
+            await db.SaveChangesAsync(Ct);
+        });
+
+        var candidates = await Use(h, s => s.GetTeamWorkloadCandidatesAsync(Leader, Team, TaskId, Ct));
+        Assert.Equal(2, candidates.Length);
+        Assert.All(candidates, candidate => Assert.Equal(120, candidate.SchedulableMinutes));
+        Assert.Equal("FITS", candidates.Single(candidate => candidate.UserId == Leader).Status);
+        Assert.Equal(fragmentedStatus, candidates.Single(candidate => candidate.UserId == Member).Status);
+        if (!splittable) Assert.Equal(Leader, candidates[0].UserId);
+        Assert.False(await h.DbAsync(db => db.WorkSessions.AnyAsync(Ct)));
+    }
+
     [Fact]
     public async Task Team_workload_is_leader_only_and_counts_private_busy_time_without_returning_details()
     {

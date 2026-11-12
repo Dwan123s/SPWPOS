@@ -163,14 +163,17 @@ public sealed partial class WorkspaceService
     public async Task<TeamTaskDraft> DraftManualTeamTaskAsync(Guid uid, Guid teamId, ManualTeamTaskInput input, CancellationToken ct)
     {
         var member = await TeamMember(uid, teamId, ct, true);
-        Require(!string.IsNullOrWhiteSpace(input.Name) && input.Name.Trim().Length <= 200 && (input.Description is null or { Length: <= 4000 }) &&
-            input.EstimatedMinutes is >= 1 and <= 43200 && input.Priority is >= 1 and <= 4,
-            "INVALID_TEAM_TASK", "Kiểm tra tên, mô tả, thời lượng và mức ưu tiên.");
+        ValidateManualTeamTask(input);
         ValidateTeamDeadline(input.Deadline);
         return await StoreTeamDraft(uid, teamId, member.Version, new(Guid.NewGuid(), input.Name.Trim(),
             input.Description?.Trim() ?? "", input.EstimatedMinutes, input.Deadline, input.Priority, input.Splittable,
             null, 0, "Open", Guid.NewGuid(), false), ct);
     }
+
+    private static void ValidateManualTeamTask(ManualTeamTaskInput input) =>
+        Require(!string.IsNullOrWhiteSpace(input.Name) && input.Name.Trim().Length <= 200 && (input.Description is null or { Length: <= 4000 }) &&
+            input.EstimatedMinutes is >= 1 and <= 43200 && input.Priority is >= 1 and <= 4,
+            "INVALID_TEAM_TASK", "Kiểm tra tên, mô tả, thời lượng và mức ưu tiên.");
 
     private async Task<TeamTaskDraft> StoreTeamDraft(Guid uid, Guid teamId, Guid version, SharedTaskView task, CancellationToken ct)
     {

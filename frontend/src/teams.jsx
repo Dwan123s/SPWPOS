@@ -889,7 +889,18 @@ export function TeamsPage({ onWorkspaceChanged }) {
               : undefined
           }
           onClose={() => setComposerOpen(false)}
-          onManualDraft={(input) => run(async () => setDraft(await post(`${detail.team.id}/drafts/manual`, input)))}
+          onManualDraft={(input) =>
+            run(async () => {
+              setDraft(null);
+              const draft = changeTask
+                ? await post(`tasks/${changeTask.id}/changes/manual`, {
+                    version: changeTask.version,
+                    task: input,
+                  })
+                : await post(`${detail.team.id}/drafts/manual`, input);
+              setDraft(draft);
+            })
+          }
           onDraft={() =>
             run(async () =>
               setDraft(
@@ -1215,7 +1226,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
               {claim.failure?.needsAvailability && (
                 <a className="btn secondary" href="#time" onClick={cancelClaim}>Mở Giờ làm việc</a>
               )}
-              {claim.canUndo !== false &&
+              {claim.canUndo !== false && (claim.failure || claim.options?.length > 0) &&
                 !claim.failure?.needsAvailability &&
                 claim.failure?.code !== "NO_WORK_HOURS_BEFORE_DEADLINE" && (
                   <button

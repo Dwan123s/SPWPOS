@@ -32,6 +32,7 @@ public sealed record TeamInviteView(Guid Id, string Code, DateTimeOffset Expires
 public sealed record TeamInvitePreview(string TeamName, int MemberCount, DateTimeOffset ExpiresAt, bool AlreadyMember, string? RequestStatus = null);
 public sealed record ManualTeamTaskInput(string Name, string? Description, int EstimatedMinutes,
     DateTimeOffset Deadline, int Priority = 2, bool Splittable = true);
+public sealed record ManualTeamTaskChangeInput(Guid Version, ManualTeamTaskInput Task);
 public sealed record TeamTaskDraft(Guid ProposalId, string Reply, string Question, SharedTaskView? Task);
 public sealed record PrivateClaimSession(Guid Id, string TaskName, DateTimeOffset Start, DateTimeOffset End, bool Preserved);
 public sealed record PrivateClaimOption(int Index, string Label, PrivateClaimSession[] After, PrivateClaimSession[] Before, string[] Explanations);
@@ -90,6 +91,7 @@ public interface IPrivateTeamService
     Task<TeamCompletionDownload> DownloadTeamSourceFileAsync(Guid uid, Guid taskId, Guid fileId, CancellationToken ct);
     Task AttachTeamSourceFileAsync(Guid uid, Guid taskId, TeamSourceFileInput input, CancellationToken ct);
     Task<TeamTaskDraft> ProposeTeamTaskChangeAsync(Guid uid, Guid taskId, TeamTextInput input, CancellationToken ct);
+    Task<TeamTaskDraft> ProposeManualTeamTaskChangeAsync(Guid uid, Guid taskId, ManualTeamTaskChangeInput input, CancellationToken ct);
     Task<PrivateClaimView> PreviewTeamTaskChangeAsync(Guid uid, Guid taskId, CancellationToken ct);
     Task RejectTeamTaskChangeAsync(Guid uid, Guid taskId, Guid version, CancellationToken ct);
     Task<PolicyView?> GetAvailabilityPolicyAsync(Guid uid, CancellationToken ct);

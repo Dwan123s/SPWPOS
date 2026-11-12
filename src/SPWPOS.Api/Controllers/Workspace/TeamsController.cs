@@ -72,6 +72,9 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
         await service.AttachTeamSourceFileAsync(UserId, id, input, ct); return Done();
     }
     [HttpPost("tasks/{id:guid}/changes")] public async Task<IActionResult> Change(Guid id, TeamTextInput input, CancellationToken ct) => Data(await service.ProposeTeamTaskChangeAsync(UserId, id, input, ct));
+    [HttpPost("tasks/{id:guid}/changes/manual")]
+    public async Task<IActionResult> ManualChange(Guid id, ManualTeamTaskChangeInput input, CancellationToken ct) =>
+        Data(await service.ProposeManualTeamTaskChangeAsync(UserId, id, input, ct));
     [HttpPost("tasks/{id:guid}/changes/preview")] public async Task<IActionResult> PreviewChange(Guid id, CancellationToken ct) => Data(await service.PreviewTeamTaskChangeAsync(UserId, id, ct));
     [HttpPost("tasks/{id:guid}/changes/reject")] public async Task<IActionResult> Reject(Guid id, TeamVersionInput input, CancellationToken ct) { await service.RejectTeamTaskChangeAsync(UserId, id, input.Version, ct); return Done(); }
     [HttpGet("/api/time/policy")] public async Task<IActionResult> Policy(CancellationToken ct) => Data(await service.GetAvailabilityPolicyAsync(UserId, ct));

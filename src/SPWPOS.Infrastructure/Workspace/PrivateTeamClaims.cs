@@ -39,6 +39,8 @@ public sealed partial class WorkspaceService
             var assignment = await db.TeamTaskAssignments.SingleAsync(x => x.TeamTaskId == taskId && x.UserId == uid && x.Active, ct);
             var original = state.Tasks.Single(x => x.Id == assignment.WorkTaskId);
             task.Id = original.Id; task.Progress = original.Progress; task.Status = original.Status; task.CreatedAt = original.CreatedAt;
+            if (task.EstimatedMinutes == original.EstimatedMinutes)
+                task.ConfirmedRemainingMinutes = original.ConfirmedRemainingMinutes;
             WriteImportance(task, new(original.ImportanceLevel, original.ImportanceSource, original.ImportanceReason, original.ImportanceConfidence), original.ImportanceConfirmedAt);
         }
         var candidate = state with { Tasks = state.Tasks.Where(x => x.Id != task.Id).Append(task).ToArray() };
@@ -173,6 +175,8 @@ public sealed partial class WorkspaceService
             var personal = state.Tasks.Single(x => x.Id == payload.Task.Id);
             Require(!state.Sessions.Any(x => x.TaskId == personal.Id && x.Status is WorkSessionStatus.Running or WorkSessionStatus.Paused), "SESSION_ACTIVE", "Kết thúc phiên đang thực hiện trước khi đổi yêu cầu.", 409);
             db.TeamPlanningWrite = true;
+            if (personal.EstimatedMinutes != payload.Task.EstimatedMinutes)
+                personal.ConfirmedRemainingMinutes = null;
             personal.Name = payload.Task.Name; personal.Description = payload.Task.Description; personal.EstimatedMinutes = payload.Task.EstimatedMinutes; personal.Deadline = payload.Task.Deadline;
             personal.Priority = payload.Task.Priority; personal.Splittable = payload.Task.Splittable; personal.UpdatedAt = Now;
             candidate = state;
@@ -255,7 +259,33 @@ public sealed partial class WorkspaceService
         var draft = await InterpretSharedDraft(uid, current.TeamId, input.Text, SharedDto(current), ct);
         if (draft is null) return new(Guid.Empty, "Chưa thay đổi yêu cầu.", "Hãy nêu cụ thể yêu cầu và deadline mới.", null);
         var member = await TeamMember(uid, current.TeamId, ct, true);
-        var row = new PrivatePlanningProposal { UserId = uid, Kind = "TEAM_CHANGE", ExpiresAt = Now.AddMinutes(20), PayloadJson = JsonSerializer.Serialize(new TeamDraftPayload(current.TeamId, member.Version, draft with { Version = version })) };
+        return await StoreTeamChange(uid, current.TeamId, member.Version, draft with { Version = version }, ct);
+    }
+
+    public async Task<TeamTaskDraft> ProposeManualTeamTaskChangeAsync(Guid uid, Guid taskId, ManualTeamTaskChangeInput input, CancellationToken ct)
+    {
+        var current = await SharedTask(uid, taskId, ct);
+        var member = await TeamMember(uid, current.TeamId, ct, true);
+        Require(current.Version == input.Version && current.Status is "Open" or "Assigned",
+            "TASK_STALE", "Task đã thay đổi hoặc không còn có thể chỉnh sửa. Hãy tải lại.", 409);
+        var task = input.Task;
+        ValidateManualTeamTask(task);
+        if (task.Deadline != current.Deadline) ValidateTeamDeadline(task.Deadline);
+        var draft = SharedDto(current) with
+        {
+            Name = task.Name.Trim(),
+            Description = task.Description?.Trim() ?? "",
+            EstimatedMinutes = task.EstimatedMinutes,
+            Deadline = task.Deadline,
+            Priority = task.Priority,
+            Splittable = task.Splittable
+        };
+        return await StoreTeamChange(uid, current.TeamId, member.Version, draft, ct);
+    }
+
+    private async Task<TeamTaskDraft> StoreTeamChange(Guid uid, Guid teamId, Guid membershipVersion, SharedTaskView draft, CancellationToken ct)
+    {
+        var row = new PrivatePlanningProposal { UserId = uid, Kind = "TEAM_CHANGE", ExpiresAt = Now.AddMinutes(20), PayloadJson = JsonSerializer.Serialize(new TeamDraftPayload(teamId, membershipVersion, draft)) };
         db.PrivatePlanningProposals.Add(row); await db.SaveChangesAsync(ct);
         return new(row.Id, "Xem yêu cầu mới trước khi gửi. Người nhận sẽ xác nhận lịch riêng; yêu cầu hiện tại còn hiệu lực đến lúc đó.", "", draft);
     }
