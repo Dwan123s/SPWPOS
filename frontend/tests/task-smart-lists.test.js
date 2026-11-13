@@ -113,3 +113,27 @@ it("keeps ideas and unfinished drafts in Inbox and hides imported drafts until c
     }),
   ).toBe(true);
 });
+
+it("includes undated leaf tasks in the Today pane without inventing dates or calendar sessions", () => {
+  const now = Date.parse("2026-11-04T01:00:00Z");
+  const workspace = {
+    tasks: [
+      task("undated", null),
+      task("due-today", "2026-11-04T18:00:00+07:00"),
+      task("due-later", "2026-11-05T18:00:00+07:00"),
+      task("project", null),
+      { ...task("project-child", null), parentId: "project" },
+      { ...task("completed", null, "Completed"), completedAt: "2026-11-04T00:00:00Z" },
+      task("cancelled", null, "Cancelled"),
+      { ...task("deleted", null), isDeleted: true },
+    ],
+    sessions: [],
+  };
+  const before = JSON.stringify(workspace);
+  const model = smartTaskLists(workspace, now);
+  expect(model.todayTasks.map((item) => item.id)).toEqual(["due-today", "undated", "project-child"]);
+  expect(model.todayCompleted).toBe(1);
+  expect(model.isOverdue(workspace.tasks[0])).toBe(false);
+  expect(model.plannedDays.has("undated")).toBe(false);
+  expect(JSON.stringify(workspace)).toBe(before);
+});

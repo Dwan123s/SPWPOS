@@ -206,13 +206,15 @@ function render() {
     .match(/^friends\/(people|friends|incoming|outgoing)$/);
   const taskMatch = location.hash.slice(1)
     .match(/^tasks\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i);
+  const projectMatch = location.hash.slice(1).match(/^tasks\/project\/([a-zA-Z0-9-]+)$/);
   state.socialFriendsTab = friendsMatch?.[1] || null;
   state.profileUserId = profileMatch?.[1] || null;
   state.route = profileMatch
     ? "profile"
     : friendsMatch
       ? "friends"
-      : taskMatch ? "tasks" : location.hash.slice(1) || "today";
+      : taskMatch || projectMatch ? "tasks" : location.hash.slice(1) || "today";
+  if (projectMatch) state.taskScope = "projects";
   if (state.route === "admin") {
     state.route = "admin-users";
     history.replaceState(null, "", "#admin-users");
@@ -235,6 +237,7 @@ function render() {
       <RoutePage
         key={state.route}
         route={state.route}
+        projectId={projectMatch?.[1] || null}
         profileId={state.profileUserId}
         friendsTab={state.socialFriendsTab}
         onWorkspaceChanged={() =>

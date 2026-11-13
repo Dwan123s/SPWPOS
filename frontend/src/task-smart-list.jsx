@@ -3,12 +3,15 @@ import { state, dateFmt, icon, statusLabels } from "./ui.jsx";
 import { api } from "./api.js";
 import { taskColumns, taskRows } from "./tasks.jsx";
 import { TaskInbox } from "./task-inbox.jsx";
+import { ProjectList, projectColumns } from "./task-projects.jsx";
+import { ProjectWorkspace } from "./project-workspace.jsx";
 import { activeTask, isInboxNote, smartTaskLists } from "./task-smart-lists.js";
 import { PopupDetails } from "./popup-dismissal.jsx";
 import "./task-smart-list.css";
 
 const lists = {
   personal: { label: "Việc của tôi" },
+  projects: { label: "Projects" },
   all: { label: "Tất cả công việc" },
   inbox: {
     label: "Ghi nháp",
@@ -81,16 +84,19 @@ function TodayTaskPane({ model }) {
             );
           })}
         </ul>
-      ) : <p>Chưa có việc được xếp hoặc đến hạn hôm nay.</p>}
+      ) : <p>Chưa có công việc cần làm hôm nay.</p>}
     </aside>
   );
 }
 
-export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
+export function TaskSmartList({ onShowMatrix, onWorkspaceChanged, projectId = null }) {
+  const [openedProject, setOpenedProject] = useState(projectId);
+  useEffect(() => { setOpenedProject(projectId); }, [projectId]);
   const [scope, setScope] = useState(() =>
     lists[state.taskScope] ? state.taskScope : "personal",
   );
   const [columns, setColumns] = useState(() => Object.keys(taskColumns));
+  const [visibleProjectColumns, setProjectColumns] = useState(["progress", "owner"]);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [toolbarHost, setToolbarHost] = useState(null);
   const [query, setQuery] = useState("");
@@ -163,6 +169,7 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
   const inbox = notes.filter(isInboxNote);
   const selected = lists[scope];
   const isDrafts = scope === "inbox";
+  const isProjects = scope === "projects";
   const isFlat = scope === "personal" || scope === "all";
   const incomplete = filters.status === "active";
   function choose(key) {
@@ -192,7 +199,7 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
       ? model.todayGroups
       : scope === "week"
         ? model.weekGroups
-        : [{ key: "all", tasks: scope === "personal" ? model.all.filter((task) => !task.isTeamTask) : model.all }];
+        : [{ key: "all", tasks: scope === "personal" ? model.personalInbox : isProjects ? model.projects : model.all }];
   const groups = sourceGroups
     .map((g) => ({ ...g, projectContext: isFlat ? g.tasks : undefined, tasks: g.tasks.filter(matches) }))
     .filter((g) => isFlat || g.tasks.length);
@@ -207,6 +214,11 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
     </button>
   );
   return (
+    <>
+    {openedProject && <ProjectWorkspace key={openedProject} projectId={openedProject} workspace={workspace} onWorkspaceChanged={onWorkspaceChanged} onBack={() => {
+      choose("projects"); setOpenedProject(null); location.hash = "tasks";
+    }} />}
+    <div hidden={!!openedProject}>
     <div className="task-smart-layout">
       <TodayTaskPane model={model} />
       <nav className="task-smart-nav" aria-label="Danh sách thông minh">
@@ -214,8 +226,12 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
           aria-pressed={scope === "personal"} onClick={() => choose("personal")}>
           {icon("mail")} Inbox
         </button>
-        <button type="button" className={`task-smart-nav-item${!isDrafts && scope !== "personal" ? " is-active" : ""}`}
-          aria-pressed={!isDrafts && scope !== "personal"} onClick={() => choose("all")}>
+        <button type="button" className={`task-smart-nav-item${isProjects ? " is-active" : ""}`}
+          aria-pressed={isProjects} onClick={() => choose("projects")}>
+          {icon("folder")} Projects
+        </button>
+        <button type="button" className={`task-smart-nav-item${["all", "today", "week"].includes(scope) ? " is-active" : ""}`}
+          aria-pressed={["all", "today", "week"].includes(scope)} onClick={() => choose("all")}>
           {icon("tasks")} Công việc
         </button>
         <button type="button" className={`task-smart-nav-item${isDrafts ? " is-active" : ""}`}
@@ -230,15 +246,15 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
       </nav>
       <section
         className="task-smart-main"
-        aria-label={`Nội dung ${selected.label}`}
+        aria-label={`Nội dung ${scope === "personal" ? "Inbox" : selected.label}`}
       >
         <div className="task-smart-toolbar" ref={setToolbarHost}>
           {!isDrafts && (
             <PopupDetails className="task-work-popup task-work-scope">
               <summary aria-label={`Lọc danh sách · ${selected.label}`}>{selected.label}</summary>
               <div>
-                <div className="task-work-scope-options" aria-label="Phạm vi công việc">
-                  {Object.entries(lists).filter(([key]) => key !== "inbox").map(([key, list]) => (
+                {!isProjects && <div className="task-work-scope-options" aria-label="Phạm vi công việc">
+                  {Object.entries(lists).filter(([key]) => !["inbox", "projects"].includes(key)).map(([key, list]) => (
                     <button key={key} type="button" aria-pressed={scope === key}
                       onClick={(event) => {
                         const disclosure = event.currentTarget.closest("details");
@@ -249,12 +265,12 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
                       {list.label}
                     </button>
                   ))}
-                </div>
+                </div>}
                 <select aria-label="Lọc trạng thái" className="filter" value={filters.status}
                   onChange={(event) => setFilter("status", event.target.value)}>
                   <option value="">Tất cả trạng thái</option>
                   <option value="active">Chưa hoàn thành</option>
-                  {(isFlat ? ["Todo", "InProgress", "Completed", "Cancelled"] : ["Todo", "InProgress"])
+                  {(isFlat || isProjects ? ["Todo", "InProgress", "Completed", "Cancelled"] : ["Todo", "InProgress"])
                     .map((key) => <option value={key} key={key}>{statusLabels[key]}</option>)}
                 </select>
                   <select
@@ -320,8 +336,8 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
           </button>
           {searchOpen && (
             <input id="work-task-search" type="search" className="task-work-search-input" autoFocus
-              aria-label={isDrafts ? "Tìm trong ghi nháp" : "Tìm công việc"}
-              placeholder={isDrafts ? "Tìm ghi nháp…" : "Tìm công việc…"}
+              aria-label={isDrafts ? "Tìm trong ghi nháp" : isProjects ? "Tìm project" : "Tìm công việc"}
+              placeholder={isDrafts ? "Tìm ghi nháp…" : isProjects ? "Tìm project…" : "Tìm công việc…"}
               value={query} onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key !== "Escape") return;
@@ -348,16 +364,17 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
                 <button type="button" className="task-work-tool task-work-incomplete" aria-pressed={incomplete}
                   onClick={() => setFilter("status", incomplete ? "" : "active")}>
                   <span className="task-work-incomplete-icon">{icon("check")}</span>
-                  <span>Chưa hoàn thành</span>
+                  <span>{isProjects ? "Project đang hoạt động" : "Chưa hoàn thành"}</span>
                 </button>
                 <PopupDetails className="task-work-popup task-column-picker">
                   <summary><span className="task-work-columns-icon" aria-hidden="true" /> Cột</summary>
                   <div>
-                    {Object.entries(taskColumns).map(([key, label]) => (
+                    {Object.entries(isProjects ? projectColumns : taskColumns).map(([key, label]) => (
                       <label className="checkbox" key={key}>
-                        <input type="checkbox" checked={columns.includes(key)} onChange={(event) => {
+                        <input type="checkbox" checked={(isProjects ? visibleProjectColumns : columns).includes(key)} onChange={(event) => {
                           const checked = event.target.checked;
-                          setColumns((current) => checked ? [...current, key] : current.filter((item) => item !== key));
+                          const changeColumns = isProjects ? setProjectColumns : setColumns;
+                          changeColumns((current) => checked ? [...current, key] : current.filter((item) => item !== key));
                         }} />
                         {label}
                       </label>
@@ -394,7 +411,9 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
             }}
           />
         </div>
-        {scope !== "inbox" && (
+        {isProjects && <ProjectList projects={model.projects.filter(matches)} columns={visibleProjectColumns} filtered={filtered}
+          onOpenProject={(id) => { setOpenedProject(id); location.hash = `tasks/project/${encodeURIComponent(id)}`; }} />}
+        {scope !== "inbox" && !isProjects && (
           <>
             <div className="task-smart-groups">
               {groups.length ? (
@@ -448,6 +467,8 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged }) {
         )}
       </section>
     </div>
+    </div>
+    </>
   );
 }
 function groupLabel(day, today) {

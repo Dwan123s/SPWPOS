@@ -1001,7 +1001,7 @@ export function openDetail(id, { afterSession = false, initialTab = "details" } 
   );
 }
 
-function TaskDrawerSource({ task, lines, canAttach }) {
+export function TaskDrawerSource({ task, lines, canAttach }) {
   const picker = useRef(null);
   const [attachedName, setAttachedName] = useState("");
   const [busy, setBusy] = useState(false);

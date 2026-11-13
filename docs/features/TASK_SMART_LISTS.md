@@ -1,6 +1,16 @@
-# Inbox, Today và Next 7 Days
+# Inbox, Projects và các danh sách công việc
 
-Phần **Công việc → Danh sách** có thanh điều hướng riêng với ba danh sách chính, số lượng mục và lựa chọn **Tất cả công việc** để tra cứu lịch sử. Bố cục chuyển thành các nút ngang trên màn hình nhỏ. Tham khảo khái niệm [Smart List của TickTick](https://help.ticktick.com/articles/7055782283059396608); quy tắc dưới đây phù hợp với task có deadline và các phiên làm việc của PLANORA.
+Phần **Công việc** có các tab riêng **Inbox**, **Projects**, **Công việc**, **Ghi nháp** và **Eisenhower** khi được bật. Các nút cuộn ngang trên màn hình nhỏ.
+
+- **Inbox** chỉ chứa công việc cá nhân độc lập, không có cha và không có việc con. Project và các việc con không xuất hiện trong bảng Inbox.
+- **Projects** chứa công việc cha cá nhân có ít nhất một việc con chưa bị xóa. Bảng hiển thị tên, số việc con, tiến độ, người phụ trách và phạm vi cá nhân. Có tìm kiếm, lọc trạng thái/danh mục/ưu tiên/hạn chót, sắp xếp tên, chọn cột và phân trang 12 project. Bấm tên mở chi tiết project cùng các việc con. **Thêm project…** mở biểu mẫu tạo project từ danh sách việc/tài liệu hiện có; lưu xong vẫn ở Projects.
+- **Công việc** giữ danh sách tổng hợp cá nhân và nhóm, bao gồm project và việc con. Các lựa chọn Hôm nay và 7 ngày tới vẫn có trong bộ lọc danh sách. Cột Projects được lưu riêng với cột công việc trong lần mở trang.
+
+Khung **Hôm nay** bên trái hiển thị việc chưa hoàn thành/chưa hủy, gồm việc chưa có due date (cả việc độc lập và việc con), việc quá hạn, đến hạn hôm nay hoặc có phiên giao với hôm nay. Project cha và dữ liệu đã xóa không được tính thêm. Task có due date vẫn hiện badge Hạn/Quá hạn theo ngày thật; task chưa có hạn chỉ hiện tên và nút hoàn thành. Việc có hạn/phiên cụ thể được ưu tiên trước việc chưa có hạn. Quy tắc này chỉ đưa task vào danh sách bên trái, không tự đặt deadline hoặc tạo phiên trên lịch.
+
+Trong **Projects**, bấm tên mở trang project riêng tại `#tasks/project/<id>`, có breadcrumb quay lại danh sách Projects. Các mục **Danh sách**, **Chi tiết** và **Tài liệu** dùng dữ liệu/chức năng hiện có. Danh sách chỉ chứa việc con của project, có tìm kiếm, lọc chưa hoàn thành, chọn cột, hoàn thành, checklist, lịch dự kiến, thời lượng và hạn chót. Việc con được sắp theo lịch thực hiện và thứ tự phụ thuộc; nút thêm việc con gắn đúng project đang mở. Có thể tải lại hoặc quay lại bằng lịch sử trình duyệt; project bị xóa hoặc không thuộc tài khoản sẽ hiện trạng thái không tìm thấy. Trạng thái danh sách Projects và bản nháp được giữ khi vào/ra trang project.
+
+Các chức năng ghi chú bên dưới nằm ở tab **Ghi nháp**; chữ Inbox trong biểu mẫu ghi chú là nhãn cũ của cùng chức năng:
 
 - **Inbox** chứa ý tưởng, nhiệm vụ tạm thời và bản nháp chưa nhập thành công việc. Chỉ nhập nội dung, nhấn Enter hoặc **Lưu vào Inbox**; Shift+Enter xuống dòng. Không yêu cầu deadline, thời lượng hay AI. Dữ liệu lưu vào ghi chú của tài khoản qua API Notes hiện có, dùng chung thư viện Nhập việc và giới hạn 200 ghi chú. Có tìm kiếm, chỉnh sửa và xóa với xác nhận; xóa đồng thời xóa bản nháp trong thư viện Nhập việc.
 - **Hoàn thiện trong Nhập việc** mở đúng ghi chú đã chọn. Sau khi bản nháp được nhập/lập kế hoạch, nó rời Inbox nhưng lịch sử vẫn trong Nhập việc. Sửa thêm nội dung cần xử lý làm bản nháp xuất hiện lại. Không gọi AI hoặc tạo task chỉ vì mở bản nháp.

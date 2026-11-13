@@ -1,0 +1,127 @@
+.project-workspace {
+  min-width: 0;
+  color: var(--ui-ink);
+  --work-rule: var(--ui-line);
+  --work-muted: var(--ui-muted);
+  --work-blue: var(--ui-accent);
+  font-family: var(--ui-font);
+}
+.project-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.project-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.project-breadcrumb button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  color: var(--ui-muted);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.project-breadcrumb > .icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  transform: rotate(-90deg);
+  color: var(--ui-muted);
+}
+.project-breadcrumb h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.project-page-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.project-page-search .icon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--ui-muted);
+}
+.project-page-search input {
+  min-width: 0;
+  width: 200px;
+  padding: 8px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+.project-page-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+.project-page-due .icon {
+  width: 16px;
+  height: 16px;
+}
+.project-page-count {
+  margin: 12px 0;
+  font-size: 11px;
+  color: var(--ui-muted);
+}
+.project-page-details {
+  margin-top: 18px;
+  padding: 24px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+}
+.project-page-details h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.project-page-details p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.project-page-details dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 20px 0;
+}
+.project-page-details dt {
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+.project-page-details dd {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+.project-workspace [hidden] {
+  display: none;
+}
+@media (max-width: 600px) {
+  .project-page-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .project-breadcrumb h2 {
+    font-size: 15px;
+  }
+  .project-page-details {
+    padding: 16px;
+  }
+}

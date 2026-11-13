@@ -90,16 +90,19 @@ export function smartTaskLists(workspace, now = Date.now()) {
     }
     return candidates.sort()[0] || null;
   }
-  const tasks = workspace.tasks || [];
+  const tasks = (workspace.tasks || []).filter((task) => !task.isDeleted);
   const projectIds = new Set(tasks.map((task) => task.parentId).filter(Boolean));
+  const projects = tasks.filter((task) => !task.parentId && !task.isTeamTask && projectIds.has(task.id));
+  const personalInbox = tasks.filter((task) => !task.isTeamTask && !task.parentId && !projectIds.has(task.id));
   const todayTasks = tasks.filter((task) =>
     activeTask(task) && !projectIds.has(task.id) &&
-    (isOverdue(task) || todayStarts.has(task.id) || dayOf(task.deadline) === today),
+    // Show undated work in the sidebar without creating a due date or session.
+    (!dayOf(task.deadline) || isOverdue(task) || todayStarts.has(task.id) || dayOf(task.deadline) === today),
   ).sort((a, b) =>
     Number(isOverdue(b)) - Number(isOverdue(a)) ||
     (todayStarts.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
     (todayStarts.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
-    (Date.parse(a.deadline) || 0) - (Date.parse(b.deadline) || 0) ||
+    (Date.parse(a.deadline) || Number.MAX_SAFE_INTEGER) - (Date.parse(b.deadline) || Number.MAX_SAFE_INTEGER) ||
     b.priority - a.priority,
   );
   const todayCompleted = tasks.filter((task) =>
@@ -135,6 +138,8 @@ export function smartTaskLists(workspace, now = Date.now()) {
     todayGroups: groups(today),
     weekGroups: groups(lastDay),
     all: tasks,
+    projects,
+    personalInbox,
     dayOf,
     plannedDays,
     plannedStarts,
