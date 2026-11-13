@@ -31,13 +31,26 @@ public static class VietnameseTelex
         "as is of or for has was us bus class pass test tests case cases file files save status focus tasks work hours now own cow show low new row rows json url http https".Split(' '),
         StringComparer.OrdinalIgnoreCase);
     private static readonly Regex Tokens = new(
-        @"(?<protected>https?://[^\s]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|`[^`\r\n]*`|(?:[A-Za-z]:\\|/)[^\s]+|[\w.-]+\.(?:cs|jsx?|tsx?|json|md|txt|csv|pdf|docx|xlsx)\b)|(?<word>(?<![\p{L}\p{N}_])[A-Za-z]{2,24}(?![\p{L}\p{N}_]))",
-        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+        @"(?<protected>https?://[^\s]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|`[^`\r\n]*`|(?:[A-Za-z]:\\|/)[^\s]+|[\w.-]+\.(?:cs|jsx?|tsx?|json|md|txt|csv|pdf|docx|xlsx)\b)|(?<word>[\p{L}\p{N}_]+)",
+        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.NonBacktracking);
     private const string ToneKeys = "sfrxj";
     private const string ToneMarks = "\u0301\u0300\u0309\u0303\u0323";
 
-    public static string Normalize(string text) => Tokens.Replace(text, match =>
-        match.Groups["word"].Success ? Decode(match.Value) : match.Value);
+    public static string Normalize(string text)
+    {
+        // Scan whole identifiers in linear time, then decode only short ASCII
+        // words. A wall-clock limit on the entire callback-driven replacement
+        // made valid long conversations fail under concurrent server load.
+        var decoded = new Dictionary<string, string>(StringComparer.Ordinal);
+        return Tokens.Replace(text, match =>
+        {
+            var word = match.Value;
+            if (!match.Groups["word"].Success || word.Length is < 2 or > 24 ||
+                word.Any(c => c is not (>= 'a' and <= 'z') and not (>= 'A' and <= 'Z'))) return word;
+            if (!decoded.TryGetValue(word, out var result)) decoded[word] = result = Decode(word);
+            return result;
+        });
+    }
 
     private static string Decode(string token)
     {

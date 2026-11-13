@@ -3,6 +3,32 @@ namespace SPWPOS.UnitTests;
 
 public sealed class VietnameseTelexTests
 {
+    [Fact]
+    public void Long_identifiers_do_not_prevent_processing_the_latest_correction()
+    {
+        var identifier = new string('x', 60000);
+        Assert.Equal(identifier + " đừng lưu, chỉ xem trước 90 phút",
+            VietnameseTelex.Normalize(identifier + " ddungwf luuw, chir xem truowsc 90 phuts"));
+    }
+
+    [Fact]
+    public void Long_repeated_context_preserves_protected_data_and_decodes_the_latest_message()
+    {
+        const string input = "lamf https://example.com/vieetss lamf@example.com `vieetss` task_lamf C:\\work\\lamf.txt /tasks/vieets ";
+        const string expected = "làm https://example.com/vieetss lamf@example.com `vieetss` task_lamf C:\\work\\lamf.txt /tasks/vieets ";
+        Assert.Equal(string.Concat(Enumerable.Repeat(expected, 600)) + "chưa áp dụng",
+            VietnameseTelex.Normalize(string.Concat(Enumerable.Repeat(input, 600)) + "chuaw aps dungj"));
+    }
+
+    [Fact]
+    public void Concurrent_long_contexts_preserve_each_requests_latest_correction()
+    {
+        var context = string.Concat(Enumerable.Repeat("lamf vieejc ", 5000));
+        var normalized = string.Concat(Enumerable.Repeat("làm việc ", 5000));
+        Parallel.For(0, 8, index => Assert.Equal(normalized + $"đừng lưu {index}",
+            VietnameseTelex.Normalize(context + $"ddungwf luuw {index}")));
+    }
+
     [Theory]
     [InlineData("lamf", "làm")]
     [InlineData("vieets", "viết")]

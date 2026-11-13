@@ -54,6 +54,31 @@ public sealed class AgentVisionApiTests
     }
 
     [Fact]
+    public async Task An_applied_upload_is_reused_after_text_turns_without_replaying_its_saved_events()
+    {
+        await using var f = new Factory(); using var client = await f.ClientAsync(); await WorkspaceFlowTests.Authorize(f, client);
+        var start = f.Clock.GetUtcNow().AddDays(1);
+        f.Ai.Response = _ => AgentAiTestDouble.Empty() with { Events = [new("Toán", start, start.AddHours(1), EventType: "CLASS")] };
+        var conversation = Guid.NewGuid();
+        var first = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns",
+            new AgentTurnInput(conversation, Guid.NewGuid(), "Xếp thời khóa biểu trong ảnh.", Image: TwoImages))).GetProperty("data");
+        Assert.Equal("APPLIED", first.GetProperty("status").GetString());
+        var before = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data").GetProperty("events").GetRawText();
+        f.Ai.Response = _ => AgentAiTestDouble.Empty();
+        foreach (var text in new[] { "Giải thích cách chia nhỏ công việc", "Cảm ơn", "Tôi nên nghỉ ngơi thế nào?" })
+            await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns", new AgentTurnInput(conversation, Guid.NewGuid(), text));
+        var imageCalls = f.Ai.ImageCalls;
+        var followup = (await WorkspaceFlowTests.Send(client, HttpMethod.Post, "/api/agent/turns",
+            new AgentTurnInput(conversation, Guid.NewGuid(), "Chỉ giải thích các buổi học tuần sau dựa trên ảnh đã gửi, không lưu lịch."))).GetProperty("data");
+        Assert.Equal("ANSWERED", followup.GetProperty("status").GetString());
+        Assert.Equal(imageCalls + 1, f.Ai.ImageCalls);
+        Assert.Equal(TwoImages.GetImages(), f.Ai.LastImage!.GetImages());
+        Assert.Equal(JsonValueKind.Null, followup.GetProperty("image").ValueKind);
+        var after = (await WorkspaceFlowTests.Send(client, HttpMethod.Get, "/api/workspace")).GetProperty("data").GetProperty("events").GetRawText();
+        Assert.Equal(before, after);
+    }
+
+    [Fact]
     public async Task Invalid_second_image_or_more_than_two_are_rejected_and_second_image_is_part_of_request_identity()
     {
         await using var f = new Factory(); using var client = await f.ClientAsync(); await WorkspaceFlowTests.Authorize(f, client);

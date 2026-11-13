@@ -128,20 +128,17 @@ public sealed partial class WorkspaceService
                 "AGENT_AI_NOT_CONFIGURED", "NORA chưa kết nối được với dịch vụ AI. Lịch đã lưu được giữ nguyên; hãy kiểm tra kết nối và thử lại.", 503);
             var state = await State(uid, ct); var revision = state.Preference.Revision;
             var historyRows = await Mine<AgentTurn>(uid).AsNoTracking().Where(x => x.ConversationId == input.ConversationId && x.Id != turnId &&
-                x.Status != "PROCESSING" && x.Status != "DELETED").OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(8).ToArrayAsync(ct);
-            var history = historyRows.Reverse().Select(x => new AgentMessage(x.Text,
-                x.Status == "FAILED" ? "Yêu cầu thất bại; chưa lưu thay đổi từ yêu cầu này. Kiểm tra dữ liệu hiện tại trước khi trả lời."
-                    : TurnView(x).Reply + " " + TurnView(x).Outcome + " " + TurnView(x).Question, x.Status)).ToArray();
+                x.Status != "PROCESSING" && x.Status != "DELETED").OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(AgentHistoryTurns).ToArrayAsync(ct);
+            var history = ConversationHistory(historyRows);
             var latest = historyRows.FirstOrDefault();
             AgentTurn? imageSource = null;
             var visionImage = input.Image;
-            // A brief calendar lookup between clarification replies does not
-            // discard an uploaded timetable from this conversation.
+            // An upload remains conversation data after its turn is answered or
+            // applied. Reuse the newest original bundle within the history window;
+            // intervening text replies do not remove it or authorize another import.
             if (visionImage is null)
             {
-                bool PendingImage(AgentTurn row) => row.Status is "NEEDS_INPUT" or "BLOCKED" or "FAILED";
-                var imageRows = TimetableFollowup(input.Text) ? historyRows.Where(PendingImage) : historyRows.TakeWhile(PendingImage);
-                foreach (var row in imageRows)
+                foreach (var row in historyRows)
                 {
                     if (StoredAgentImage(row) is not { Data.Length: > 0 } stored) continue;
                     (imageSource, visionImage) = (row, stored);
@@ -174,7 +171,7 @@ public sealed partial class WorkspaceService
             }
             else if (nativeAgent)
             {
-                runtime = await RunNoraAgentAsync(uid, turnId, input, state, history, pending, activeTaskTypes, visionImage, publish, ct);
+                runtime = await RunNoraAgentAsync(uid, turnId, input, state, history, pending, activeTaskTypes, visionImage, imageSource, publish, ct);
                 intent = runtime.Intent;
                 scheduleReviewReply = runtime.ReadReply;
             }

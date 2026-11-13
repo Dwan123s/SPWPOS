@@ -280,6 +280,189 @@ public sealed partial class NoraAgentRuntimeTests
         Assert.Equal(1, await h.DbAsync(db => db.AgentRuns.CountAsync(Ct)));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Clarifications_keep_the_original_goal_beyond_three_followups_and_the_history_window(bool longAnswers)
+    {
+        var model = new Model();
+        var messages = new List<string> { "Xếp lịch làm báo cáo về cảm biến nhiệt độ" };
+        model.Decision = (request, number) =>
+        {
+            var data = JsonDocument.Parse(request.Contents[0].GetProperty("parts")[0].GetProperty("text").GetString()!).RootElement;
+            var goal = data.GetProperty("request").GetString()!;
+            Assert.Contains(messages[0], goal);
+            Assert.Contains(messages[^1], goal);
+            Assert.InRange(goal.Length, 1, 64000);
+            foreach (var message in messages) Assert.Contains(message, goal);
+            Assert.Equal(messages[^1], data.GetProperty("latestMessage").GetString());
+            return Task.FromResult(Call("ask_user", new { reply = "Cần thêm chi tiết.", question = "Bạn bổ sung điều kiện nào?", options = Array.Empty<string>() }, number));
+        };
+        await using var h = await Harness(model, 2);
+        var user = await h.RegisterAsync();
+        var conversation = Guid.NewGuid();
+        var first = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), messages[0]), Ct));
+        for (var index = 1; index <= 10; index++)
+        {
+            messages.Add($"Điều kiện bổ sung số {index}" + (longAnswers ? new string('x', 900) : ""));
+            var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), messages[^1]), Ct));
+            Assert.Equal("NEEDS_INPUT", turn.Status);
+            Assert.Equal(first.Run!.Id, turn.Run!.Id);
+        }
+        Assert.Equal(11, model.Calls);
+        Assert.Equal(1, await h.DbAsync(db => db.AgentRuns.CountAsync(Ct)));
+        Assert.False(await h.DbAsync(db => db.WorkTasks.AnyAsync(Ct)));
+    }
+
+    [Theory]
+    [InlineData(50, 900)]
+    [InlineData(75, 1900)]
+    public async Task Extended_clarifications_rebuild_stored_answers_with_bounded_context(int followups, int padding)
+    {
+        var messages = new List<string> { "Lên kế hoạch cho báo cáo cảm biến, giữ nguyên các buổi học." };
+        var model = new Model { Decision = (request, number) => {
+            var data = JsonDocument.Parse(request.Contents[0].GetProperty("parts")[0].GetProperty("text").GetString()!).RootElement;
+            var source = data.GetProperty("request").GetString()!;
+            Assert.Contains(messages[0], source);
+            Assert.Contains(messages[^1], source);
+            Assert.InRange(source.Length, 1, 64000);
+            if (padding == 900) foreach (var message in messages) Assert.Contains(message, source);
+            return Task.FromResult(Call("ask_user", new { reply = "Đã ghi nhận điều kiện.", question = "Còn điều kiện nào?", options = Array.Empty<string>() }, number));
+        } };
+        await using var h = await Harness(model, 2);
+        var user = await h.RegisterAsync();
+        var conversation = Guid.NewGuid();
+        var first = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), messages[0]), Ct));
+        for (var index = 1; index <= followups; index++)
+        {
+            messages.Add($"Điều kiện riêng số {index}: " + string.Join(" ", Enumerable.Repeat("chi tiết", padding / 9)));
+            var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), messages[^1]), Ct));
+            Assert.Equal("NEEDS_INPUT", turn.Status);
+            Assert.Equal(first.Run!.Id, turn.Run!.Id);
+        }
+        var saved = await h.DbAsync(db => db.AgentRuns.SingleAsync(Ct));
+        Assert.InRange(saved.Goal.Length, 1, 8000);
+        Assert.Contains(messages[^1], saved.Goal);
+        Assert.False(await h.DbAsync(db => db.WorkTasks.AnyAsync(Ct)));
+    }
+
+    [Theory]
+    [InlineData(60, true)]
+    [InlineData(1439, true)]
+    [InlineData(1441, false)]
+    public async Task Clarification_memory_survives_a_break_but_expires_after_a_day(int idleMinutes, bool resumes)
+    {
+        var model = new Model { Decision = (_, number) => Task.FromResult(Call("ask_user",
+            new { reply = "Cần làm rõ.", question = "Bạn muốn làm trong bao lâu?", options = Array.Empty<string>() }, number)) };
+        await using var h = await Harness(model, 2);
+        var user = await h.RegisterAsync();
+        var conversation = Guid.NewGuid();
+        var first = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), Goal), Ct));
+        h.Clock.Advance(TimeSpan.FromMinutes(idleMinutes));
+        var second = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "90 phút"), Ct));
+        Assert.Equal("NEEDS_INPUT", second.Status);
+        Assert.Equal(resumes, first.Run!.Id == second.Run!.Id);
+    }
+
+    [Fact]
+    public async Task Recent_history_retains_thirty_two_exchanges_without_crossing_conversations()
+    {
+        var expected = new List<string>();
+        var model = new Model { Decision = (request, number) => {
+            var data = JsonDocument.Parse(request.Contents[0].GetProperty("parts")[0].GetProperty("text").GetString()!).RootElement;
+            var actual = data.GetProperty("history").EnumerateArray().Select(x => x.GetProperty("text").GetString()).ToArray();
+            Assert.Equal(expected.TakeLast(32), actual);
+            return Task.FromResult(Understood(Call("reply_to_user", new { reply = "Có thể chia công việc thành những bước nhỏ." }, number), "Advice"));
+        } };
+        await using var h = await Harness(model, 2);
+        var user = await h.RegisterAsync();
+        var conversation = Guid.NewGuid();
+        for (var index = 0; index < 36; index++)
+        {
+            var text = $"Cho tôi lời khuyên học tập số {index}";
+            var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), text), Ct));
+            Assert.Equal("ANSWERED", turn.Status);
+            expected.Add(text);
+        }
+        expected.Clear();
+        var isolated = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), "Giải thích cách tập trung"), Ct));
+        Assert.Equal("ANSWERED", isolated.Status);
+    }
+
+    [Fact]
+    public async Task Continuing_a_new_request_does_not_reuse_the_previous_requests_goal()
+    {
+        var model = new Model { Decision = (_, number) => Task.FromResult(number == 1
+            ? Understood(Call("reply_to_user", new { reply = "Đã hiểu yêu cầu." }, number), "Advice")
+            : Call("ask_user", new { reply = "Đã hiểu yêu cầu.", question = "Bạn bổ sung điều kiện nào?", options = Array.Empty<string>() }, number)) };
+        await using var h = await Harness(model, 2);
+        var user = await h.RegisterAsync();
+        var conversation = Guid.NewGuid();
+        await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "Giải thích cách luyện piano"), Ct));
+        var pending = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "Lên kế hoạch viết báo cáo"), Ct));
+        model.Decision = (request, number) => {
+            var data = JsonDocument.Parse(request.Contents[0].GetProperty("parts")[0].GetProperty("text").GetString()!).RootElement;
+            Assert.Equal("Lên kế hoạch viết báo cáo\nBổ sung: 90 phút", data.GetProperty("request").GetString());
+            return Task.FromResult(Call("ask_user", new { reply = "Đã ghi nhận.", question = "Hạn chót là khi nào?", options = Array.Empty<string>() }, number));
+        };
+        var next = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "90 phút"), Ct));
+        Assert.Equal("NEEDS_INPUT", next.Status);
+        Assert.Equal(pending.Run!.Id, next.Run!.Id);
+    }
+
+    [Fact]
+    public async Task Large_replies_trim_old_history_while_preserving_the_latest_exchanges()
+    {
+        var model = new Model { Decision = (request, number) => {
+            var data = JsonDocument.Parse(request.Contents[0].GetProperty("parts")[0].GetProperty("text").GetString()!).RootElement;
+            var history = data.GetProperty("history").EnumerateArray().ToArray();
+            Assert.Equal(13, history.Length);
+            Assert.StartsWith("Message 7:", history[0].GetProperty("text").GetString());
+            Assert.StartsWith("Message 19:", history[^1].GetProperty("text").GetString());
+            Assert.InRange(history.Sum(x => x.GetProperty("text").GetString()!.Length + x.GetProperty("reply").GetString()!.Length), 1, 64000);
+            return Task.FromResult(Understood(Call("reply_to_user", new { reply = "Hãy bắt đầu với một bước nhỏ." }, number), "Advice"));
+        } };
+        await using var h = await Harness(model, 2);
+        var user = await h.RegisterAsync();
+        var conversation = Guid.NewGuid();
+        await h.DbAsync(async db => {
+            db.AgentConversations.Add(new() { Id = conversation, UserId = user.Id, Title = "Long history", CreatedAt = h.Clock.GetUtcNow().AddHours(-1), UpdatedAt = h.Clock.GetUtcNow() });
+            for (var index = 0; index < 20; index++)
+            {
+                var text = ($"Message {index}: " + new string('x', 1000))[..1000];
+                var turn = new AgentTurn { UserId = user.Id, ConversationId = conversation, RequestId = Guid.NewGuid(), Text = text,
+                    Status = "ANSWERED", CreatedAt = h.Clock.GetUtcNow().AddMinutes(index - 30), UpdatedAt = h.Clock.GetUtcNow() };
+                turn.ResultJson = JsonSerializer.Serialize(new AgentTurnView(turn.Id, conversation, turn.RequestId, text,
+                    new string('y', 3900), "ANSWERED", "", null, [], [], turn.CreatedAt), Json);
+                db.AgentTurns.Add(turn);
+            }
+            await db.SaveChangesAsync(Ct);
+        });
+        var result = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "Cho tôi lời khuyên học tập"), Ct));
+        Assert.Equal("ANSWERED", result.Status);
+    }
+
+    [Fact]
+    public async Task Retrying_a_failed_initial_request_keeps_its_goal_without_adding_the_previous_topic()
+    {
+        const string requestText = "Lên kế hoạch luyện phát âm";
+        var model = new Model { Decision = (request, number) => {
+            if (number == 2) throw new AuthException("AI_UNAVAILABLE", "Provider unavailable", 503);
+            var data = JsonDocument.Parse(request.Contents[0].GetProperty("parts")[0].GetProperty("text").GetString()!).RootElement;
+            if (number == 3) Assert.Equal(requestText, data.GetProperty("request").GetString());
+            return Task.FromResult(Understood(Call("reply_to_user", new { reply = "Bắt đầu bằng một bước nhỏ." }, number), "Advice"));
+        } };
+        await using var h = await Harness(model, 2);
+        var user = await h.RegisterAsync();
+        var conversation = Guid.NewGuid();
+        await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(conversation, Guid.NewGuid(), "Giải thích cách chia nhỏ công việc"), Ct));
+        var input = new AgentTurnInput(conversation, Guid.NewGuid(), requestText);
+        await Assert.ThrowsAsync<AuthException>(() => Agent(h, s => s.SendAgentTurnAsync(user.Id, input, Ct)));
+        var retry = await Agent(h, s => s.SendAgentTurnAsync(user.Id, input, Ct));
+        Assert.Equal("ANSWERED", retry.Status);
+        Assert.Equal(2, await h.DbAsync(db => db.AgentTurns.CountAsync(Ct)));
+    }
+
     [Fact] public async Task A_processing_budget_stop_can_resume_the_original_goal_without_losing_pending_context()
     {
         var model = new Model { Decision = (_, n) => Task.FromResult(Call("get_preferences", new { }, n)) };

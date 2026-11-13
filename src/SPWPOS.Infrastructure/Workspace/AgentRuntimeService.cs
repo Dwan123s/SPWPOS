@@ -20,37 +20,37 @@ public sealed partial class WorkspaceService
     }
 
     private async Task<RuntimeExecution> RunNoraAgentAsync(Guid uid, Guid turnId, AgentTurnInput input,
-        PlanningState snapshot, AgentMessage[] history, AgentPendingRequest? pending, string[] types, AgentImage? image,
+        PlanningState snapshot, AgentMessage[] history, AgentPendingRequest? pending, string[] types, AgentImage? image, AgentTurn? imageSource,
         Func<AgentStreamEvent, CancellationToken, Task>? publish, CancellationToken ct)
     {
         var limits = noraOptions?.Value ?? new NoraAgentOptions();
         var provider = (INoraAgentModel)interpreter;
+        var source = input.Text;
         var run = await Mutate(uid, async () =>
         {
             var rows = await Mine<AgentRun>(uid).Where(x => x.ConversationId == input.ConversationId).ToArrayAsync(ct);
             Require(!rows.Any(x => x.Status == "RUNNING" && x.LeaseUntil > Now), "AGENT_BUSY", "NORA đang xử lý một yêu cầu trong hội thoại này.", 409);
-            var previous = rows.OrderByDescending(x => x.UpdatedAt).FirstOrDefault();
+            var previous = rows.OrderByDescending(x => x.UpdatedAt).ThenByDescending(x => x.CreatedAt).FirstOrDefault();
             var previousTurn = previous is null ? null : await Mine<AgentTurn>(uid).AsNoTracking().SingleOrDefaultAsync(x => x.Id == previous.TurnId, ct);
             var recoverableStop = previousTurn?.Status == "BLOCKED" && TurnView(previousTurn).ErrorCode is
                 "AGENT_BUDGET_EXCEEDED" or "TOOL_BUDGET_EXCEEDED" or "AGENT_TIME_LIMIT";
             var same = rows.SingleOrDefault(x => x.TurnId == turnId);
             var resume = same ?? ((history.LastOrDefault()?.Status == "NEEDS_INPUT" && previous?.Status == "WAITING_FOR_INPUT" || recoverableStop) &&
-                previous!.Continuations < 3 &&
-                previous.UpdatedAt > Now.AddMinutes(-30) ? previous : null);
+                previous!.UpdatedAt > (recoverableStop ? Now.AddMinutes(-30) : Now.AddHours(-24)) ? previous : null);
             foreach (var abandoned in rows.Where(x => x.Status == "RUNNING")) { abandoned.Status = "INTERRUPTED"; abandoned.Version = Guid.NewGuid(); }
             if (resume is null)
             {
                 resume = new AgentRun { UserId = uid, ConversationId = input.ConversationId, TurnId = turnId,
-                    Goal = input.Text, CreatedAt = Now };
+                    Goal = input.Text, CreatedAt = await Mine<AgentTurn>(uid).Where(x => x.Id == turnId).Select(x => x.CreatedAt).SingleAsync(ct) };
                 db.AgentRuns.Add(resume);
             }
             else if (resume.TurnId != turnId)
             {
-                Require(resume.Continuations < 3, "AGENT_CONTINUATION_LIMIT", "Yêu cầu đã hỏi lại nhiều lần. Hãy bắt đầu yêu cầu mới với các điều kiện đầy đủ.", 409);
                 resume.Continuations++; resume.TurnId = turnId;
-                var combined = resume.Goal + "\nBổ sung: " + input.Text;
-                resume.Goal = combined[..Math.Min(8000, combined.Length)];
+                source = await ContinuedAgentRequestAsync(uid, resume, turnId, input.Text, ct);
+                resume.Goal = BoundedAgentRequest(source, 8000);
             }
+            else source = await ContinuedAgentRequestAsync(uid, resume, turnId, input.Text, ct);
             resume.SnapshotRevision = snapshot.Preference.Revision;
             resume.Status = "RUNNING"; resume.Version = Guid.NewGuid(); resume.UpdatedAt = Now;
             resume.LeaseUntil = Now.AddSeconds(limits.TimeoutSeconds + 60);
@@ -58,7 +58,6 @@ public sealed partial class WorkspaceService
         }, ct, false);
         var runId = run.Id; var leaseVersion = run.Version;
         agentFileLog?.RunStarted(runId, turnId, input.ConversationId, input, run.Continuations);
-        var source = run.Goal;
         var drafts = new Dictionary<string, AgentIntent>(StringComparer.Ordinal);
         var candidates = new Dictionary<string, RuntimeCandidate>(StringComparer.Ordinal);
         var state = Copy(snapshot);
@@ -313,6 +312,9 @@ public sealed partial class WorkspaceService
         var initialData = new { currentTime = localNow,
             clock = new { currentLocal = localNow, today, tomorrow = today.AddDays(1), currentWeekStart = monday, nextWeekStart = monday.AddDays(7) },
             timeZone = state.Preference.TimeZoneId, activeTaskTypes = types, request = source, latestMessage = input.Text, history, pendingRequest = pending,
+            imageContext = image is null ? null : new { reused = imageSource is not null, sourceTurnId = imageSource?.Id ?? turnId,
+                originalText = imageSource?.Text ?? input.Text, sourceStatus = imageSource?.Status ?? "CURRENT",
+                uploadedAt = imageSource?.CreatedAt ?? run.CreatedAt, imageCount = image.GetImages().Length },
             matchingSavedTasks = matchingTasks.Take(8).Select(t => new { t.Id, t.Name, t.Deadline, t.EstimatedMinutes, t.Priority,
                 t.TaskType, t.Splittable, t.WorkWindowStart, t.WorkWindowEnd, importance = ImportanceDto(t) }).ToArray(),
             matchingSavedTasksTruncated = matchingTasks.Length > 8,

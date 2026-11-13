@@ -11,7 +11,6 @@ public sealed partial class NoraAgentRuntimeTests
         call with { Understanding = new(intent, summary, personal, missing) };
 
     [Theory]
-    [InlineData("Xin chào Nora", "Conversation")]
     [InlineData("Tôi đang căng thẳng vì nhiều bài quá, bạn có lời khuyên gì không?", "Advice")]
     [InlineData("Giải thích ma trận Eisenhower dùng để làm gì", "Advice")]
     public async Task Conversation_and_general_advice_need_one_model_call_zero_tools_and_no_calendar_changes(string text, string intent)
@@ -34,6 +33,25 @@ public sealed partial class NoraAgentRuntimeTests
         Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
         Assert.Empty(await h.DbAsync(db => db.PlanProposals.ToArrayAsync(Ct)));
         Assert.Equal(0, await h.DbAsync(db => db.AgentToolCalls.CountAsync(Ct)));
+    }
+
+    [Fact]
+    public async Task Greeting_is_answered_without_a_model_call_or_workspace_changes()
+    {
+        var model = new Model { Decision = (_, _) => throw new InvalidOperationException("Greeting must use the local response.") };
+        await using var h = await Harness(model);
+        var user = await h.RegisterAsync();
+        var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id,
+            new(Guid.NewGuid(), Guid.NewGuid(), "Xin chào Nora"), Ct));
+        Assert.Equal("ANSWERED", turn.Status);
+        Assert.Contains("Chào bạn", turn.Reply);
+        Assert.Equal(0, model.Calls);
+        Assert.Null(turn.Run);
+        Assert.Empty(turn.Changes);
+        Assert.Null(turn.Plan);
+        Assert.False(await h.DbAsync(db => db.WorkTasks.AnyAsync(Ct)));
+        Assert.False(await h.DbAsync(db => db.FixedEvents.AnyAsync(Ct)));
+        Assert.False(await h.DbAsync(db => db.PlanProposals.AnyAsync(Ct)));
     }
 
     [Fact] public async Task Missing_essential_details_are_asked_before_any_personal_data_tool()
