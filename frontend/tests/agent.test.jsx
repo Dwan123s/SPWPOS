@@ -626,6 +626,27 @@ it.each([
   },
 );
 
+it("preserves a typed draft when preparing a schedule request from the task tab", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query === "(min-width: 1081px)",
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+  state.workspace.tasks = [{ id: "report", name: "Viết báo cáo" }];
+  render(<AgentPage />);
+  await ready();
+  await screen.findByText(/Vừa cập nhật/);
+  fireEvent.click(screen.getByRole("button", { name: "Công việc", exact: true }));
+  const plan = screen.getByRole("button", { name: "Soạn yêu cầu xếp lịch cho Viết báo cáo" });
+  const composer = screen.getByLabelText("Yêu cầu của bạn");
+  expect(plan.disabled).toBe(true);
+  expect(composer.value).toBe("Xếp báo cáo");
+  fireEvent.change(composer, { target: { value: "" } });
+  fireEvent.click(plan);
+  expect(composer.value).toContain("(ID: report). Chỉ xem trước");
+  expect(calls.some((call) => call.method === "POST")).toBe(false);
+});
+
 it("keeps the calendar collapsed when a new saved response arrives", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query === "(min-width: 1081px)",

@@ -278,7 +278,7 @@
 .notice-item.is-unread {
   border-color: #caddf0;
   background: linear-gradient(110deg, #edf6ffee, #f8fcff);
-  box-shadow: inset 3px 0 0 #4c92d5;
+  box-shadow: none;
 }
 .notice-item-icon {
   display: grid;

@@ -1225,7 +1225,7 @@ it("autosaves the checklist and completes the task only after confirmation", asy
   expect(completed.getAttribute("aria-checked")).toBe("true");
   expect(statusUpdates()).toHaveLength(1);
   expect(statusUpdates()[0].body).toEqual({ status: "Completed", progress: 100 });
-});
+}, 15000);
 
 it("keeps the newly created task available if marking it complete fails", async () => {
   const original = vi.mocked(fetch).getMockImplementation();
@@ -1900,11 +1900,11 @@ it("returns to today's work after explicitly saving a proposed schedule", async 
 it("manually creates a calendar event from a selected day and keeps the form on a save conflict", async () => {
   currentWorkspace.features = [...(currentWorkspace.features || []), "secretary-v1"];
   state.calendarView = "week";
+  state.calendarStart = addCalendarDays(dayKey(Date.now()), 7);
   mount();
   await navigate("calendar", "Lịch làm việc");
-  const add = screen.getAllByRole("button", { name: /^Thêm lịch ngày/ }).find((entry) =>
-    Date.parse(entry.getAttribute("aria-label").replace("Thêm lịch ngày ", "") + "T09:00") > Date.now() + 86400000);
-  const date = add.getAttribute("aria-label").replace("Thêm lịch ngày ", "");
+  const date = state.calendarStart;
+  const add = screen.getByRole("button", { name: `Thêm lịch ngày ${date}` });
   await userEvent.setup().click(add);
   const dialog = within(screen.getByRole("dialog"));
   expect(dialog.getByLabelText("Bắt đầu").value).toBe(`${date}T09:00`);

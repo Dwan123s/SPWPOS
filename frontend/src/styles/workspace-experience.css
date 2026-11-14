@@ -172,7 +172,6 @@
   border-color: #fff;
   color: #0059d9;
   box-shadow:
-    inset 3px 0 0 var(--planora-blue),
     0 4px 14px #286cbe0d;
 }
 .glass-workspace :is(.quick-search, .side-note) {
@@ -304,7 +303,7 @@
 .glass-workspace .note-list-item.active {
   background: linear-gradient(130deg, #e1efff, #edf8ff);
   border-color: #8cbfff;
-  box-shadow: inset 3px 0 0 var(--planora-blue);
+  box-shadow: none;
 }
 .glass-workspace .calendar-toolbar {
   background: #ffffff94;

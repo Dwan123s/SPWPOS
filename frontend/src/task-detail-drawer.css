@@ -176,7 +176,6 @@
 .task-drawer-brief-section[data-tone="summary"] {
   padding: 13px 14px;
   border: 1px solid #d3e4f8;
-  border-left: 3px solid #2a77c6;
   border-radius: 9px;
   background: #eff6ff;
 }

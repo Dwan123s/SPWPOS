@@ -372,7 +372,7 @@
 }
 .note-title-field:focus-within,
 .note-body-field:focus-within {
-  box-shadow: inset 3px 0 #997100;
+  box-shadow: none;
   padding-left: 12px;
   margin-left: -12px;
 }
@@ -803,7 +803,6 @@
 .note-preview-event {
   display: grid;
   gap: 7px;
-  border-left: 3px solid #c59d34;
   background: #fff8e5;
   border-radius: 0 10px 10px 0;
   padding: 12px;

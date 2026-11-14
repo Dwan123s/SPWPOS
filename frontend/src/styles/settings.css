@@ -97,7 +97,7 @@
   border-color: #bed8fa;
   background: #eaf3ff;
   color: #0759c8;
-  box-shadow: inset 3px 0 #0866dc;
+  box-shadow: none;
 }
 .settings-nav-icon {
   display: grid;

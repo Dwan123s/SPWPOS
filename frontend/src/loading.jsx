@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { icon } from "./ui.jsx";
 import { MascotEyes } from "./mascot-eyes.jsx";
+import { planningQuoteOfDay } from "./planning-quotes.js";
 
 const preferenceKey = "planora.loading.motion-paused";
 const readMotionPaused = () => {
@@ -12,10 +13,11 @@ const readMotionPaused = () => {
 };
 
 export function Loading({
-  label = "Đang mở không gian làm việc…",
+  label = "Đang tải…",
   fullscreen = false,
 }) {
   const [paused, setPaused] = useState(readMotionPaused);
+  const [quote] = useState(planningQuoteOfDay);
   const [reduced, setReduced] = useState(false);
   const [hidden, setHidden] = useState(() => document.hidden);
 
@@ -64,7 +66,6 @@ export function Loading({
               height="58"
               decoding="async"
             />
-            <span>Không gian cho ngày của bạn</span>
           </header>
           <button
             type="button"
@@ -115,16 +116,6 @@ export function Loading({
           )}
         </div>
         <div className="loading-copy">
-          {fullscreen && (
-            <>
-              <span className="loading-eyebrow">CÙNG NORA BẮT ĐẦU</span>
-              <h1>
-                Một ngày nhẹ nhàng hơn,
-                <br />
-                <span>bắt đầu từ đây.</span>
-              </h1>
-            </>
-          )}
           <p
             className="loading-label"
             role="status"
@@ -137,20 +128,12 @@ export function Loading({
             <span />
           </div>
           {fullscreen && (
-            <p className="loading-note">
-              Một chút chờ đợi, nhiều khoảng trống cho điều quan trọng.
-            </p>
+            <figure className="loading-quote">
+              <blockquote>{quote}</blockquote>
+            </figure>
           )}
         </div>
       </div>
-      {fullscreen && (
-        <footer className="loading-footer">
-          <span className="loading-footer-dot" />
-          PLANORA
-          <span className="loading-footer-divider" />
-          Plan smarter. Work realistically.
-        </footer>
-      )}
     </section>
   );
 }

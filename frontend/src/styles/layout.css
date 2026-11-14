@@ -889,7 +889,6 @@ textarea:focus-visible {
 .session-card {
   background: #f6f9fb;
   border-color: #dce7ef;
-  border-left: 3px solid #7aa1bd;
   border-radius: 9px;
   padding: 14px;
   margin-bottom: 12px;
@@ -1230,7 +1229,6 @@ textarea:focus-visible {
   padding: 12px 9px;
   width: 100%;
   border: 1px solid #dbe7ef;
-  border-left: 3px solid #7aa1bd;
   border-radius: 7px;
   background: #eef4f9;
   color: #3b576b;
@@ -1811,7 +1809,6 @@ dialog::backdrop {
 }
 .preview-session {
   background: #e7f0f7;
-  border-left: 3px solid #7aa1bd;
   padding: 14px;
   border-radius: 7px;
   color: #37566c;

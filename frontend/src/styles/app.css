@@ -596,7 +596,6 @@ svg {
 }
 .session-card {
   border: 1px solid var(--line);
-  border-left: 3px solid var(--cyan);
   border-radius: 10px;
   padding: 14px;
   margin-bottom: 12px;

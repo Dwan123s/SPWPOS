@@ -6,6 +6,7 @@ import { ConversationDeleteDialog } from "./conversation-delete-dialog.jsx";
 import { NoraResultCard } from "./nora-result-card.jsx";
 import { NoraReminders, refreshNoraReminders } from "./nora-reminders.jsx";
 import { NoraSchedulePanel } from "./nora-schedule-panel.jsx";
+import { openDetail } from "./tasks.jsx";
 import { askNora, takeAgentDraft, secretaryMode } from "./agent-handoff.js";
 import { NoraEventEditor } from "./nora-event-editor.jsx";
 import {
@@ -1848,6 +1849,11 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
             refreshKey={`${calendarRevision}:${conversationId}:${state.workspace?.preference?.revision || ""}`}
             busy={busy}
             onEditEvent={editEvent}
+            taskDraftBlocked={!!(text || image.attachment || image.active || voice.active)}
+            onOpenTask={(id) => {
+              if (!wide) setPlanOpen(false);
+              openDetail(id);
+            }}
             onSuggest={(prompt) => {
               setPlanOpen(wide);
               editRequest(prompt);

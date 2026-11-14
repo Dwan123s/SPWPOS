@@ -473,7 +473,6 @@
   border-radius: 11px;
   background: linear-gradient(125deg, #dcf8fc, #d6eaff);
   padding: 12px;
-  border-left: 3px solid #08bbd3;
 }
 .start-entry-booked > span {
   display: flex;
@@ -781,7 +780,6 @@ html[data-start-transition="login"]::view-transition-new(root) {
   display: block;
   box-sizing: border-box;
   border: 0;
-  border-left: 2px solid #86c8fb;
   border-radius: 0;
   outline-color: #0671de;
   background: transparent;
@@ -882,7 +880,6 @@ html[data-start-transition="login"]::view-transition-new(root) {
 }
 .start-sample-session {
   background: #d6f5fa;
-  border-left: 3px solid #07bfd5;
   border-radius: 10px;
   padding: 12px 15px;
   font-size: 12px;
@@ -1002,7 +999,6 @@ html[data-start-transition="login"]::view-transition-new(root) {
   padding: 13px;
   border-radius: 9px;
   background: #e0f2ffd9;
-  border-left: 3px solid #139ee4;
   color: #347594;
 }
 .start-time-visual > span {

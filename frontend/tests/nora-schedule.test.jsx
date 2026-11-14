@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NoraSchedulePanel } from "../src/nora-schedule-panel.jsx";
@@ -52,6 +53,41 @@ beforeEach(() => {
         failRefresh ? { error: { message: "Offline" } } : { data: workspace },
     })),
   );
+});
+it("finds saved personal tasks and drafts a preview for the selected ID without sending it", async () => {
+  workspace.tasks.push(
+    { id: "project", name: "Đồ án" },
+    { id: "write", parentId: "project", name: "Viết báo cáo", estimatedMinutes: 90 },
+    { id: "team", name: "Việc nhóm", isTeamTask: true },
+    { id: "done", name: "Việc đã xong", status: "Completed" },
+  );
+  state.workspace = { ...workspace, tasks: [] };
+  const suggest = vi.fn();
+  const openTask = vi.fn();
+  function Panel() {
+    const [view, setView] = useState("day");
+    return <NoraSchedulePanel view={view} onViewChange={setView} date="2026-10-20"
+      onSuggest={suggest} onOpenTask={openTask} />;
+  }
+  const user = userEvent.setup();
+  render(<Panel />);
+  await screen.findByText(/Vừa cập nhật/);
+  await user.click(screen.getByRole("button", { name: "Công việc", exact: true }));
+  const list = screen.getByRole("region", { name: "Công việc cá nhân" });
+  expect(within(list).queryByRole("button", { name: "Đồ án" })).toBeNull();
+  expect(within(list).queryByText("Việc nhóm")).toBeNull();
+  expect(within(list).queryByText("Việc đã xong")).toBeNull();
+  expect(within(list).queryByText("Hồ sơ")).toBeNull();
+  await user.click(within(list).getByRole("checkbox"));
+  expect(within(list).getByText("Hồ sơ")).toBeTruthy();
+  await user.type(within(list).getByRole("searchbox"), "Đồ án");
+  expect(within(list).queryByText("Hồ sơ")).toBeNull();
+  await user.click(within(list).getByRole("button", { name: "Viết báo cáo" }));
+  expect(openTask).toHaveBeenCalledWith("write");
+  expect(state.workspace.tasks).toContainEqual(expect.objectContaining({ id: "write" }));
+  await user.click(within(list).getByRole("button", { name: /Soạn yêu cầu xếp lịch/ }));
+  expect(suggest).toHaveBeenCalledWith(expect.stringContaining("(ID: write). Chỉ xem trước"));
+  expect(fetch).toHaveBeenCalledTimes(1);
 });
 it("keeps fixed events and work sessions together in the saved day, excluding preview-only entries", async () => {
   const preview = {

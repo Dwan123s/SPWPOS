@@ -4,7 +4,6 @@
   margin-bottom: 16px;
   padding: 16px;
   border: 1px solid var(--calendar-entry-border);
-  border-inline-start: 4px solid var(--calendar-entry-accent);
   border-radius: 10px;
   background: var(--calendar-entry-bg);
   color: var(--calendar-entry-text);

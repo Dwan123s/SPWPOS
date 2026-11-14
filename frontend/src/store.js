@@ -26,8 +26,11 @@ export function update(patch) {
 let screenVersion = 0;
 let navigationVersion = 0;
 let transition;
+let loadingExit;
 export function setScreen(screen, screenKey, { group = null } = {}) {
   const version = ++navigationVersion;
+  loadingExit?.cancel();
+  loadingExit = null;
   const animate =
     group === "workspace" &&
     snapshot.screenGroup === group &&
@@ -45,6 +48,21 @@ export function setScreen(screen, screenKey, { group = null } = {}) {
   };
   transition?.skipTransition();
   transition = null;
+  const loader = snapshot.pageKey === "loading" && screenKey !== "loading"
+    ? document.querySelector(".planora-loading--fullscreen") : null;
+  if (loader?.animate && loader.dataset.motionState === "running" && motionAllowed()) {
+    try {
+      const exit = loader.animate([{ opacity: 1 }, { opacity: 0 }],
+        { duration: 260, easing: "ease-out", fill: "forwards" });
+      loadingExit = exit;
+      exit.finished.then(commit, commit).finally(() => {
+        if (loadingExit === exit) loadingExit = null;
+      });
+      return;
+    } catch {
+      // Continue immediately when the browser cannot animate this element.
+    }
+  }
   if (animate && typeof document.startViewTransition === "function") {
     try {
       transition = document.startViewTransition(commit);

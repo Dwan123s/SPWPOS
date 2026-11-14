@@ -703,7 +703,7 @@
   }
   .nora-panel-tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     padding: 3px;
     gap: 3px;
     background: #eaf1f8;
@@ -728,6 +728,79 @@
     background: white;
     box-shadow: 0 1px 4px #163f621a;
     font-weight: 600;
+  }
+  .nora-task-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
+  }
+  .nora-task-controls :is(input, button) {
+    min-height: 44px;
+    min-width: 0;
+    border: 1px solid #c8d9ea;
+    border-radius: 8px;
+    background: #fff;
+  }
+  .nora-task-controls input {
+    padding-inline: 10px;
+  }
+  .nora-task-controls button {
+    display: grid;
+    place-items: center;
+    color: #155d9e;
+  }
+  .nora-task-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    font-size: 12px;
+  }
+  .nora-task-list ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .nora-task-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding-block: 10px;
+    border-top: 1px solid #d4e1ed;
+  }
+  .nora-task-summary small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #485d73;
+    overflow-wrap: anywhere;
+  }
+  .nora-task-list :is(.nora-task-name, .nora-task-plan) {
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: start;
+    font: inherit;
+    cursor: pointer;
+  }
+  .nora-task-list .nora-task-name {
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .nora-task-list .nora-task-plan {
+    min-height: 36px;
+    padding-inline: 4px;
+    font-size: 12px;
+    color: #155d9e;
+  }
+  .nora-task-list :is(.nora-task-name, .nora-task-plan):enabled:hover {
+    text-decoration: underline;
+  }
+  .nora-task-list button:disabled {
+    cursor: default;
+    opacity: .55;
   }
   .nora-day-controls {
     display: flex;
@@ -831,7 +904,6 @@
     font-variant-numeric: tabular-nums;
   }
   .nora-timeline-item > div {
-    border-left: 3px solid #718aa4;
     border-radius: 3px 9px 9px 3px;
     background: #f2f7fc;
     padding: 10px;
@@ -926,7 +998,6 @@
   .nora-request-result blockquote {
     margin: 12px 0;
     padding-left: 12px;
-    border-left: 2px solid #afc9e4;
     color: #000;
     font-size: 13px;
     line-height: 1.8;

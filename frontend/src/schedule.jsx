@@ -81,13 +81,15 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
         data-action="event-detail"
         data-id={e.id}
       >
+        <span className="calendar-card-topline">
         <span className="block-time">
           {from}
           {" — "}
           {to}
         </span>
-        <strong title={e.name}>{e.name}</strong>
         <CalendarTimeTag phase={phase} />
+        </span>
+        <strong title={e.name}>{e.name}</strong>
         <span className="block-meta">
           {icon("lock")}
           Lịch Trình
@@ -103,14 +105,16 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
       data-action="session-detail"
       data-id={s.id}
     >
+      <span className="calendar-card-topline">
       <span className="block-time">
         {timeFmt(s.start)}
         {" — "}
         {timeFmt(s.end)}
         {s.isLocked ? icon("lock") : ""}
       </span>
-      <strong title={s.taskName}>{s.taskName}</strong>
       <CalendarTimeTag phase={calendarPhase(s.start, s.end, now)} />
+      </span>
+      <strong title={s.taskName}>{s.taskName}</strong>
       <span className="block-meta">
         {minutes(Math.round((new Date(s.end) - new Date(s.start)) / 60000))}
         {" · "}

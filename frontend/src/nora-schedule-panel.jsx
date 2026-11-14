@@ -9,6 +9,7 @@ import {
   timelineForDay,
 } from "./nora-schedule.js";
 import { planDay, planHours, planSessionName } from "./nora-chat-ui.jsx";
+import { NoraTaskList } from "./nora-task-list.jsx";
 
 export function NoraSchedulePanel({
   turn,
@@ -17,7 +18,9 @@ export function NoraSchedulePanel({
   date,
   onDateChange,
   onSuggest,
+  taskDraftBlocked = false,
   onEditEvent,
+  onOpenTask,
   refreshKey,
   busy,
 }) {
@@ -28,16 +31,25 @@ export function NoraSchedulePanel({
   const [attempt, setAttempt] = useState(0);
   const request = useRef(0);
   useEffect(() => {
+    const refresh = () => setAttempt((value) => value + 1);
+    window.addEventListener("workspace-updated", refresh);
+    return () => window.removeEventListener("workspace-updated", refresh);
+  }, []);
+  useEffect(() => {
     const id = ++request.current;
+    const previousWorkspace = state.workspace;
     setLoading(true);
     setError("");
     setUpdated(null);
     api("/api/workspace")
       .then((value) => {
-        if (!Array.isArray(value?.events) || !Array.isArray(value?.sessions))
+        if (!Array.isArray(value?.events) || !Array.isArray(value?.sessions) || !Array.isArray(value?.tasks))
           throw new Error("Chưa nhận được dữ liệu lịch đầy đủ.");
         if (id === request.current) {
-          setWorkspace(value);
+          // The task drawer and its actions read the shared workspace. Keep
+          // both views on that snapshot without rolling back a newer load.
+          if (state.workspace === previousWorkspace) state.workspace = value;
+          setWorkspace(state.workspace);
           setUpdated(new Date());
         }
       })
@@ -89,6 +101,13 @@ export function NoraSchedulePanel({
           onClick={() => onViewChange("day")}
         >
           Lịch trong ngày
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === "tasks"}
+          onClick={() => onViewChange("tasks")}
+        >
+          Công việc
         </button>
         <button
           type="button"
@@ -232,6 +251,18 @@ export function NoraSchedulePanel({
             </div>
           )}
         </>
+      ) : view === "tasks" ? (
+        <NoraTaskList
+          workspace={workspace}
+          now={Date.now()}
+          busy={busy}
+          loading={loading}
+          error={error}
+          draftBlocked={taskDraftBlocked}
+          onRefresh={() => setAttempt((value) => value + 1)}
+          onOpenTask={onOpenTask}
+          onSuggest={onSuggest}
+        />
       ) : turn ? (
         <section
           className="nora-request-result"
@@ -290,15 +321,15 @@ export function NoraSchedulePanel({
           </button>
         </section>
       ) : null}
-      <a
-        className="nora-open-calendar"
-        href="#calendar"
-        onClick={() => {
-          state.calendarStart = date;
-        }}
-      >
-        Mở lịch đầy đủ {icon("arrow")}
-      </a>
+      {view !== "tasks" && (
+        <a
+          className="nora-open-calendar"
+          href="#calendar"
+          onClick={() => { state.calendarStart = date; }}
+        >
+          Mở lịch đầy đủ {icon("arrow")}
+        </a>
+      )}
     </section>
   );
 }

@@ -1,4 +1,22 @@
 /* NORA leads the loading experience; the surrounding scene stays quiet. */
+.loading-quote {
+  margin: 24px 0 0;
+  max-width: 440px;
+  color: #476478;
+}
+.loading-quote figcaption {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+}
+.loading-quote blockquote {
+  margin: 0;
+  font-size: clamp(14px, 1.5vw, 16px);
+  line-height: 1.65;
+  font-style: italic;
+  text-wrap: pretty;
+}
 .planora-loading {
   --loading-ink: #183650;
   --loading-muted: #000;

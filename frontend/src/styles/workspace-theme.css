@@ -371,7 +371,7 @@
 }
 
 .shell.planning-console .settings-workspace .settings-nav-item.is-active {
-  box-shadow: inset 2px 0 var(--ui-accent-line);
+  box-shadow: none;
 }
 
 .shell.planning-console .calendar-workspace .week-day {

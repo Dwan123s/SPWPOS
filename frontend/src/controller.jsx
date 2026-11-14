@@ -579,9 +579,12 @@ async function action(name, id, element) {
       if (element?.dataset.returnProject) openDetail(element.dataset.returnProject);
       break;
     }
-    case "edit-task":
-      openTask(taskById(id));
+    case "edit-task": {
+      const task = taskById(id);
+      if (!task) throw new Error("Công việc này không còn trong danh sách. Hãy tải lại dữ liệu.");
+      openTask(task);
       break;
+    }
     case "duplicate-task": {
       const task = taskById(id);
       if (!task) break;
