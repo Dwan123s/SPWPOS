@@ -70,7 +70,7 @@ public sealed class TelegramApiTests
     private sealed class StartNoticeFactory : ApiFactory
     {
         public Sender Gateway { get; } = new();
-        public StartNoticeFactory() : base(true) { }
+        public StartNoticeFactory() : base(true, runNotificationWorker: true) { }
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);

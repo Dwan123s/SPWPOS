@@ -16,12 +16,14 @@ public class ApiFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection? sqliteAnchor;
     private readonly string? sqlConnection;
     private readonly string? sqlDatabase;
+    private readonly bool runNotificationWorker;
     private bool sqlDatabaseCreated;
     private bool sqlDatabaseDeleted;
     public TestClock Clock { get; } = new();
     public TestEmailService Email { get; } = new();
-    public ApiFactory(bool useSqlServer = false)
+    public ApiFactory(bool useSqlServer = false, bool runNotificationWorker = false)
     {
+        this.runNotificationWorker = runNotificationWorker;
         if (!useSqlServer)
         {
             // Keep the named database alive while each request or worker opens
@@ -56,6 +58,14 @@ public class ApiFactory : WebApplicationFactory<Program>
         });
         builder.ConfigureServices(services =>
         {
+            // Ordinary API tests drive notification scans explicitly. The wall-clock
+            // worker otherwise changes workspace versions while fixtures are
+            // arranging data, making results depend on machine load.
+            foreach (var worker in services.Where(service =>
+                !runNotificationWorker &&
+                service.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) &&
+                service.ImplementationType == typeof(SPWPOS.Infrastructure.Workspace.WorkspaceNotificationWorker)).ToArray())
+                services.Remove(worker);
             if (sqliteAnchor is not null) TestInfrastructure.ReplacePersistence(services, sqliteAnchor.ConnectionString);
             else if (sqlConnection is not null) TestInfrastructure.ReplaceSqlServerPersistence(services, sqlConnection);
             TestInfrastructure.ReplaceSecurityDependencies(services, Clock, Email);

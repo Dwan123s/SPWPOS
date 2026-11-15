@@ -142,7 +142,7 @@ public sealed partial class AgentFreeTimeTests
         Assert.Equal("APPLIED", result.Status); Assert.True(result.CanUndo);
         Assert.Contains("Đã lưu thời khóa biểu", result.Reply);
         Assert.DoesNotContain("mặc định", result.Reply);
-        var day = Assert.Single(result.Reply.Split('\n'), x => x.StartsWith("- 22/10:"));
+        var day = Assert.Single(result.Reply.Split('\n'), x => x.StartsWith($"- {Day:dd/MM}:"));
         foreach (var gap in new[] { "07:00–08:00 (60 phút)", "10:00–11:00 (60 phút)", "12:00–14:00 (120 phút)",
             "16:00–17:00 (60 phút)", "18:00–20:00 (120 phút)", "21:00–22:00 (60 phút)" }) Assert.Contains(gap, day);
         Assert.Contains("Tổng 480 phút", day); Assert.Contains("Họp nhóm", day); Assert.Contains("Báo cáo", day); Assert.Contains("Ăn tối", day);
