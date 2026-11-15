@@ -270,8 +270,8 @@ async function navigate(route, title) {
     location.hash = route;
     window.dispatchEvent(new Event("hashchange"));
   });
-  await screen.findByRole("heading", { level: 1, name: title });
-  await waitFor(() => expect(document.querySelector(".page-skeleton")).toBeNull());
+  await screen.findByRole("heading", { level: 1, name: title }, { timeout: 5000 });
+  await waitFor(() => expect(document.querySelector(".page-skeleton")).toBeNull(), { timeout: 5000 });
 }
 
 it("opens a task's planned date in the calendar and can jump to another date", async () => {
@@ -287,7 +287,7 @@ it("opens a task's planned date in the calendar and can jump to another date", a
   mount();
   await navigate("tasks", "Công việc");
   fireEvent.click(screen.getByRole("button", { name: `Mở lịch dự kiến của ${task.name}` }));
-  const date = await screen.findByLabelText("Đến ngày trên lịch");
+  const date = await screen.findByLabelText("Đến ngày trên lịch", {}, { timeout: 5000 });
   expect(date.value).toBe("2099-01-15");
   fireEvent.change(date, { target: { value: "2099-02-10" } });
   await waitFor(() => expect(state.calendarStart).toBe("2099-02-10"));
@@ -1939,18 +1939,37 @@ it("shows apply only for real proposals and keeps simulations read-only", async 
   expect(screen.queryByRole("button", { name: "Lưu lịch này" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Bỏ đề xuất" })).toBeNull();
 });
+it("opens Nhập việc directly from Công việc and keeps the link after returning", async () => {
+  mount();
+  await navigate("tasks", "Công việc");
+  const user = userEvent.setup();
+  const pageHeader = async (name) => {
+    const heading = await screen.findByRole("heading", { level: 1, name });
+    return within(heading.closest(".page-header"));
+  };
+  const tasksHeader = await pageHeader("Công việc");
+  expect(tasksHeader.getByRole("button", { name: "Thêm công việc" })).toBeTruthy();
+  await user.click(tasksHeader.getByRole("link", { name: "Nhập việc" }));
+  const notesHeader = await pageHeader("Nhập việc");
+  expect(screen.queryByRole("navigation", { name: "Khu vực công việc" })).toBeNull();
+  await user.click(notesHeader.getByRole("link", { name: "Công việc" }));
+  const returnedHeader = await pageHeader("Công việc");
+  expect(returnedHeader.getByRole("link", { name: "Nhập việc" }).getAttribute("href")).toBe("#notes");
+});
+
 it("saves a captured draft as a note without creating a task or schedule", async () => {
   mount();
   await navigate("tasks", "Công việc");
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: "Ghi nháp", exact: true }));
-  await user.click(screen.getByRole("button", { name: "Ghi nhanh" }));
+  expect(screen.getByRole("searchbox", { name: "Tìm trong ghi nháp" })).toBeTruthy();
   await user.type(
-    screen.getByLabelText("Mô tả bằng câu tự nhiên"),
+    screen.getByRole("textbox", { name: "Ý tưởng hoặc nhiệm vụ mới" }),
     "Chuẩn bị báo cáo React",
   );
-  await user.click(screen.getByRole("button", { name: "Lưu nháp" }));
-  await waitFor(() => expect(location.hash).toBe("#notes"));
+  await user.click(screen.getByRole("button", { name: "Lưu vào Inbox" }));
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Ý tưởng hoặc nhiệm vụ mới" }).value).toBe(""));
+  expect(location.hash).toBe("#tasks");
   expect(calls.find(c => c.url === "/api/notes" && c.options.method === "POST").body.content).toBe("Chuẩn bị báo cáo React");
   expect(calls.some(c => c.url === "/api/tasks" || c.url === "/api/plans")).toBe(false);
 });

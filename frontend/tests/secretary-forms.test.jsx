@@ -234,10 +234,18 @@ it("lets users finish work without entering percentages or dependencies", () => 
   ).toBeTruthy();
 });
 
-it("keeps the session result action available in secretary mode", () => {
+it.each([true, false])("shows the session result action in secretary mode only for an ended session (ended=%s)", (ended) => {
+  const now = Date.now();
+  Object.assign(state.workspace.sessions[0], {
+    status: "Scheduled",
+    start: new Date(now + (ended ? -2 : 1) * 3600000).toISOString(),
+    end: new Date(now + (ended ? -1 : 2) * 3600000).toISOString(),
+  });
   render(<App initialize={false} />);
   act(() => sessionDetail(state.workspace.sessions[0].id));
-  expect(screen.getByRole("button", { name: "Ghi kết quả phiên" })).toBeTruthy();
+  const outcome = screen.queryByRole("button", { name: "Ghi kết quả phiên" });
+  if (ended) expect(outcome).toBeTruthy();
+  else expect(outcome).toBeNull();
 });
 
 it("replaces the scenario parameter form with an unsent conversation request", () => {

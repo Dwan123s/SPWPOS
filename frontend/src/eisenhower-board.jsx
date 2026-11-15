@@ -934,11 +934,7 @@ export function EisenhowerBoard({
       aria-label="Ma trận Eisenhower"
     >
       <div className="eis-heading">
-        <div>
-          <span className="team-eyebrow">TẬP TRUNG ĐÚNG VIỆC</span>
-          <h2>Ma trận Eisenhower</h2>
-          <p>Chọn điều quan trọng. Dành thời gian đúng lúc.</p>
-        </div>
+        <h2>Ma trận Eisenhower</h2>
         <div className="eis-toolbar">
           <label className="team-search">
             {icon("search")}

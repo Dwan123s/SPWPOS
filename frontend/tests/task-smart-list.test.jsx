@@ -450,7 +450,7 @@ it("edits with the note version and requires confirmation before deleting", asyn
   );
   expect(api).toHaveBeenCalledWith("/api/notes/draft?version=v2", "DELETE");
 });
-it("keeps Inbox composing intact when switching to Eisenhower and back", async () => {
+it("keeps draft text when switching from Ghi nháp to Eisenhower and back", async () => {
   state.workspace.features = ["eisenhower-v1"];
   render(tasksPage());
   await screen.findByRole("button", { name: draft.title });
@@ -461,9 +461,11 @@ it("keeps Inbox composing intact when switching to Eisenhower and back", async (
   fireEvent.click(
     screen.getByRole("button", { name: "Eisenhower", exact: true }),
   );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Danh sách", exact: true }),
-  );
+  expect(screen.getByRole("button", { name: "Mở trang Hôm nay" })).toBeTruthy();
+  const tabs = within(screen.getByRole("navigation", { name: "Danh sách thông minh" }));
+  expect(screen.getByRole("button", { name: "Eisenhower", exact: true }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.queryByRole("button", { name: "Danh sách", exact: true })).toBeNull();
+  fireEvent.click(tabs.getByRole("button", { name: "Ghi nháp", exact: true }));
   expect(
     screen.getByRole("textbox", { name: "Ý tưởng hoặc nhiệm vụ mới" }).value,
   ).toBe("Chưa lưu");

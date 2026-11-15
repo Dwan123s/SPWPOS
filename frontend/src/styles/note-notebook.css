@@ -1,14 +1,4 @@
 /* A two-pane notes workspace using the existing plain-text forms and API. */
-.planning-console[data-route="notes"] .page-header {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
 .note-studio {
   --note-writing-size: 18px;
   --note-writing-line: calc(var(--note-writing-size) * 1.8);

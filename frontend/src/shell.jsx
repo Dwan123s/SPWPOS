@@ -145,7 +145,6 @@ export function workspaceShell(routes, title, description, body) {
   const home = state.route === "today";
   const work = workRoutes.includes(state.route);
   const plan = planRoutes.includes(state.route);
-  const sectionRoutes = work && state.route !== "tasks" ? workRoutes : plan ? planRoutes : [];
   const railCurrent = work ? "tasks" : plan ? "calendar" : state.route;
   const nav = (keys) =>
     nodeList(
@@ -382,18 +381,18 @@ export function workspaceShell(routes, title, description, body) {
               </button>
             </div>
           </header>
-          {sectionRoutes.length > 0 && (
+          {plan && (
             <nav
-              className={`workspace-section-links${plan ? " workspace-section-links--plan" : ""}`}
-              aria-label={work ? "Khu vực công việc" : "Khu vực lập lịch"}
+              className="workspace-section-links workspace-section-links--plan"
+              aria-label="Khu vực lập lịch"
             >
-              {sectionRoutes.map((key) => (
+              {planRoutes.map((key) => (
                 <a
                   key={key}
                   href={`#${key}`}
                   aria-current={state.route === key ? "page" : undefined}
                 >
-                  {plan && icon(routes[key][2])}
+                  {icon(routes[key][2])}
                   {routes[key][0]}
                 </a>
               ))}
@@ -413,8 +412,22 @@ export function workspaceShell(routes, title, description, body) {
                     <h1 tabIndex="-1">{title}</h1>
                     <p>{description}</p>
                   </div>
-                  {state.route === "tasks" &&
-                    button("Thêm công việc", "new-task", "primary", "", "plus")}
+                  {work && (
+                    <div className="work-header-actions">
+                      {state.route === "tasks" ? (
+                        <>
+                          <a href="#notes" className="btn secondary">
+                            {icon("edit")} Nhập việc
+                          </a>
+                          {button("Thêm công việc", "new-task", "primary", "", "plus")}
+                        </>
+                      ) : (
+                        <a href="#tasks" className="btn secondary">
+                          {icon("tasks")} Công việc
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               {state.analysisError ? (

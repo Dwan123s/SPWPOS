@@ -209,19 +209,25 @@
   font-size: 13px;
 }
 
-.shell.planning-console[data-route="tasks"] .page-header {
+.shell.planning-console:is([data-route="tasks"], [data-route="notes"]) .page-header {
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 12px;
 }
 
-.shell.planning-console[data-route="tasks"] .page-header > div:first-child {
+.shell.planning-console:is([data-route="tasks"], [data-route="notes"]) .page-header > div:first-child {
   flex: 1 1 auto;
   width: auto;
 }
 
-.shell.planning-console[data-route="tasks"] .page-header > .btn {
+.work-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.work-header-actions > .btn {
   min-height: 40px;
   white-space: nowrap;
 }

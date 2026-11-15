@@ -72,28 +72,27 @@ export function GroupHub({
       ) : (
         <>
           <header className="team-directory-hero">
-            <div>
+            <div className="team-directory-intro">
               <span className="team-directory-emblem">{icon("users")}</span>
-              <h1>Nhóm của bạn</h1>
-              <p>
-                Theo dõi công việc, hạn chót và trao đổi với các thành viên.
-              </p>
-              <div className="team-actions">
-                <button
-                  className="btn primary"
-                  disabled={busy}
-                  onClick={() => open("create")}
-                >
-                  {icon("plus")} Tạo nhóm mới
-                </button>
-                <button
-                  className="btn secondary"
-                  disabled={busy}
-                  onClick={() => open("join")}
-                >
-                  {icon("userPlus")} Tham gia bằng link hoặc mã
-                </button>
+              <div>
+                <h1>Nhóm của bạn</h1>
               </div>
+            </div>
+            <div className="team-actions">
+              <button
+                className="btn primary"
+                disabled={busy}
+                onClick={() => open("create")}
+              >
+                {icon("plus")} Tạo nhóm mới
+              </button>
+              <button
+                className="btn secondary"
+                disabled={busy}
+                onClick={() => open("join")}
+              >
+                {icon("userPlus")} Tham gia bằng link hoặc mã
+              </button>
             </div>
             {!loading && teams.length > 0 && (
               <dl className="team-directory-stats">

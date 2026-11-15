@@ -3,17 +3,14 @@
   padding: 22px;
 }
 .eis-board .eis-heading {
-  align-items: flex-start;
-  gap: 20px;
+  align-items: center;
+  gap: 12px 20px;
   margin-bottom: 20px;
 }
 .eis-board .eis-heading h2 {
   font-size: 23px;
   letter-spacing: -0.025em;
-  margin: 5px 0 7px;
-}
-.eis-board .eis-heading p {
-  color: #000;
+  margin: 0;
 }
 .eis-board .eis-toolbar {
   display: flex;
@@ -109,7 +106,7 @@
 }
 .eis-board .eis-grid {
   align-items: stretch;
-  height: clamp(420px, calc(100dvh - 520px), 650px);
+  height: clamp(702px, calc(100dvh - 220px), 854px);
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
@@ -146,6 +143,19 @@
   font-size: 10px;
   color: #000;
 }
+.eis-board .eis-grid:not(.eis-queue) .eis-quadrant > header {
+  padding: 7px 16px;
+}
+.eis-board .eis-grid:not(.eis-queue) .eis-quadrant > header > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+}
+.eis-board .eis-grid:not(.eis-queue) .eis-quadrant header p {
+  margin: 0;
+}
 .eis-column-count {
   font-size: 10px;
   font-weight: 600;
@@ -164,7 +174,6 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  overscroll-behavior: contain;
 }
 .eis-board .eis-column-add {
   flex-shrink: 0;
@@ -592,6 +601,9 @@
     display: block;
     height: min(580px, 75dvh);
     min-height: 340px;
+  }
+  .eis-board .eis-grid:not(.eis-queue) {
+    min-height: 380px;
   }
   .eis-board .eis-grid > div:not(.eis-visible) {
     display: none;

@@ -165,6 +165,42 @@ export function TaskInbox({
   );
   return (
     <div className="task-inbox-content">
+      <header className="task-draft-heading">
+        <h2>Ghi nháp</h2>
+      </header>
+      <form className="task-inbox-capture" onSubmit={save}>
+        <label className="sr-only" htmlFor="inbox-capture">
+          Ý tưởng hoặc nhiệm vụ mới
+        </label>
+        <textarea
+          id="inbox-capture"
+          value={content}
+          maxLength={8000}
+          rows={2}
+          disabled={busy}
+          placeholder="Ghi nhanh một ý tưởng hoặc việc cần nhớ…"
+          onChange={(event) => setContent(event.target.value)}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing &&
+              event.nativeEvent.keyCode !== 229
+            )
+              save(event);
+          }}
+        />
+        <div>
+          <span>Enter để lưu · Shift + Enter để xuống dòng</span>
+          <button
+            type="submit"
+            className="btn primary small"
+            disabled={busy || !content.trim()}
+          >
+            {icon("plus")} Lưu vào Inbox
+          </button>
+        </div>
+      </form>
       {saveError && (
         <p className="form-error" role="alert">
           {saveError}
@@ -215,52 +251,12 @@ export function TaskInbox({
         !error && (
           <div className="task-smart-empty">
             {icon("mail")}
-            <h3>
-              {term
-                ? "Không có ý tưởng phù hợp"
-                : "Thêm việc cần làm, tick khi hoàn thành"}
-            </h3>
-            <p>
-              {term
-                ? "Thử một từ khóa khác."
-                : "Ghi nhanh một việc cần nhớ, rồi tick khi làm xong. Bạn vẫn có thể mở Nhập việc để lên kế hoạch chi tiết."}
-            </p>
+            <h3>{term ? "Không có ý tưởng phù hợp" : "Chưa có bản nháp"}</h3>
+            {term && <p>Thử một từ khóa khác.</p>}
           </div>
         )
       )}
-      <form className="task-inbox-capture" onSubmit={save}>
-        <label className="sr-only" htmlFor="inbox-capture">
-          Ý tưởng hoặc nhiệm vụ mới
-        </label>
-        <textarea
-          id="inbox-capture"
-          value={content}
-          maxLength={8000}
-          rows={2}
-          disabled={busy}
-          placeholder="Ghi nhanh một ý tưởng hoặc việc cần nhớ…"
-          onChange={(event) => setContent(event.target.value)}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing &&
-              event.nativeEvent.keyCode !== 229
-            )
-              save(event);
-          }}
-        />
-        <div>
-          <span>Enter để lưu · Shift + Enter để xuống dòng</span>
-          <button
-            type="submit"
-            className="btn primary small"
-            disabled={busy || !content.trim()}
-          >
-            {icon("plus")} Lưu vào Inbox
-          </button>
-        </div>
-      </form>
+
       {deleting && (
         <ConversationDeleteDialog
           title={deleting.title}

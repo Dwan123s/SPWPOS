@@ -7,16 +7,22 @@
 
 .team-directory-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  align-items: end;
-  gap: 28px;
-  padding: clamp(22px, 4vw, 44px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 20px clamp(16px, 2vw, 26px);
+  border: 1px solid var(--team-line);
   border-radius: var(--surface-corner, 14px);
-  color: #fff;
-  background:
-    radial-gradient(ellipse at 100% 0%, #316ba8 0%, transparent 65%),
-    linear-gradient(120deg, #102a49, #194677);
+  color: var(--ui-ink, #102642);
+  background: var(--ui-highlight, #f3f8ff);
   box-shadow: var(--ui-panel-shadow);
+}
+
+.team-directory-intro {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
 }
 
 .team-directory-emblem,
@@ -30,8 +36,8 @@
 }
 
 .team-directory-emblem {
-  border: 1px solid #ffffff45;
-  background: #ffffff18;
+  color: var(--team-accent);
+  background: var(--ui-accent-soft, #e6f0ff);
 }
 
 .team-directory-hero h1,
@@ -42,44 +48,46 @@
   overflow-wrap: anywhere;
 }
 
-.team-directory-hero p {
-  color: #e0edfd;
-  font-size: 14px;
+.team-directory-hero h1 {
+  margin: 0;
+  font-size: clamp(22px, 2.1vw, 30px);
 }
 
 .team-directory-hero .team-actions {
-  margin-top: 22px;
+  margin: 0;
+  gap: 8px;
 }
 
 .team-directory-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-column: 1 / -1;
   margin: 0;
-  border: 1px solid #ffffff38;
+  border: 1px solid var(--team-line);
   border-radius: var(--control-corner, 8px);
-  background: #ffffff12;
+  background: var(--team-surface);
 }
 
 .team-directory-stats > div {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding: clamp(10px, 1.6vw, 20px);
+  padding: 12px 16px;
 }
 
 .team-directory-stats > div + div {
-  border-inline-start: 1px solid #ffffff38;
+  border-inline-start: 1px solid var(--team-line);
 }
 
 .team-directory-stats dt {
-  color: #e0edfd;
+  color: var(--team-muted);
   font-size: 12px;
 }
 
 .team-directory-stats dd {
   order: -1;
   margin: 0;
-  font-size: 27px;
+  font-size: 23px;
   font-weight: 700;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
@@ -105,10 +113,12 @@
 
 .team-directory-heading {
   justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--team-line);
 }
 
 .team-directory-heading h2 {
-  font-size: 19px;
+  font-size: 17px;
 }
 
 .team-directory-filters label,
@@ -178,7 +188,7 @@
   padding: 14px;
   border: 1px solid var(--team-line);
   border-radius: var(--control-corner, 8px);
-  background: #f8faff;
+  background: var(--team-surface);
   text-align: left;
 }
 
@@ -218,17 +228,41 @@
 .team-directory-empty {
   display: grid;
   justify-items: center;
+  align-content: center;
   gap: 10px;
-  padding: 30px 15px;
-  border: 1px dashed var(--team-line);
-  background: #f8faff;
+  min-height: 240px;
+  padding: 36px 20px;
+  border-radius: var(--control-corner, 8px);
+  background: var(--ui-glass, #f8faff);
   text-align: center;
 }
 
 .team-hub .team-directory-empty > .icon {
-  width: 26px;
-  height: 26px;
+  box-sizing: content-box;
+  width: 24px;
+  height: 24px;
+  padding: 14px;
+  margin-bottom: 4px;
+  border-radius: var(--surface-corner, 14px);
+  background: var(--ui-accent-soft, #e6f0ff);
   color: var(--team-accent);
+}
+
+.team-directory-empty p {
+  max-width: 420px;
+}
+
+.team-hub > .team-privacy-strip {
+  gap: 14px;
+  padding: 16px 20px;
+  border-color: var(--team-line);
+  border-radius: var(--surface-corner, 14px);
+  background: var(--ui-glass, #f8faff);
+}
+
+.team-hub > .team-privacy-strip p {
+  font-size: 12px;
+  color: var(--team-muted);
 }
 
 .team-directory-back {

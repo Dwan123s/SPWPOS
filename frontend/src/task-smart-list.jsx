@@ -89,7 +89,7 @@ function TodayTaskPane({ model }) {
   );
 }
 
-export function TaskSmartList({ onShowMatrix, onWorkspaceChanged, projectId = null }) {
+export function TaskSmartList({ onShowMatrix, onShowList, matrixContent, onWorkspaceChanged, projectId = null }) {
   const [openedProject, setOpenedProject] = useState(projectId);
   useEffect(() => { setOpenedProject(projectId); }, [projectId]);
   const [scope, setScope] = useState(() =>
@@ -173,6 +173,7 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged, projectId = nu
   const isFlat = scope === "personal" || scope === "all";
   const incomplete = filters.status === "active";
   function choose(key) {
+    onShowList?.();
     state.taskScope = key;
     setScope(key);
     setSelectedTaskId(null);
@@ -222,32 +223,33 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged, projectId = nu
     <div className="task-smart-layout">
       <TodayTaskPane model={model} />
       <nav className="task-smart-nav" aria-label="Danh sách thông minh">
-        <button type="button" className={`task-smart-nav-item${scope === "personal" ? " is-active" : ""}`}
-          aria-pressed={scope === "personal"} onClick={() => choose("personal")}>
+        <button type="button" className={`task-smart-nav-item${!matrixContent && scope === "personal" ? " is-active" : ""}`}
+          aria-pressed={!matrixContent && scope === "personal"} onClick={() => choose("personal")}>
           {icon("mail")} Inbox
         </button>
-        <button type="button" className={`task-smart-nav-item${isProjects ? " is-active" : ""}`}
-          aria-pressed={isProjects} onClick={() => choose("projects")}>
+        <button type="button" className={`task-smart-nav-item${!matrixContent && isProjects ? " is-active" : ""}`}
+          aria-pressed={!matrixContent && isProjects} onClick={() => choose("projects")}>
           {icon("folder")} Projects
         </button>
-        <button type="button" className={`task-smart-nav-item${["all", "today", "week"].includes(scope) ? " is-active" : ""}`}
-          aria-pressed={["all", "today", "week"].includes(scope)} onClick={() => choose("all")}>
+        <button type="button" className={`task-smart-nav-item${!matrixContent && ["all", "today", "week"].includes(scope) ? " is-active" : ""}`}
+          aria-pressed={!matrixContent && ["all", "today", "week"].includes(scope)} onClick={() => choose("all")}>
           {icon("tasks")} Công việc
         </button>
-        <button type="button" className={`task-smart-nav-item${isDrafts ? " is-active" : ""}`}
-          aria-pressed={isDrafts} onClick={() => choose("inbox")}>
+        <button type="button" className={`task-smart-nav-item${!matrixContent && isDrafts ? " is-active" : ""}`}
+          aria-pressed={!matrixContent && isDrafts} onClick={() => choose("inbox")}>
           {icon("edit")} Ghi nháp
         </button>
         {onShowMatrix && (
-          <button type="button" className="task-smart-nav-item" onClick={onShowMatrix}>
+          <button type="button" className={`task-smart-nav-item${matrixContent ? " is-active" : ""}`} aria-pressed={!!matrixContent} onClick={onShowMatrix}>
             {icon("spark")} Eisenhower
           </button>
         )}
       </nav>
       <section
         className="task-smart-main"
-        aria-label={`Nội dung ${scope === "personal" ? "Inbox" : selected.label}`}
+        aria-label={`Nội dung ${matrixContent ? "Eisenhower" : scope === "personal" ? "Inbox" : selected.label}`}
       >
+        <div hidden={!!matrixContent}>
         <div className="task-smart-toolbar" ref={setToolbarHost}>
           {!isDrafts && (
             <PopupDetails className="task-work-popup task-work-scope">
@@ -326,25 +328,29 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged, projectId = nu
                 </div>
             </PopupDetails>
           )}
-          <button ref={searchTrigger} type="button" className="task-work-tool task-work-search-toggle"
+          {!isDrafts && <button ref={searchTrigger} type="button" className="task-work-tool task-work-search-toggle"
             aria-label="Tìm kiếm" aria-expanded={searchOpen} aria-controls="work-task-search"
             onClick={() => {
               setSearchOpen((current) => !current);
               if (searchOpen) setQuery("");
             }}>
             {icon("search")}
-          </button>
-          {searchOpen && (
-            <input id="work-task-search" type="search" className="task-work-search-input" autoFocus
+          </button>}
+          {(isDrafts || searchOpen) && (
+            <div className={isDrafts ? "task-draft-search" : undefined}>
+            {isDrafts && icon("search")}
+            <input id="work-task-search" type="search" className="task-work-search-input" autoFocus={!isDrafts}
               aria-label={isDrafts ? "Tìm trong ghi nháp" : isProjects ? "Tìm project" : "Tìm công việc"}
               placeholder={isDrafts ? "Tìm ghi nháp…" : isProjects ? "Tìm project…" : "Tìm công việc…"}
               value={query} onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key !== "Escape") return;
                 setQuery("");
+                if (isDrafts) return;
                 setSearchOpen(false);
                 searchTrigger.current?.focus();
               }} />
+            </div>
           )}
           <div className="task-work-toolbar-end">
             {filtered && (
@@ -355,11 +361,7 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged, projectId = nu
                 Bỏ bộ lọc
               </button>
             )}
-            {isDrafts ? (
-              <button type="button" className="task-work-tool" data-action="capture">
-                {icon("spark")} Ghi nhanh
-              </button>
-            ) : (
+            {!isDrafts && (
               <>
                 <button type="button" className="task-work-tool task-work-incomplete" aria-pressed={incomplete}
                   onClick={() => setFilter("status", incomplete ? "" : "active")}>
@@ -465,6 +467,8 @@ export function TaskSmartList({ onShowMatrix, onWorkspaceChanged, projectId = nu
             <span className="sr-only" aria-live="polite">{count} công việc</span>
           </>
         )}
+        </div>
+        {matrixContent && <div className="task-matrix-content">{matrixContent}</div>}
       </section>
     </div>
     </div>
