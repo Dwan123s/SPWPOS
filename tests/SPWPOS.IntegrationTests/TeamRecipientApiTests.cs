@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SPWPOS.Application.Workspace;
@@ -12,9 +15,27 @@ namespace SPWPOS.IntegrationTests;
 
 public sealed class TeamRecipientApiTests
 {
-    [Fact] public async Task Confirm_accepts_named_recipient_and_legacy_empty_body_and_recipient_changes_are_versioned()
+    private sealed class FixedClockFactory : ApiFactory
     {
-        var ct = TestContext.Current.CancellationToken; await using var factory = new ApiFactory(); using var client = await factory.ClientAsync();
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            // JWT validation must use the same clock as token creation in these
+            // fixed-date HTTP scenarios, including when CI runs on another day.
+            builder.ConfigureTestServices(services => services.PostConfigure<JwtBearerOptions>(
+                JwtBearerDefaults.AuthenticationScheme, options =>
+                    options.TokenValidationParameters.LifetimeValidator = (notBefore, expires, _, _) =>
+                        expires.HasValue && expires.Value > Clock.GetUtcNow().UtcDateTime &&
+                        (!notBefore.HasValue || notBefore.Value <= Clock.GetUtcNow().UtcDateTime)));
+        }
+    }
+    [Theory]
+    [InlineData("2026-11-11T08:00:00Z", 0)]
+    [InlineData("2026-11-15T08:00:00Z", 1)]
+    public async Task Confirm_accepts_named_recipient_and_legacy_empty_body_and_recipient_changes_are_versioned(string now, int reportWeek)
+    {
+        var ct = TestContext.Current.CancellationToken; await using var factory = new FixedClockFactory(); using var client = await factory.ClientAsync();
+        factory.Clock.Advance(DateTimeOffset.Parse(now) - factory.Clock.GetUtcNow());
         var tokens = await AuthFlowTests.RegisterLoginAsync(factory, client); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Access);
         var teamId = Guid.NewGuid(); var recipient = Guid.NewGuid(); var singleId = Guid.NewGuid(); var openId = Guid.NewGuid();
         var singleDraft = Guid.NewGuid(); var openDraft = Guid.NewGuid();
@@ -39,10 +60,16 @@ public sealed class TeamRecipientApiTests
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(named, new TeamTaskRecipientInput(), ct)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/teams/{teamId}/drafts/{openDraft}/confirm", null, ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync($"/api/teams/tasks/{singleId}/preview", null, ct)).StatusCode);
-        using var report = await client.GetAsync($"/api/teams/{teamId}/workload", ct);
+        using var report = await client.GetAsync($"/api/teams/{teamId}/workload?week={reportWeek}", ct);
         Assert.Equal(HttpStatusCode.OK, report.StatusCode);
         var json = await report.Content.ReadAsStringAsync(ct);
-        Assert.Contains("designatedUserId", json);
+        using var payload = JsonDocument.Parse(json);
+        var reportedTasks = payload.RootElement.GetProperty("data").GetProperty("tasks").EnumerateArray().ToArray();
+        Assert.Equal(2, reportedTasks.Length);
+        var designated = Assert.Single(reportedTasks, task => task.GetProperty("id").GetGuid() == singleId);
+        Assert.Equal(recipient, designated.GetProperty("designatedUserId").GetGuid());
+        var open = Assert.Single(reportedTasks, task => task.GetProperty("id").GetGuid() == openId);
+        Assert.Equal(JsonValueKind.Null, open.GetProperty("designatedUserId").ValueKind);
         Assert.DoesNotContain("schedulableMinutes", json);
         Assert.DoesNotContain("workingMinutes", json);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/teams/{teamId}/workload/{singleId}/candidates", ct)).StatusCode);
