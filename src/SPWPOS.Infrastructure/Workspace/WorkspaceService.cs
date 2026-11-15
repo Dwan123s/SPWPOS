@@ -27,18 +27,21 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         preference = new() { UserId = uid, Revision = Guid.Empty }; db.WorkPreferences.Add(preference); return preference;
     }
     private async Task<T> Mutate<T>(Guid uid, Func<Task<T>> action, CancellationToken ct, bool revision = true,
-        System.Data.IsolationLevel isolation = System.Data.IsolationLevel.ReadCommitted, bool repairTimeConflicts = true)
+        System.Data.IsolationLevel isolation = System.Data.IsolationLevel.ReadCommitted, bool repairTimeConflicts = true, Guid? relatedUserId = null)
     {
         var email = await db.Users.AsNoTracking().Where(x => x.Id == uid).Select(x => x.NormalizedEmail).SingleOrDefaultAsync(ct);
         Require(email is not null, "UNAUTHORIZED", "Tài khoản không khả dụng.", 401);
         // Workspace writes use an optimistic account revision. Authentication and
         // refresh-token rotation retain their separate account serialization.
         await using var tx = await db.Database.BeginTransactionAsync(isolation, ct);
-        if (isolation == System.Data.IsolationLevel.Serializable && db.Database.IsSqlServer())
+        if ((isolation == System.Data.IsolationLevel.Serializable || relatedUserId.HasValue) && db.Database.IsSqlServer())
         {
             // Serialize the initial read/update as well: two shared reads held by
             // SERIALIZABLE would otherwise deadlock when both claim this account.
-            await db.WorkPreferences.FromSqlInterpolated($"SELECT * FROM [WorkPreferences] WITH (UPDLOCK, HOLDLOCK) WHERE [UserId] = {uid}").ToArrayAsync(ct);
+            // Cross-account reviews must acquire both workspace locks in the
+            // same order before either reviewer claims their own preference.
+            foreach (var userId in new[] { uid, relatedUserId ?? uid }.Distinct().OrderBy(id => id))
+                await db.WorkPreferences.FromSqlInterpolated($"SELECT * FROM [WorkPreferences] WITH (UPDLOCK, HOLDLOCK) WHERE [UserId] = {userId}").ToArrayAsync(ct);
         }
         Require(await db.Users.AnyAsync(x => x.Id == uid && x.IsActive && x.EmailConfirmed, ct), "FORBIDDEN", "Tài khoản không khả dụng.", 403);
         var preference = await Preference(uid, ct);
@@ -75,8 +78,8 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         if (revision) { await UpdateLearningAsync(uid, ct); await PersistRiskAsync(uid, new(Now, preference.PlanningHorizonDays), ct); await db.SaveChangesAsync(ct); }
         await tx.CommitAsync(ct); return result;
     }
-    private Task Mutate(Guid uid, Func<Task> action, CancellationToken ct, bool revision = true) =>
-        Mutate(uid, async () => { await action(); return true; }, ct, revision);
+    private Task Mutate(Guid uid, Func<Task> action, CancellationToken ct, bool revision = true, Guid? relatedUserId = null) =>
+        Mutate(uid, async () => { await action(); return true; }, ct, revision, relatedUserId: relatedUserId);
     private async Task<PlanningState> State(Guid uid, CancellationToken ct)
     {
         // Default preference is immutable until the first mutation persists it.
