@@ -27,6 +27,7 @@ export default defineConfig({
           const assets = fileURLToPath(new URL("../src/SPWPOS.Api/wwwroot/", import.meta.url));
           cpSync(`${assets}/assets`, `${resolvedOutput}/assets`, { recursive: true });
           cpSync(`${assets}/brand`, `${resolvedOutput}/brand`, { recursive: true });
+          cpSync(`${assets}/.well-known`, `${resolvedOutput}/.well-known`, { recursive: true });
           return;
         }
         copyFileSync(

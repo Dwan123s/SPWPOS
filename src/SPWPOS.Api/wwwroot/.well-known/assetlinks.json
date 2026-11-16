@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.planora.preview",
+      "sha256_cert_fingerprints": [
+        "4D:83:BB:EB:4B:23:3F:B1:17:14:E6:12:1E:20:52:F9:DA:EE:C3:1E:19:6B:1B:A3:68:94:52:F5:B0:43:F5:C0"
+      ]
+    }
+  }
+]
