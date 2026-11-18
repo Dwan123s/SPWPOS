@@ -1,6 +1,5 @@
 import { Component, lazy, Suspense, useLayoutEffect, useState } from "react";
 import { syncDecorations, setMobileMenu } from "./shell.jsx";
-import { localInput } from "./ui.jsx";
 
 // A failed download can be retried without discarding the current session.
 export function createPageResource(load, name) {
@@ -21,6 +20,7 @@ const pages = {
   profile: createPageResource(() => import("./social.jsx"), "ProfilePage"),
   friends: createPageResource(() => import("./social.jsx"), "FriendsPage"),
   teams: createPageResource(() => import("./teams.jsx"), "TeamsPage"),
+  premium: createPageResource(() => import("./team-premium-page.jsx"), "TeamPremiumPage"),
   today: createPageResource(() => import("./dashboard.jsx"), "todayPage"),
   tasks: createPageResource(() => import("./page-tasks.jsx"), "tasksPage"),
   calendar: createPageResource(() => import("./schedule.jsx"), "calendarPage"),
@@ -28,10 +28,6 @@ const pages = {
   insights: createPageResource(
     () => import("./page-insights.jsx"),
     "insightsPage",
-  ),
-  scenario: createPageResource(
-    () => import("./page-scenario.jsx"),
-    "scenarioPage",
   ),
   notifications: createPageResource(
     () => import("./page-notifications.jsx"),
@@ -113,11 +109,6 @@ function ReadyPage({ resource, route, onReady, ...props }) {
   useLayoutEffect(() => {
     syncDecorations();
     setMobileMenu(false);
-    if (route === "scenario") {
-      const input = document.querySelector('input[name="deadline"]');
-      if (input && !input.value)
-        input.value = localInput(Date.now() + 7 * 86400000);
-    }
     onReady?.();
   }, [route, onReady]);
   return <Page {...props} />;

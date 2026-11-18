@@ -111,7 +111,7 @@ it("respects both OS reduced motion and the saved pause setting", () => {
   vi.spyOn(window, "matchMedia").mockReturnValue({ matches: true });
   view.rerender(
     <PageTransition route="time">
-      <h1>Giờ rảnh</h1>
+      <h1>Thời Gian Làm Việc</h1>
     </PageTransition>,
   );
   expect(animate).not.toHaveBeenCalled();

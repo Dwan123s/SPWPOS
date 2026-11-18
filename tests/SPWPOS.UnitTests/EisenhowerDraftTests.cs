@@ -23,7 +23,7 @@ public sealed class EisenhowerDraftTests
         var id = await Board(h, s => s.SaveMatrixDraftAsync(user.Id, null, input, Ct));
         Assert.Equal(id, await Board(h, s => s.SaveMatrixDraftAsync(user.Id, null, input, Ct)));
         var row = Assert.Single((await Board(h, s => s.GetEisenhowerAsync(user.Id, Ct))).Tasks);
-        Assert.Equal(id, row.Id); Assert.Equal("Draft", row.Kind); Assert.Equal("Q2", row.Quadrant); Assert.Null(row.Deadline);
+        Assert.Equal(id, row.Id); Assert.Equal("Draft", row.Kind); Assert.Equal("Unknown", row.Quadrant); Assert.Equal("Important", row.Importance); Assert.Null(row.Deadline);
         Assert.Equal(0, row.EstimatedMinutes); Assert.Equal(0, row.RemainingMinutes); Assert.Equal("Một nhiệm vụ tạm thời", row.Description);
         var note = Assert.Single(await Notes(h, s => s.GetNotesAsync(user.Id, Ct)));
         Assert.Equal(id, note.Id); Assert.False(note.AnalysisImported); Assert.Empty(note.CreatedTaskIds);
@@ -39,9 +39,9 @@ public sealed class EisenhowerDraftTests
         await Assert.ThrowsAsync<AuthException>(() => Board(h, s => s.SaveMatrixDraftAsync(user.Id, id, new("Cũ", Version: row.Version), Ct)));
         view = await Board(h, s => s.GetEisenhowerAsync(user.Id, Ct)); row = Assert.Single(view.Tasks);
         Assert.Equal(deadline, row.Deadline); Assert.Equal("Đã chỉnh", row.Name);
-        await Board(h, s => s.MoveMatrixDraftAsync(user.Id, id, new(row.Version, view.Revision, "Q1"), Ct));
+        await Board(h, s => s.MoveMatrixDraftAsync(user.Id, id, new(row.Version, view.Revision, "Q2"), Ct));
         row = Assert.Single((await Board(h, s => s.GetEisenhowerAsync(user.Id, Ct))).Tasks);
-        Assert.Equal("Q1", row.Quadrant); Assert.Equal(deadline, row.Deadline);
+        Assert.Equal("Q2", row.Quadrant); Assert.Equal(deadline, row.Deadline);
         var other = Guid.NewGuid(); await h.DbAsync(async db => { db.Users.Add(new() { Id = other, UserName = "another", Email = "another@example.com", NormalizedEmail = "ANOTHER@EXAMPLE.COM", IsActive = true, EmailConfirmed = true }); await db.SaveChangesAsync(Ct); });
         await Assert.ThrowsAsync<AuthException>(() => Board(h, s => s.SaveMatrixDraftAsync(other, id, new("Không được sửa", Version: row.Version), Ct)));
         Assert.Empty((await Board(h, s => s.GetEisenhowerAsync(other, Ct))).Tasks);
@@ -52,7 +52,7 @@ public sealed class EisenhowerDraftTests
         var id = await Board(h, s => s.SaveMatrixDraftAsync(user.Id, null, new("Ý tưởng", Quadrant: "Q2", RequestId: Guid.NewGuid()), Ct));
         var note = Assert.Single(await Notes(h, s => s.GetNotesAsync(user.Id, Ct)));
         note = await Notes(h, s => s.SaveNoteAsync(user.Id, id, new("Ý tưởng", "Bổ sung điều kiện", note.Version), Ct));
-        Assert.Equal("Q2", Assert.Single((await Board(h, s => s.GetEisenhowerAsync(user.Id, Ct))).Tasks).Quadrant);
+        Assert.Equal("Important", Assert.Single((await Board(h, s => s.GetEisenhowerAsync(user.Id, Ct))).Tasks).Importance);
         note = await Notes(h, s => s.AnalyzeNoteAsync(user.Id, id, new(note.Version), Ct));
         await Notes(h, s => s.ImportNoteAsync(user.Id, id, new(note.Version, note.Analysis!.Tasks), Ct));
         var row = Assert.Single((await Board(h, s => s.GetEisenhowerAsync(user.Id, Ct))).Tasks);

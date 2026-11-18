@@ -7,38 +7,6 @@
   background: #ffffffeb;
   color: #264568;
 }
-.eis-view-switch {
-  display: flex;
-  gap: 5px;
-  padding: 5px;
-  border: 1px solid #e0eaf6;
-  border-radius: 12px;
-  width: fit-content;
-  background: #f4f8fe;
-  margin-bottom: 18px;
-}
-.eis-view-switch button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 0;
-  border-radius: 8px;
-  padding: 9px 14px;
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  color: #000;
-  cursor: pointer;
-}
-.eis-view-switch button[aria-pressed="true"] {
-  background: #fff;
-  color: #1765c7;
-  box-shadow: 0 2px 8px #234f8210;
-}
-.eis-view-switch .icon {
-  width: 16px;
-  height: 16px;
-}
 .eis-heading,
 .eis-focus > header {
   display: flex;

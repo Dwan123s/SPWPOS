@@ -16,6 +16,7 @@ public interface IImportanceInterpreter
     Task<ImportanceSuggestion> SuggestImportanceAsync(ImportanceContext context, CancellationToken ct);
 }
 public sealed record ImportanceView(string Level, string Source, string Reason, double? Confidence, bool Confirmed = false);
+public sealed record EisenhowerPriorityView(string Importance, string Urgency, string Quadrant, string Explanation, string UrgencySource = "Auto");
 public sealed record ImportanceInput(Guid Version,
     [Required, RegularExpression("^(Important|Lower|Unknown)$")] string Level,
     [Required, StringLength(1000, MinimumLength = 1)] string Reason);
@@ -43,10 +44,12 @@ public interface IEisenhowerService
 
 public sealed record TaskChecklistItem(Guid Id, string Text, bool Completed = false);
 public sealed record MatrixDraftInput([Required, StringLength(120)] string Name, [StringLength(4000)] string Description = "",
-    DateTimeOffset? Deadline = null, [RegularExpression("^(Q[1-4]|Unknown)$")] string Quadrant = "Unknown", Guid Version = default, Guid RequestId = default);
+    DateTimeOffset? Deadline = null, [RegularExpression("^(Q[1-4]|Unknown)$")] string Quadrant = "Unknown", Guid Version = default, Guid RequestId = default,
+    [RegularExpression("^(Important|Lower|Unknown)$")] string? ImportanceLevel = null);
 public sealed record MatrixTaskInput([Required, StringLength(200)] string Name, [StringLength(4000)] string Description,
     DateTimeOffset Deadline, [Range(1, 43200)] int EstimatedMinutes, string Quadrant = "Auto", Guid Version = default,
-    TaskChecklistItem[]? Checklist = null, bool Splittable = true);
+    TaskChecklistItem[]? Checklist = null, bool Splittable = true,
+    [RegularExpression("^(Important|Lower|Unknown)$")] string? ImportanceLevel = null);
 public sealed record MatrixChecklistInput(Guid Version, [Required, MaxLength(100)] TaskChecklistItem[] Items);
 public sealed record MatrixMoveInput(Guid Version, Guid Revision, string Quadrant, Guid? BeforeId = null);
 public sealed record MatrixScheduleInput(Guid Version, Guid Revision, bool ExplicitRequest = false);

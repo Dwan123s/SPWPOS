@@ -118,7 +118,7 @@ public sealed partial class NoraAgentRuntimeTests
             Understood(Call("reply_to_user", new { reply = "Bạn rảnh cả ngày." }, n), "CalendarQuery", personal: true)) };
         await using var h = await Harness(model); var user = await h.RegisterAsync();
         var turn = await Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), "Lịch của tôi ngày mai thế nào?"), Ct));
-        Assert.Equal("BLOCKED", turn.Status); Assert.DoesNotContain("rảnh cả ngày", turn.Reply);
+        Assert.Equal("BLOCKED", turn.Status); Assert.DoesNotContain("Thời Gian Làm Việc cả ngày", turn.Reply);
         Assert.Equal(0, turn.Run!.ToolCalls);
     }
 

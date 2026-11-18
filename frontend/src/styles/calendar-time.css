@@ -6,6 +6,14 @@
   --calendar-entry-text: #4f337a;
 }
 
+.calendar-entry-task.calendar-time-past {
+  --calendar-entry-bg: #f6f3fa;
+  --calendar-entry-hover: #efe9f6;
+  --calendar-entry-border: #ddd3e9;
+  --calendar-entry-accent: #a38bb9;
+  --calendar-entry-text: #51415e;
+}
+
 .calendar-entry-event {
   --calendar-entry-bg: var(--calendar-time-bg);
   --calendar-entry-hover: var(--calendar-time-hover);
@@ -54,13 +62,6 @@
   outline: 2px solid var(--calendar-entry-accent);
   outline-offset: 2px;
 }
-.calendar-workspace .calendar-block.calendar-timed-card .block-meta {
-  color: var(--calendar-entry-text);
-}
-.calendar-workspace .calendar-block.calendar-timed-card strong {
-  font-size: 12px;
-  line-height: 1.5;
-}
 .calendar-workspace .calendar-timed-card .block-time {
   font-size: 11px;
 }
@@ -89,4 +90,14 @@
 }
 .calendar-time-tag::before {
   content: "";
+}
+.calendar-session-hours {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.calendar-session-team {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

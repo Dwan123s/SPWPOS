@@ -72,7 +72,7 @@ public sealed partial class WorkspaceService
             .ThenBy(x => x.Start < requestedStart ? 1 : 0).ThenBy(x => x.Start)
             .Take(3).ToArray();
         var suggestion = alternatives.Length == 0
-            ? "Chưa tìm được khoảng rảnh liên tục đủ thời lượng và thỏa các ràng buộc trong 8 ngày từ ngày bạn chọn. Hãy điều chỉnh giờ rảnh hoặc thời lượng."
+            ? "Chưa tìm được khoảng Thời Gian Làm Việc liên tục đủ thời lượng và thỏa các ràng buộc trong 8 ngày từ ngày bạn chọn. Hãy điều chỉnh Thời Gian Làm Việc hoặc thời lượng."
             : "Đề xuất giữ nguyên thời lượng: " + string.Join("; ", alternatives.Select(x =>
             {
                 var localStart = TimeZoneInfo.ConvertTime(x.Start, zone);

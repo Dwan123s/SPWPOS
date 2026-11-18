@@ -1,0 +1,477 @@
+.team-report {
+  --team-report-accent: #205db4;
+  --team-report-tone: #6e87aa;
+  --team-report-tint: #edf3fa;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.team-report [data-tone="active"] {
+  --team-report-tone: #235fb8;
+  --team-report-tint: #e8f0ff;
+}
+
+.team-report [data-tone="review"] {
+  --team-report-tone: #8a5707;
+  --team-report-tint: #fff2d9;
+}
+
+.team-report [data-tone="done"] {
+  --team-report-tone: #147257;
+  --team-report-tint: #e4f5ee;
+}
+
+.team-report [data-tone="late"] {
+  --team-report-tone: #a33538;
+  --team-report-tint: #fcebed;
+}
+
+.team-report-overview,
+.team-report-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 5px 18px #2348730c;
+}
+
+.team-report-overview {
+  padding: clamp(14px, 2vw, 24px);
+  background: linear-gradient(110deg, #fbfdff, #eaf3ff 63%, #edf0ff);
+}
+
+.team-report-title,
+.team-report-member-button,
+.team-report-recipient,
+.team-report-progress,
+.team-report-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-report-title {
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.team-report-title h3 {
+  margin: 0;
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  overflow-wrap: anywhere;
+}
+
+.team-report-title-icon,
+.team-report-metric-icon,
+.team-report-avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  background: var(--team-report-tint);
+  color: var(--team-report-accent);
+}
+
+.team-report-title-icon {
+  background: #dceaff;
+}
+
+.team-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.team-report-metrics > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "icon value" "icon label";
+  align-content: center;
+  align-items: center;
+  column-gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d4e2f4;
+  border-radius: 12px;
+  background: #ffffffc9;
+}
+
+.team-report-metric-icon {
+  grid-area: icon;
+  color: var(--team-report-tone);
+}
+
+.team-report-metrics dt {
+  grid-area: label;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.team-report-metrics dd {
+  grid-area: value;
+  margin: 0;
+  font-size: clamp(1rem, 1.8vw, 1.45rem);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.team-report-breakdown {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.team-report-heading {
+  padding: 16px 18px 12px;
+}
+
+.team-report-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.team-report-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.team-report-members {
+  width: calc(100% - 36px);
+  margin: 0 18px 12px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: left;
+}
+
+.team-report-members :is(th, td) {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.team-report-members tr:last-child > * {
+  border-bottom: 0;
+}
+
+.team-report .team-report-members tbody th {
+  background: transparent;
+}
+.team-report-member-name {
+  width: 46%;
+}
+.team-report-member-count {
+  width: 19%;
+}
+.team-report-members td:nth-child(2) {
+  color: var(--muted);
+}
+
+.team-report-member-button,
+.team-report-task-link,
+.team-report-stages button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.team-report-member-button,
+.team-report-task-link {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px 4px 0;
+  font-weight: 650;
+  text-align: left;
+}
+
+.team-report :is(button, select):focus-visible {
+  outline: 2px solid var(--team-report-accent);
+  outline-offset: 2px;
+}
+
+.team-report :is(.team-report-task-link, .team-report-member-button):hover {
+  color: var(--team-report-accent);
+}
+
+.team-report-member-button[aria-pressed="true"] {
+  color: var(--team-report-accent);
+}
+
+.team-report-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #e8f0fe;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.team-report-member-bar,
+.team-report-distribution {
+  display: flex;
+  overflow: hidden;
+  background: var(--workload-track);
+  border-radius: 999px;
+}
+
+.team-report-member-bar {
+  height: 5px;
+  margin-top: 5px;
+}
+.team-report-member-bar > span {
+  background: #5488d4;
+  border-radius: inherit;
+}
+
+.team-report-distribution {
+  height: 9px;
+  margin: 2px 18px 8px;
+}
+.team-report-distribution > span {
+  flex-basis: 0;
+  background: var(--team-report-tone);
+}
+
+.team-report-stages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px 12px 12px;
+}
+
+.team-report-stages button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 5px;
+  text-align: left;
+}
+
+.team-report-stages button:is(:hover, [aria-pressed="true"]) {
+  background: var(--team-report-tint);
+}
+
+.team-report-stages button[aria-pressed="true"] {
+  border-color: var(--team-report-tone);
+}
+
+.team-report-stage-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--team-report-tone);
+}
+
+.team-report-list-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.team-report-result-count {
+  display: inline-block;
+  min-width: 1.5rem;
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: #edf4ff;
+  color: var(--team-report-accent);
+  font-size: 0.75rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.team-report-tasks .workload-scroll {
+  border-radius: 0 0 15px 15px;
+}
+.team-report .team-report-task-table {
+  min-width: 51rem;
+  font-size: 0.84rem;
+}
+.team-report-task-table tbody tr:hover {
+  background: #f7faff;
+}
+.team-report-task-table th:first-child {
+  width: 36%;
+}
+.team-report-task-table th:nth-child(2) {
+  width: 18%;
+}
+.team-report-task-table :is(th, td) {
+  padding: 10px 14px;
+  overflow-wrap: anywhere;
+}
+
+.team-report-task-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-report-task-link .icon {
+  flex: none;
+  width: 15px;
+  color: var(--team-report-accent);
+}
+
+.team-report-task-table time,
+.team-report-progress span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.team-report-task-table [data-tone="late"] time {
+  color: var(--team-report-tone);
+  font-weight: 650;
+}
+
+.team-report-progress progress {
+  appearance: none;
+  width: clamp(44px, 5vw, 90px);
+  height: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--workload-track);
+  accent-color: var(--team-report-tone);
+}
+
+.team-report-progress progress::-webkit-progress-bar {
+  background: var(--workload-track);
+  border-radius: 999px;
+}
+.team-report-progress progress::-webkit-progress-value {
+  background: var(--team-report-tone);
+  border-radius: 999px;
+}
+.team-report-progress progress::-moz-progress-bar {
+  background: var(--team-report-tone);
+  border-radius: 999px;
+}
+
+.team-report-status {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--team-report-tint);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.team-report-empty {
+  margin: 0;
+  padding: 12px 18px 20px;
+  color: var(--muted);
+}
+.team-report-empty p {
+  margin: 0;
+}
+.team-report-empty button {
+  margin-top: 8px;
+}
+
+.team-report-mobile-label {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .team-report .team-report-task-table,
+  .team-report-task-table tbody {
+    display: block;
+    min-width: 0;
+  }
+  .team-report-task-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .team-report-task-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .team-report-task-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .team-report-task-table tbody :is(th, td) {
+    width: auto;
+    border: 0;
+    padding: 0;
+  }
+  .team-report-task-table tbody th {
+    grid-column: 1 / -1;
+  }
+  .team-report-task-recipient {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .team-report-task-status {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .team-report-task-progress {
+    grid-column: 1 / -1;
+  }
+  .team-report-mobile-label {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--muted);
+    font-size: 0.73rem;
+  }
+  .team-report-progress progress {
+    flex: 1;
+  }
+}
+
+@media (max-width: 950px) {
+  .team-report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .team-report-breakdown {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 460px) {
+  .team-report-heading {
+    padding-inline: 12px;
+  }
+  .team-report-metrics > div {
+    column-gap: 6px;
+    padding: 8px;
+  }
+  .team-report-metric-icon {
+    width: 26px;
+    height: 26px;
+  }
+  .team-report-metric-icon .icon {
+    width: 14px;
+  }
+  .team-report-members {
+    width: calc(100% - 24px);
+    margin-inline: 12px;
+  }
+  .team-report-members .team-report-avatar {
+    width: 24px;
+    height: 24px;
+  }
+}

@@ -45,7 +45,8 @@ export function TeamJoinRequests({ detail, busy, onReview, sectionRef }) {
             <div className="team-actions">
               <button
                 className="btn primary"
-                disabled={busy}
+                disabled={busy || (detail.plan?.memberLimit != null && detail.members.length >= detail.plan.memberLimit)}
+                title={detail.plan?.memberLimit != null && detail.members.length >= detail.plan.memberLimit ? "Nâng cấp gói để duyệt thêm thành viên" : undefined}
                 onClick={() => onReview(request, true)}
                 aria-label={`Duyệt ${request.name}`}
               >

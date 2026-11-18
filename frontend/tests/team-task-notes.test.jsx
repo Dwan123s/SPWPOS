@@ -64,7 +64,7 @@ it("downloads the original leader attachment only after an explicit click, separ
     completionFiles: [{ id: "report", name: "Bài nộp.pdf" }],
   };
   render(<TaskSourceFiles task={task} />);
-  const panel = screen.getByRole("region", { name: "Tài liệu từ trưởng nhóm" });
+  const panel = screen.getByRole("region", { name: "Tài liệu nguồn" });
   expect(within(panel).getByText("Đề bài.docx")).toBeTruthy();
   expect(screen.queryByText("Bài nộp.pdf")).toBeNull();
   expect(downloadPrivateFile).not.toHaveBeenCalled();

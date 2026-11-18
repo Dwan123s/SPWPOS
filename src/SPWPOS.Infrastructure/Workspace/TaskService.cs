@@ -10,6 +10,7 @@ public sealed partial class WorkspaceService
     private async Task<Guid> SaveTaskCoreAsync(Guid uid, Guid? id, TaskInput input, CancellationToken ct)
     {
         ValidTask(input, requirePlanningDetails: false);
+        ValidateEisenhowerPriority(input.ImportanceLevel);
         WorkTask? existingTask = null;
         if (id is { } existingId)
         {
@@ -87,6 +88,7 @@ public sealed partial class WorkspaceService
                     task.WorkWindowEnd = start.AddMinutes(duration);
             }
         }
+        SetEisenhowerPriority(task, input.ImportanceLevel);
         var tasks = await Mine<WorkTask>(uid).Where(x => !x.IsDeleted).ToArrayAsync(ct);
         var edges = await Mine<TaskDependency>(uid).ToArrayAsync(ct);
         Require(!PlanningEngine.HasCycle(tasks.Where(x => x.Id != task.Id).Append(task), edges),
@@ -129,7 +131,8 @@ public sealed partial class WorkspaceService
     }, ct);
     public Task SetStatusAsync(Guid uid, Guid id, StatusInput input, CancellationToken ct) =>
         Mutate(uid, () => SetTaskStatusCore(uid, id, input, ct), ct);
-    private async Task SetTaskStatusCore(Guid uid, Guid id, StatusInput input, CancellationToken ct, TeamCompletionSubmitInput? submission = null)
+    private async Task SetTaskStatusCore(Guid uid, Guid id, StatusInput input, CancellationToken ct, TeamCompletionSubmitInput? submission = null,
+        string? reportUrl = null)
     {
         Require(Enum.TryParse<WorkTaskStatus>(input.Status, true, out var status) && Enum.IsDefined(status), "INVALID_STATUS", "Trạng thái không hợp lệ.");
         var task = await Find<WorkTask>(uid, id, ct); Require(!task.IsDeleted, "NOT_FOUND", "Công việc đã xóa.", 404);
@@ -157,7 +160,7 @@ public sealed partial class WorkspaceService
         task.Status = status; task.Progress = status == WorkTaskStatus.Completed ? 100 : input.Progress; task.UpdatedAt = Now; task.CompletedAt = status == WorkTaskStatus.Completed ? Now : null;
         if (shared is not null)
         {
-            if (status == WorkTaskStatus.Completed) await SubmitTeamCompletion(uid, shared, ct, submission);
+            if (status == WorkTaskStatus.Completed) await SubmitTeamCompletion(uid, shared, ct, submission, reportUrl);
             else { shared.Progress = task.Progress; shared.Version = Guid.NewGuid(); TeamLog(uid, shared.TeamId, shared.Id, "PROGRESS_CONFIRMED"); }
             (await TeamMember(uid, shared.TeamId, ct)).MutationVersion = Guid.NewGuid();
         }

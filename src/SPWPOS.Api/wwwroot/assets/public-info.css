@@ -1,0 +1,25 @@
+:root {
+  color: #121212;
+  background: #f5f8fa;
+  font: 1rem/1.65 system-ui, sans-serif;
+}
+
+body { margin: 0; }
+
+main {
+  max-width: 46rem;
+  margin: 3rem auto;
+  padding: clamp(1rem, 4vw, 3rem);
+  background: #fff;
+  border: 1px solid #dce4eb;
+}
+
+h1 { line-height: 1.2; }
+h2 { margin-top: 2rem; }
+a { color: #0056ad; }
+.brand { font-weight: 750; }
+nav { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 2rem; }
+
+@media (max-width: 48rem) {
+  main { margin: 0; border: 0; }
+}

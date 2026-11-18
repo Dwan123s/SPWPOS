@@ -16,7 +16,7 @@ public sealed partial class WorkspaceService
         Deadline = data.Deadline, Priority = data.Priority, Splittable = data.Splittable, IsHardDeadline = true,
         CreationSource = "TEAM", CreatedAt = now, UpdatedAt = now, MinimumSessionMinutes = state.Preference.MinimumSessionMinutes,
         ChecklistJson = JsonSerializer.Serialize(TeamRequirements(shared.Id, data.Description), AgentJson),
-        InheritedImportance = shared.ImportanceLevel, InheritedImportanceReason = shared.ImportanceReason
+        InheritedImportance = data.Importance?.Level ?? shared.ImportanceLevel, InheritedImportanceReason = data.Importance?.Reason ?? shared.ImportanceReason
     };
 
     private async Task<PrivateClaimView> PreviewClaim(Guid uid, Guid taskId, bool change, CancellationToken ct, bool extended = false)
@@ -206,7 +206,10 @@ public sealed partial class WorkspaceService
             personal.Name = payload.Task.Name; personal.Description = payload.Task.Description; personal.EstimatedMinutes = payload.Task.EstimatedMinutes; personal.Deadline = payload.Task.Deadline;
             personal.Priority = payload.Task.Priority; personal.Splittable = payload.Task.Splittable; personal.UpdatedAt = Now;
             candidate = state;
+            var confirmedImportance = JsonSerializer.Deserialize<SharedTaskView>(shared.PendingChangeJson!)?.Importance;
             shared.Name = personal.Name; shared.Description = personal.Description; shared.EstimatedMinutes = personal.EstimatedMinutes; shared.Deadline = personal.Deadline!.Value; shared.Priority = personal.Priority; shared.Splittable = personal.Splittable; shared.PendingChangeJson = null;
+            WriteImportance(shared, confirmedImportance, Now, "Leader");
+            personal.InheritedImportance = shared.ImportanceLevel; personal.InheritedImportanceReason = shared.ImportanceReason;
         }
         else
         {
@@ -304,13 +307,15 @@ public sealed partial class WorkspaceService
             EstimatedMinutes = task.EstimatedMinutes,
             Deadline = task.Deadline,
             Priority = task.Priority,
-            Splittable = task.Splittable
+            Splittable = task.Splittable,
+            Importance = task.ImportanceLevel is { } level ? new(level, "Leader", "Mức quan trọng do trưởng nhóm chọn.", null, level != "Unknown") : ImportanceDto(current)
         };
         return await StoreTeamChange(uid, current.TeamId, member.Version, draft, ct);
     }
 
     private async Task<TeamTaskDraft> StoreTeamChange(Guid uid, Guid teamId, Guid membershipVersion, SharedTaskView draft, CancellationToken ct)
     {
+        draft = draft with { Eisenhower = EisenhowerPriority.Describe(draft.Importance?.Level ?? "Unknown", draft.Deadline, Now) };
         var row = new PrivatePlanningProposal { UserId = uid, Kind = "TEAM_CHANGE", ExpiresAt = Now.AddMinutes(20), PayloadJson = JsonSerializer.Serialize(new TeamDraftPayload(teamId, membershipVersion, draft)) };
         db.PrivatePlanningProposals.Add(row); await db.SaveChangesAsync(ct);
         return new(row.Id, "Xem yêu cầu mới trước khi gửi. Người nhận sẽ xác nhận lịch riêng; yêu cầu hiện tại còn hiệu lực đến lúc đó.", "", draft);

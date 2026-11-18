@@ -5,38 +5,65 @@ import "./work-time-review.css";
 
 export function FinishWorkButton({
   sessionId,
+  teamTask = false,
+  requireReportUrl = false,
   onWorkspaceChanged = async () => {},
 }) {
   const [confirm, setConfirm] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [reportUrl, setReportUrl] = useState("");
+  const [serverRequiresReport, setServerRequiresReport] = useState(false);
+  const reportRequired = requireReportUrl || serverRequiresReport;
   return (
     <span className="work-time-finish">
       {!confirm ? (
         <button
           type="button"
           className="btn primary small"
-          onClick={() => setConfirm(true)}
+          onClick={() => {
+            setError("");
+            setConfirm(true);
+          }}
         >
           Đã xong công việc
         </button>
       ) : (
         <>
           <small>
-            Hoàn thành toàn bộ task và giải phóng các phiên còn lại?
+            {teamTask ? "Gửi công việc cho trưởng nhóm duyệt và giải phóng các phiên còn lại?"
+              : "Hoàn thành toàn bộ task và giải phóng các phiên còn lại?"}
           </small>
+          {(teamTask || reportRequired) && (
+            <label className="field">
+              {reportRequired ? "Link báo cáo (bắt buộc)" : "Link báo cáo"}
+              <input
+                type="url"
+                maxLength={2048}
+                placeholder="https://…"
+                value={reportUrl}
+                required={reportRequired}
+                disabled={busy}
+                onChange={(event) => setReportUrl(event.target.value)}
+              />
+            </label>
+          )}
           <button
             type="button"
             className="btn primary small"
-            disabled={busy}
+            disabled={busy || (reportRequired && !reportUrl.trim())}
             onClick={async () => {
               setBusy(true);
               setError("");
               try {
-                await api(`/api/sessions/${sessionId}/finish-task`, "POST");
+                const path = `/api/sessions/${sessionId}/finish-task`;
+                if (reportUrl.trim())
+                  await api(path, "POST", { reportUrl: reportUrl.trim() });
+                else await api(path, "POST");
                 await onWorkspaceChanged();
                 setConfirm(false);
               } catch (failure) {
+                if (failure.code === "TEAM_REPORT_URL_REQUIRED") setServerRequiresReport(true);
                 setError(failure.message);
               } finally {
                 setBusy(false);
@@ -154,6 +181,8 @@ export function WorkTimeReviewCard({ onWorkspaceChanged = async () => {} }) {
             <FinishWorkButton
               key={current.sessionId}
               sessionId={current.sessionId}
+              teamTask={current.teamTask}
+              requireReportUrl={current.teamReportUrlRequired}
               onWorkspaceChanged={changed}
             />
             <a className="btn secondary small" href="#calendar">

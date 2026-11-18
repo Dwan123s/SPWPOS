@@ -46,7 +46,7 @@ public sealed partial class AgentFreeTimeTests
         var result = await Send(h, user.Id, "Xem lịch ngày mai");
         Assert.Contains("chưa có cuộc hẹn hay phiên làm việc nào được lưu", result.Reply);
         Assert.Contains(configured ? "19:00–22:00 (180 phút)" : "chưa có giờ làm việc được bạn xác nhận", result.Reply);
-        Assert.DoesNotContain("rảnh cả ngày", result.Reply); Assert.Equal(1, ai.Calls);
+        Assert.DoesNotContain("Thời Gian Làm Việc cả ngày", result.Reply); Assert.Equal(1, ai.Calls);
     }
 
     [Fact]
@@ -71,8 +71,8 @@ public sealed partial class AgentFreeTimeTests
     {
         var ai = Ai(); await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
         var result = await Send(h, user.Id, "Ngày mai tôi rảnh lúc nào?");
-        Assert.Contains("Ngày mai (22/10/2026), bạn còn rảnh từ 19:00–22:00 (180 phút)", result.Reply);
-        Assert.DoesNotContain("Các khoảng bạn còn rảnh theo", result.Reply);
+        Assert.Contains("Ngày mai (22/10/2026), Thời Gian Làm Việc của bạn còn từ 19:00–22:00 (180 phút)", result.Reply);
+        Assert.DoesNotContain("Các khoảng bạn còn Thời Gian Làm Việc theo", result.Reply);
         Assert.DoesNotContain("Lịch chưa thay đổi", result.Reply);
         Assert.Equal("ANSWERED", result.Status); Assert.Empty(result.Changes); Assert.Equal(1, ai.Calls);
     }

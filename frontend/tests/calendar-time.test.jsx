@@ -69,14 +69,16 @@ it.each(["week", "agenda"])(
       ["Buổi đã qua", "event", "past", "Đã qua"],
       ["Buổi đang học", "event", "current", "Đang diễn ra"],
       ["Buổi sắp tới", "event", "future", "Sắp tới"],
-      ["Phiên cũ chưa kết thúc timer", "task", "past", "Đã qua"],
+      ["Phiên cũ chưa kết thúc timer", "task", "past", "Chờ ghi kết quả"],
     ]) {
       const card = screen.getByText(title).closest(".calendar-timed-card");
       expect(card.classList.contains(`calendar-entry-${kind}`)).toBe(true);
       expect(card.classList.contains(`calendar-time-${phase}`)).toBe(true);
-      expect(
-        within(card).getByText(label).classList.contains("calendar-time-tag"),
-      ).toBe(true);
+      expect(card.getAttribute("aria-label")).toContain(label);
+      expect(within(card).queryByText(label)).toBeNull();
+      if (phase === "current" || kind === "task") {
+        expect(within(card).getByTitle(label).classList.contains("calendar-card-indicator")).toBe(true);
+      }
     }
     const legend = within(screen.getByLabelText("Màu theo loại lịch"));
     expect(legend.getByText("Phiên công việc")).toBeTruthy();
@@ -96,11 +98,12 @@ it("updates at start/end boundaries without reloading, then clears its timer", (
   const { unmount } = render(calendarPage());
   const card = () =>
     screen.getByText("Buổi kế tiếp").closest(".calendar-timed-card");
-  expect(within(card()).getByText("Sắp tới")).toBeTruthy();
+  expect(card().getAttribute("aria-label")).toContain("Sắp tới");
   act(() => vi.advanceTimersByTime(10000));
-  expect(within(card()).getByText("Đang diễn ra")).toBeTruthy();
+  expect(within(card()).getByTitle("Đang diễn ra")).toBeTruthy();
   act(() => vi.advanceTimersByTime(10000));
-  expect(within(card()).getByText("Đã qua")).toBeTruthy();
+  expect(card().getAttribute("aria-label")).toContain("Đã qua");
+  expect(within(card()).queryByTitle("Đang diễn ra")).toBeNull();
   unmount();
   expect(vi.getTimerCount()).toBe(0);
 });
@@ -121,9 +124,9 @@ it("refreshes a suspended tab and handles an event spanning local midnight", () 
       .map((title) => title.closest(".calendar-timed-card"));
   expect(cards()).toHaveLength(2);
   for (const card of cards())
-    expect(within(card).getByText("Đang diễn ra")).toBeTruthy();
+    expect(within(card).getByTitle("Đang diễn ra")).toBeTruthy();
   vi.setSystemTime(new Date("2026-10-30T05:00:00Z"));
   fireEvent.focus(window);
   for (const card of cards())
-    expect(within(card).getByText("Đã qua")).toBeTruthy();
+    expect(card.getAttribute("aria-label")).toContain("Đã qua");
 });

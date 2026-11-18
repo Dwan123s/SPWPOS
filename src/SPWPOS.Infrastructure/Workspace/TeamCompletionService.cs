@@ -5,9 +5,39 @@ namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService
 {
-    // Called by both personal-task and shared-task progress APIs inside their transaction.
-    private async Task SubmitTeamCompletion(Guid uid, TeamTask task, CancellationToken ct, TeamCompletionSubmitInput? submission = null)
+    private static TeamCompletionPolicy CompletionPolicy(TeamProject team) =>
+        new(team.CompletionPolicyVersion, team.RequireCompletionReportUrl, team.NotifyLeaderOnCompletionSubmission);
+
+    public Task<TeamCompletionPolicy> SaveTeamCompletionPolicyAsync(Guid uid, Guid teamId, TeamCompletionPolicy input, CancellationToken ct) => Mutate(uid, async () =>
     {
+        var leader = await TeamMember(uid, teamId, ct, leader: true);
+        var team = await db.TeamProjects.SingleAsync(x => x.Id == teamId, ct);
+        Require(team.CompletionPolicyVersion == input.Version, "TEAM_POLICY_STALE", "Quy định gửi duyệt đã thay đổi. Hãy mở lại cài đặt.", 409);
+        team.RequireCompletionReportUrl = input.RequireReportUrl;
+        team.NotifyLeaderOnCompletionSubmission = input.NotifyLeader;
+        team.CompletionPolicyVersion = Guid.NewGuid();
+        leader.MutationVersion = Guid.NewGuid();
+        return CompletionPolicy(team);
+    }, ct, false);
+
+    // Called by both personal-task and shared-task progress APIs inside their transaction.
+    private async Task SubmitTeamCompletion(Guid uid, TeamTask task, CancellationToken ct, TeamCompletionSubmitInput? submission, string? reportUrl)
+    {
+        var team = await db.TeamProjects.AsNoTracking().SingleAsync(x => x.Id == task.TeamId, ct);
+        reportUrl = (submission?.ReportUrl ?? reportUrl)?.Trim();
+        if (string.IsNullOrEmpty(reportUrl))
+        {
+            Require(!team.RequireCompletionReportUrl, "TEAM_REPORT_URL_REQUIRED",
+                "Nhóm yêu cầu link báo cáo. Mở Nhóm, chọn công việc và nhập link khi gửi duyệt.");
+            reportUrl = null;
+        }
+        else
+        {
+            Require(reportUrl.Length <= 2048 && Uri.IsWellFormedUriString(reportUrl, UriKind.Absolute) &&
+                Uri.TryCreate(reportUrl, UriKind.Absolute, out var url) && url.Scheme is "http" or "https" && !string.IsNullOrEmpty(url.Host),
+                "TEAM_REPORT_URL_INVALID", "Nhập link báo cáo hợp lệ bắt đầu bằng https:// hoặc http://.");
+        }
+
         task.ProgressBeforeReview = task.Progress;
         task.Progress = 100;
         task.Status = "PendingReview";
@@ -19,8 +49,9 @@ public sealed partial class WorkspaceService
         task.CompletionReviewNote = null;
         task.Version = Guid.NewGuid();
         db.TeamCompletionSubmissions.Add(new() { Id = task.CompletionRequestId.Value, TeamTaskId = task.Id, UserId = uid,
-            Note = submission?.Note?.Trim() ?? "", CreatedAt = Now });
+            Note = submission?.Note?.Trim() ?? "", ReportUrl = reportUrl, CreatedAt = Now });
         TeamLog(uid, task.TeamId, task.Id, "TASK_COMPLETION_SUBMITTED");
+        if (!team.NotifyLeaderOnCompletionSubmission) return;
         var name = await TeamUserName(uid, ct);
         foreach (var leader in await db.TeamMemberships.Where(x => x.TeamId == task.TeamId && x.Active && x.Role == "Leader").Select(x => x.UserId).ToArrayAsync(ct))
             await AddNotification(leader, "TEAM_COMPLETION_REQUEST", "Task nhóm đang chờ duyệt",

@@ -1,12 +1,40 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SPWPOS.Application.Authentication;
+using SPWPOS.Domain.Entities;
 using SPWPOS.TestSupport;
 
 namespace SPWPOS.UnitTests;
 
 public sealed partial class PrivateTeamPlanningTests
 {
+    [Fact]
+    public async Task Personal_workload_counts_remaining_work_hours_and_planned_time_by_session_status()
+    {
+        await using var h = await Setup();
+        var now = Tomorrow.AddHours(1); // 20:00 in the fixture's 19:00–22:00 work window.
+        h.Clock.Advance(now - h.Clock.GetUtcNow());
+        await h.DbAsync(async db =>
+        {
+            var task = new WorkTask { UserId = Member, Name = "Báo cáo", Deadline = now.AddDays(1), EstimatedMinutes = 105 };
+            db.WorkTasks.Add(task);
+            db.WorkSessions.AddRange(
+                new() { UserId = Member, TaskId = task.Id, Start = now.AddHours(-1), End = now.AddMinutes(-30), Status = WorkSessionStatus.Completed },
+                new() { UserId = Member, TaskId = task.Id, Start = now.AddMinutes(-30), End = now.AddMinutes(-15), Status = WorkSessionStatus.Missed },
+                new() { UserId = Member, TaskId = task.Id, Start = now.AddMinutes(30), End = now.AddMinutes(90), Status = WorkSessionStatus.Scheduled });
+            await db.SaveChangesAsync(Ct);
+        });
+
+        var workload = await Workspace(h, s => s.GetWorkloadAsync(Member, Ct));
+        var today = Assert.Single(workload.Days, day => day.Date == new DateOnly(2026, 11, 2));
+        Assert.Equal(180, today.WorkingMinutes);
+        Assert.Equal(120, today.RemainingWorkMinutes);
+        Assert.Equal(105 * 60, today.PlannedSeconds);
+        Assert.Equal(30 * 60, today.CompletedPlannedSeconds);
+        Assert.Equal(15 * 60, today.SkippedPlannedSeconds);
+        Assert.Equal(180, workload.Days[1].RemainingWorkMinutes);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -40,6 +68,14 @@ public sealed partial class PrivateTeamPlanningTests
         h.Clock.Advance(TimeSpan.FromDays(1));
         var claim = await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct));
         await Use(h, s => s.ConfirmTeamClaimAsync(Member, claim.Id, new(), Ct));
+        var personal = await Workspace(h, s => s.GetWorkloadAsync(Member, Ct));
+        Assert.NotEmpty(personal.Days.SelectMany(day => day.Sessions));
+        Assert.All(personal.Days.SelectMany(day => day.Sessions), session =>
+        {
+            Assert.True(session.TeamTask);
+            Assert.Equal(Team, session.TeamId);
+            Assert.Equal("Đồ án", session.TeamName);
+        });
         var denied = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.GetTeamWorkloadAsync(Member, Team, 0, Ct)));
         Assert.Equal("TEAM_FORBIDDEN", denied.Code);
 
@@ -49,6 +85,10 @@ public sealed partial class PrivateTeamPlanningTests
         var task = Assert.Single(initial.Tasks);
         Assert.Equal(Member, task.AssigneeId);
         Assert.Equal("ASSIGNED", task.Risk);
+        var memberTotal = Assert.Single(initial.Members, row => row.UserId == Member);
+        Assert.Equal(1, memberTotal.TaskCount);
+        Assert.Equal(task.EstimatedMinutes, memberTotal.EstimatedMinutes);
+        Assert.Equal(0, Assert.Single(initial.Members, row => row.UserId == Leader).EstimatedMinutes);
 
         await h.DbAsync(async db =>
         {
@@ -65,6 +105,71 @@ public sealed partial class PrivateTeamPlanningTests
 
         h.Clock.Advance(TimeSpan.FromHours(16));
         Assert.Equal("OVERDUE", Assert.Single((await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct))).Tasks).Risk);
+    }
+
+    [Fact]
+    public async Task Availability_requests_and_responses_are_private_and_do_not_assign_the_task()
+    {
+        await using var h = await Setup();
+        await h.DbAsync(async db =>
+        {
+            db.TeamMemberships.Add(new() { TeamId = Team, UserId = Other });
+            await db.SaveChangesAsync(Ct);
+        });
+
+        var task = Assert.Single((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks);
+        var denied = await Assert.ThrowsAsync<AuthException>(() => Use(h,
+            s => s.RequestTeamAvailabilityAsync(Member, TaskId, new(task.Version, Other), Ct)));
+        Assert.Equal("TEAM_FORBIDDEN", denied.Code);
+        await Use(h, s => s.RequestTeamAvailabilityAsync(Leader, TaskId, new(task.Version, Member), Ct));
+        var requested = Assert.Single((await Use(h, s => s.GetTeamAsync(Member, Team, Ct))).Tasks);
+        Assert.Equal(Member, requested.AvailabilityCheck?.UserId);
+        Assert.Null(requested.AvailabilityCheck?.CanTake);
+        Assert.Null(Assert.Single((await Use(h, s => s.GetTeamAsync(Other, Team, Ct))).Tasks).AvailabilityCheck);
+        denied = await Assert.ThrowsAsync<AuthException>(() => Use(h,
+            s => s.RespondTeamAvailabilityAsync(Other, TaskId, new(requested.Version, true), Ct)));
+        Assert.Equal("TEAM_AVAILABILITY_FORBIDDEN", denied.Code);
+
+        Assert.NotEmpty((await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct))).Options);
+        await Use(h, s => s.RespondTeamAvailabilityAsync(Member, TaskId, new(requested.Version, true), Ct));
+        var replied = Assert.Single((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks);
+        Assert.True(replied.AvailabilityCheck?.CanTake);
+        Assert.Null(replied.AssigneeId);
+        Assert.Null(replied.DesignatedUserId);
+        Assert.Null(Assert.Single((await Use(h, s => s.GetTeamAsync(Other, Team, Ct))).Tasks).AvailabilityCheck);
+        Assert.False(await h.DbAsync(db => db.WorkSessions.AnyAsync(Ct)));
+        var notice = Assert.Single(await Workspace(h, s => s.GetNotificationsAsync(Leader, Ct)),
+            n => n.Kind == "TEAM_AVAILABILITY_RESPONDED");
+        Assert.Contains("có thể nhận", notice.Message);
+
+        await Use(h, s => s.ChangeTeamTaskRecipientAsync(Leader, TaskId, new(replied.Version, Other), Ct));
+        Assert.Null(Assert.Single((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks).AvailabilityCheck);
+    }
+
+    [Fact]
+    public async Task Early_submission_appears_in_the_submission_week_and_current_review_queue()
+    {
+        await using var h = await Setup();
+        h.Clock.Advance(TimeSpan.FromDays(1));
+        await h.DbAsync(async db =>
+        {
+            (await db.TeamTasks.SingleAsync(Ct)).Deadline = Tomorrow.AddDays(15);
+            await db.SaveChangesAsync(Ct);
+        });
+        await ClaimForReview(h);
+        Assert.Empty((await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, 0, Ct))).Tasks);
+        var task = await Current(h);
+        await Use(h, s => s.UpdateTeamProgressAsync(Member, TaskId, new(task.Version, 100), Ct));
+
+        var notice = Assert.Single(await Workspace(h, s => s.GetNotificationsAsync(Leader, Ct)), n => n.Kind == "TEAM_COMPLETION_REQUEST");
+        Assert.Equal(Team, notice.TeamId);
+        Assert.Equal(TaskId, notice.TeamTaskId);
+        h.Clock.Advance(TimeSpan.FromDays(7));
+        foreach (var week in new[] { -1, 0 })
+        {
+            var workload = await Use(h, s => s.GetTeamWorkloadAsync(Leader, Team, week, Ct));
+            Assert.Equal("REVIEW", Assert.Single(workload.Tasks).Risk);
+        }
     }
 
     [Fact]

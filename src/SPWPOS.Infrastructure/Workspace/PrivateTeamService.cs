@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using SPWPOS.Infrastructure.Commerce;
 using SPWPOS.Application.Authentication;
 using SPWPOS.Application.Workspace;
 using SPWPOS.Domain.Entities;
@@ -11,10 +12,13 @@ public sealed partial class WorkspaceService
 {
     private sealed record TeamDraftPayload(Guid TeamId, Guid MembershipVersion, SharedTaskView Task);
     private sealed record ClaimPayload(WorkTask Task, PlanView[] Plans, WorkSession[] Before, bool IsChange = false, string Analysis = "");
-    private async Task<TeamMembership> TeamMember(Guid uid, Guid teamId, CancellationToken ct, bool leader = false)
+    private async Task<TeamMembership> TeamMember(Guid uid, Guid teamId, CancellationToken ct, bool leader = false, bool allowSuspended = false)
     {
         var member = await db.TeamMemberships.SingleOrDefaultAsync(x => x.TeamId == teamId && x.UserId == uid && x.Active, ct);
         Require(member is not null && (!leader || member.Role == "Leader"), "TEAM_FORBIDDEN", "Bạn không có quyền thực hiện thao tác trong nhóm này.", 403);
+        if (!allowSuspended)
+            Require((await TeamRenewal.GetAsync(db, teamId, Now, ct))?.Status != "Suspended", "TEAM_SUSPENDED",
+                "Nhóm đã bị vô hiệu hóa do Premium hết hạn quá 3 ngày. Chủ nhóm cần gia hạn để mở lại.", 409);
         return member;
     }
     private async Task<TeamTask> SharedTask(Guid uid, Guid taskId, CancellationToken ct)
@@ -23,7 +27,8 @@ public sealed partial class WorkspaceService
             ?? throw new AuthException("NOT_FOUND", "Không tìm thấy công việc nhóm.", 404);
         await TeamMember(uid, task.TeamId, ct); return task;
     }
-    private static SharedTaskView SharedDto(TeamTask t) => new(t.Id, t.Name, t.Description, t.EstimatedMinutes, t.Deadline, t.Priority, t.Splittable, t.AssigneeId, t.Progress, t.Status, t.Version, t.PendingChangeJson != null, t.CompletionRequestId, t.CompletionSubmittedAt, t.CompletionReviewedAt, t.CompletionReviewedBy, t.CompletionApproved, t.CompletionReviewNote, DesignatedUserId: t.DesignatedUserId, Importance: ImportanceDto(t), ParentTaskId: t.ParentTaskId);
+    private SharedTaskView SharedDto(TeamTask t) => new(t.Id, t.Name, t.Description, t.EstimatedMinutes, t.Deadline, t.Priority, t.Splittable, t.AssigneeId, t.Progress, t.Status, t.Version, t.PendingChangeJson != null, t.CompletionRequestId, t.CompletionSubmittedAt, t.CompletionReviewedAt, t.CompletionReviewedBy, t.CompletionApproved, t.CompletionReviewNote, DesignatedUserId: t.DesignatedUserId, Importance: ImportanceDto(t), ParentTaskId: t.ParentTaskId,
+        Eisenhower: EisenhowerPriority.Describe(t.ImportanceLevel, t.Deadline, Now));
     private void TeamLog(Guid uid, Guid teamId, Guid? taskId, string kind) => db.TeamActivities.Add(new() { ActorId = uid, TeamId = teamId, TaskId = taskId, Kind = kind, CreatedAt = Now });
     // DTOs for group reads are deliberately projected from shared tables only.
     public async Task<TeamView[]> ListTeamsAsync(Guid uid, CancellationToken ct) => await
@@ -38,13 +43,17 @@ public sealed partial class WorkspaceService
     }, ct, false);
     public async Task<TeamDetailView> GetTeamAsync(Guid uid, Guid teamId, CancellationToken ct)
     {
-        var member = await TeamMember(uid, teamId, ct); var team = await db.TeamProjects.AsNoTracking().SingleAsync(x => x.Id == teamId, ct);
+        var member = await TeamMember(uid, teamId, ct, allowSuspended: true); var team = await db.TeamProjects.AsNoTracking().SingleAsync(x => x.Id == teamId, ct);
+        var renewal = await TeamRenewal.GetAsync(db, teamId, Now, ct);
         var members = await (from m in db.TeamMemberships.AsNoTracking() join u in db.Users.AsNoTracking() on m.UserId equals u.Id
             join p in db.UserProfiles.AsNoTracking() on u.Id equals p.UserId into profiles
             from p in profiles.DefaultIfEmpty()
             where m.TeamId == teamId && m.Active select new TeamMemberView(m.UserId,
                 p != null && p.DisplayName != "" ? p.DisplayName : u.FirstName + " " + u.LastName, m.Role, m.Version,
                 p != null ? p.AvatarUrl : "")).ToArrayAsync(ct);
+        if (renewal?.Status == "Suspended")
+            return new(new(teamId, team.Name, member.Role), members, [], [], [], CompletionPolicy(team),
+                await TeamPlans.CurrentAsync(db, teamId, Now, ct), renewal);
         var teamTasks = db.TeamTasks.AsNoTracking().Where(x => x.TeamId == teamId);
         var tasks = await teamTasks.OrderBy(x => x.Status == "Completed" || x.Status == "Split")
             .ThenBy(x => x.Deadline).ThenBy(x => x.Id).Take(500).ToArrayAsync(ct);
@@ -61,7 +70,7 @@ public sealed partial class WorkspaceService
         var visibleRequests = tasks.Where(x => x.CompletionRequestId != null && (member.Role == "Leader" || x.AssigneeId == uid))
             .Select(x => x.CompletionRequestId!.Value).ToArray();
         var submissions = await db.TeamCompletionSubmissions.AsNoTracking().Where(x => visibleRequests.Contains(x.Id))
-            .Select(x => new { x.Id, x.Note }).ToDictionaryAsync(x => x.Id, ct);
+            .Select(x => new { x.Id, x.Note, x.ReportUrl }).ToDictionaryAsync(x => x.Id, ct);
         var reports = await db.TeamCompletionFiles.AsNoTracking().Where(x => visibleRequests.Contains(x.SubmissionId))
             .Select(x => new { x.SubmissionId, File = new TeamCompletionFileView(x.Id, x.Name, x.MimeType, x.Size, x.CreatedAt) }).ToArrayAsync(ct);
         var sourceIds = tasks.Where(x => x.SourceDocumentId != null).Select(x => x.SourceDocumentId!.Value).Distinct().ToArray();
@@ -73,6 +82,7 @@ public sealed partial class WorkspaceService
             where assignment.Active && assignment.UserId == uid && myTaskIds.Contains(assignment.TeamTaskId)
             select new { assignment.TeamTaskId, personal.ChecklistJson }).ToDictionaryAsync(x => x.TeamTaskId, x => x.ChecklistJson, ct);
         var children = tasks.Where(t => t.ParentTaskId.HasValue).ToLookup(t => t.ParentTaskId!.Value);
+        var memberIds = members.Select(m => m.UserId).ToHashSet();
         var views = tasks.Select(t => {
             var checklist = t.Status == "Split" ? [] : TeamRequirements(t.Id, t.Description);
             if (myChecklists.TryGetValue(t.Id, out var stored))
@@ -80,12 +90,17 @@ public sealed partial class WorkspaceService
             var subtasks = children[t.Id].ToArray();
             var dto = SharedDto(t) with { SourceFiles = t.SourceDocumentId is { } source && sources.TryGetValue(source, out var file) ? [file] : [],
                 Checklist = checklist, SubtaskCount = subtasks.Length, SubtasksCompleted = subtasks.Count(child => child.Status == "Completed") };
+            if (t.AvailabilityCheckVersion == t.Version && t.Status == "Open" && t.Deadline > Now &&
+                t.AvailabilityCheckUserId is { } target && memberIds.Contains(target) && (target == uid || member.Role == "Leader"))
+                dto = dto with { AvailabilityCheck = new(target, t.AvailabilityCheckCanTake) };
             return t.CompletionRequestId is { } request && visibleRequests.Contains(request)
                 ? dto with { CompletionSubmissionNote = submissions.GetValueOrDefault(request)?.Note,
+                    CompletionReportUrl = submissions.GetValueOrDefault(request)?.ReportUrl,
                     CompletionFiles = reports.Where(x => x.SubmissionId == request).Select(x => x.File).ToArray() } : dto;
         }).ToArray();
         var requests = member.Role == "Leader" ? await PendingTeamJoinRequests(teamId, ct) : [];
-        return new(new(teamId, team.Name, member.Role), members, views, activity, requests);
+        var plan = await TeamPlans.CurrentAsync(db, teamId, Now, ct);
+        return new(new(teamId, team.Name, member.Role), members, views, activity, requests, CompletionPolicy(team), plan, renewal);
     }
     private static string InviteHash(string code) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code.Trim())));
     private static string InviteCode(string code)
@@ -121,6 +136,7 @@ public sealed partial class WorkspaceService
         var hash = InviteHash(InviteCode(code));
         var invite = await db.TeamInvites.SingleOrDefaultAsync(x => x.CodeHash == hash, ct);
         Require(invite is not null && !invite.Revoked && invite.ExpiresAt > Now && invite.RemainingUses > 0, "INVITE_INVALID", "Mã mời đã hết hạn hoặc bị thu hồi.", 409);
+        Require((await TeamRenewal.GetAsync(db, invite.TeamId, Now, ct))?.Status != "Suspended", "TEAM_SUSPENDED", "Nhóm đang bị vô hiệu hóa. Chủ nhóm cần gia hạn Premium.", 409);
         var member = await db.TeamMemberships.SingleOrDefaultAsync(x => x.UserId == uid && x.TeamId == invite.TeamId, ct);
         if (member?.Active == true) return invite.TeamId;
         Require(member?.ApprovalStatus != "Removed", "MEMBER_REMOVED", "Bạn đã bị loại khỏi nhóm này và không thể dùng link mời để tham gia lại.", 403);
@@ -140,7 +156,7 @@ public sealed partial class WorkspaceService
     }, ct, false, System.Data.IsolationLevel.Serializable);
     public Task RemoveTeamMemberAsync(Guid uid, Guid teamId, Guid memberId, Guid version, CancellationToken ct) => Mutate(uid, async () =>
     {
-        var actor = await TeamMember(uid, teamId, ct, uid != memberId); var target = await TeamMember(memberId, teamId, ct);
+        var actor = await TeamMember(uid, teamId, ct, uid != memberId, allowSuspended: true); var target = await TeamMember(memberId, teamId, ct, allowSuspended: true);
         Require(target.Version == version, "MEMBER_STALE", "Thành viên đã thay đổi. Tải lại nhóm.", 409);
         Require(target.Role != "Leader", "LEADER_REQUIRED", "Trưởng nhóm cần tiếp tục quản lý nhóm.", 409);
         if (uid != memberId) { await KickTeamMember(actor, target, ct); return; }
@@ -182,6 +198,25 @@ public sealed partial class WorkspaceService
     private void ValidateTeamDeadline(DateTimeOffset deadline) =>
         Require(ValidTeamDeadline(deadline), "TEAM_DEADLINE_RANGE", "Hạn chót phải cách hiện tại hơn 5 phút.", 409);
 
+    public Task ExtendTeamTaskDeadlineAsync(Guid uid, Guid taskId, TeamTaskDeadlineInput input, CancellationToken ct) => Mutate(uid, async () =>
+    {
+        var task = await SharedTask(uid, taskId, ct);
+        var leader = await TeamMember(uid, task.TeamId, ct, leader: true);
+        Require(task.Status == "Open" && task.AssigneeId is null,
+            "TASK_UNAVAILABLE", "Chỉ gia hạn trực tiếp cho việc chưa có người nhận.", 409);
+        if (task.Deadline == input.Deadline && task.Deadline > Now) return;
+        Require(task.Version == input.Version, "TASK_STALE", "Công việc đã thay đổi. Hãy tải lại và thử lại.", 409);
+        Require(task.Deadline <= Now, "TASK_UNAVAILABLE", "Công việc hiện vẫn còn hạn.", 409);
+        ValidateTeamDeadline(input.Deadline);
+        task.Deadline = input.Deadline;
+        task.Version = Guid.NewGuid();
+        task.AvailabilityCheckUserId = null;
+        task.AvailabilityCheckVersion = null;
+        task.AvailabilityCheckCanTake = null;
+        leader.MutationVersion = Guid.NewGuid();
+        TeamLog(uid, task.TeamId, task.Id, "TASK_DEADLINE_EXTENDED");
+    }, ct, false);
+
     public async Task<TeamTaskDraft> DraftManualTeamTaskAsync(Guid uid, Guid teamId, ManualTeamTaskInput input, CancellationToken ct)
     {
         var member = await TeamMember(uid, teamId, ct, true);
@@ -189,16 +224,18 @@ public sealed partial class WorkspaceService
         ValidateTeamDeadline(input.Deadline);
         return await StoreTeamDraft(uid, teamId, member.Version, new(Guid.NewGuid(), input.Name.Trim(),
             input.Description?.Trim() ?? "", input.EstimatedMinutes, input.Deadline, input.Priority, input.Splittable,
-            null, 0, "Open", Guid.NewGuid(), false), ct);
+            null, 0, "Open", Guid.NewGuid(), false,
+            Importance: input.ImportanceLevel is { } level ? new(level, "Leader", "Mức quan trọng do trưởng nhóm chọn.", null, level != "Unknown") : null), ct);
     }
 
     private static void ValidateManualTeamTask(ManualTeamTaskInput input) =>
         Require(!string.IsNullOrWhiteSpace(input.Name) && input.Name.Trim().Length <= 200 && (input.Description is null or { Length: <= 4000 }) &&
-            input.EstimatedMinutes is >= 1 and <= 43200 && input.Priority is >= 1 and <= 4,
+            input.EstimatedMinutes is >= 1 and <= 43200 && input.Priority is >= 1 and <= 4 && input.ImportanceLevel is null or "Important" or "Lower" or "Unknown",
             "INVALID_TEAM_TASK", "Kiểm tra tên, mô tả, thời lượng và mức ưu tiên.");
 
     private async Task<TeamTaskDraft> StoreTeamDraft(Guid uid, Guid teamId, Guid version, SharedTaskView task, CancellationToken ct)
     {
+        task = task with { Eisenhower = EisenhowerPriority.Describe(task.Importance?.Level ?? "Unknown", task.Deadline, Now) };
         var row = new PrivatePlanningProposal { UserId = uid, Kind = "TEAM_DRAFT", ExpiresAt = Now.AddMinutes(20), PayloadJson = JsonSerializer.Serialize(new TeamDraftPayload(teamId, version, task)) };
         db.PrivatePlanningProposals.Add(row); await db.SaveChangesAsync(ct);
         return new(row.Id, "Bản nháp và thời lượng đề xuất. Chỉ tạo task chung sau khi bạn xác nhận.", "", task);
@@ -222,7 +259,7 @@ public sealed partial class WorkspaceService
             Require(existing.Version == t.Version && existing.Status is "Open" or "Assigned", "TASK_STALE", "Task đã thay đổi, hãy tạo lại đề xuất.", 409);
             if (existing.Deadline != t.Deadline) ValidateTeamDeadline(t.Deadline);
             if (existing.AssigneeId != null) existing.PendingChangeJson = JsonSerializer.Serialize(t);
-            else { existing.Name = t.Name; existing.Description = t.Description; existing.EstimatedMinutes = t.EstimatedMinutes; existing.Deadline = t.Deadline; existing.Priority = t.Priority; existing.Splittable = t.Splittable; }
+            else { existing.Name = t.Name; existing.Description = t.Description; existing.EstimatedMinutes = t.EstimatedMinutes; existing.Deadline = t.Deadline; existing.Priority = t.Priority; existing.Splittable = t.Splittable; WriteImportance(existing, t.Importance, Now, "Leader"); }
             existing.Version = Guid.NewGuid(); TeamLog(uid, teamId, t.Id, "TASK_CHANGE_PROPOSED");
         }
         else {

@@ -1,11 +1,18 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { api } from "../src/api.js";
 import { AnalyticsHistory } from "../src/analytics.jsx";
 import { RecoveryPanel } from "../src/recovery.jsx";
 vi.mock("../src/api.js", () => ({ api: vi.fn() }));
 const totals = {
   focusSeconds: 1800,
+  recordedActualSeconds: 2700,
   plannedSeconds: 3600,
   openFocusSeconds: 60,
   completedTasks: 1,
@@ -30,17 +37,15 @@ beforeEach(() => {
 });
 it("history changes the server range and identifies provisional timers", async () => {
   render(<AnalyticsHistory />);
-  await screen.findByText(/Thời gian phiên đang chạy là tạm tính/);
-  expect(screen.getByText(/Kỳ trước chưa có thời gian tập trung/)).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Khoảng thống kê"), {
-    target: { value: "3" },
-  });
+  await screen.findByText("Đang chạy · 1 phút tạm tính");
+  expect(screen.getByText("45 phút")).toBeTruthy();
+  expect(screen.getByText("30 phút")).toBeTruthy();
+  const period = within(screen.getByRole("group", { name: "Khoảng thống kê" }));
+  fireEvent.click(period.getByRole("button", { name: "3 ngày" }));
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith("/api/intelligence/history?days=3"),
   );
-  fireEvent.change(screen.getByLabelText("Khoảng thống kê"), {
-    target: { value: "30" },
-  });
+  fireEvent.click(period.getByRole("button", { name: "30 ngày" }));
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith("/api/intelligence/history?days=30"),
   );
@@ -49,7 +54,7 @@ it("malformed analytics response becomes a recoverable error", async () => {
   api.mockResolvedValue({});
   render(<AnalyticsHistory />);
   expect(await screen.findByText(/Chưa tải được thống kê hợp lệ/)).toBeTruthy();
-  expect(screen.queryByText("Tập trung đã ghi nhận")).toBeNull();
+  expect(screen.queryByText("Lịch dự kiến")).toBeNull();
 });
 it("recovery loads read-only and applies only after a click", async () => {
   const record = {
@@ -142,8 +147,44 @@ it("does not show an empty recovery state before its initial request completes",
 
 it("hides task pagination for empty analytics results", async () => {
   render(<AnalyticsHistory />);
+  fireEvent.click(screen.getByRole("button", { name: "Theo công việc" }));
   await screen.findByText("Chưa có công việc phù hợp.");
   expect(
     screen.queryByRole("navigation", { name: "Phân trang thống kê" }),
   ).toBeNull();
+});
+
+it("keeps task history separate from the selected daily period", async () => {
+  render(<AnalyticsHistory />);
+  await screen.findByText("45 phút");
+  fireEvent.click(screen.getByRole("button", { name: "Chọn ngày" }));
+  fireEvent.change(screen.getByLabelText("Từ ngày"), {
+    target: { value: "2026-10-12" },
+  });
+  fireEvent.change(screen.getByLabelText("Đến ngày"), {
+    target: { value: "2026-10-14" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Áp dụng" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      "/api/intelligence/history?start=2026-10-12&end=2026-10-14",
+    ),
+  );
+  expect(
+    api.mock.calls.some(([path]) => path.startsWith("/api/intelligence/tasks")),
+  ).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Theo công việc" }));
+  await screen.findByText(/Tổng thời lượng từ trước đến nay/);
+  const search = screen.getByRole("searchbox", { name: "Tìm công việc" });
+  fireEvent.change(search, { target: { value: "Báo cáo" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tìm", exact: true }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      "/api/intelligence/tasks?page=1&pageSize=20&search=B%C3%A1o%20c%C3%A1o",
+    ),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Theo ngày", exact: true }),
+  );
+  expect(screen.getByText("45 phút")).toBeTruthy();
 });

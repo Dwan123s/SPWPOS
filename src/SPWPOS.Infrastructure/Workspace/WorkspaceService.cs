@@ -127,8 +127,11 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
         var sharedTasks = await (from assignment in db.TeamTaskAssignments.AsNoTracking()
             join task in db.TeamTasks.AsNoTracking() on assignment.TeamTaskId equals task.Id
             join member in db.TeamMemberships.AsNoTracking() on task.TeamId equals member.TeamId
+            join team in db.TeamProjects.AsNoTracking() on task.TeamId equals team.Id
             where assignment.Active && assignment.UserId == userId && member.UserId == userId && member.Active
-            select new { assignment.WorkTaskId, task.Id, task.Description, task.Status }).ToDictionaryAsync(x => x.WorkTaskId, ct);
+            select new { assignment.WorkTaskId, task.Id, task.TeamId, task.Description, task.Status, team.RequireCompletionReportUrl, TeamName = team.Name,
+                SourceName = db.TeamTaskDocuments.Where(file => file.Id == task.SourceDocumentId && file.TeamId == task.TeamId)
+                    .Select(file => file.Name).FirstOrDefault() }).ToDictionaryAsync(x => x.WorkTaskId, ct);
         var profile = await db.UserProfiles.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct);
         var ns = await db.NotificationSettings.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct) ?? new();
         return new(new(user.Id, user.Email!, user.FirstName, user.LastName, profile?.DisplayName ?? (user.FirstName + " " + user.LastName), profile?.Bio ?? "", profile?.AvatarUrl ?? ""),
@@ -141,7 +144,10 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
                 IsTeamTask: t.InheritedImportance is not null, Checklist: ReadTaskChecklist(t), InheritsProjectDeadline: t.InheritsProjectDeadline,
                 TeamChecklist: sharedTasks.TryGetValue(t.Id, out var shared)
                     ? CheckedTeamRequirements(TeamRequirements(shared.Id, shared.Description), ReadTaskChecklist(t)) : null,
-                TeamStatus: shared?.Status, SourceFileName: projectSources.GetValueOrDefault(t.ParentId ?? t.Id))).ToArray(),
+                TeamStatus: shared?.Status, SourceFileName: shared is null ? projectSources.GetValueOrDefault(t.ParentId ?? t.Id) : shared.SourceName,
+                TeamReportUrlRequired: shared?.RequireCompletionReportUrl == true, TeamName: shared?.TeamName,
+                TeamId: shared?.TeamId, TeamTaskId: shared?.Id,
+                UrgencyOverride: "Auto", Eisenhower: EisenhowerPriority.Describe(t.EffectiveImportance, t.Deadline, Now))).ToArray(),
             state.Availability.Select(x => new AvailabilityInput(x.DayOfWeek, x.StartMinute, x.EndMinute)).ToArray(),
             state.Exceptions.Select(x => new ExceptionView(x.Id, x.Date, x.StartMinute, x.EndMinute, x.IsAvailable, x.Note, x.OverridesWeeklyAvailability, x.IsWeekEdit)).ToArray(),
             state.Events.Select(x => new EventView(x.Id, x.Name, x.Start, x.End, x.Description, x.EventType, IsUrgentEvent(x))).ToArray(),
@@ -165,6 +171,7 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     }, ct, false);
     private static void ValidTask(TaskInput input, bool requirePlanningDetails = true)
     {
+        ValidateEisenhowerPriority(input.ImportanceLevel);
         Require(!string.IsNullOrWhiteSpace(input.Name) && !string.IsNullOrWhiteSpace(input.TaskType), "VALIDATION_ERROR", "Nhập tên và loại công việc.");
         Require(input.EstimatedMinutes is null or (>= 1 and <= 43200) && input.Priority is >= 1 and <= 4 && input.MinimumSessionMinutes is >= 5 and <= 480,
             "VALIDATION_ERROR", "Thời lượng hoặc mức ưu tiên không hợp lệ.");
@@ -178,6 +185,9 @@ public sealed partial class WorkspaceService(ApplicationDbContext db, PlanningEn
     private static WorkTask NewTask(Guid uid, TaskInput input, DateTimeOffset now) => new()
     {
         UserId = uid, Name = input.Name.Trim(), Description = input.Description ?? "", Deadline = input.Deadline,
+        ImportanceLevel = input.ImportanceLevel ?? "Unknown", ImportanceSource = input.ImportanceLevel is "Important" or "Lower" ? "User" : "Unknown",
+        ImportanceReason = input.ImportanceLevel is "Important" or "Lower" ? "Mức quan trọng được chọn khi tạo công việc." : "",
+        ImportanceConfirmedAt = input.ImportanceLevel is "Important" or "Lower" ? now : null,
         EstimatedMinutes = input.EstimatedMinutes ?? 0, Priority = input.Priority, TaskType = NormalizeTaskType(input.TaskType), Splittable = ActivityContinuity.CanSplit(input.Name, input.TaskType, input.Splittable),
         IsHardDeadline = input.IsHardDeadline, CreationSource = input.CreationSource, InheritsProjectDeadline = input.InheritsProjectDeadline == true,
         MinimumSessionMinutes = input.MinimumSessionMinutes, CategoryId = input.CategoryId, ParentId = input.ParentId, CreatedAt = now, UpdatedAt = now

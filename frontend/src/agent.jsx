@@ -1038,7 +1038,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       title: "Bắt đầu từ thời gian biểu",
       subtitle: "Gửi lịch cố định trước, NORA phân tích sau",
       icon: "image",
-      text: "Tôi muốn gửi thời gian biểu cố định để bạn phân tích lịch bận trước, rồi cùng tôi xác nhận các giờ có thể làm việc. Không tự tạo giờ rảnh.",
+      text: "Tôi muốn gửi thời gian biểu cố định để bạn phân tích lịch bận trước, rồi cùng tôi xác nhận các giờ có thể làm việc. Không tự tạo Thời Gian Làm Việc.",
     },
     {
       title: "Xếp một cuộc họp",
@@ -1050,13 +1050,13 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
       title: "Hoàn thành trước deadline",
       subtitle: "2 giờ tập trung trước hạn chót",
       icon: "check",
-      text: "Báo cáo SWP cần làm liên tục 2 tiếng, deadline 18h ngày mai. Xếp vào giờ rảnh cho tôi.",
+      text: "Báo cáo SWP cần làm liên tục 2 tiếng, deadline 18h ngày mai. Xếp vào Thời Gian Làm Việc cho tôi.",
     },
     {
-      title: "Cập nhật giờ rảnh",
+      title: "Cập nhật Thời Gian Làm Việc",
       subtitle: "Thiết lập nhịp sinh hoạt của bạn",
       icon: "clock",
-      text: "Tôi rảnh thứ Hai đến thứ Sáu từ 19h đến 22h, riêng ngày mai bận từ 20h đến 21h.",
+      text: "Tôi Thời Gian Làm Việc thứ Hai đến thứ Sáu từ 19h đến 22h, riêng ngày mai bận từ 20h đến 21h.",
     },
     {
       title: "Tối ưu lịch",
@@ -1372,7 +1372,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
               </h2>
               <p>
                 Gửi thời gian biểu cố định của bạn trước. Mình phân tích giờ
-                bận, cùng bạn xác nhận giờ rảnh, rồi sắp xếp bài tập và việc gấp
+                bận, cùng bạn xác nhận Thời Gian Làm Việc, rồi sắp xếp bài tập và việc gấp
                 như một thư ký cá nhân.
               </p>
               <div className="agent-examples">
@@ -1477,7 +1477,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
           {capabilities && !capabilities.aiAvailable && (
             <p className="info">
               Trợ lý AI chưa được cấu hình. Bạn vẫn có thể nhập lịch ở mục Giờ
-              rảnh và Công việc.{" "}
+              Thời Gian Làm Việc và Công việc.{" "}
               <button
                 type="button"
                 className="btn small secondary"
@@ -1522,7 +1522,7 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                   ],
                   [
                     "Tìm giờ trống",
-                    "Ngày mai tôi có thể làm việc trong khoảng giờ rảnh nào? Chỉ xem giờ rảnh trong cài đặt và các mục lịch đã lưu, chưa thay đổi lịch.",
+                    "Ngày mai tôi có thể làm việc trong khoảng Thời Gian Làm Việc nào? Chỉ xem Thời Gian Làm Việc trong cài đặt và các mục lịch đã lưu, chưa thay đổi lịch.",
                   ],
                   [
                     "Tối ưu lịch",
@@ -1778,9 +1778,9 @@ export function AgentPage({ onWorkspaceChanged = async () => {} }) {
                       {capabilities.provider === "VertexAI"
                         ? "Google Cloud"
                         : capabilities.provider}{" "}
-                      và tự tính giờ rảnh từng ngày theo chế độ lưu ở trên. NORA
+                      và tự tính Thời Gian Làm Việc từng ngày theo chế độ lưu ở trên. NORA
                       giữ lịch cố định và hỏi giờ sinh hoạt còn thiếu, rồi cấu
-                      hình giờ rảnh theo thông tin bạn cung cấp. Thiếu ngày hoặc
+                      hình Thời Gian Làm Việc theo thông tin bạn cung cấp. Thiếu ngày hoặc
                       giờ theo tiết, NORA sẽ hỏi thêm.
                     </p>
                   )}

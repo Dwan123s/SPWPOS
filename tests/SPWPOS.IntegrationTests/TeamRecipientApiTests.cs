@@ -39,7 +39,10 @@ public sealed class TeamRecipientApiTests
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(named, new TeamTaskRecipientInput(), ct)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/teams/{teamId}/drafts/{openDraft}/confirm", null, ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync($"/api/teams/tasks/{singleId}/preview", null, ct)).StatusCode);
-        using var report = await client.GetAsync($"/api/teams/{teamId}/workload", ct);
+        var now = factory.Clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7));
+        var fromMonday = ((int)now.DayOfWeek + 6) % 7;
+        var deadlineWeek = (fromMonday + 2) / 7;
+        using var report = await client.GetAsync($"/api/teams/{teamId}/workload?week={deadlineWeek}", ct);
         Assert.Equal(HttpStatusCode.OK, report.StatusCode);
         var json = await report.Content.ReadAsStringAsync(ct);
         Assert.Contains("designatedUserId", json);

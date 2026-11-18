@@ -3,6 +3,7 @@ import { SessionTimer } from "./react-ui.jsx";
 import { Select, nodeList } from "./react-ui.jsx";
 import { sessionStartIssue, sessionStartOpensAt } from "./session-start.jsx";
 import { CalendarClock, CalendarTimeTag, calendarPhase } from "./calendar-time.jsx";
+import { teamSessionFocus } from "./calendar-team-focus.js";
 import { askNora, secretaryMode } from "./agent-handoff.js";
 import {
   state,
@@ -19,6 +20,7 @@ import {
   toast,
   field,
   modal,
+  closeModal,
   minutes,
   timeValue,
 } from "./ui.jsx";
@@ -79,6 +81,7 @@ export function sessionDetail(id) {
   const s = sessionById(id);
   if (!s) return;
   const task = state.workspace.tasks.find((item) => item.id === s.taskId);
+  const focus = task && teamSessionFocus(state.workspace.sessions, [task]).get(s.id);
   const canSplit = task?.splittable === true && !task.requiresContinuousSession;
   const duration = Math.round((Date.parse(s.end) - Date.parse(s.start)) / 60000);
   const minimumSplit = Math.max(task?.minimumSessionMinutes ?? 25, state.workspace.preference?.minimumSessionMinutes ?? 25);
@@ -86,11 +89,23 @@ export function sessionDetail(id) {
     .flatMap((entry) => [Date.parse(entry.start), Date.parse(entry.end)])];
   modal(
     s.taskName,
-    "Phiên làm việc",
+    focus ? `${focus.label} · Công việc nhóm` : "Phiên làm việc",
     <>
       <CalendarClock boundaries={boundaries}>
         {(now) => <SessionSummary session={s} task={task} duration={duration} now={now} />}
       </CalendarClock>
+      {focus?.items.length > 0 && (
+        <section className="calendar-session-focus" aria-label="Gợi ý cho phiên này">
+          <h3>Gợi ý cho phiên này</h3>
+          <ul>
+            {focus.items.map((item) => (
+              <li key={item.id}>
+                {item.text}{item.completed && <span>Đã hoàn thành</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {s.status === "Scheduled" && !secretaryMode() ? (
         <>
           <form data-form="session-edit" data-id={id}>
@@ -219,15 +234,16 @@ export function eventDetail(id) {
   </>);
 }
 export function eventModal(event = {}, { manual = true } = {}) {
-  const start = event.start || new Date(Date.now() + 3600000).toISOString(),
-    end = event.end || new Date(Date.now() + 7200000).toISOString();
+  const quarterHour = 15 * 60000;
+  const start = event.start || new Date(Math.ceil((Date.now() + 1) / quarterHour) * quarterHour).toISOString();
+  const end = event.end || new Date(Date.parse(start) + 3600000).toISOString();
   if (!event.id && Date.parse(start) <= Date.now()) {
     toast("Không thể tạo lịch trong quá khứ. Hãy chọn khoảng giờ sắp tới.", "error");
     return;
   }
   modal(
     event.id ? "Chỉnh sửa Lịch Trình" : "Thêm Lịch Trình",
-    event.id ? "Thay đổi áp dụng cho lần xuất hiện này." : "Giữ khung giờ này cho lịch học, ca làm hoặc cuộc hẹn. Planora sẽ xếp công việc quanh giờ bận.",
+    event.id ? "Thay đổi áp dụng cho lần xuất hiện này." : "Chặn một khoảng giờ bận trên lịch.",
     <BusyEventForm event={event} start={start} end={end} manual={manual} />,
   );
 }
@@ -235,11 +251,30 @@ export function eventModal(event = {}, { manual = true } = {}) {
 function BusyEventForm({ event, start, end, manual }) {
   const [repeat, setRepeat] = useState(event.repeatWeeks > 1);
   const [range, setRange] = useState({ start: localInput(start), end: localInput(end) });
-  let duration = 0;
+  const [lockedDuration, setLockedDuration] = useState(() => event.id ? null : Math.round((Date.parse(end) - Date.parse(start)) / 60000));
+  const timeHintId = useId();
+  let startTime = null;
+  let duration = null;
+  let timeError = "";
   try {
-    duration = Math.round((Date.parse(toUtc(range.end)) - Date.parse(toUtc(range.start))) / 60000);
-  } catch {
-    // A partially entered time has no duration yet.
+    if (range.start) startTime = Date.parse(toUtc(range.start));
+    if (startTime !== null && range.end) {
+      duration = (Date.parse(toUtc(range.end)) - startTime) / 60000;
+      if (duration <= 0) timeError = "Giờ kết thúc phải sau giờ bắt đầu.";
+    }
+  } catch (error) {
+    timeError = error.message;
+  }
+  function changeStart(next) {
+    let nextEnd = range.end;
+    if (lockedDuration > 0 && next) {
+      try {
+        nextEnd = localInput(Date.parse(toUtc(next)) + lockedDuration * 60000);
+      } catch {
+        // Keep the end time while the start time is incomplete or invalid.
+      }
+    }
+    setRange({ start: next, end: nextEnd });
   }
   function handoff(form) {
     const data = new FormData(form);
@@ -264,20 +299,29 @@ function BusyEventForm({ event, start, end, manual }) {
     <form className="busy-event-form" data-form="event" data-id={event.id || ""}>
       {field("Tên Lịch Trình", "name", "text", event.name || "",
         { required: true, maxLength: 200, autoFocus: manual, placeholder: "Ví dụ: Ca làm chiều" })}
-      <div className="form-grid">
-        <label className="field">
-          Bắt đầu
-          <input type="datetime-local" name="start" required value={range.start}
-            min={event.id ? undefined : localInput(Math.ceil((Date.now() + 1) / 60000) * 60000)}
-            onChange={(e) => setRange({ ...range, start: e.target.value })} />
-        </label>
-        <label className="field">
-          Kết thúc
-          <input type="datetime-local" name="end" required value={range.end}
-            onChange={(e) => setRange({ ...range, end: e.target.value })} />
-        </label>
-      </div>
-      {duration > 0 && <p className="busy-event-hint">Thời lượng {minutes(duration, "long")}</p>}
+      <fieldset className="busy-event-time">
+        <legend>Thời gian</legend>
+        <div className="form-grid">
+          <label className="field">
+            Bắt đầu
+            <input type="datetime-local" name="start" required value={range.start}
+              min={event.id ? undefined : localInput(Math.ceil((Date.now() + 1) / 60000) * 60000)}
+              aria-describedby={timeError && startTime === null ? timeHintId : undefined}
+              onChange={(e) => changeStart(e.target.value)} />
+          </label>
+          <label className="field">
+            Kết thúc
+            <input type="datetime-local" name="end" required value={range.end}
+              aria-invalid={Boolean(timeError && startTime !== null)}
+              aria-describedby={timeError && startTime !== null ? timeHintId : undefined}
+              onChange={(e) => {
+                setLockedDuration(null);
+                setRange({ ...range, end: e.target.value });
+              }} />
+          </label>
+        </div>
+        {timeError && <p id={timeHintId} className="busy-event-time-error" role="alert">{timeError}</p>}
+      </fieldset>
       <div className="form-grid">
         <label className="field">
           Loại lịch
@@ -304,7 +348,7 @@ function BusyEventForm({ event, start, end, manual }) {
       )}
       <label className="field">
         Ghi chú (tùy chọn)
-        <textarea name="description" maxLength={1000} rows={3} defaultValue={event.description || ""} />
+        <textarea name="description" maxLength={1000} rows={2} defaultValue={event.description || ""} />
       </label>
       <label className="busy-event-urgent">
         <input type="checkbox" name="isUrgent" defaultChecked={Boolean(event.isUrgent)} aria-describedby="busy-event-urgent-hint" />
@@ -315,20 +359,21 @@ function BusyEventForm({ event, start, end, manual }) {
       <div className="form-actions">
         {event.id && button("Xóa lịch", "delete-event", "danger", event.id, "trash")}
         {state.noraAvailable && !event.id && <button type="button" className="btn ghost" onClick={(e) => handoff(e.currentTarget.form)}>Nhờ NORA</button>}
-        <button type="submit" className="btn primary">Lưu Lịch Trình</button>
+        {button("Hủy", "close-modal", "secondary")}
+        <button type="submit" className="btn primary" disabled={Boolean(timeError)}>Lưu Lịch Trình</button>
       </div>
     </form>
   );
 }
 export function exceptionModal(e = {}) {
   if (secretaryMode()) {
-    askNora(e.id ? `Tôi muốn điều chỉnh khoảng ${e.isAvailable ? "rảnh" : "bận"} ngày ${e.date} (mã ${e.id}). Hỏi tôi thay đổi cần thực hiện.`
+    askNora(e.id ? `Tôi muốn điều chỉnh khoảng ${e.isAvailable ? "Thời Gian Làm Việc" : "bận"} ngày ${e.date} (mã ${e.id}). Hỏi tôi thay đổi cần thực hiện.`
       : "Tôi muốn cập nhật giờ bận hoặc giờ có thể làm việc. Hỏi tôi thông tin còn thiếu rồi cấu hình quanh thời gian biểu.");
     return;
   }
   modal(
     e.id ? "Sửa ngoại lệ" : "Thêm ngoại lệ thời gian",
-    "Điều chỉnh một ngày riêng, bổ sung thời gian rảnh hoặc đánh dấu bận.",
+    "Điều chỉnh một ngày riêng, bổ sung Thời Gian Làm Việc hoặc đánh dấu bận.",
     <form data-form="exception" data-id={e.id || ""}>
       <div className="form-grid">
         {field(
@@ -346,8 +391,8 @@ export function exceptionModal(e = {}) {
             </option>
             <option value="true" selected={e.isAvailable}>
               {e.overridesWeeklyAvailability
-                ? "Giờ rảnh duy nhất trong ngày"
-                : "Rảnh thêm"}
+                ? "Thời Gian Làm Việc duy nhất trong ngày"
+                : "Thời Gian Làm Việc thêm"}
             </option>
           </Select>
         </label>
@@ -379,8 +424,9 @@ export function exceptionModal(e = {}) {
     </form>,
   );
 }
-export function planModal(plan, simulation = false) {
+export function planModal(plan, simulation = false, { calendarDay } = {}) {
   state.plan = plan;
+  state.planCalendarDay = calendarDay;
   const blocked = plan.strict && plan.warnings.some((w) => w.unscheduledMinutes > 0 || ["SOFT_DEADLINE_EXCEEDED", "DEADLINE_CONFLICT"].includes(w.code));
   const confirmMove = plan.hasUrgentReplan && !plan.isApplied && !blocked;
   const movedTaskIds = new Set(
@@ -479,7 +525,7 @@ export function planModal(plan, simulation = false) {
       </div>
       {!plan.sessions.length ? (
         <div className="info spaced">
-          Chưa có phiên phù hợp. Kiểm tra thời gian rảnh, deadline và thời lượng
+          Chưa có phiên phù hợp. Kiểm tra Thời Gian Làm Việc, deadline và thời lượng
           công việc.
         </div>
       ) : (
@@ -503,9 +549,16 @@ export function planModal(plan, simulation = false) {
         {!simulation && !blocked && !plan.isApplied && plan.status !== "DISCARDED"
           ? button(confirmMove ? "Xác nhận dời lịch" : plan.hasDeadlineProtection ? "Xác nhận kế hoạch" : "Lưu lịch này", "apply-plan", "primary", plan.id, "check")
           : ""}
-        {!simulation && plan.isApplied
-          ? button("Mở Hôm nay để làm việc", "nav", "primary", "today", "play")
-          : ""}
+        {!simulation && plan.isApplied && (
+          calendarDay ? (
+            <a className="btn primary" href="#calendar" onClick={() => {
+              state.calendarStart = calendarDay;
+              closeModal();
+            }}>
+              {icon("calendar")} Mở lịch
+            </a>
+          ) : button("Mở Hôm nay để làm việc", "nav", "primary", "today", "play")
+        )}
       </div>
     </>,
   );

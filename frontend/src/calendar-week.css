@@ -125,10 +125,6 @@
 .calendar-positioned-item.is-dragging {
   opacity: 0.35;
 }
-.calendar-positioned-item.is-short .block-meta,
-.calendar-positioned-item.is-short .calendar-time-tag {
-  display: none !important;
-}
 .calendar-positioned-item.is-short > .calendar-block {
   padding-top: 2px;
   padding-bottom: 2px;

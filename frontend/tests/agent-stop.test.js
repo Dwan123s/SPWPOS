@@ -8,7 +8,7 @@ it.each(["AGENT_BUDGET_EXCEEDED", "TOOL_BUDGET_EXCEEDED", "AGENT_TIME_LIMIT"])(
     expect(isAgentProcessingStop(turn)).toBe(true);
     expect(agentBlockedHint(turn)).toContain("Tiếp tục xử lý");
     expect(agentBlockedHint(turn)).not.toMatch(
-      /thêm giờ rảnh|deadline|Giờ rảnh/,
+      /thêm Thời Gian Làm Việc|deadline|Thời Gian Làm Việc/,
     );
   },
 );

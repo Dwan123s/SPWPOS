@@ -48,7 +48,7 @@ function chatDay(at) {
     ? "Hôm qua"
     : dateFmt(at, { year: "numeric" });
 }
-export function TeamChat({ teamId, name }) {
+export function TeamChat({ teamId, name, active = true }) {
   const myPet = usePetAppearance();
   const [messages, setMessages] = useState([]),
     [text, setText] = useState("");
@@ -105,6 +105,11 @@ export function TeamChat({ teamId, name }) {
   }
   useEffect(() => {
     alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
     let fetching = false;
     async function refresh() {
       if (fetching || document.hidden) return;
@@ -117,7 +122,7 @@ export function TeamChat({ teamId, name }) {
           const data = await api(
             `/api/teams/${teamId}/messages${initial ? "" : `?after=${cursor.current}`}`,
           );
-          if (!alive.current) return;
+          if (!live) return;
           const items = data.items || [];
           rememberAuthors(data);
           setMessages((prev) => mergeMessages(prev, items));
@@ -128,12 +133,12 @@ export function TeamChat({ teamId, name }) {
           cursor.current = data.nextAfter ?? cursor.current ?? 0;
           hasMore = !initial && data.hasMore && items.length > 0;
         } while (hasMore && ++pages < 3);
-        if (alive.current) setError("");
+        if (live) setError("");
       } catch (e) {
-        if (alive.current) setError(e.message);
+        if (live) setError(e.message);
       } finally {
         fetching = false;
-        if (alive.current) setLoading(false);
+        if (live) setLoading(false);
       }
     }
     refresh();
@@ -143,11 +148,11 @@ export function TeamChat({ teamId, name }) {
     };
     document.addEventListener("visibilitychange", visible);
     return () => {
-      alive.current = false;
+      live = false;
       clearInterval(timer);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [teamId]);
+  }, [teamId, active]);
   useLayoutEffect(() => {
     if (follow.current && list.current)
       list.current.scrollTop = list.current.scrollHeight;

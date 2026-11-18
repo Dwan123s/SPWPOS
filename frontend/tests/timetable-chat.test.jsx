@@ -184,7 +184,7 @@ it("submits two timetables together in one planning request without an OCR call"
   await screen.findByAltText("Ảnh thời khóa biểu đã chọn 2");
   expect(sent).toHaveLength(0);
   fireEvent.change(screen.getByLabelText("Yêu cầu của bạn"), {
-    target: { value: "Gộp cả hai lịch trong tuần tới và tìm giờ rảnh" },
+    target: { value: "Gộp cả hai lịch trong tuần tới và tìm Thời Gian Làm Việc" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu" }));
   await waitFor(() => expect(sent).toHaveLength(1));

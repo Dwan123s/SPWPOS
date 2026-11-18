@@ -77,7 +77,7 @@ it("switches from the existing list to a bounded matrix without requesting AI or
   );
   render(tasksPage());
   fireEvent.click(
-    screen.getByRole("button", { name: "Eisenhower", exact: true }),
+    screen.getByRole("button", { name: "Ma trận ưu tiên", exact: true }),
   );
   const matrix = await screen.findByRole("region", {
     name: "Ma trận Eisenhower",

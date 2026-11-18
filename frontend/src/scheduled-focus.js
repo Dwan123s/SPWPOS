@@ -1,3 +1,4 @@
+import { eisenhowerPriority } from "./eisenhower-priority.js";
 const eligible = new Set(["Scheduled", "Running", "Paused"]);
 export function focusEntries(workspace, now = Date.now()) {
   const tasks = new Map((workspace.tasks || []).map((task) => [task.id, task]));
@@ -24,7 +25,7 @@ export function focusEntries(workspace, now = Date.now()) {
           session.taskName ||
           tasks.get(session.taskId)?.name ||
           "Phiên làm việc",
-        urgent: tasks.get(session.taskId)?.priority === 4,
+        urgent: eisenhowerPriority(tasks.get(session.taskId), now).urgency === "Urgent",
       })),
   ].filter(
     (item) =>

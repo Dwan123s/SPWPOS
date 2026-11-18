@@ -43,7 +43,7 @@ export function TeamRecipientSelect({
   );
 }
 
-export function TeamRecipientEditor({ task, members, busy, onSave }) {
+export function TeamRecipientEditor({ task, members, busy, onSave, onRequestAvailability }) {
   const [value, setValue] = useState(task.designatedUserId || "");
   return (
     <section
@@ -64,6 +64,15 @@ export function TeamRecipientEditor({ task, members, busy, onSave }) {
       >
         Lưu người nhận
       </button>
+      {onRequestAvailability && (
+        <button type="button" className="btn secondary"
+          disabled={busy || !value || (task.designatedUserId && value !== task.designatedUserId) ||
+            (task.availabilityCheck?.userId === value && task.availabilityCheck.canTake == null) ||
+            Date.parse(task.deadline) <= Date.now()}
+          onClick={() => onRequestAvailability(task, value)}>
+          Yêu cầu kiểm tra lịch
+        </button>
+      )}
     </section>
   );
 }

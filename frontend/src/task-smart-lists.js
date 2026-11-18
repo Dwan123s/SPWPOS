@@ -1,11 +1,7 @@
+import { eisenhowerPriority } from "./eisenhower-priority.js";
 const plannedStatuses = new Set(["Scheduled", "Running", "Paused"]);
 export const activeTask = (task) =>
   !["Completed", "Cancelled"].includes(task.status);
-export const isInboxNote = (note) =>
-  note.analysisImported === false ||
-  (note.analysisImported == null &&
-    !note.createdTaskIds?.length &&
-    !note.planId);
 export function addCalendarDays(day, amount) {
   const date = new Date(`${day}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + amount);
@@ -103,7 +99,7 @@ export function smartTaskLists(workspace, now = Date.now()) {
     (todayStarts.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
     (todayStarts.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
     (Date.parse(a.deadline) || Number.MAX_SAFE_INTEGER) - (Date.parse(b.deadline) || Number.MAX_SAFE_INTEGER) ||
-    b.priority - a.priority,
+    eisenhowerPriority(a, now).rank - eisenhowerPriority(b, now).rank,
   );
   const todayCompleted = tasks.filter((task) =>
     task.status === "Completed" && !projectIds.has(task.id) && dayOf(task.completedAt) === today,
@@ -125,7 +121,7 @@ export function smartTaskLists(workspace, now = Date.now()) {
         tasks: items.sort(
           (a, b) =>
             (Date.parse(a.deadline) || 0) - (Date.parse(b.deadline) || 0) ||
-            b.priority - a.priority,
+            eisenhowerPriority(a, now).rank - eisenhowerPriority(b, now).rank,
         ),
       }));
   }

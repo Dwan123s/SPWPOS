@@ -4,6 +4,7 @@
 .idea/
 TestResults/
 artifacts/
+/logs/
 src/SPWPOS.Api/logs/
 **/node_modules/
 frontend/dist/

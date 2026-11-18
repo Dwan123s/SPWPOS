@@ -169,6 +169,7 @@ export function EisenhowerMatrix() {
   const { view, error, retry } = useEisenhower();
   return (
     <EisenhowerBoard
+      sharedTaskDetail
       view={view}
       error={error}
       retry={retry}

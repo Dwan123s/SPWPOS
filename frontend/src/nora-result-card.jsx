@@ -31,7 +31,7 @@ export function NoraResultCard({
   const explanation =
     /^(?:(?:tôi|mình)\s+)?(?:đã|vừa)\s+(?:lên lịch|xếp|thêm|lưu|cập nhật)/i.test(
       reply,
-    ) && !/(?:vì |để |ưu tiên|tuy nhiên|lưu ý|phân tích|giờ rảnh)/i.test(reply)
+    ) && !/(?:vì |để |ưu tiên|tuy nhiên|lưu ý|phân tích|giờ rảnh|thời gian làm việc)/i.test(reply)
       ? ""
       : reply;
   return (

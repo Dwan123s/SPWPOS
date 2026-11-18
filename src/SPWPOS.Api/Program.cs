@@ -36,6 +36,8 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddHttpsRedirection(o => o.HttpsPort = 7043);
 builder.Services.AddHsts(o => { o.MaxAge = TimeSpan.FromDays(365); o.IncludeSubDomains = true; });
 var trustedProxies = builder.Configuration.GetSection("Security:TrustedProxyAddresses").Get<string[]>() ?? [];
+var cloudRunDirectIngress = builder.Configuration.GetValue<bool>("Security:CloudRunDirectIngress")
+    && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("K_SERVICE"));
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -272,7 +274,19 @@ app.UseStatusCodePages(async context =>
     await ApiProblems.WriteAsync(context.HttpContext, status, status == 404 ? "NOT_FOUND" : "REQUEST_REJECTED",
         status == 404 ? "Resource not found." : "The request could not be processed.", context.HttpContext.RequestAborted);
 });
-if (trustedProxies.Length > 0) app.UseForwardedHeaders();
+if (cloudRunDirectIngress)
+{
+    // Cloud Run's managed ingress redirects HTTP and terminates TLS before forwarding.
+    app.Use((context, next) =>
+    {
+        context.Request.Scheme = Uri.UriSchemeHttps;
+        return next(context);
+    });
+}
+else if (trustedProxies.Length > 0)
+{
+    app.UseForwardedHeaders();
+}
 app.Use(async (context, next) =>
 {
     context.Response.Headers.XContentTypeOptions = "nosniff";

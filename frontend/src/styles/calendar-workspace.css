@@ -63,27 +63,33 @@
   min-width: 0;
   gap: 4px;
   margin: 0;
-  padding: 9px 8px;
+  padding: 7px 9px;
 }
 .calendar-workspace .calendar-block.calendar-timed-card strong {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 12px;
+  line-height: 1.4;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .calendar-workspace .calendar-block .block-time {
   font-size: 10px;
 }
-.calendar-workspace .calendar-block .calendar-time-tag {
-  padding: 2px 6px;
-  font-size: 9px;
+.calendar-card-indicator {
+  width: 7px;
+  height: 7px;
+  margin-inline-start: auto;
+  flex: 0 0 7px;
+  border-radius: 50%;
 }
-.calendar-workspace .calendar-block .block-meta {
-  margin-top: 1px;
-  font-size: 9px;
+.calendar-card-indicator.active {
+  background: #168451;
+}
+.calendar-card-indicator.review {
+  background: #a85d0b;
 }
 .calendar-workspace .agenda-week {
   padding: 0 16px;
@@ -113,8 +119,7 @@
 }
 .calendar-workspace .calendar-agenda-entry {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) auto;
-  grid-template-areas: "time title phase" "time meta phase";
+  grid-template-columns: 120px minmax(0, 1fr);
   align-items: center;
   gap: 6px 12px;
   min-width: 0;
@@ -122,20 +127,8 @@
   padding: 12px;
 }
 .calendar-workspace .calendar-agenda-entry .block-time {
-  grid-area: time;
   justify-content: flex-start;
   font-size: 11px;
-}
-.calendar-workspace .calendar-agenda-entry > strong {
-  grid-area: title;
-}
-.calendar-workspace .calendar-agenda-entry .block-meta {
-  grid-area: meta;
-}
-.calendar-workspace .calendar-agenda-entry .calendar-time-tag {
-  grid-area: phase;
-  align-self: center;
-  justify-self: end;
 }
 .calendar-workspace .calendar-hint {
   font-size: 10px;
@@ -191,8 +184,7 @@
     font-size: 9px;
   }
   .calendar-workspace .calendar-agenda-entry {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "time phase" "title title" "meta meta";
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     padding: 10px;
   }

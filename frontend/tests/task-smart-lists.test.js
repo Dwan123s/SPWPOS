@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { smartTaskLists, isInboxNote } from "../src/task-smart-lists.js";
+import { smartTaskLists } from "../src/task-smart-lists.js";
 const task = (id, deadline, status = "Todo") => ({
   id,
   deadline,
@@ -100,20 +100,6 @@ it("treats midnight as the end of the previous day and ignores cancelled session
     ),
   ).toEqual([]);
 });
-it("keeps ideas and unfinished drafts in Inbox and hides imported drafts until content is edited again", () => {
-  expect(isInboxNote({ createdTaskIds: [], analysis: null })).toBe(true);
-  expect(
-    isInboxNote({ analysisImported: true, createdTaskIds: ["task"] }),
-  ).toBe(false);
-  expect(
-    isInboxNote({
-      analysisImported: false,
-      createdTaskIds: ["task"],
-      hasProcessedContent: true,
-    }),
-  ).toBe(true);
-});
-
 it("includes undated leaf tasks in the Today pane without inventing dates or calendar sessions", () => {
   const now = Date.parse("2026-11-04T01:00:00Z");
   const workspace = {

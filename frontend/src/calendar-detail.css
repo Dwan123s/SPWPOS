@@ -52,6 +52,36 @@
   margin: 0;
 }
 
+.calendar-session-focus {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--ui-line, #dbe5ef);
+  border-radius: 10px;
+}
+
+.calendar-session-focus h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.calendar-session-focus ul {
+  margin: 8px 0 0;
+  padding-inline-start: 18px;
+  list-style: disc;
+  overflow-wrap: anywhere;
+}
+
+.calendar-session-focus li + li {
+  margin-top: 6px;
+}
+
+.calendar-session-focus li span {
+  margin-inline-start: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .calendar-detail-footer {
   padding-top: 12px;
   border-top: 1px solid var(--ui-line, #dbe5ef);

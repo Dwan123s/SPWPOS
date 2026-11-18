@@ -5,7 +5,7 @@
 **Trạng thái:** Bộ kiểm thử đề xuất; chưa chạy các prompt này với model thật.
 
 **Phạm vi:** NORA chat và công cụ lập lịch hiện tại: 64 ca độc lập, 6 chuỗi hội thoại, 12 ca vòng đời/lỗi cần thao tác hoặc test harness, 4 ca giọng nói tùy chọn. Tổng cộng **86 kịch bản**; các chuỗi có nhiều lượt gửi.
-**Tham chiếu:** [Hướng dẫn NORA](../features/PLANNING_AGENT_GUIDE.md), [báo cáo T01–T12 gốc](NORA_REQUEST_RESPONSE_QUALITY_REPORT_2026-10-18.md), `AgentContracts.cs`, `AgentInterpreter.cs`, `AgentService.cs`, `AgentContext.cs`.
+**Tham chiếu:** [Hướng dẫn kiểm thử NORA](../development/NORA_SANDBOX.md), `AgentContracts.cs`, `AgentInterpreter.cs`, `AgentService.cs`, `AgentContext.cs`.
 
 Bộ này mở rộng phạm vi đánh giá, không phải danh sách mọi câu người dùng có thể nói. “Khả năng suy xét khi lập lịch” được đánh giá qua ràng buộc được giữ, phương án có khả thi không, lựa chọn có căn cứ và giải thích có đúng dữ liệu không. Không yêu cầu model xuất suy luận nội bộ hay chain-of-thought.
 

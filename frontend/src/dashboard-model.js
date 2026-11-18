@@ -1,3 +1,4 @@
+import { eisenhowerPriority } from "./eisenhower-priority.js";
 const excludedSessions = new Set(["Skipped", "Missed", "Cancelled"]);
 function dayKey(value, zone) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -302,7 +303,7 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
   );
   const queue = [...tasks].sort(
     (a, b) =>
-      b.priority - a.priority || new Date(a.deadline) - new Date(b.deadline),
+      eisenhowerPriority(a, now).rank - eisenhowerPriority(b, now).rank || new Date(a.deadline) - new Date(b.deadline),
   );
   const ratio = insights?.biases?.find((bias) => bias.taskType === "All");
   const accuracy =
@@ -322,6 +323,7 @@ export function dashboardModel(workspace, insights, now = Date.now()) {
     scheduledMinutes: Math.max(0, days[0].planned - focusMinutes),
     restMinutes: breaks.length * breakMinutes,
     breaks,
+    minuteNow,
     timeline,
     queue,
     due,

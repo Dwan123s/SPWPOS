@@ -59,7 +59,7 @@ public sealed partial class WorkspaceService
         Require(proposal.Status == "PROPOSED" && !proposal.IsApplied && proposal.ExpiresAt > Now, "PLAN_EXPIRED", "Đề xuất hết hạn. Xem trước lại để tiếp tục.", 409);
         Require(proposal.Revision == state.Preference.Revision, "PLAN_STALE", "Lịch đã thay đổi. Xem trước lại để kiểm tra xung đột.", 409);
         Require(!plan.Warnings.Any(x => x.UnscheduledMinutes > 0 || x.Code == "SOFT_DEADLINE_EXCEEDED"),
-            "NOTE_PLAN_INCOMPLETE", "Chưa xếp đủ các hoạt động. Chỉnh thời lượng, giờ rảnh hoặc hạn chót rồi xem trước lại.", 409);
+            "NOTE_PLAN_INCOMPLETE", "Chưa xếp đủ các hoạt động. Chỉnh thời lượng, Thời Gian Làm Việc hoặc hạn chót rồi xem trước lại.", 409);
         var tasks = await NoteTasks(uid, context.Activities, state, ct);
         ApplyMatrixDraftClassification(note, tasks);
         Require(tasks.Length == context.TaskIds.Length, "PLAN_STALE", "Đề xuất không còn hợp lệ.", 409);
@@ -135,9 +135,9 @@ public sealed partial class WorkspaceService
             if (state.Exceptions.Where(x => !x.IsAvailable).Any(x =>
                 PlanningEngine.At(x.Date, x.StartMinute, zone) < to && PlanningEngine.At(x.Date, x.EndMinute, zone) > from))
                 return warning with { Code = "NOTE_UNAVAILABLE_TIME",
-                    Message = $"Khung giờ {localStart:dd'/'MM HH:mm}–{localEnd:HH:mm} trùng thời gian đã đánh dấu không rảnh. Chọn giờ khác hoặc chỉnh thời gian không rảnh rồi xem lại lịch." };
+                    Message = $"Khung giờ {localStart:dd'/'MM HH:mm}–{localEnd:HH:mm} trùng thời gian đã đánh dấu không Thời Gian Làm Việc. Chọn giờ khác hoặc chỉnh thời gian không Thời Gian Làm Việc rồi xem lại lịch." };
             return warning with { Code = "NOTE_OUTSIDE_AVAILABILITY",
-                Message = $"Khung giờ {localStart:dd'/'MM HH:mm}–{localEnd:HH:mm} nằm ngoài giờ rảnh đã thiết lập. Cho phép dùng giờ đã chọn cho lần này hoặc chỉnh giờ rảnh rồi xem lại lịch." };
+                Message = $"Khung giờ {localStart:dd'/'MM HH:mm}–{localEnd:HH:mm} nằm ngoài Thời Gian Làm Việc đã thiết lập. Cho phép dùng giờ đã chọn cho lần này hoặc chỉnh Thời Gian Làm Việc rồi xem lại lịch." };
         }).ToArray()
     };
 
@@ -162,7 +162,7 @@ public sealed partial class WorkspaceService
             Require(await db.TaskTypes.AnyAsync(x => x.Code == type && x.IsActive, ct), "INVALID_TASK_TYPE", $"Loại công việc của “{activity.Name}” không hợp lệ. Chọn lại loại công việc rồi xem lịch.");
             var input = new TaskInput(activity.Name, activity.Description, deadline, activity.EstimatedMinutes!.Value,
                 activity.Priority, activity.Type, activity.Splittable && activity.Start is null, Math.Max(5, Math.Min(state.Preference.MinimumSessionMinutes, activity.EstimatedMinutes.Value)),
-                IsHardDeadline: activity.IsHardDeadline, CreationSource: "NATURAL_LANGUAGE");
+                IsHardDeadline: activity.IsHardDeadline, CreationSource: "NATURAL_LANGUAGE", ImportanceLevel: activity.ImportanceLevel);
             ValidTask(input);
             var task = NewTask(uid, input, Now);
             task.WorkWindowStart = activity.Start; task.WorkWindowEnd = end;

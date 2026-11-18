@@ -6,9 +6,8 @@ export function payOsReturnParameter(value) {
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password) return null;
-    // The SDK interpolates this value without escaping it. Preserve all query
-    // parameters/fragments so payOS receives the exact server-signed return URL.
-    return encodeURIComponent(url.href);
+    // The SDK encodes RETURN_URL when constructing the iframe URL.
+    return url.href;
   } catch {
     return null;
   }

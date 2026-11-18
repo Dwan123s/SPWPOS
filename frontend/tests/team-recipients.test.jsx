@@ -30,16 +30,19 @@ const task = {
 };
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-01T00:00:00Z"));
   state.workspace = workspace();
 });
 
-it("only the designated person sees claim actions and the task appears in their personal and available filters", () => {
+it("shows a designated task in the recipient's personal list and excludes it from shared work", () => {
   const detail = {
     team: { id: "team", role: "Member" },
     members,
     tasks: [{ ...task, designatedUserId: "other" }],
   };
-  const { rerender } = render(<TaskBoard detail={detail} uid="me" />);
+  const onClaim = vi.fn();
+  const { rerender } = render(<TaskBoard detail={detail} uid="me" onClaim={onClaim} />);
+  fireEvent.click(screen.getByRole("button", { name: "Cả nhóm", exact: true }));
   expect(
     screen.queryByRole("button", { name: "Xem lịch trước khi nhận" }),
   ).toBeNull();
@@ -54,11 +57,12 @@ it("only the designated person sees claim actions and the task appears in their 
   fireEvent.click(within(popup).getByRole("button", { name: "Đóng" }));
   fireEvent.click(screen.getByRole("button", { name: "Có thể nhận" }));
   expect(screen.queryByRole("article")).toBeNull();
-  rerender(<TaskBoard detail={detail} uid="other" />);
+  rerender(<TaskBoard detail={detail} uid="other" onClaim={onClaim} />);
+  expect(screen.queryByRole("article")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Việc của tôi" }));
   expect(
     screen.getByRole("button", { name: "Xem lịch trước khi nhận" }),
   ).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Việc của tôi" }));
   expect(screen.getByRole("article", { name: task.name })).toBeTruthy();
 });
 
@@ -72,6 +76,7 @@ it("lets a leader release an unclaimed task from its popup while keeping the cur
       onRecipientChange={onRecipientChange}
     />,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Cả nhóm" }));
   fireEvent.click(screen.getByRole("button", { name: task.name }));
   const popup = screen.getByRole("dialog");
   fireEvent.change(within(popup).getByRole("combobox"), {
@@ -117,6 +122,44 @@ it("sends a named recipient only after confirming a single AI task draft", async
     ),
   );
   expect(api.mock.calls.some(([url]) => url.includes("/preview"))).toBe(false);
+});
+
+it("opens manual entry separately and previews the chosen time and deadline before assigning", async () => {
+  const team = { id: "team", name: "Nhóm nhập thủ công", role: "Leader" };
+  api.mockImplementation(async (url, _method, body) => {
+    if (url === "/api/teams") return [team];
+    if (url === "/api/teams/team") return { team, members, tasks: [], activity: [] };
+    if (url === "/api/teams/team/drafts/manual")
+      return { proposalId: "manual-draft", task: { ...task, ...body }, question: "" };
+    return {};
+  });
+  render(<TeamsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: team.name }));
+  fireEvent.click(await screen.findByRole("button", { name: "Đăng việc mới" }));
+  fireEvent.click(screen.getByRole("button", { name: "Nhập thủ công" }));
+  expect(screen.queryByRole("button", { name: "NORA soạn bản nháp" })).toBeNull();
+  const form = within(screen.getByRole("form", { name: "Nhập công việc thủ công" }));
+  fireEvent.change(form.getByLabelText("Tên công việc"), { target: { value: "  Kiểm tra báo cáo  " } });
+  fireEvent.click(form.getByRole("button", { name: "1 giờ" }));
+  expect(form.getByRole("spinbutton", { name: "Thời lượng (phút)" }).value).toBe("60");
+  fireEvent.change(form.getByLabelText("Ngày", { exact: true }), { target: { value: "2027-01-10" } });
+  fireEvent.change(form.getByLabelText("Giờ", { exact: true }), { target: { value: "19:30" } });
+  fireEvent.click(form.getByRole("button", { name: "Thêm mục checklist" }));
+  fireEvent.change(form.getByRole("textbox", { name: "Nội dung checklist 1" }), { target: { value: "Soát số liệu" } });
+
+  fireEvent.click(screen.getByRole("button", { name: "Dùng NORA" }));
+  fireEvent.click(screen.getByRole("button", { name: "Nhập thủ công" }));
+  fireEvent.click(form.getByRole("button", { name: "Xem bản nháp" }));
+  const preview = await screen.findByRole("region", { name: "Bản nháp công việc" });
+  expect(within(preview).getByRole("heading", { name: "Kiểm tra báo cáo" })).toBeTruthy();
+  expect(within(preview).getByRole("button", { name: "Đăng công việc cho nhóm" })).toBeTruthy();
+  expect(api).toHaveBeenCalledWith("/api/teams/team/drafts/manual", "POST", {
+    name: "Kiểm tra báo cáo", description: "YÊU CẦU CẦN THỰC HIỆN\n- Soát số liệu", estimatedMinutes: 60,
+    deadline: "2027-01-10T12:30:00.000Z", priority: 2, splittable: true, importanceLevel: "Unknown",
+  });
+  expect(api.mock.calls.some(([url]) => url.endsWith("/confirm"))).toBe(false);
+  fireEvent.change(form.getByRole("textbox", { name: "Nội dung checklist 1" }), { target: { value: "Kiểm tra lần cuối" } });
+  expect(screen.queryByRole("region", { name: "Bản nháp công việc" })).toBeNull();
 });
 
 it("can select different recipients for separate tasks from a file brief, retaining shared tasks as the default", async () => {
@@ -302,6 +345,7 @@ async function openEditableBrief({ pending = false } = {}) {
     screen.getByRole("button", { name: "NORA phân tích & chia việc" }),
   );
   await screen.findByText("01. " + first.name);
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "Chỉnh sửa gói việc" })[0].disabled).toBe(false));
   return { first, second };
 }
 it("lets the leader set a common deadline on pending packages without rerunning AI, then confirms the edited revision", async () => {
@@ -349,7 +393,7 @@ it("edits summary, requirements and duration, keeps the other package and source
   fireEvent.change(screen.getByLabelText("Việc cần thực hiện"), {
     target: { value: "• Yêu cầu đã chỉnh" },
   });
-  fireEvent.change(screen.getByLabelText("Thời lượng (phút)"), {
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Thời lượng (phút)" }), {
     target: { value: "120" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Lưu chỉnh sửa" }));

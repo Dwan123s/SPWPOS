@@ -154,7 +154,7 @@ const plan = {
   sessions: sessions.slice(1),
   warnings: [],
   explanations: [
-    "Xếp phiên trong giờ rảnh và chừa thời gian nghỉ.",
+    "Xếp phiên trong Thời Gian Làm Việc và chừa thời gian nghỉ.",
     "Giữ nguyên phiên đã khóa.",
   ],
   status: "READY",

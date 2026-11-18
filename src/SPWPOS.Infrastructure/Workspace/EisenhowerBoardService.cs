@@ -18,7 +18,7 @@ public sealed partial class WorkspaceService
     private static void SetMatrixQuadrant(WorkTask task, string quadrant, DateTimeOffset now)
     {
         Require(quadrant is "Auto" or "Q1" or "Q2" or "Q3" or "Q4", "INVALID_QUADRANT", "Chọn một trong bốn ô hoặc tự đánh giá.");
-        task.UrgencyOverride = quadrant == "Auto" ? "Auto" : quadrant is "Q1" or "Q3" ? "Urgent" : "NotUrgent";
+        task.UrgencyOverride = "Auto";
         if (quadrant != "Auto") WriteImportance(task, new(quadrant is "Q1" or "Q2" ? "Important" : "Lower", "User",
             "Bạn chọn mức quan trọng trực tiếp trên ma trận.", null, true), now, "User");
     }
@@ -44,6 +44,7 @@ public sealed partial class WorkspaceService
             original?.CategoryId, original?.ParentId, original?.IsHardDeadline ?? true, original?.CreationSource ?? "MANUAL", original?.Version), ct);
         var task = db.WorkTasks.Local.Single(t => t.Id == taskId);
         SetMatrixQuadrant(task, input.Quadrant, Now);
+        SetEisenhowerPriority(task, input.ImportanceLevel);
         task.ChecklistJson = JsonSerializer.Serialize(checklist, AgentJson);
         if (original is null) task.MatrixOrder = (await Mine<WorkTask>(uid).Select(t => (long?)t.MatrixOrder).MaxAsync(ct) ?? 0) + 1024;
         task.Version = Guid.NewGuid(); task.UpdatedAt = Now;
@@ -103,6 +104,8 @@ public sealed partial class WorkspaceService
         Require(rows.Any(t => t.Id == id), "INVALID_TASK", "Chỉ di chuyển task đang cần thực hiện.", 409);
         SetMatrixQuadrant(task, input.Quadrant is "Unknown" ? "Auto" : input.Quadrant, Now);
         var destination = engine.AssessEisenhower(planning, Now).Single(t => t.Id == id).Quadrant;
+        Require(input.Quadrant is "Auto" or "Unknown" || input.Quadrant == destination, "URGENCY_FROM_DEADLINE",
+            "Độ khẩn cấp tự động theo deadline. Bạn chỉ có thể thay đổi mức quan trọng của công việc.", 409);
         var ordered = planning.Tasks.Where(t => t.Id != id && (!map.TryGetValue(t.Id, out var link) || link.Kind == "Accepted") && rows.Any(r => r.Id == t.Id && r.Quadrant == destination))
             .OrderBy(t => t.MatrixOrder).ThenBy(t => t.Deadline).ThenBy(t => t.Id).ToList();
         Require(input.BeforeId is null || ordered.Any(t => t.Id == input.BeforeId), "MATRIX_STALE", "Vị trí thả vừa thay đổi. Tải lại ma trận.", 409);

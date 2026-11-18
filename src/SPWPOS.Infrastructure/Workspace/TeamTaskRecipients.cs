@@ -32,4 +32,50 @@ public sealed partial class WorkspaceService
         task.DesignatedUserId = input.UserId; task.Version = Guid.NewGuid(); leader.MutationVersion = Guid.NewGuid();
         TeamLog(uid, task.TeamId, task.Id, "TASK_RECIPIENT_CHANGED"); await NotifyDesignatedMember(task, ct);
     }, ct, false);
+
+    private void RequireOpenAvailabilityCheck(TeamTask task, Guid version)
+    {
+        Require(task.Version == version, "TASK_STALE", "Công việc đã thay đổi. Hãy tải lại và thử lại.", 409);
+        Require(task.Status == "Open" && task.AssigneeId == null && task.Deadline > Now,
+            "TASK_UNAVAILABLE", "Chỉ kiểm tra lịch cho công việc còn hạn và chưa được nhận.", 409);
+    }
+
+    public Task RequestTeamAvailabilityAsync(Guid uid, Guid taskId, TeamAvailabilityRequestInput input, CancellationToken ct) => Mutate(uid, async () =>
+    {
+        var task = await SharedTask(uid, taskId, ct);
+        var leader = await TeamMember(uid, task.TeamId, ct, leader: true);
+        RequireOpenAvailabilityCheck(task, input.Version);
+        Require(task.DesignatedUserId == null || task.DesignatedUserId == input.UserId,
+            "TASK_DESIGNATED", "Chỉ người được chỉ định mới có thể kiểm tra lịch cho công việc này.", 409);
+        if (task.AvailabilityCheckVersion == task.Version && task.AvailabilityCheckUserId == input.UserId && task.AvailabilityCheckCanTake == null) return;
+        await ValidateDesignatedMember(task.TeamId, input.UserId, ct);
+        task.Version = Guid.NewGuid();
+        task.AvailabilityCheckVersion = task.Version;
+        task.AvailabilityCheckUserId = input.UserId;
+        task.AvailabilityCheckCanTake = null;
+        leader.MutationVersion = Guid.NewGuid();
+        await AddNotification(input.UserId, "TEAM_AVAILABILITY_REQUESTED", "Trưởng nhóm muốn bạn kiểm tra lịch",
+            $"Mở nhóm và kiểm tra lịch cho việc “{task.Name}”. Bạn có thể phản hồi trước khi nhận việc.",
+            $"team-availability:{task.Id}:{task.Version}", null, ct);
+    }, ct, false);
+
+    public Task RespondTeamAvailabilityAsync(Guid uid, Guid taskId, TeamAvailabilityResponseInput input, CancellationToken ct) => Mutate(uid, async () =>
+    {
+        var task = await SharedTask(uid, taskId, ct);
+        var member = await TeamMember(uid, task.TeamId, ct);
+        RequireOpenAvailabilityCheck(task, input.Version);
+        Require(task.AvailabilityCheckVersion == task.Version && task.AvailabilityCheckUserId == uid,
+            "TEAM_AVAILABILITY_FORBIDDEN", "Yêu cầu kiểm tra lịch này không dành cho bạn.", 403);
+        Require(task.AvailabilityCheckCanTake == null && input.CanTake.HasValue,
+            "TEAM_AVAILABILITY_CLOSED", "Yêu cầu đã có phản hồi hoặc thiếu kết quả.", 409);
+        task.Version = Guid.NewGuid();
+        task.AvailabilityCheckVersion = task.Version;
+        task.AvailabilityCheckCanTake = input.CanTake;
+        member.MutationVersion = Guid.NewGuid();
+        var response = input.CanTake == true ? "có thể nhận" : "chưa thể nhận";
+        foreach (var leader in await db.TeamMemberships.Where(x => x.TeamId == task.TeamId && x.Active && x.Role == "Leader").Select(x => x.UserId).ToArrayAsync(ct))
+            await AddNotification(leader, "TEAM_AVAILABILITY_RESPONDED", "Có phản hồi kiểm tra lịch",
+                $"Thành viên phản hồi {response} việc “{task.Name}”. Mở nhóm để xem chi tiết.",
+                $"team-availability:{task.Id}:{task.Version}", null, ct);
+    }, ct, false);
 }

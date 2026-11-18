@@ -3,6 +3,7 @@ import { dateFmt, dayKey, icon, timeFmt } from "./ui.jsx";
 import { useNotificationFeed } from "./notification-popups.jsx";
 import { previewNotificationPopup } from "./notification-feed.js";
 import { requestTeamJoinReview } from "./team-notification-link.js";
+import { openTeamTask, teamReviewTarget } from "./team-task-link.js";
 import { NotificationSoundSettings } from "./notification-sound-settings.jsx";
 
 const types = {
@@ -23,7 +24,12 @@ function notificationType(kind) {
       TEAM_TASK_COMPLETED: "team",
       TEAM_COMPLETION_REJECTED: "team",
       TEAM_TASK_DESIGNATED: "team",
+      TEAM_AVAILABILITY_REQUESTED: "team",
+      TEAM_AVAILABILITY_RESPONDED: "team",
       TEAM_JOIN_REQUEST: "team",
+      TEAM_PREMIUM_EXPIRED: "team",
+      TEAM_PREMIUM_SUSPENDED: "team",
+      TEAM_FRIEND_INVITE: "team",
       FRIEND_REQUEST: "friend",
       FRIEND_ACCEPTED: "friend",
       NORA_REMINDER: "reminder",
@@ -396,6 +402,7 @@ export function NotificationCenter({ workspace }) {
 function NotificationItem({ item, task }) {
   const type = notificationType(item.kind);
   const meta = types[type];
+  const hasReviewTarget = teamReviewTarget(item);
   const target =
     type === "friend"
       ? {
@@ -405,22 +412,26 @@ function NotificationItem({ item, task }) {
               ? "friends/incoming"
               : "friends/friends",
         }
+      : item.kind === "TEAM_FRIEND_INVITE"
+        ? { label: "Xem lời mời vào nhóm", route: "teams" }
       : item.kind === "TEAM_JOIN_REQUEST"
         ? item.joinRequestPending === false
           ? null
           : { label: "Mở nhóm để duyệt", route: "teams" }
-        : item.kind === "SESSION_REVIEW"
-          ? { label: "Phản hồi NORA", route: "today" }
+        : hasReviewTarget
+          ? { label: "Mở công việc cần duyệt", route: "teams" }
+          : item.kind === "SESSION_REVIEW"
+            ? task ? { label: "Mở công việc để ghi giờ", taskId: task.id } : { label: "Xem phiên cần ghi giờ", route: "today" }
           : type === "reminder"
             ? { label: "Mở NORA", route: "agent" }
             : item.kind === "TEAM_COMPLETION_REJECTED" && task
               ? { label: "Mở việc cần bổ sung", taskId: task.id }
             : type === "team"
               ? { label: "Mở công việc nhóm", route: "teams" }
-              : type === "session" || type === "event" || type === "schedule"
-                ? { label: "Xem lịch làm việc", route: "calendar" }
-                : task
-                  ? { label: "Xem công việc", taskId: task.id }
+              : task
+                ? { label: "Xem công việc", taskId: task.id }
+                : type === "session" || type === "event" || type === "schedule"
+                  ? { label: "Xem lịch làm việc", route: "calendar" }
                   : type === "warning"
                     ? { label: "Xem tiến độ", route: "insights" }
                     : item.taskId
@@ -487,6 +498,7 @@ function NotificationItem({ item, task }) {
                   className="notice-open"
                   data-action="task-detail"
                   data-id={target.taskId}
+                  data-session-id={item.sessionId || undefined}
                 >
                   {target.label}
                   {icon("arrow")}
@@ -496,9 +508,14 @@ function NotificationItem({ item, task }) {
                   className={`notice-open${item.kind === "TEAM_JOIN_REQUEST" ? " notice-review-open" : ""}`}
                   href={`#${target.route}`}
                   onClick={
-                    item.kind === "TEAM_JOIN_REQUEST"
+                    item.kind === "TEAM_JOIN_REQUEST" || item.kind?.startsWith("TEAM_PREMIUM_")
                       ? () => requestTeamJoinReview(item.teamId)
-                      : undefined
+                      : hasReviewTarget
+                        ? (event) => {
+                            event.preventDefault();
+                            openTeamTask(item.teamId, item.teamTaskId);
+                          }
+                        : undefined
                   }
                 >
                   {target.label}

@@ -219,7 +219,7 @@ it("opens the manual event form with the selected time even in secretary mode", 
   expect(api).not.toHaveBeenCalled();
 });
 
-it("shows duration, asks for a count only for weekly repeats, and carries the draft to NORA", () => {
+it("uses start and end times, asks for a count only for weekly repeats, and carries the draft to NORA", () => {
   state.noraAvailable = true;
   render(calendarPage());
   fireEvent.click(screen.getByRole("button", { name: "Thêm lịch ngày 2026-11-05" }));
@@ -229,7 +229,8 @@ it("shows duration, asks for a count only for weekly repeats, and carries the dr
   fireEvent.change(screen.getByLabelText("Tên Lịch Trình"), { target: { value: "Ca làm chiều" } });
   fireEvent.change(screen.getByLabelText("Loại lịch"), { target: { value: "WORK" } });
   fireEvent.change(screen.getByLabelText("Kết thúc"), { target: { value: "2026-11-05T10:30" } });
-  expect(screen.getByText("Thời lượng 1 giờ 30 phút")).toBeTruthy();
+  expect(screen.queryByText(/Thời lượng/)).toBeNull();
+  expect(screen.queryByRole("group", { name: "Chọn nhanh thời lượng" })).toBeNull();
   fireEvent.change(screen.getByLabelText("Lặp lại"), { target: { value: "weekly" } });
   fireEvent.change(screen.getByLabelText("Tổng số lần"), { target: { value: "4" } });
   expect(new FormData(form).get("repeatWeeks")).toBe("4");

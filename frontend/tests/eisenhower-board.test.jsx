@@ -74,6 +74,7 @@ function setup(tasks = [item()]) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-01T00:00:00Z"));
   state.workspace = workspace();
   state.workspace.features = ["eisenhower-v1"];
   refresh = vi.fn().mockResolvedValue();
@@ -162,9 +163,9 @@ it("lets the compact popup set or clear a deadline, and keeps the draft and requ
     quadrant: "Q4",
   });
 });
-it("renders undated Inbox tasks safely and moves them without creating a real task or applying a plan", async () => {
+it("keeps undated Inbox tasks unclassified and prevents moving them into a deadline-based quadrant", async () => {
   setup([
-    item("draft", "Q2", {
+    item("draft", "Unknown", {
       kind: "Draft",
       deadline: null,
       estimatedMinutes: 0,
@@ -172,6 +173,7 @@ it("renders undated Inbox tasks safely and moves them without creating a real ta
       checklist: [],
     }),
   ]);
+  fireEvent.click(screen.getByRole("button", { name: /Cần làm rõ/ }));
   expect(within(screen.getAllByRole("article")[0]).getByText("Chưa có ngày hạn")).toBeTruthy();
   expect(screen.queryByText("0 phút")).toBeNull();
   fireEvent.change(
@@ -181,21 +183,8 @@ it("renders undated Inbox tasks safely and moves them without creating a real ta
   fireEvent.click(
     screen.getByRole("button", { name: "Tùy chọn Report draft" }),
   );
-  fireEvent.change(
-    screen.getByRole("combobox", { name: "Di chuyển Report draft" }),
-    { target: { value: "Q1" } },
-  );
-  await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
-  expect(api.mock.calls[0]).toEqual([
-    "/api/eisenhower/drafts/draft/position",
-    "POST",
-    {
-      version: "version-draft",
-      revision: "revision1",
-      quadrant: "Q1",
-      beforeId: null,
-    },
-  ]);
+  expect(screen.getByRole("combobox", { name: "Di chuyển Report draft" }).disabled).toBe(true);
+  expect(api).not.toHaveBeenCalled();
 });
 it("toggles a checklist step without marking the whole task completed", async () => {
   setup();
@@ -287,7 +276,7 @@ it("moves tasks between quadrants from a mobile/keyboard accessible selector, wi
   fireEvent.click(screen.getByRole("button", { name: "Tùy chọn Report a" }));
   fireEvent.change(
     screen.getByRole("combobox", { name: "Di chuyển Report a" }),
-    { target: { value: "Q1" } },
+    { target: { value: "Q4" } },
   );
   await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
   expect(api.mock.calls[0]).toEqual([
@@ -296,7 +285,7 @@ it("moves tasks between quadrants from a mobile/keyboard accessible selector, wi
     {
       version: "version-a",
       revision: "revision1",
-      quadrant: "Q1",
+      quadrant: "Q4",
       beforeId: null,
     },
   ]);
@@ -315,7 +304,7 @@ it("reorders tasks in a quadrant with Alt+arrow and handles stale writes without
 });
 it("mouse/touch pointer drop saves only on release and Escape cancels", async () => {
   setup();
-  const target = screen.getByRole("region", { name: "Làm trước" });
+  const target = screen.getByRole("region", { name: "Có thể để sau" });
   document.elementFromPoint = vi.fn(() => target);
   const handle = screen.getByRole("button", { name: "Kéo task Report a" });
   fireEvent.pointerDown(handle, { button: 0, clientX: 10, clientY: 10 });
@@ -329,7 +318,7 @@ it("mouse/touch pointer drop saves only on release and Escape cancels", async ()
   fireEvent.pointerMove(window, { clientX: 100, clientY: 100 });
   fireEvent.pointerUp(window, { clientX: 100, clientY: 100 });
   await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
-  expect(api.mock.calls[0][2].quadrant).toBe("Q1");
+  expect(api.mock.calls[0][2].quadrant).toBe("Q4");
 });
 it("Q4 only asks for a schedule on demand and applies only after a separate explicit click", async () => {
   setup([item("a", "Q4", { recommendation: "Backlog" })]);
@@ -482,14 +471,14 @@ it("sorts without writes and only allows cross-quadrant drops under deadline sor
   fireEvent.pointerUp(window, { clientX: 100, clientY: 100 });
   expect(api).not.toHaveBeenCalled();
   document.elementFromPoint = vi.fn(() =>
-    screen.getByRole("region", { name: "Làm trước" }),
+    screen.getByRole("region", { name: "Có thể để sau" }),
   );
   fireEvent.pointerDown(handle, { button: 0, clientX: 10, clientY: 10 });
   fireEvent.pointerMove(window, { clientX: 100, clientY: 100 });
   fireEvent.pointerUp(window, { clientX: 100, clientY: 100 });
   await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
   expect(api.mock.calls[0][2]).toMatchObject({
-    quadrant: "Q1",
+    quadrant: "Q4",
     beforeId: null,
   });
 });

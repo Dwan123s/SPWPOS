@@ -191,8 +191,8 @@ public sealed partial class WorkspaceService
             $"- Có {entries.Count(x => x.Kind == "EVENT")} lịch cố định và {entries.Count(x => x.Kind == "WORK")} phiên làm việc; tổng thời gian có lịch là {occupiedMinutes} phút (đã gộp phần trùng)." };
         foreach (var item in entries.Take(6)) details.Add($"- {item.Name}: {Window(item.Start, item.End)}" + (item.Status == "Completed" ? " · phiên đã đánh dấu hoàn tất" : ""));
         if (entries.Length > 6) details.Add($"- Đang hiển thị 6/{entries.Length} mục; các số tổng hợp vẫn tính toàn bộ lịch trong khoảng này.");
-        details.Add($"\n**Thời gian còn lại và điểm cần chú ý**\n- Còn {totalFree} phút trống theo giờ rảnh đã cài đặt và lịch đã lưu; {shortGaps.Length} khoảng ngắn dưới {minimum} phút.");
-        if (!hasAvailability) details.Add("- Chưa có giờ rảnh phù hợp được cài đặt. Không thể coi các giờ chưa có sự kiện là giờ bạn có thể làm việc.");
+        details.Add($"\n**Thời gian còn lại và điểm cần chú ý**\n- Còn {totalFree} phút trống theo Thời Gian Làm Việc đã cài đặt và lịch đã lưu; {shortGaps.Length} khoảng ngắn dưới {minimum} phút.");
+        if (!hasAvailability) details.Add("- Chưa có Thời Gian Làm Việc phù hợp được cài đặt. Không thể coi các giờ chưa có sự kiện là giờ bạn có thể làm việc.");
         if (largest is not null) details.Add($"- Khoảng trống dài nhất: {Window(largest.Start, largest.End)} ({(int)(largest.End - largest.Start).TotalMinutes} phút). Khoảng trống chưa tự động là một phiên làm việc hợp lệ.");
         foreach (var conflict in conflicts.Take(3)) details.Add("- " + conflict + ".");
         foreach (var task in checks.Take(4)) details.Add($"- {task.Name}: hạn {Stamp(task.Deadline)}, còn khoảng {task.RemainingMinutes} phút theo tiến độ đã lưu; có {task.SavedMinutes} phút trong lịch trước hạn. {task.Concern}");
@@ -216,7 +216,7 @@ public sealed partial class WorkspaceService
             taskSuggestionsAreAlternatives = true, taskProgressIsCurrentSnapshot = true, changesSaved = false
         };
         var fallback = shortGaps.Length > 0
-            ? "Lịch của bạn có những khoảng trống bị chia nhỏ, nên tổng thời gian rảnh chưa phản ánh thời gian có thể tập trung liên tục. Mình gợi ý giữ các khoảng nghỉ ngắn, đồng thời xem việc gần hạn và khoảng dài hơn trước khi quyết định xếp thêm."
+            ? "Lịch của bạn có những khoảng trống bị chia nhỏ, nên tổng Thời Gian Làm Việc chưa phản ánh thời gian có thể tập trung liên tục. Mình gợi ý giữ các khoảng nghỉ ngắn, đồng thời xem việc gần hạn và khoảng dài hơn trước khi quyết định xếp thêm."
             : "Mình đã đối chiếu các mục lịch và tiến độ đã lưu để bạn dễ chọn việc tiếp theo. Bạn có thể xem những việc đến hạn sớm trước; chỉ nên thêm việc khi có đủ thời lượng và vẫn giữ được các ràng buộc hiện tại.";
         return new(facts, string.Join("\n", details), fallback);
     }

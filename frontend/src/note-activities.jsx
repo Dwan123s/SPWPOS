@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { dateFmt, icon, localInput, minutes, toUtc } from "./ui.jsx";
 import { NotePlanPreview } from "./note-plan-preview.jsx";
+import { EisenhowerPriorityField } from "./eisenhower-priority.jsx";
 import "./styles/note-activities.css";
 
 const taskTypes = {
@@ -137,7 +138,7 @@ function resolvedRemark(message, drafts, originals) {
   if (!/duration|deadline|end time|thời lượng|hạn chót|kết thúc/.test(text))
     return false;
   if (
-    /conflict|overlap|availability|depend|xung đột|trùng|giờ rảnh|phụ thuộc/.test(
+    /conflict|overlap|availability|depend|xung đột|trùng|giờ rảnh|thời gian làm việc|phụ thuộc/i.test(
       text,
     )
   )
@@ -244,17 +245,6 @@ export function NoteActivitiesReview({
         ?.focus({ preventScroll: true });
     });
   }
-  if (note.planId)
-    return (
-      <div className="card note-activities-saved" role="status">
-        {icon("check")}
-        <h3>Đã lưu {drafts.length} hoạt động vào lịch.</h3>
-        <p>Các sự kiện cố định và phiên công việc đã sẵn sàng.</p>
-        <a className="btn primary" href="#calendar">
-          Mở lịch
-        </a>
-      </div>
-    );
   return (
     <div className="note-activities-grid">
       <section
@@ -333,7 +323,7 @@ export function NoteActivitiesReview({
                       })
                     : fixed
                       ? "Cần bổ sung giờ bắt đầu"
-                      : "AI sẽ chọn giờ rảnh để xếp việc"}
+                      : "AI sẽ chọn Thời Gian Làm Việc để xếp việc"}
                   {activity.end
                     ? ` – ${dateFmt(activity.end, { hour: "2-digit", minute: "2-digit" })}`
                     : !fixed && activity.estimatedMinutes
@@ -486,6 +476,8 @@ export function NoteActivitiesReview({
                       </>
                     )}
                   </div>
+                  {!fixed && <EisenhowerPriorityField task={activity} value={activity.importanceLevel || "Unknown"}
+                    onChange={(level) => update(index, "importanceLevel", level)} />}
                   {!fixed && activity.start && (
                     <p className="reason">
                       Giữ giờ bắt đầu đã yêu cầu. Lịch sẽ dùng đúng thời lượng
@@ -523,7 +515,7 @@ export function NoteActivitiesReview({
                 onReviewDirty(true);
               }}
             />
-            Tôi đã kiểm tra các lưu ý, giờ rảnh và điều kiện trong ghi chú.
+            Tôi đã kiểm tra các lưu ý, Thời Gian Làm Việc và điều kiện trong ghi chú.
           </label>
         )}
         {editError && (
@@ -547,13 +539,13 @@ export function NoteActivitiesReview({
                 onReviewDirty(true);
               }}
             />
-            Cho phép dùng giờ bắt đầu đã chọn cho lần này, kể cả ngoài giờ rảnh
+            Cho phép dùng giờ bắt đầu đã chọn cho lần này, kể cả ngoài Thời Gian Làm Việc
             thường lệ.
           </label>
         )}
         {allowRequestedHours && (
           <p className="reason">
-            Giờ rảnh bổ sung chỉ được lưu cho ngày đã chọn khi bạn xác nhận
+            Thời Gian Làm Việc bổ sung chỉ được lưu cho ngày đã chọn khi bạn xác nhận
             lịch.
           </p>
         )}
@@ -641,13 +633,13 @@ export function NoteActivitiesReview({
               <p className="note-review-help">
                 Các công việc đã có giờ bắt đầu. Bạn có thể xem đề xuất để kiểm
                 tra khung giờ; chọn “Cho phép dùng giờ bắt đầu đã chọn” nếu muốn
-                dùng các giờ này ngoài giờ rảnh thường lệ.
+                dùng các giờ này ngoài Thời Gian Làm Việc thường lệ.
               </p>
             )}
             {!hasTime && needsGeneralHours && (
               <div className="note-hours-help">
                 <p>
-                  Chưa có giờ rảnh cho công việc chưa chọn giờ bắt đầu. Bạn vẫn
+                  Chưa có Thời Gian Làm Việc cho công việc chưa chọn giờ bắt đầu. Bạn vẫn
                   có thể xem kiểm tra lịch; bổ sung giờ làm khi cần xếp các việc
                   này.
                 </p>
@@ -656,7 +648,7 @@ export function NoteActivitiesReview({
                   disabled={blocked}
                   onClick={onSetTime}
                 >
-                  Thiết lập giờ rảnh
+                  Thiết lập Thời Gian Làm Việc
                 </button>
               </div>
             )}
@@ -739,8 +731,8 @@ export function NoteActivitiesReview({
                 {blockingWarnings.length > 0 && (
                   <p className="note-warning-next-step">
                     {hasLateTask
-                      ? "Bấm Quay lại chỉnh sửa, mở Chỉnh sửa ở việc bị quá hạn để đổi hạn chót hoặc thời lượng. Bạn cũng có thể bổ sung giờ rảnh trước hạn rồi xem lại lịch đề xuất."
-                      : "Bấm Quay lại chỉnh sửa để điều chỉnh thời lượng, giờ thực hiện hoặc giờ rảnh, rồi xem lại lịch đề xuất."}
+                      ? "Bấm Quay lại chỉnh sửa, mở Chỉnh sửa ở việc bị quá hạn để đổi hạn chót hoặc thời lượng. Bạn cũng có thể bổ sung Thời Gian Làm Việc trước hạn rồi xem lại lịch đề xuất."
+                      : "Bấm Quay lại chỉnh sửa để điều chỉnh thời lượng, giờ thực hiện hoặc Thời Gian Làm Việc, rồi xem lại lịch đề xuất."}
                   </p>
                 )}
                 {proposal.warnings.some(

@@ -16,6 +16,7 @@ public sealed partial class ApplicationDbContext
     public DbSet<AvailabilityPolicy> AvailabilityPolicies => Set<AvailabilityPolicy>();
     public DbSet<PrivatePlanningProposal> PrivatePlanningProposals => Set<PrivatePlanningProposal>();
     public DbSet<TeamProject> TeamProjects => Set<TeamProject>();
+    public DbSet<TeamPlanPurchase> TeamPlanPurchases => Set<TeamPlanPurchase>();
     public DbSet<TeamMembership> TeamMemberships => Set<TeamMembership>();
     public DbSet<TeamInvite> TeamInvites => Set<TeamInvite>();
     public DbSet<TeamTask> TeamTasks => Set<TeamTask>();
@@ -31,11 +32,33 @@ internal static class PrivateTeamModel
 {
     public static void Configure(ModelBuilder b)
     {
+        b.Entity<TeamPlanPurchase>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.OrderCode).IsUnique();
+            e.HasIndex(x => x.PaymentLinkId).IsUnique();
+            e.HasIndex(x => x.ReceiptReference).IsUnique();
+            e.HasIndex(x => new { x.TeamId, x.CreatedAt });
+            e.HasIndex(x => new { x.UserId, x.CreatedAt });
+            e.Property(x => x.PlanCode).HasMaxLength(24);
+            e.Property(x => x.PaymentLinkId).HasMaxLength(100);
+            e.Property(x => x.CheckoutUrl).HasMaxLength(512);
+            e.Property(x => x.ClosedStatus).HasMaxLength(16);
+            e.Property(x => x.ReceiptReference).HasMaxLength(100);
+            e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
         b.Entity<TeamMembership>().Property(x => x.ApprovalStatus).HasMaxLength(16).HasDefaultValue("Approved");
         b.Entity<TeamMembership>().HasIndex(x => new { x.TeamId, x.ApprovalStatus });
         b.Entity<AvailabilityPolicy>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.UserId).IsUnique(); e.Property(x => x.Version).IsConcurrencyToken(); e.Property(x => x.RoutineDaysJson).HasDefaultValue("[]"); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<PrivatePlanningProposal>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.UserId, x.ExpiresAt }); e.Property(x => x.Applied).IsConcurrencyToken(); e.Property(x => x.Kind).HasMaxLength(20); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
-        b.Entity<TeamProject>(e => { e.HasKey(x => x.Id); e.Property(x => x.Name).HasMaxLength(120); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CreatorId).OnDelete(DeleteBehavior.Restrict); });
+        b.Entity<TeamProject>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.CompletionPolicyVersion).IsConcurrencyToken();
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CreatorId).OnDelete(DeleteBehavior.Restrict);
+        });
         b.Entity<TeamMembership>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TeamId, x.UserId }).IsUnique(); e.Property(x => x.Role).HasMaxLength(10); e.Property(x => x.Version).IsConcurrencyToken(); e.Property(x => x.MutationVersion).IsConcurrencyToken(); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamInvite>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.CodeHash).IsUnique(); e.Property(x => x.CodeHash).HasMaxLength(64); e.Property(x => x.Version).IsConcurrencyToken(); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamTask>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.TeamId); e.Property(x => x.Name).HasMaxLength(200); e.Property(x => x.Description).HasMaxLength(4000); e.Property(x => x.CompletionReviewNote).HasMaxLength(500); e.Property(x => x.Status).HasMaxLength(20); e.Property(x => x.Version).IsConcurrencyToken(); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AssigneeId).OnDelete(DeleteBehavior.Restrict); });
@@ -43,7 +66,7 @@ internal static class PrivateTeamModel
         b.Entity<TeamClaimProposal>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.UserId, x.ExpiresAt }); e.Property(x => x.Status).HasMaxLength(20).IsConcurrencyToken(); e.HasOne<TeamTask>().WithMany().HasForeignKey(x => x.TeamTaskId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamActivity>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TeamId, x.CreatedAt }); e.Property(x => x.Kind).HasMaxLength(40); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamChatMessage>(e => { e.HasKey(x => x.Id); e.HasIndex(x => new { x.TeamId, x.Id }); e.HasIndex(x => new { x.TeamId, x.UserId, x.RequestId, x.IsSystem }).IsUnique(); e.Property(x => x.Text).HasMaxLength(2000); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
-        b.Entity<TeamCompletionSubmission>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.TeamTaskId); e.Property(x => x.Note).HasMaxLength(1000); e.HasOne<TeamTask>().WithMany().HasForeignKey(x => x.TeamTaskId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
+        b.Entity<TeamCompletionSubmission>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.TeamTaskId); e.Property(x => x.Note).HasMaxLength(1000); e.Property(x => x.ReportUrl).HasMaxLength(2048); e.HasOne<TeamTask>().WithMany().HasForeignKey(x => x.TeamTaskId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamCompletionFile>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.SubmissionId); e.Property(x => x.Name).HasMaxLength(180); e.Property(x => x.MimeType).HasMaxLength(100); e.HasOne<TeamCompletionSubmission>().WithMany().HasForeignKey(x => x.SubmissionId).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamTaskDocument>(e => { e.HasKey(x => x.Id); e.HasIndex(x => x.TeamId); e.Property(x => x.Name).HasMaxLength(180); e.Property(x => x.MimeType).HasMaxLength(100); e.HasOne<TeamProject>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict); });
         b.Entity<TeamTask>().HasOne<TeamTaskDocument>().WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.Restrict);

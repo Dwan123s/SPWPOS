@@ -20,13 +20,16 @@ beforeEach(() => {
 it("offers Start in Telegram instead of token or chat-id input and detects successful linking", async () => {
   render(<TelegramCard />);
   await userEvent.setup().click(await screen.findByRole("button", { name: "Kết nối Telegram", exact: true }));
-  const link = await screen.findByRole("link", { name: "Mở bot Telegram · Nhấn Start" });
-  expect(link.href).toBe("https://t.me/planora_test_bot?start=single-use-token");
+  const web = await screen.findByRole("link", { name: "Mở Telegram Web" });
+  const app = screen.getByRole("link", { name: "Mở ứng dụng Telegram" });
+  expect(web.href).toBe("https://web.t.me/planora_test_bot?start=single-use-token");
+  expect(app.href).toBe("https://t.me/planora_test_bot?start=single-use-token");
   expect(document.querySelector("input")).toBeNull();
   status = { configured: true, connected: true, enabled: true, displayName: "Nguyễn An" };
   await act(async () => fireEvent(window, new Event("focus")));
   await screen.findByText("Nguyễn An");
-  expect(screen.queryByRole("link", { name: /Mở bot/ })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Mở Telegram Web" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Mở ứng dụng Telegram" })).toBeNull();
   expect(screen.getByRole("button", { name: "Tạm dừng nhắc Telegram" })).toBeTruthy();
 });
 

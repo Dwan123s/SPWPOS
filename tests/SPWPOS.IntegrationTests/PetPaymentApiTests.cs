@@ -23,7 +23,7 @@ public sealed class PetPaymentApiTests
         public PayOsPaymentState? Payment;
         public Task<PayOsPaymentState?> GetPaymentAsync(long code, CancellationToken ct) => Task.FromResult(Payment);
         public Task<PayOsLink?> FindAsync(long code, CancellationToken ct) => Task.FromResult<PayOsLink?>(null);
-        public Task<PayOsLink> CreateAsync(long code, int amount, DateTimeOffset expiresAt, CancellationToken ct)
+        public Task<PayOsLink> CreateAsync(long code, int amount, DateTimeOffset expiresAt, CancellationToken ct, PayOsPremiumProduct? premiumProduct = null)
         { OrderCode = code; return Task.FromResult(new PayOsLink(code,amount,"VND","link-api","https://pay.payos.vn/web/link-api","123456")); }
     }
     private sealed class Factory : ApiFactory
@@ -37,6 +37,38 @@ public sealed class PetPaymentApiTests
                 services.Configure<PayOsOptions>(x => { x.Enabled=true; x.ClientId="test"; x.ApiKey="test"; x.ChecksumKey=Key; x.PublicBaseUrl="https://planora.example/"; });
             });
         }
+    }
+    [Fact]
+    public async Task Premium_checkout_upgrades_all_account_groups_after_verified_webhook()
+    {
+        await using var f = new Factory();
+        using var client = await f.ClientAsync();
+        await Authorize(f, client);
+        var team = (await Send(client, HttpMethod.Post, "/api/teams", new TeamNameInput("Premium test"))).GetProperty("data").GetProperty("id").GetGuid();
+        var other = (await Send(client, HttpMethod.Post, "/api/teams", new TeamNameInput("Free test"))).GetProperty("data").GetProperty("id").GetGuid();
+        var path = "/api/commerce/premium";
+        var order = (await Send(client, HttpMethod.Post, path, new TeamPlanCheckoutInput("premiumUnlimited"))).GetProperty("data");
+        Assert.Equal("PENDING", order.GetProperty("status").GetString());
+        var before = (await Send(client, HttpMethod.Get, $"/api/teams/{team}")).GetProperty("data");
+        Assert.Equal(5, before.GetProperty("plan").GetProperty("memberLimit").GetInt32());
+        f.Gateway.Payment = new(f.Gateway.OrderCode, 110000, "link-api", "PAID", 110000, 0, [new(110000, "team-api-receipt", "123456")]);
+        var data = new { orderCode = f.Gateway.OrderCode, amount = 110000, currency = "VND", paymentLinkId = "link-api", accountNumber = "123456", reference = "team-api-receipt", code = "00" };
+        var element = JsonSerializer.SerializeToElement(data);
+        var canonical = string.Join('&', element.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal).Select(p => p.Name + "=" + p.Value));
+        var signature = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(Key), Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+        using var webhookClient = await f.ClientAsync();
+        for (var i = 0; i < 2; i++)
+        {
+            using var response = await webhookClient.PostAsync("/api/commerce/payos/webhook",
+                new StringContent(JsonSerializer.Serialize(new { data, signature }), Encoding.UTF8, "application/json"), Ct);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+        var after = (await Send(client, HttpMethod.Get, $"/api/teams/{team}")).GetProperty("data");
+        Assert.Equal("premiumUnlimited", after.GetProperty("plan").GetProperty("code").GetString());
+        Assert.Equal(JsonValueKind.Null, after.GetProperty("plan").GetProperty("memberLimit").ValueKind);
+        var untouched = (await Send(client, HttpMethod.Get, $"/api/teams/{other}")).GetProperty("data");
+        Assert.Equal("premiumUnlimited", untouched.GetProperty("plan").GetProperty("code").GetString());
+        Assert.NotNull((await Send(client, HttpMethod.Get, path)).GetProperty("data").GetProperty("validUntil").GetString());
     }
     [Fact] public async Task Checkout_needs_login_and_only_verified_webhook_unlocks_purchased_skin()
     {

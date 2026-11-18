@@ -12,6 +12,7 @@ import { TeamJoinRequests } from "../src/team-membership.jsx";
 import { state } from "../src/ui.jsx";
 import { workspace } from "./fixtures.js";
 import { NotificationCenter } from "../src/notifications.jsx";
+import { TeamOverview } from "../src/team-components.jsx";
 import {
   pendingTeamJoinReview,
   finishTeamJoinReview,
@@ -119,6 +120,42 @@ it("handles a review link while the groups screen is already mounted and shows a
   );
 });
 
+it("opens the exact task from a completion notice, including StrictMode", async () => {
+  state.workspace.events = [];
+  state.workspace.notifications = [{
+    id: "report", kind: "TEAM_COMPLETION_REQUEST", teamId: "team", teamTaskId: "report-task",
+    title: "Task nhóm đang chờ duyệt", message: "Có báo cáo mới.",
+    createdAt: "2026-11-03T01:26:00Z", isRead: false,
+  }];
+  api.mockImplementation(async (path) => {
+    if (path === "/api/teams") return [team];
+    if (path === "/api/teams/team") return {
+      team, members: [], activity: [],
+      tasks: [{
+        id: "report-task", name: "Báo cáo tuần", description: "Tổng hợp kết quả", progress: 100,
+        deadline: "2026-11-12T12:00:00Z", estimatedMinutes: 60, status: "PendingReview", assigneeId: "member",
+      }],
+    };
+    return [];
+  });
+  const view = render(<NotificationCenter workspace={state.workspace} />);
+  fireEvent.click(screen.getByRole("link", { name: "Mở công việc cần duyệt" }));
+  view.rerender(<StrictMode><TeamsPage /></StrictMode>);
+  expect(await screen.findByRole("dialog", { name: "Báo cáo tuần" })).toBeTruthy();
+  expect(screen.getByText("Lịch cá nhân đã sẵn sàng")).toBeTruthy();
+});
+
+it("calculates group progress from actionable tasks after splitting", () => {
+  const tasks = [
+    { id: "parent", status: "Split", subtaskCount: 2, subtasksCompleted: 2 },
+    { id: "child-1", status: "Completed", parentTaskId: "parent" },
+    { id: "child-2", status: "Completed", parentTaskId: "parent" },
+  ];
+  render(<TeamOverview tasks={tasks} />);
+  expect(screen.getByText("100%")).toBeTruthy();
+  expect(screen.getByText("2/2 công việc hoàn thành")).toBeTruthy();
+});
+
 it("submits a pending request without opening private group data", async () => {
   let sent = false;
   api.mockImplementation(async (path, method) => {
@@ -200,6 +237,7 @@ it("leader approves through the API and kick requires explicit confirmation", as
   });
   render(<TeamsPage />);
   fireEvent.click(await screen.findByRole("button", { name: "SSG" }));
+  fireEvent.click(await screen.findByRole("button", { name: /^Thành viên/ }));
   fireEvent.click(await screen.findByRole("button", { name: "Duyệt Ngọc" }));
   await waitFor(() =>
     expect(screen.queryByRole("button", { name: "Duyệt Ngọc" })).toBeNull(),

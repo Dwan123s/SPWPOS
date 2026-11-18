@@ -17,9 +17,10 @@ public sealed record PayOsTransaction(int Amount, string Reference, string Accou
 // Returned only after verifying the signed merchant API response.
 public sealed record PayOsPaymentState(long OrderCode, int AmountVnd, string Id, string Status,
     int AmountPaid, int AmountRemaining, PayOsTransaction[] Transactions);
+public sealed record PayOsPremiumProduct(string Name);
 public interface IPayOsGateway
 {
     Task<PayOsLink?> FindAsync(long orderCode, CancellationToken ct);
     Task<PayOsPaymentState?> GetPaymentAsync(long orderCode, CancellationToken ct);
-    Task<PayOsLink> CreateAsync(long orderCode, int amount, DateTimeOffset expiresAt, CancellationToken ct);
+    Task<PayOsLink> CreateAsync(long orderCode, int amount, DateTimeOffset expiresAt, CancellationToken ct, PayOsPremiumProduct? premiumProduct = null);
 }

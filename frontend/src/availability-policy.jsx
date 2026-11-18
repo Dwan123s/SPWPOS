@@ -79,14 +79,14 @@ export function AvailabilityPolicyCard({
     >
       <h2>
         {autoPreview
-          ? "Lịch sinh hoạt và giờ rảnh NORA đề xuất"
+          ? "Lịch sinh hoạt và Thời Gian Làm Việc NORA đề xuất"
           : "Chính sách sinh hoạt"}
       </h2>
       {weekStart && weekEnd && <p className="info"><strong>Tuần {dateFmt(`${weekStart}T12:00:00Z`, { timeZone: "UTC" })} – {dateFmt(`${weekEnd}T12:00:00Z`, { timeZone: "UTC", year: "numeric" })}</strong><br />Đề xuất chỉ áp dụng trong tuần này, theo thời khóa biểu bạn đã gửi.</p>}
       <p>
         {current?.confirmed
           ? "Đã xác nhận. Khoảng trống được tính lại theo lịch cố định thực tế từng ngày."
-          : "NORA trừ lịch cố định, giờ ngủ, ăn trưa/tối 30 phút, nghỉ ngơi và di chuyển để tìm giờ rảnh. Bạn xem đề xuất rồi áp dụng, không cần tự nhập giờ rảnh."}
+          : "NORA trừ lịch cố định, giờ ngủ, ăn trưa/tối 30 phút, nghỉ ngơi và di chuyển để tìm Thời Gian Làm Việc. Bạn xem đề xuất rồi áp dụng, không cần tự nhập Thời Gian Làm Việc."}
       </p>
       {p && (
         <div>
@@ -116,7 +116,7 @@ export function AvailabilityPolicyCard({
       {busy && !preview && (
         <p role="status">
           NORA đang sắp xếp ăn, ngủ, nghỉ quanh thời khóa biểu và tính các
-          khoảng rảnh…
+          khoảng Thời Gian Làm Việc…
         </p>
       )}
       {!autoPreview && (
@@ -205,7 +205,7 @@ export function AvailabilityPolicyCard({
                 </p>
               )}
               <p>
-                Giờ rảnh sau khi trừ lịch cố định và sinh hoạt:{" "}
+                Thời Gian Làm Việc sau khi trừ lịch cố định và sinh hoạt:{" "}
                 {Math.floor(
                   (day.workGaps || []).reduce(
                     (sum, s) =>
@@ -218,7 +218,7 @@ export function AvailabilityPolicyCard({
               </p>
               {!!day.workGaps?.length && (
                 <p className="routine-free-summary">
-                  Giờ rảnh:{" "}
+                  Thời Gian Làm Việc:{" "}
                   {day.workGaps
                     .map((s) => `${timeFmt(s.start)}–${timeFmt(s.end)}`)
                     .join(" · ")}
@@ -263,7 +263,7 @@ export function AvailabilityPolicyCard({
           <p>
             {useTimetableHours
               ? "Khi áp dụng, tuần này sẽ dùng các khung giờ tính từ thời khóa biểu. Các giờ riêng bạn đã đặt theo ngày vẫn được ưu tiên."
-              : "Đây là đề xuất; lịch chưa thay đổi. Giờ rảnh bạn đã xác nhận trước đó được giữ lại."}
+              : "Đây là đề xuất; lịch chưa thay đổi. Thời Gian Làm Việc bạn đã xác nhận trước đó được giữ lại."}
           </p>
           {preview.warnings.map((warning, i) => (
             <p role="status" key={i}>
@@ -312,7 +312,7 @@ export function AvailabilityPolicyCard({
         className="btn secondary"
         onClick={() =>
           askNora(
-            "Tôi muốn thêm hoạt động riêng vào lịch, ngoài thời khóa biểu và lịch sinh hoạt đã đề xuất. Hãy để tôi mô tả hoạt động và thời gian, rồi kiểm tra tác động tới giờ rảnh.",
+            "Tôi muốn thêm hoạt động riêng vào lịch, ngoài thời khóa biểu và lịch sinh hoạt đã đề xuất. Hãy để tôi mô tả hoạt động và thời gian, rồi kiểm tra tác động tới Thời Gian Làm Việc.",
           )
         }
       >

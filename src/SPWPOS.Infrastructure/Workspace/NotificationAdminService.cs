@@ -22,7 +22,7 @@ public sealed partial class WorkspaceService
     private async Task AddNotification(Guid uid, string kind, string title, string message, string key, Guid? taskId, CancellationToken ct, Guid? sessionId = null, Guid? planId = null, Guid? fixedEventId = null)
     {
         var settings = await db.NotificationSettings.SingleOrDefaultAsync(x => x.UserId == uid, ct);
-        var visible = settings?.InAppEnabled != false;
+        var visible = kind is "TEAM_PREMIUM_EXPIRED" or "TEAM_PREMIUM_SUSPENDED" || settings?.InAppEnabled != false;
         var emailPending = settings?.EmailEnabled == true && kind is "DEADLINE" or "SESSION_REMINDER";
         var telegram = await db.TelegramConnections.SingleOrDefaultAsync(x => x.UserId == uid && x.Enabled && x.ChatId != null, ct);
         if (!visible && !emailPending && telegram is null) return;
@@ -43,6 +43,7 @@ public sealed partial class WorkspaceService
     }
     public Task EnsureNotificationsAsync(Guid uid, CancellationToken ct) => Mutate(uid, async () =>
     {
+        await EnsureTeamRenewalNotifications(uid, ct);
         await RefreshNoraReminderChannelsAsync(uid,ct);
         var settings = await db.NotificationSettings.SingleOrDefaultAsync(x => x.UserId == uid, ct) ?? new();
         var state = await State(uid, ct); bool missed = false;
@@ -108,8 +109,32 @@ public sealed partial class WorkspaceService
     {
         var rows = await Mine<InAppNotification>(uid).AsNoTracking()
             .Where(x => x.IsVisible && x.ScheduledFor <= Now).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(100)
-            .Select(x => new { View = new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null, null, null), x.DedupeKey }).ToArrayAsync(ct);
-        if (rows.All(x => x.View.Kind != "TEAM_JOIN_REQUEST")) return rows.Select(x => x.View).ToArray();
+            .Select(x => new { View = new NotificationView(x.Id, x.Kind, x.Title, x.Message, x.TaskId, x.CreatedAt, x.ReadAt != null, null, null, null, x.SessionId), x.DedupeKey }).ToArrayAsync(ct);
+        const string reviewPrefix = "team-review:";
+        var reviews = new Dictionary<Guid, Guid>();
+        foreach (var row in rows.Where(x => x.View.Kind == "TEAM_COMPLETION_REQUEST"))
+            if (row.DedupeKey.StartsWith(reviewPrefix, StringComparison.Ordinal) && Guid.TryParse(row.DedupeKey[reviewPrefix.Length..], out var requestId))
+                reviews[row.View.Id] = requestId;
+        var reviewIds = reviews.Values.Distinct().ToArray();
+        var reviewTargets = reviewIds.Length == 0 ? null : await (from task in db.TeamTasks.AsNoTracking()
+            join membership in db.TeamMemberships.AsNoTracking() on task.TeamId equals membership.TeamId
+            where task.CompletionRequestId != null && reviewIds.Contains(task.CompletionRequestId.Value) &&
+                membership.UserId == uid && membership.Active && membership.Role == "Leader"
+            select new { RequestId = task.CompletionRequestId!.Value, task.TeamId, task.Id }).ToDictionaryAsync(x => x.RequestId, ct);
+
+        NotificationView WithReviewTarget(NotificationView view)
+        {
+            var row = rows.First(x => x.View.Id == view.Id);
+            if (view.Kind is "TEAM_PREMIUM_EXPIRED" or "TEAM_PREMIUM_SUSPENDED")
+            {
+                var parts = row.DedupeKey.Split(':');
+                if (parts.Length > 1 && Guid.TryParse(parts[1], out var team)) return view with { TeamId = team };
+            }
+            return reviews.TryGetValue(view.Id, out var request) && reviewTargets?.TryGetValue(request, out var target) == true
+                ? view with { TeamId = target.TeamId, TeamTaskId = target.Id } : view;
+        }
+
+        if (rows.All(x => x.View.Kind != "TEAM_JOIN_REQUEST")) return rows.Select(x => WithReviewTarget(x.View)).ToArray();
         // Existing join notices already identify the applicant membership in their
         // dedupe key. Resolve it in one batch so old inbox entries work as well.
         var memberships = new Dictionary<Guid, (Guid Id, Guid Version)>();
@@ -122,7 +147,7 @@ public sealed partial class WorkspaceService
         var ids = memberships.Values.Select(x => x.Id).Distinct().ToArray();
         var teams = await db.TeamMemberships.AsNoTracking().Where(x => ids.Contains(x.Id))
             .Select(x => new { x.Id, x.TeamId, x.Active, x.ApprovalStatus, x.Version }).ToDictionaryAsync(x => x.Id, ct);
-        return rows.Select(row => row.View.Kind != "TEAM_JOIN_REQUEST" ? row.View
+        return rows.Select(row => row.View.Kind != "TEAM_JOIN_REQUEST" ? WithReviewTarget(row.View)
             : memberships.TryGetValue(row.View.Id, out var request) && teams.TryGetValue(request.Id, out var member)
                 ? row.View with { TeamId = member.TeamId, JoinRequestPending = !member.Active && member.ApprovalStatus == "Pending" && member.Version == request.Version }
                 : row.View with { JoinRequestPending = false }).ToArray();

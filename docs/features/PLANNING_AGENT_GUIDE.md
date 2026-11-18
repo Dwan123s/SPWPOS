@@ -79,7 +79,7 @@ Khi người dùng chỉ cung cấp tên/mô tả công việc, AI có thể **�
 - Công việc hỗ trợ **khung thực hiện riêng**, ví dụ “chỉ học tối thứ Năm”. Khung thực hiện được lưu riêng với deadline và được kiểm tra khi lập lịch, sửa phiên hoặc bắt đầu làm việc. Lượt làm rõ phải giữ nguyên ngày/khung giờ đã xác nhận. Khi chỉ có khung thực hiện và chưa có deadline, điểm kết thúc khung chỉ là giới hạn lập lịch, không được coi là deadline cứng do người dùng đặt.
 - Bằng chứng thời lượng/deadline được đối chiếu với nội dung người dùng. Backend có thể lấy lại thời lượng ghi ngay sau đúng tên công việc và nhận ra nhãn deadline đứng ngay trước đoạn giờ được trích; không lấy giờ rảnh làm thời lượng và không lấy ngày thực hiện làm deadline.
 
-Kiểm thử hồi quy dùng phản hồi AI được kiểm soát và database SQLite. Sandbox có chế độ offline và chế độ gọi AI thật với dữ liệu giả; không thay đổi lịch người dùng. [Kiểm chứng bản tích hợp](../reviews/NORA_GUARDRAILS_INTEGRATION_2026-10-19.md) ghi kết quả riêng với [báo cáo gốc ngày 18/10](../reviews/NORA_REQUEST_RESPONSE_QUALITY_REPORT_2026-10-18.md).
+Kiểm thử hồi quy dùng phản hồi AI được kiểm soát và database SQLite. [Hướng dẫn kiểm thử NORA](../development/NORA_SANDBOX.md) mô tả chế độ offline và chế độ gọi AI thật với dữ liệu giả.
 
 ### Các bước
 
@@ -146,8 +146,8 @@ Ngày 14/10/2026 đã kiểm tra thành công với Gemini thật `gemini-3.5-fl
 - Google Cloud đã được hỗ trợ qua provider `VertexAI`, với Cloud API key hoặc ADC. Dùng [hướng dẫn cấu hình](../integrations/GOOGLE_CLOUD_AI.md); `VertexApiKey` độc lập với `GeminiApiKey`. Script kiểm tra Cloud thành công trước khi lưu cấu hình và nạp lại server.
 - Phạm vi áp dụng credit phải được xác nhận trong Cloud Billing. [Tài liệu Free Trial](https://docs.cloud.google.com/free/docs/free-cloud-features) nêu rõ credit chỉ áp dụng dịch vụ đủ điều kiện; khi nâng cấp paid account, khoản ngoài credit/free tier được tính vào phương thức thanh toán.
 
-## Các phần chưa triển khai trong giai đoạn này
+## Tài liệu liên quan
 
 Giao diện NORA mới có streaming thật từ VertexAI/Gemini, tiến trình thu gọn, mascot đi bộ và bảng kế hoạch chỉ mở sau kết quả. Chi tiết thiết kế, transport và kiểm chứng: [NORA_CHAT_RESEARCH.md](../design/NORA_CHAT_RESEARCH.md).
 
-Thống kê lịch sử 3/7/30 ngày, tự điều chỉnh sau 48 giờ bằng worker, ngày lễ Việt Nam/nhắc trước một ngày, streak, XP, pet, skin, nạp xu, payment và admin tài chính nằm trong [PLANORA_UPGRADE_PLAN.md](../plans/PLANORA_UPGRADE_PLAN.md).
+Xem [cách NORA gọi công cụ lập kế hoạch](NORA_AGENT_RUNTIME.md), [cách ghi nhận và xếp bù phiên đã qua](WORKSPACE_UPGRADE_PHASES_1_TO_4.md) và [kế hoạch NORA chủ động](../plans/NORA_PROACTIVE_DAILY_ASSISTANT_2026-11-04.md).

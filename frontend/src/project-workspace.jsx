@@ -3,6 +3,7 @@ import { dateFmt, icon, statusLabels } from "./ui.jsx";
 import { taskColumns, taskRows, TaskDrawerSource } from "./tasks.jsx";
 import { orderProjectChildren, smartTaskLists } from "./task-smart-lists.js";
 import { PopupDetails } from "./popup-dismissal.jsx";
+import { ProjectAllocation, projectAllocation } from "./project-allocation.jsx";
 import "./project-workspace.css";
 
 export function ProjectWorkspace({
@@ -88,6 +89,9 @@ export function ProjectWorkspace({
           </button>
         ))}
       </nav>
+      {children.length > 0 && (
+        <ProjectAllocation impact={projectAllocation(workspace, project.id)} />
+      )}
       <div hidden={tab !== "list"}>
         <div className="task-smart-toolbar" ref={setToolbarHost}>
           <label className="project-page-search">

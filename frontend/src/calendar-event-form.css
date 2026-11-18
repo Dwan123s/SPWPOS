@@ -1,14 +1,63 @@
+#modal:has(.busy-event-form) {
+  width: min(36rem, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  border-radius: 4px;
+  background: #fff;
+}
+
+#modal .modal-body:has(.busy-event-form) {
+  padding: clamp(16px, 4vw, 24px);
+}
+
+#modal .modal-body:has(.busy-event-form) .modal-head {
+  margin-bottom: 16px;
+}
+
 .busy-event-form {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .busy-event-form .form-grid {
   align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .busy-event-form .field {
   margin: 0;
+  min-width: 0;
+}
+
+.busy-event-time input {
+  min-width: 0;
+  width: 100%;
+}
+
+#modal .busy-event-form :is(input:not([type="checkbox"]), select, textarea, .btn) {
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.busy-event-time {
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px 12px;
+  border: 1px solid var(--border, #d6e1ef);
+  background: #f6f9fc;
+}
+
+.busy-event-time legend {
+  padding: 0 4px;
+  color: #111;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.busy-event-time-error {
+  margin: 8px 0 0;
+  color: #a22b28;
+  font-size: 13px;
 }
 
 .busy-event-repeat {
@@ -20,7 +69,7 @@
 
 .busy-event-hint {
   margin: 0;
-  color: var(--ui-muted, #4b6078);
+  color: #30343a;
   font-size: 13px;
 }
 
@@ -48,11 +97,19 @@
 }
 
 .busy-event-form .form-actions {
-  margin-top: 4px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, #d6e1ef);
 }
 
 @media (max-width: 560px) {
   .busy-event-repeat {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .busy-event-time .form-grid {
     grid-template-columns: 1fr;
   }
 }

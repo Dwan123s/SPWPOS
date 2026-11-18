@@ -124,3 +124,19 @@ it("finishes the entire task only after explicitly confirming and refreshes the 
   await waitFor(() => expect(changed).toHaveBeenCalled());
   expect(api).toHaveBeenCalledWith("/api/sessions/active/finish-task", "POST");
 });
+
+it("requires and sends the team report link when finishing a session", async () => {
+  api.mockResolvedValue({});
+  render(<FinishWorkButton sessionId="active" teamTask requireReportUrl />);
+  fireEvent.click(screen.getByRole("button", { name: "Đã xong công việc" }));
+  const confirm = screen.getByRole("button", { name: "Xác nhận hoàn thành" });
+  expect(confirm.disabled).toBe(true);
+  fireEvent.change(screen.getByRole("textbox", { name: "Link báo cáo (bắt buộc)" }), {
+    target: { value: "https://example.com/report" },
+  });
+  fireEvent.click(confirm);
+  await waitFor(() => expect(api).toHaveBeenCalledWith("/api/sessions/active/finish-task", "POST", {
+    reportUrl: "https://example.com/report",
+  }));
+  await screen.findByRole("button", { name: "Đã xong công việc" });
+});

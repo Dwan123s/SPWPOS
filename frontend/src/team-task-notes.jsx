@@ -8,7 +8,7 @@ const sectionNames = [
   [
     "Việc cần thực hiện",
     "tasks",
-    ["yeu cau can thuc hien", "yeu cau", "cong viec can lam", "requirements"],
+    ["yeu cau can thuc hien", "yeu cau", "viec can thuc hien", "cong viec can lam", "requirements"],
   ],
   [
     "Đầu ra cần bàn giao",
@@ -116,8 +116,23 @@ export function TaskNoteContent({ lines }) {
     ),
   );
 }
+export function teamTaskNoteSections(task) {
+  return parseTaskNotes(task.description || "").filter(
+    (section) => section.title !== "Tài liệu nguồn" || !task.sourceFiles?.length,
+  );
+}
+
+export function TaskNoteSection({ section }) {
+  return (
+    <section className={`team-task-note-section${section.title === "Tóm tắt" ? " summary" : ""}`}>
+      <h4><span>{icon(section.glyph)}</span>{section.title}</h4>
+      <TaskNoteContent lines={section.lines} />
+    </section>
+  );
+}
+
 export function TaskRequirements({ task }) {
-  const sections = parseTaskNotes(task.description || "");
+  const sections = teamTaskNoteSections(task);
   return (
     <section className="team-task-notes" aria-label="Yêu cầu & ghi chú">
       <header>
@@ -129,18 +144,7 @@ export function TaskRequirements({ task }) {
       </header>
       {sections.length ? (
         <div className="team-task-note-sections">
-          {sections.map((section, i) => (
-            <section
-              className={`team-task-note-section${section.title === "Tóm tắt" ? " summary" : ""}`}
-              key={i}
-            >
-              <h4>
-                <span>{icon(section.glyph)}</span>
-                {section.title}
-              </h4>
-              <TaskNoteContent lines={section.lines} />
-            </section>
-          ))}
+          {sections.map((section, i) => <TaskNoteSection key={i} section={section} />)}
         </div>
       ) : (
         <p className="team-task-notes-empty">
@@ -170,10 +174,10 @@ export function TaskSourceFiles({ task, leader, busy, onAttach }) {
   return (
     <section
       className="team-task-source-files"
-      aria-label="Tài liệu từ trưởng nhóm"
+      aria-label="Tài liệu nguồn"
     >
       <header>
-        <h3>{icon("folder")} Tài liệu từ trưởng nhóm</h3>
+        <h3>{icon("folder")} Tài liệu nguồn</h3>
         <span>{task.sourceFiles?.length || 0} file</span>
       </header>
       {task.sourceFiles?.length ? (

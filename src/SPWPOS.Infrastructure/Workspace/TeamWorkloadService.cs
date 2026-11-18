@@ -13,7 +13,7 @@ public sealed partial class WorkspaceService
          from profile in profiles.DefaultIfEmpty()
          where membership.TeamId == teamId && membership.Active && user.IsActive && user.EmailConfirmed
          orderby membership.Role descending, user.FirstName, user.LastName, user.Id
-         select new TeamWorkloadMember(user.Id, profile != null && profile.DisplayName != "" ? profile.DisplayName : user.FirstName + " " + user.LastName))
+         select new TeamWorkloadMember(user.Id, profile != null && profile.DisplayName != "" ? profile.DisplayName : user.FirstName + " " + user.LastName, 0, 0))
         .ToArrayAsync(ct);
 
     public async Task<TeamWorkloadView> GetTeamWorkloadAsync(Guid uid, Guid teamId, int week, CancellationToken ct)
@@ -30,6 +30,13 @@ public sealed partial class WorkspaceService
         var tasks = teamTasks.Where(t => InWorkloadWeek(t, start, end, week))
             .OrderBy(t => t.Deadline).ThenBy(t => t.Id).Select(t => SummarizeTeamTask(t, now)).ToArray();
         var members = await TeamWorkloadMembers(teamId, ct);
+        var byPerson = tasks.Where(task => task.Deadline >= start && task.Deadline < end)
+            .ToLookup(task => task.AssigneeId ?? task.DesignatedUserId);
+        members = members.Select(member => member with
+        {
+            TaskCount = byPerson[member.UserId].Count(),
+            EstimatedMinutes = byPerson[member.UserId].Sum(task => task.EstimatedMinutes)
+        }).ToArray();
         await snapshot.CommitAsync(ct);
         var refresh = tasks.Where(t => t.Status is "Open" or "Assigned" && t.Deadline > now)
             .Select(t => t.Deadline.AddSeconds(1)).Append(now.AddMinutes(5)).Min();
@@ -39,8 +46,9 @@ public sealed partial class WorkspaceService
     private static bool InWorkloadWeek(TeamTask task, DateTimeOffset start, DateTimeOffset end, int week) =>
         task.Status is "Open" or "Assigned" or "PendingReview" or "Completed" &&
         (task.Deadline >= start && task.Deadline < end ||
+         task.CompletionSubmittedAt >= start && task.CompletionSubmittedAt < end ||
          task.CompletionReviewedAt >= start && task.CompletionReviewedAt < end ||
-         week == 0 && task.Deadline < start && task.Status is "Open" or "Assigned" or "PendingReview");
+         week == 0 && (task.Status == "PendingReview" || task.Deadline < start && (task.Status is "Open" or "Assigned")));
 
     private static TeamWorkloadTask SummarizeTeamTask(TeamTask task, DateTimeOffset now)
     {

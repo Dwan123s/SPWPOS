@@ -17,6 +17,7 @@ import { openTeamTask } from "./team-task-link.js";
 import { ScheduledFocus } from "./scheduled-focus.jsx";
 import { UpcomingFocus } from "./focus-timer.jsx";
 import { EisenhowerFocus } from "./eisenhower.jsx";
+import { TaskPriorityIndicators } from "./task-workflow.jsx";
 import { PopupDetails } from "./popup-dismissal.jsx";
 import availabilityArt from "./assets/home-setup/availability.webp";
 import calendarArt from "./assets/home-setup/google-calendar.webp";
@@ -128,13 +129,17 @@ function DaySummary({ summary, hasAvailability, now, progress }) {
 function DayRunway({ model, now }) {
   const [view, setView] = useState("agenda");
   const preference = state.workspace.preference;
+  const visible = model.timeline.filter((item) => Date.parse(item.end) > now && item.status !== "Completed");
+  const breaks = model.breaks.filter((rest) => rest.span[1] > model.minuteNow);
   const first = Math.min(
     preference.preferredStartMinute ?? 480,
-    ...model.timeline.map((item) => item.span[0]),
+    ...visible.map((item) => item.span[0]),
+    ...breaks.map((rest) => rest.span[0]),
   );
   const last = Math.max(
     preference.preferredEndMinute ?? 1080,
-    ...model.timeline.map((item) => item.span[1]),
+    ...visible.map((item) => item.span[1]),
+    ...breaks.map((rest) => rest.span[1]),
   );
   const start = Math.floor(first / 60) * 60;
   const end = Math.min(1440, Math.ceil(last / 60) * 60);
@@ -145,17 +150,21 @@ function DayRunway({ model, now }) {
     (_, index) => start + index * 60,
   );
   const lanes = [];
-  const timeline = model.timeline.map((item) => {
+  const timeline = visible.map((item) => {
     let lane = lanes.findIndex((end) => end <= item.span[0]);
     if (lane === -1) lane = lanes.length;
     lanes[lane] = item.span[1];
     return { ...item, lane };
   });
   const laneCount = Math.max(1, lanes.length);
-  const planned = timeline.filter((item) => item.status !== "Completed");
-  const completed = timeline.filter((item) => item.status === "Completed");
-  const deadlines = new Map(
-    state.workspace.tasks.map((task) => [task.id, task.deadline]),
+  const activeBreak = breaks.find((rest) => rest.span[0] <= model.minuteNow &&
+    !timeline.some((item) => item.span[1] === rest.span[0]));
+  const agendaBreak = (rest) => (
+    <div className="daily-agenda-rest">
+      {icon("pause")}
+      <span>Nghỉ {rest.span[1] - rest.span[0]} phút</span>
+      <small>{clock(rest.span[0])}–{clock(rest.span[1])}</small>
+    </div>
   );
   return (
     <section className="runway-card daily-schedule" aria-label="Lịch hôm nay">
@@ -192,39 +201,9 @@ function DayRunway({ model, now }) {
       >
         {view === "agenda" && (
           <div className="daily-agenda">
-            {[...planned, ...completed].map((item, index) => {
-              if (item.status === "Completed") {
-                const deadline = deadlines.get(item.taskId);
-                return (
-                  <Fragment key={`${item.kind}-${item.id}`}>
-                    {index === planned.length && (
-                      <h3 className="home-agenda-divider">Đã hoàn thành</h3>
-                    )}
-                    <button
-                      type="button"
-                      className="home-completed-session"
-                      data-action="session-detail"
-                      data-id={item.id}
-                    >
-                      <span className="home-completed-check">
-                        {icon("check")}
-                      </span>
-                      <span className="home-completed-info">
-                        <span>{item.taskName || item.name}</span>
-                        {Number.isFinite(Date.parse(deadline)) && (
-                          <time
-                            className="home-completed-due"
-                            dateTime={deadline}
-                          >
-                            Hạn {dateFmt(deadline)}
-                          </time>
-                        )}
-                      </span>
-                    </button>
-                  </Fragment>
-                );
-              }
-              const rest = model.breaks.find(
+            {activeBreak && agendaBreak(activeBreak)}
+            {timeline.map((item) => {
+              const rest = breaks.find(
                 (rest) => rest.span[0] === item.span[1],
               );
               const phase = calendarPhase(item.start, item.end, now);
@@ -244,6 +223,7 @@ function DayRunway({ model, now }) {
                         item.kind === "session" ? "session-detail" : "nav"
                       }
                       data-id={item.kind === "session" ? item.id : "calendar"}
+                      data-open-task={item.kind === "session" ? "true" : undefined}
                     >
                       <div className="daily-agenda-session-top">
                         <span
@@ -271,23 +251,15 @@ function DayRunway({ model, now }) {
                       </div>
                     </button>
                   </div>
-                  {rest && (
-                    <div className="daily-agenda-rest">
-                      {icon("pause")}
-                      <span>Nghỉ {rest.span[1] - rest.span[0]} phút</span>
-                      <small>
-                        {clock(rest.span[0])}–{clock(rest.span[1])}
-                      </small>
-                    </div>
-                  )}
+                  {rest && agendaBreak(rest)}
                 </Fragment>
               );
             })}
-            {!timeline.length && (
+            {!timeline.length && !activeBreak && (
               <div className="daily-agenda-empty">
                 <span>{icon("calendar")}</span>
                 <h3>Hôm nay còn trống</h3>
-                <p>Chưa có sự kiện hoặc phiên làm việc hôm nay.</p>
+                <p>Không còn sự kiện hoặc phiên làm việc nào hôm nay.</p>
               </div>
             )}
           </div>
@@ -310,7 +282,7 @@ function DayRunway({ model, now }) {
                     style={{ top: (minute - start) * scale }}
                   />
                 ))}
-                {model.breaks.map((rest) => (
+                {breaks.map((rest) => (
                   <div
                     key={rest.span[0]}
                     className="runway-break"
@@ -343,6 +315,7 @@ function DayRunway({ model, now }) {
                         item.kind === "session" ? "session-detail" : "nav"
                       }
                       data-id={item.kind === "session" ? item.id : "calendar"}
+                      data-open-task={item.kind === "session" ? "true" : undefined}
                       aria-label={`${item.taskName || item.name}, ${timeFmt(item.start)} đến ${timeFmt(item.end)}, ${minutes(item.span[1] - item.span[0])}`}
                       style={{
                         top: (item.span[0] - start) * scale + 2,
@@ -485,7 +458,7 @@ function CapacityHorizon({ model }) {
     >
       <div className="console-card-heading">
         <h3>Khả năng trong 7 ngày</h3>
-        <ToolButton label="Thiết lập thời gian rảnh" id="time" symbol="clock" />
+        <ToolButton label="Thiết lập Thời Gian Làm Việc" id="time" symbol="clock" />
       </div>
       <p>Tổng thời lượng lịch học, lịch hẹn và phiên công việc</p>
       <div
@@ -542,7 +515,7 @@ function CapacityHorizon({ model }) {
           <span>
             {model.hasAvailability
               ? "Chưa có dữ liệu khả năng thực hiện."
-              : "Chưa đặt giờ rảnh để tính khả năng xếp thêm."}
+              : "Chưa đặt Thời Gian Làm Việc để tính khả năng xếp thêm."}
           </span>
           {!model.hasAvailability &&
             button("Đặt giờ làm việc", "nav", "small ghost", "time", "clock")}
@@ -805,7 +778,7 @@ function HomeDeadlines({ model, sessions }) {
             <thead>
               <tr>
                 <th scope="col">Công việc</th>
-                <th scope="col">Dự kiến</th>
+                <th scope="col">Dự kiến làm</th>
                 <th scope="col">Thời lượng</th>
                 <th scope="col">Hạn chót</th>
               </tr>
@@ -826,6 +799,7 @@ function HomeDeadlines({ model, sessions }) {
                       >
                         {icon("tasks")} {task.name}
                       </button>
+                      <TaskPriorityIndicators task={task} sessions={sessions} now={model.now} />
                     </td>
                     <td>
                       {scheduled ? (
@@ -839,6 +813,7 @@ function HomeDeadlines({ model, sessions }) {
                           {dayKey(scheduled.start) === model.today
                             ? "Hôm nay"
                             : dateFmt(scheduled.start)}
+                          <small className="home-planned-time">{timeFmt(scheduled.start)}–{timeFmt(scheduled.end)}</small>
                         </button>
                       ) : (
                         "Chưa xếp"
@@ -869,12 +844,10 @@ function HomeDeadlines({ model, sessions }) {
       ) : (
         <div className="home-empty home-deadlines-empty">
           <p>{range === "day" ? "Không có việc đến hạn hôm nay hoặc quá hạn." : "Không có việc nào sắp đến hạn."}</p>
-          {button("Thêm công việc", "new-task", "secondary small")}
         </div>
       )}
       {tasks.length > 0 && (
         <div className="home-panel-footer">
-          {button("Thêm công việc", "new-task", "ghost small", "", "plus")}
           {button("Xem tất cả công việc", "open-task-list", "ghost small", "all")}
         </div>
       )}

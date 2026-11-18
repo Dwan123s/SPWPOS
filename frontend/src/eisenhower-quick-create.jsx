@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { icon, localInput, toUtc, dateFmt, timeFmt } from "./ui.jsx";
+import { EisenhowerPriorityField } from "./eisenhower-priority.jsx";
+import { eisenhowerPriority } from "./eisenhower-priority.js";
 
 export function EisenhowerQuickCreate({
   task,
@@ -25,7 +27,10 @@ export function EisenhowerQuickCreate({
   const [dateOpen, setDateOpen] = useState(false),
     [priorityOpen, setPriorityOpen] = useState(false),
     [validation, setValidation] = useState("");
-  const current = columns.find((column) => column.id === group);
+  const [importanceLevel, setImportanceLevel] = useState(task?.importance || (group === "Q1" || group === "Q2" ? "Important" : group === "Q3" || group === "Q4" ? "Lower" : "Unknown"));
+  let deadlineValue = null;
+  try { deadlineValue = deadline ? toUtc(deadline) : null; } catch { /* The form reports an invalid deadline on submit. */ }
+  const current = columns.find((column) => column.id === eisenhowerPriority({ importanceLevel, deadline: deadlineValue }).quadrant);
   let dueLabel = "Hạn chót";
   if (deadline) {
     try {
@@ -77,6 +82,7 @@ export function EisenhowerQuickCreate({
               description,
               deadline: deadline ? toUtc(deadline) : null,
               quadrant: group,
+              importanceLevel,
               requestId: requestId.current,
             });
           } catch (failure) {
@@ -163,26 +169,8 @@ export function EisenhowerQuickCreate({
             role="group"
             aria-label="Chọn vị trí ưu tiên"
           >
-            {columns
-              .filter(
-                (column) =>
-                  column.id.startsWith("Q") || column.id === "Unknown",
-              )
-              .map((column) => (
-                <button
-                  key={column.id}
-                  type="button"
-                  className={`tone-${column.tone}`}
-                  disabled={busy}
-                  aria-pressed={group === column.id}
-                  onClick={() => {
-                    setGroup(column.id);
-                    setPriorityOpen(false);
-                  }}
-                >
-                  {column.caption || column.label}
-                </button>
-              ))}
+            <EisenhowerPriorityField value={importanceLevel} deadline={deadlineValue} disabled={busy}
+              onChange={(level) => { setImportanceLevel(level); setGroup(level === "Important" ? "Q2" : level === "Lower" ? "Q4" : "Unknown"); }} />
           </div>
         )}
         <div className="eis-quick-body">

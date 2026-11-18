@@ -15,6 +15,50 @@ public sealed partial class PrivateTeamPlanningTests
     private static async Task<SharedTaskView> Current(SPWPOS.TestSupport.ServiceHarness h) =>
         (await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks.Single();
 
+    [Fact]
+    public async Task Completion_policy_requires_a_valid_private_report_and_can_mute_leader_notification()
+    {
+        await using var h = await Setup();
+        await ClaimForReview(h);
+        await h.DbAsync(async db =>
+        {
+            db.TeamMemberships.Add(new() { TeamId = Team, UserId = Other });
+            await db.SaveChangesAsync(Ct);
+        });
+        var original = (await Use(h, s => s.GetTeamAsync(Member, Team, Ct))).CompletionPolicy!;
+        Assert.False(original.RequireReportUrl);
+        Assert.True(original.NotifyLeader);
+        var input = original with { RequireReportUrl = true, NotifyLeader = false };
+        var forbidden = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.SaveTeamCompletionPolicyAsync(Member, Team, input, Ct)));
+        Assert.Equal("TEAM_FORBIDDEN", forbidden.Code);
+        var saved = await Use(h, s => s.SaveTeamCompletionPolicyAsync(Leader, Team, input, Ct));
+        Assert.Equal(saved, (await Use(h, s => s.GetTeamAsync(Member, Team, Ct))).CompletionPolicy);
+        var stale = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.SaveTeamCompletionPolicyAsync(Leader, Team, input, Ct)));
+        Assert.Equal("TEAM_POLICY_STALE", stale.Code);
+
+        var assigned = await Current(h);
+        var progressError = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.UpdateTeamProgressAsync(Member, TaskId, new(assigned.Version, 100), Ct)));
+        Assert.Equal("TEAM_REPORT_URL_REQUIRED", progressError.Code);
+        var report = new TeamCompletionSubmitInput(assigned.Version, Guid.NewGuid(), ReportUrl: "javascript:alert(1)");
+        var badUrl = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.SubmitTeamCompletionAsync(Member, TaskId, report, Ct)));
+        Assert.Equal("TEAM_REPORT_URL_INVALID", badUrl.Code);
+        Assert.Equal("Assigned", (await Current(h)).Status);
+        Assert.Equal(0, await h.DbAsync(db => db.TeamCompletionSubmissions.CountAsync(Ct)));
+
+        report = report with { ReportUrl = "https://example.com/report" };
+        await Use(h, s => s.SubmitTeamCompletionAsync(Member, TaskId, report, Ct));
+        await Use(h, s => s.SubmitTeamCompletionAsync(Member, TaskId, report, Ct));
+        var pending = await Current(h);
+        Assert.Equal("PendingReview", pending.Status);
+        Assert.Equal(report.ReportUrl, pending.CompletionReportUrl);
+        Assert.Equal(report.ReportUrl, (await Use(h, s => s.GetTeamAsync(Member, Team, Ct))).Tasks.Single().CompletionReportUrl);
+        Assert.Null((await Use(h, s => s.GetTeamAsync(Other, Team, Ct))).Tasks.Single().CompletionReportUrl);
+        Assert.Equal(1, await h.DbAsync(db => db.TeamCompletionSubmissions.CountAsync(Ct)));
+        Assert.Equal(0, await h.DbAsync(db => db.InAppNotifications.CountAsync(x => x.Kind == "TEAM_COMPLETION_REQUEST", Ct)));
+        await Use(h, s => s.ReviewTeamCompletionAsync(Leader, TaskId, new(pending.Version, report.RequestId, true), Ct));
+        Assert.Equal("Completed", (await Current(h)).Status);
+    }
+
     [Fact] public async Task Only_leader_can_draft_and_publish_even_with_a_forged_owned_proposal()
     {
         await using var h = await Setup(new SPWPOS.TestSupport.AgentAiTestDouble { Response = _ => SPWPOS.TestSupport.AgentAiTestDouble.Empty() with { Tasks = [new(null, "Báo cáo", Tomorrow, 60, 2, "OTHER", true, DeadlineEvidence: "hạn ngày mai")] } });

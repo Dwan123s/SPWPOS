@@ -17,7 +17,8 @@ public sealed class EisenhowerBoardApiTests
         Assert.Equal(id, repeated);
         var view = (await Send(client, HttpMethod.Get, "/api/eisenhower")).GetProperty("data");
         var row = Assert.Single(view.GetProperty("tasks").EnumerateArray());
-        Assert.Equal("Draft", row.GetProperty("kind").GetString()); Assert.Equal("Q2", row.GetProperty("quadrant").GetString());
+        Assert.Equal("Draft", row.GetProperty("kind").GetString()); Assert.Equal("Unknown", row.GetProperty("quadrant").GetString());
+        Assert.Equal("Important", row.GetProperty("importance").GetString());
         Assert.True(!row.TryGetProperty("deadline", out var due) || due.ValueKind == System.Text.Json.JsonValueKind.Null);
         var notes = (await Send(client, HttpMethod.Get, "/api/notes")).GetProperty("data");
         Assert.Equal(id, Assert.Single(notes.EnumerateArray()).GetProperty("id").GetGuid());

@@ -1,18 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./api.js";
-import { minutes } from "./ui.jsx";
+import { button, dayKey, icon, minutes } from "./ui.jsx";
+import "./analytics-history.css";
 
-const notices = {
-  INSUFFICIENT_COMPLETION_SAMPLES:
-    "Chưa đủ 3 công việc hoàn thành để kết luận xu hướng.",
-  OPEN_TIMER_PROVISIONAL:
-    "Thời gian phiên đang chạy là tạm tính và được hiển thị riêng.",
-  MANUAL_ACTUAL_SEPARATE_FROM_FOCUS:
-    "Có thời lượng chỉnh tay. Thời gian tập trung vẫn lấy từ các đoạn ghi nhận của bộ đếm.",
-  NO_COMPARISON_BASELINE:
-    "Kỳ trước chưa có thời gian tập trung để tính phần trăm thay đổi.",
-};
-const duration = (seconds) => minutes(Math.floor(seconds / 60));
 // Compatibility for an older server during a staged API/schema upgrade.
 // No date-based focus is inferred from scheduled session dates.
 export function WorkspacePerformance({ tasks }) {
@@ -36,7 +26,9 @@ export function WorkspacePerformance({ tasks }) {
             <tbody>
               {rows.map((task) => (
                 <tr key={task.id}>
-                  <td>{task.name}</td>
+                  <td>
+                    {button(task.name, "task-detail", "small ghost", task.id)}
+                  </td>
                   <td>{minutes(task.estimatedMinutes)}</td>
                   <td>{minutes(task.actualMinutes)}</td>
                   <td>{task.progress}%</td>
@@ -77,303 +69,572 @@ export function WorkspacePerformance({ tasks }) {
     </section>
   );
 }
-export function AnalyticsHistory() {
-  const [days, setDays] = useState("7");
-  const [range, setRange] = useState(null);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState("");
-  const [retry, setRetry] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [tasks, setTasks] = useState(null);
-  const [taskError, setTaskError] = useState("");
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError("");
-    const query = range
-      ? `start=${range.start}&end=${range.end}`
-      : `days=${days}`;
-    api(`/api/intelligence/history?${query}`)
-      .then((result) => {
-        if (
-          !Array.isArray(result?.days) ||
-          !result.current ||
-          !Array.isArray(result.notices)
-        )
-          throw new Error("Chưa tải được thống kê hợp lệ. Hãy thử lại.");
-        if (active) setData(result);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [days, range, retry]);
-  useEffect(() => {
-    let active = true;
-    setTaskError("");
-    setTasks(null);
-    api(
-      `/api/intelligence/tasks?page=${page}&pageSize=20&search=${encodeURIComponent(search)}`,
-    )
-      .then((result) => {
-        if (!Array.isArray(result?.items) || !Number.isFinite(result.total))
-          throw new Error("Chưa tải được danh sách công việc. Hãy thử lại.");
-        if (active) setTasks(result);
-      })
-      .catch((e) => {
-        if (active) setTaskError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [page, search, retry]);
+const periods = [
+  ["3", "3 ngày"],
+  ["7", "7 ngày"],
+  ["30", "30 ngày"],
+];
+const longDuration = (seconds) => {
+  if (seconds == null) return "—";
+  if (seconds > 0 && seconds < 60) return "Dưới 1 phút";
+  return minutes(Math.floor(seconds / 60), "long");
+};
+const dayFormat = new Intl.DateTimeFormat("vi-VN", {
+  weekday: "short",
+  day: "numeric",
+  month: "numeric",
+  timeZone: "UTC",
+});
+const rangeFormat = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function AnalyticsError({ message, onRetry }) {
+  return (
+    <div className="timesheet-feedback" role="alert">
+      <span>{message}</span>
+      <button className="btn secondary small" type="button" onClick={onRetry}>
+        Thử lại
+      </button>
+    </div>
+  );
+}
+
+function DateRangeForm({ range, onApply }) {
+  const today = dayKey(Date.now());
+  const [start, setStart] = useState(range?.start || today);
+  const [end, setEnd] = useState(range?.end || today);
+  const [message, setMessage] = useState("");
+  return (
+    <form
+      className="timesheet-range-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const length = (Date.parse(end) - Date.parse(start)) / 86400000 + 1;
+        if (length < 1 || length > 90 || end > today) {
+          setMessage("Chọn khoảng từ 1 đến 90 ngày, không vượt hôm nay.");
+          return;
+        }
+        setMessage("");
+        onApply({ start, end });
+      }}
+    >
+      <label className="field">
+        Từ ngày
+        <input
+          type="date"
+          value={start}
+          max={today}
+          required
+          onChange={(event) => {
+            setStart(event.target.value);
+            setMessage("");
+          }}
+        />
+      </label>
+      <label className="field">
+        Đến ngày
+        <input
+          type="date"
+          value={end}
+          max={today}
+          required
+          onChange={(event) => {
+            setEnd(event.target.value);
+            setMessage("");
+          }}
+        />
+      </label>
+      <button className="btn primary" type="submit">
+        Áp dụng
+      </button>
+      {message && <p role="alert">{message}</p>}
+    </form>
+  );
+}
+
+function TimesheetTotals({ data }) {
+  const { current, focusChangePercent } = data;
+  const metrics = [
+    [
+      "check",
+      "Đã ghi nhận",
+      current.recordedActualSeconds,
+      "Thời lượng đã lưu, gồm cả số nhập tay.",
+      "recorded",
+    ],
+    [
+      "calendar",
+      "Lịch dự kiến",
+      current.plannedSeconds,
+      "Tổng thời lượng các phiên trong lịch.",
+      "planned",
+    ],
+    [
+      "clock",
+      "Tập trung",
+      current.focusSeconds,
+      "Thời lượng từ bộ đếm khi bạn làm việc.",
+      "focus",
+    ],
+  ];
+  return (
+    <div className="timesheet-overview">
+      <dl className="timesheet-totals">
+        {metrics.map(([symbol, label, value, hint, tone]) => (
+          <div key={label} className="timesheet-metric" data-tone={tone}>
+            <dt>
+              <span className="timesheet-icon">{icon(symbol)}</span>
+              {label}
+            </dt>
+            <dd>{longDuration(value)}</dd>
+            <dd className="timesheet-metric-hint">{hint}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="timesheet-summary-line">
+        <span>
+          <strong>{current.completedTasks}</strong> việc hoàn thành ·{" "}
+          {current.onTimeTasks} đúng hạn
+        </span>
+        {focusChangePercent != null && (
+          <span>
+            Tập trung{" "}
+            <strong>
+              {focusChangePercent > 0 ? "+" : ""}
+              {focusChangePercent}%
+            </strong>{" "}
+            so với kỳ trước
+          </span>
+        )}
+        {current.openFocusSeconds > 0 && (
+          <span className="timesheet-running">
+            Đang chạy · {longDuration(current.openFocusSeconds)} tạm tính
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const comparedTimes = [
+  { key: "plannedSeconds", label: "Dự kiến", tone: "planned" },
+  { key: "focusSeconds", label: "Tập trung", tone: "focus" },
+];
+const hasDayActivity = (day) =>
+  day.plannedSeconds ||
+  day.focusSeconds ||
+  day.openFocusSeconds ||
+  day.completedTasks;
+
+function TimesheetDays({ data }) {
+  const [visible, setVisible] = useState(7);
+  const days = [...data.days].sort((a, b) => b.date.localeCompare(a.date));
+  const scale = Math.max(
+    1,
+    ...days.flatMap((day) => comparedTimes.map(({ key }) => day[key])),
+  );
   return (
     <section
-      className="card section-gap analytics-panel"
-      aria-label="Thống kê lịch sử"
+      className="timesheet-card timesheet-days"
+      aria-label="Giờ làm theo ngày"
     >
-      <div className="card-header">
-        <div>
-          <h2>Bảng giờ làm</h2>
+      <header className="timesheet-detail-heading">
+        <h3>Theo ngày</h3>
+        <div className="timesheet-legend">
+          {comparedTimes.map(({ key, label, tone }) => (
+            <span key={key} data-tone={tone}>
+              <i aria-hidden="true" />
+              {label}
+            </span>
+          ))}
         </div>
-        <label className="field">
-          Khoảng xem{" "}
-          <select
-            aria-label="Khoảng thống kê"
-            value={range ? "custom" : days}
-            onChange={(e) => {
-              if (e.target.value !== "custom") {
-                setRange(null);
-                setDays(e.target.value);
-              }
-            }}
-          >
-            <option value="3">3 ngày</option>
-            <option value="7">7 ngày</option>
-            <option value="30">30 ngày</option>
-            {range && <option value="custom">Tùy chọn</option>}
-          </select>
-        </label>
-      </div>
-      <details className="analytics-date-range">
-        <summary>Chọn khoảng ngày</summary>
+      </header>
+      {days.some(hasDayActivity) ? (
+        <>
+          <ul className="timesheet-day-list">
+            {days.slice(0, visible).map((day) => (
+              <li key={day.date}>
+                <div className="timesheet-day-heading">
+                  <button
+                    type="button"
+                    className="timesheet-text-link"
+                    data-action="calendar-date"
+                    data-id={day.date}
+                    aria-label={`Mở lịch ngày ${day.date}`}
+                  >
+                    <time dateTime={day.date}>
+                      {dayFormat.format(new Date(day.date))}
+                    </time>
+                    {icon("arrow")}
+                  </button>
+                  {day.completedTasks > 0 && (
+                    <small>{day.completedTasks} việc hoàn thành</small>
+                  )}
+                </div>
+                <div className="timesheet-day-comparison">
+                  {comparedTimes.map(({ key, label, tone }) => (
+                    <div
+                      key={key}
+                      className="timesheet-comparison-row"
+                      data-tone={tone}
+                    >
+                      <span>{label}</span>
+                      <div className="timesheet-track" aria-hidden="true">
+                        <span
+                          style={{ width: `${(100 * day[key]) / scale}%` }}
+                        />
+                      </div>
+                      <strong>{longDuration(day[key])}</strong>
+                    </div>
+                  ))}
+                  {day.openFocusSeconds > 0 && (
+                    <small className="timesheet-running">
+                      Đang chạy · {longDuration(day.openFocusSeconds)} tạm tính
+                    </small>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {visible < days.length && (
+            <div className="timesheet-more">
+              <span>
+                Đang xem {visible}/{days.length} ngày
+              </span>
+              <button
+                type="button"
+                className="btn secondary small"
+                onClick={() => setVisible((current) => current + 7)}
+              >
+                Xem thêm ngày
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="timesheet-empty">
+          {icon("calendar")}
+          <strong>Chưa có giờ làm trong khoảng này</strong>
+          <p>
+            Chọn khoảng ngày khác để xem lịch dự kiến và thời gian tập trung.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TimesheetTasks({ page, search, setPage, onSearch }) {
+  const [draft, setDraft] = useState(search);
+  const [result, setResult] = useState(null);
+  const [retry, setRetry] = useState(0);
+  const path = `/api/intelligence/tasks?page=${page}&pageSize=20&search=${encodeURIComponent(search)}`;
+  useEffect(() => {
+    let active = true;
+    api(path)
+      .then((value) => {
+        if (
+          !Array.isArray(value?.items) ||
+          !Number.isFinite(value.total) ||
+          !(value.pageSize > 0)
+        )
+          throw new Error("Chưa tải được danh sách công việc. Hãy thử lại.");
+        if (active) setResult({ path, retry, value });
+      })
+      .catch((error) => {
+        if (active) setResult({ path, retry, error: error.message });
+      });
+    return () => {
+      active = false;
+    };
+  }, [path, retry]);
+  const current =
+    result?.path === path && result.retry === retry ? result : null;
+  const tasks = current?.value;
+  return (
+    <section
+      className="timesheet-card timesheet-tasks"
+      aria-label="Thời lượng theo công việc"
+    >
+      <header className="timesheet-detail-heading">
+        <div>
+          <h3>Thời lượng theo công việc</h3>
+          <p>
+            Tổng thời lượng từ trước đến nay của từng việc, gồm cả số nhập tay.
+          </p>
+        </div>
         <form
-          className="analytics-range-form"
-          onInput={(e) => e.currentTarget.elements.end.setCustomValidity("")}
-          onSubmit={(e) => {
-            e.preventDefault();
-            const values = new FormData(e.currentTarget);
-            const start = values.get("start"),
-              end = values.get("end");
-            const field = e.currentTarget.elements.end;
-            const length = (Date.parse(end) - Date.parse(start)) / 86400000 + 1;
-            field.setCustomValidity(
-              length < 1
-                ? "Ngày kết thúc cần từ ngày bắt đầu trở đi."
-                : length > 90
-                  ? "Chọn tối đa 90 ngày để xem thống kê."
-                  : "",
-            );
-            if (!e.currentTarget.reportValidity()) return;
-            setRange({ start, end });
+          className="timesheet-search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSearch(draft.trim());
           }}
         >
-          <label className="field">
-            Từ ngày <input name="start" type="date" required />
-          </label>
-          <label className="field">
-            Đến ngày <input name="end" type="date" required />
+          <label className="timesheet-search-field">
+            {icon("search")}
+            <input
+              type="search"
+              aria-label="Tìm công việc"
+              placeholder="Tìm theo tên công việc…"
+              value={draft}
+              maxLength={100}
+              onChange={(event) => setDraft(event.target.value)}
+            />
           </label>
           <button type="submit" className="btn secondary">
-            Xem
+            Tìm
           </button>
+          {search && (
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => {
+                setDraft("");
+                onSearch("");
+              }}
+            >
+              Xóa tìm kiếm
+            </button>
+          )}
         </form>
-      </details>
-      {loading && <p role="status">Đang tải thống kê…</p>}
-      {error && (
-        <p role="alert" className="inline-feedback is-error">
-          {error}{" "}
-          <button
-            type="button"
-            className="btn secondary small"
-            onClick={() => setRetry((x) => x + 1)}
-          >
-            Thử lại
-          </button>
-        </p>
-      )}
-      {!loading && !error && data && (
-        <>
-          <p className="reason">
-            {data.start} – {data.end} · {data.timeZoneId}
-          </p>
-          <details className="timesheet-summary">
-            <summary>Tổng hợp giờ và tiến độ</summary>
-            <div className="stats-grid analytics-metrics">
-              <div>
-                <span>Tập trung đã ghi nhận</span>
-                <h3>{duration(data.current.focusSeconds)}</h3>
-                <p>
-                  {data.focusChangePercent == null
-                    ? "Chưa có kỳ so sánh"
-                    : `${data.focusChangePercent > 0 ? "+" : ""}${data.focusChangePercent}% so với kỳ trước`}
-                </p>
-              </div>
-              <div>
-                <span>Đang chạy · tạm tính</span>
-                <h3>{duration(data.current.openFocusSeconds)}</h3>
-              </div>
-              <div>
-                <span>Công việc hoàn thành</span>
-                <h3>{data.current.completedTasks}</h3>
-                <p>
-                  {data.current.onTimeTasks} đúng hạn · không tính trùng việc
-                  cha
-                </p>
-              </div>
-              <div>
-                <span>Lịch dự kiến</span>
-                <h3>{duration(data.current.plannedSeconds)}</h3>
-                <p>Gồm các phiên chưa thực hiện hoặc bị lỡ</p>
-              </div>
-            </div>
-          </details>
-          {data.notices.map((code) => (
-            <p key={code} className="reason">
-              {notices[code] || code}
-            </p>
-          ))}
-          <div className="table-scroll">
-            <table>
-              <caption>Lịch dự kiến và thời gian tập trung theo ngày</caption>
-              <thead>
-                <tr>
-                  <th>Ngày</th>
-                  <th>Dự kiến</th>
-                  <th>Tập trung</th>
-                  <th>Đang chạy</th>
-                  <th>Hoàn thành</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.days.map((day) => (
-                  <tr key={day.date}>
-                    <td>
-                      <button
-                        type="button"
-                        className="planned-date-link"
-                        data-action="calendar-date"
-                        data-id={day.date}
-                        aria-label={`Mở lịch ngày ${day.date}`}
-                      >
-                        {day.date}
-                      </button>
-                    </td>
-                    <td>{duration(day.plannedSeconds)}</td>
-                    <td>{duration(day.focusSeconds)}</td>
-                    <td>{duration(day.openFocusSeconds)}</td>
-                    <td>{day.completedTasks}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-      <h3>Thời lượng theo công việc</h3>
-      <p className="reason">
-        Thực tế đã ghi nhận có thể gồm chỉnh tay; không thay thế giờ tập trung ở
-        trên.
-      </p>
-      <form
-        className="analytics-search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setPage(1);
-          setSearch(new FormData(e.currentTarget).get("search").trim());
-        }}
-      >
-        <label className="field">
-          Tìm công việc <input name="search" maxLength={100} />
-        </label>
-        <button type="submit" className="btn secondary">
-          Tìm
-        </button>
-      </form>
-      {taskError ? (
-        <p role="alert" className="inline-feedback is-error">
-          {taskError}{" "}
-          <button
-            type="button"
-            className="btn secondary small"
-            onClick={() => setRetry((x) => x + 1)}
-          >
-            Thử lại
-          </button>
-        </p>
+      </header>
+      {current?.error ? (
+        <AnalyticsError
+          message={current.error}
+          onRetry={() => setRetry((count) => count + 1)}
+        />
       ) : !tasks ? (
-        <p role="status">Đang tải công việc…</p>
+        <p className="timesheet-feedback" role="status">
+          Đang tải công việc…
+        </p>
+      ) : tasks.items.length === 0 ? (
+        <div className="timesheet-empty">
+          {icon("search")}
+          <strong>Chưa có công việc phù hợp.</strong>
+        </div>
       ) : (
         <>
-          {tasks.items.length > 0 && (
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Công việc</th>
-                    <th>Dự kiến</th>
-                    <th>Đã ghi nhận</th>
-                    <th>Tiến độ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tasks.items.map((task) => (
-                    <tr key={task.id}>
-                      <td>{task.name}</td>
-                      <td>{minutes(task.estimatedMinutes)}</td>
-                      <td>{duration(task.recordedActualSeconds)}</td>
-                      <td>{task.progress}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {tasks.total === 0 && (
-            <p className="compact-empty">Chưa có công việc phù hợp.</p>
-          )}
+          <ul className="timesheet-task-list">
+            {tasks.items.map((task) => (
+              <li key={task.id}>
+                <button
+                  className="timesheet-text-link"
+                  type="button"
+                  data-action="task-detail"
+                  data-id={task.id}
+                >
+                  <span>{task.name}</span>
+                  {icon("arrow")}
+                </button>
+                <dl className="timesheet-task-meta">
+                  <div>
+                    <dt>Ước lượng</dt>
+                    <dd>{minutes(task.estimatedMinutes, "long")}</dd>
+                  </div>
+                  <div>
+                    <dt>Đã ghi nhận</dt>
+                    <dd>{longDuration(task.recordedActualSeconds)}</dd>
+                  </div>
+                  <div>
+                    <dt>Tiến độ</dt>
+                    <dd className="timesheet-progress">
+                      <progress
+                        max="100"
+                        value={task.progress}
+                        aria-label={`Tiến độ ${task.name}`}
+                      />
+                      <span>{task.progress}%</span>
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ul>
           {tasks.total > tasks.pageSize && (
-            <nav className="pagination" aria-label="Phân trang thống kê">
+            <nav className="timesheet-more" aria-label="Phân trang thống kê">
               <button
                 className="btn secondary small"
                 type="button"
                 disabled={page === 1}
-                onClick={() => setPage((x) => x - 1)}
+                onClick={() => setPage(page - 1)}
               >
                 Trước
               </button>
               <span>
-                {" "}
-                Trang {page} · {tasks.total} công việc{" "}
+                Trang {page}/{Math.ceil(tasks.total / tasks.pageSize)} ·{" "}
+                {tasks.total} việc
               </span>
               <button
                 className="btn secondary small"
                 type="button"
                 disabled={page * tasks.pageSize >= tasks.total}
-                onClick={() => setPage((x) => x + 1)}
+                onClick={() => setPage(page + 1)}
               >
                 Sau
               </button>
             </nav>
           )}
         </>
+      )}
+    </section>
+  );
+}
+
+export function AnalyticsHistory() {
+  const [view, setView] = useState("days");
+  const [days, setDays] = useState("7");
+  const [custom, setCustom] = useState(false);
+  const [range, setRange] = useState(null);
+  const [result, setResult] = useState(null);
+  const [retry, setRetry] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const query = range
+    ? `start=${range.start}&end=${range.end}`
+    : `days=${days}`;
+  useEffect(() => {
+    let active = true;
+    api(`/api/intelligence/history?${query}`)
+      .then((value) => {
+        if (
+          !Array.isArray(value?.days) ||
+          !value.current ||
+          !Number.isFinite(Date.parse(value.start)) ||
+          !Number.isFinite(Date.parse(value.end)) ||
+          value.start > value.end
+        )
+          throw new Error("Chưa tải được thống kê hợp lệ. Hãy thử lại.");
+        if (active) setResult({ query, retry, value });
+      })
+      .catch((error) => {
+        if (active) setResult({ query, retry, error: error.message });
+      });
+    return () => {
+      active = false;
+    };
+  }, [query, retry]);
+  const current =
+    result?.query === query && result.retry === retry ? result : null;
+  const data = current?.value;
+
+  return (
+    <section className="timesheet" aria-label="Thống kê lịch sử">
+      <header className="timesheet-card timesheet-header">
+        <div className="timesheet-heading">
+          <span className="timesheet-icon">{icon("clock")}</span>
+          <div>
+            <h2>Giờ làm việc cá nhân</h2>
+            <p>So sánh thời lượng dự kiến với thời gian đã làm.</p>
+          </div>
+        </div>
+        <div
+          className="timesheet-segment"
+          role="group"
+          aria-label="Xem giờ làm theo"
+        >
+          <button
+            type="button"
+            aria-pressed={view === "days"}
+            onClick={() => setView("days")}
+          >
+            Theo ngày
+          </button>
+          <button
+            type="button"
+            aria-pressed={view === "tasks"}
+            onClick={() => setView("tasks")}
+          >
+            Theo công việc
+          </button>
+        </div>
+      </header>
+
+      {view === "days" ? (
+        <>
+          <section
+            className="timesheet-card timesheet-period-card"
+            aria-label="Khoảng ngày báo cáo"
+          >
+            <div className="timesheet-period-row">
+              <div
+                className="timesheet-segment"
+                role="group"
+                aria-label="Khoảng thống kê"
+              >
+                {periods.map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={!range && !custom && days === key}
+                    onClick={() => {
+                      setDays(key);
+                      setRange(null);
+                      setCustom(false);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  aria-expanded={custom}
+                  aria-controls="timesheet-custom-range"
+                  onClick={() => setCustom((open) => !open)}
+                >
+                  {icon("calendar")} Chọn ngày
+                </button>
+              </div>
+              {data && (
+                <span className="timesheet-date-label">
+                  {rangeFormat.formatRange(
+                    new Date(data.start),
+                    new Date(data.end),
+                  )}
+                </span>
+              )}
+            </div>
+            <div id="timesheet-custom-range" hidden={!custom}>
+              {custom && (
+                <DateRangeForm
+                  range={range ?? data}
+                  onApply={(value) => {
+                    setRange(value);
+                    setCustom(false);
+                  }}
+                />
+              )}
+            </div>
+          </section>
+          {current?.error ? (
+            <AnalyticsError
+              message={current.error}
+              onRetry={() => setRetry((count) => count + 1)}
+            />
+          ) : !data ? (
+            <p className="timesheet-feedback" role="status">
+              Đang tải giờ làm…
+            </p>
+          ) : (
+            <>
+              <TimesheetTotals data={data} />
+              <TimesheetDays key={query} data={data} />
+            </>
+          )}
+        </>
+      ) : (
+        <TimesheetTasks
+          page={page}
+          search={search}
+          setPage={setPage}
+          onSearch={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+        />
       )}
     </section>
   );

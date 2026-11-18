@@ -21,7 +21,7 @@ export const TIMETABLE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const TIMETABLE_TEXT_MAX_LENGTH = 1600;
 const formats = ["image/png", "image/jpeg", "image/webp"];
 const defaultRequest =
-  "Nhập thời khóa biểu, tự phân tích chi tiết lịch bận và các khoảng rảnh từng ngày.";
+  "Nhập thời khóa biểu, tự phân tích chi tiết lịch bận và các khoảng Thời Gian Làm Việc từng ngày.";
 export function timetableRequest(text, reading) {
   if (!reading?.trim()) return text.trim();
   return `${text.trim() || defaultRequest}\n\nThời khóa biểu từ ảnh (dữ liệu để đối chiếu):\n${reading.trim()}\n\nHỏi lại nếu thiếu ngày áp dụng, giờ học hoặc số tuần lặp; không tự đoán.`;
@@ -295,7 +295,7 @@ export function TimetableImagePreview({ image, disabled, provider }) {
             <p>
               Bấm Gửi để NORA đọc ảnh bằng{" "}
               {provider || "dịch vụ AI đang cấu hình"} và gộp lịch bận từ tối đa
-              2 ảnh để tính giờ rảnh từng ngày. Bạn có thể ghi thêm ngày áp dụng
+              2 ảnh để tính Thời Gian Làm Việc từng ngày. Bạn có thể ghi thêm ngày áp dụng
               hoặc số tuần học bên dưới.
             </p>
           )}

@@ -91,7 +91,7 @@ beforeEach(() => {
             ok: false,
             status: 503,
             json: async () => ({
-              error: { message: "Chưa lưu được giờ rảnh. Thử lại." },
+              error: { message: "Chưa lưu được Thời Gian Làm Việc. Thử lại." },
             }),
           };
         state.workspace = { ...state.workspace, availability: body.slots };
@@ -386,11 +386,11 @@ it("offers availability setup and explains why edited notes need fresh analysis"
     screen.getByRole("button", { name: "Tạo công việc & xem lịch" }).disabled,
   ).toBe(false);
   expect(
-    screen.getByRole("button", { name: "Chọn giờ rảnh để kiểm tra" }),
+    screen.getByRole("button", { name: "Chọn Thời Gian Làm Việc để kiểm tra" }),
   ).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Sửa ghi chú" }));
   expect(
-    screen.getByRole("link", { name: "giờ rảnh" }).getAttribute("href"),
+    screen.getByRole("link", { name: "Thời Gian Làm Việc" }).getAttribute("href"),
   ).toBe("#time");
   await user.type(screen.getByLabelText("Nội dung ghi chú"), " mới");
   expect(screen.getByText(/Bạn đã sửa nội dung/)).toBeTruthy();
@@ -431,7 +431,11 @@ it("automatically schedules a saved note and reports the applied calendar", asyn
   });
   expect(planModal).toHaveBeenCalledWith(
     expect.objectContaining({ isApplied: true }),
+    false,
+    expect.objectContaining({ calendarDay: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }),
   );
+  expect(screen.getByRole("link", { name: "Mở lịch" }).getAttribute("href"))
+    .toBe("#calendar");
   expect(refresh).toHaveBeenCalledOnce();
   expect(screen.getByRole("region", { name: "Kết quả xếp lịch" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Xem lịch đề xuất" })).toBeNull();
@@ -447,7 +451,11 @@ it("shows a confirmation proposal for urgent displacement instead of claiming th
   await useQuickSchedule(user);
   await screen.findByText(/Đã tạo đề xuất dời lịch để ưu tiên việc khẩn/);
   expect(screen.queryByText(/Đã tự động áp dụng lịch với/)).toBeNull();
-  expect(planModal).toHaveBeenCalledWith(expect.objectContaining({ hasUrgentReplan: true, isApplied: false }));
+  expect(planModal).toHaveBeenCalledWith(
+    expect.objectContaining({ hasUrgentReplan: true, isApplied: false }),
+    false,
+    expect.objectContaining({ calendarDay: expect.any(String) }),
+  );
   expect(calls.some((call) => call.url.endsWith("/apply"))).toBe(false);
 });
 
@@ -530,7 +538,7 @@ it("preserves saved note on AI failure and retries without creating tasks from r
 });
 
 async function setHours(user) {
-  await screen.findByRole("heading", { name: "Chọn giờ rảnh để tạo lịch" });
+  await screen.findByRole("heading", { name: "Chọn Thời Gian Làm Việc để tạo lịch" });
   await user.click(screen.getByLabelText("Thứ Hai"));
   await user.type(screen.getByLabelText("Giờ bắt đầu"), "19:00");
   await user.type(screen.getByLabelText("Giờ kết thúc"), "22:00");
@@ -557,7 +565,7 @@ it("saves hours inline and continues the proposal while preserving reviewed task
     { dayOfWeek: 2, startMinute: 540, endMinute: 600 },
   ];
   await user.click(
-    screen.getByRole("button", { name: "Lưu giờ rảnh & tiếp tục" }),
+    screen.getByRole("button", { name: "Lưu Thời Gian Làm Việc & tiếp tục" }),
   );
   await waitFor(() => expect(planModal).toHaveBeenCalledOnce());
   expect(
@@ -583,14 +591,14 @@ it("does not create work when saving hours fails and allows retry", async () => 
   await setHours(user);
   failAvailability = true;
   await user.click(
-    screen.getByRole("button", { name: "Lưu giờ rảnh & tiếp tục" }),
+    screen.getByRole("button", { name: "Lưu Thời Gian Làm Việc & tiếp tục" }),
   );
-  await screen.findByText("Chưa lưu được giờ rảnh. Thử lại.");
+  await screen.findByText("Chưa lưu được Thời Gian Làm Việc. Thử lại.");
   expect(calls.some((c) => c.url.endsWith("/tasks"))).toBe(false);
   expect(screen.getByLabelText("Giờ bắt đầu").value).toBe("19:00");
   failAvailability = false;
   await user.click(
-    screen.getByRole("button", { name: "Lưu giờ rảnh & tiếp tục" }),
+    screen.getByRole("button", { name: "Lưu Thời Gian Làm Việc & tiếp tục" }),
   );
   await waitFor(() => expect(planModal).toHaveBeenCalledOnce());
   expect(calls.filter((c) => c.url.endsWith("/tasks"))).toHaveLength(1);
@@ -603,16 +611,16 @@ it("rejects empty days and backwards time without saving hours or tasks", async 
   await user.click(
     screen.getByRole("button", { name: "Tạo công việc & xem lịch" }),
   );
-  await screen.findByRole("heading", { name: "Chọn giờ rảnh để tạo lịch" });
+  await screen.findByRole("heading", { name: "Chọn Thời Gian Làm Việc để tạo lịch" });
   await user.type(screen.getByLabelText("Giờ bắt đầu"), "19:00");
   await user.type(screen.getByLabelText("Giờ kết thúc"), "18:00");
   await user.click(
-    screen.getByRole("button", { name: "Lưu giờ rảnh & tiếp tục" }),
+    screen.getByRole("button", { name: "Lưu Thời Gian Làm Việc & tiếp tục" }),
   );
   await screen.findByText("Chọn ít nhất một ngày trong tuần.");
   await user.click(screen.getByLabelText("Thứ Hai"));
   await user.click(
-    screen.getByRole("button", { name: "Lưu giờ rảnh & tiếp tục" }),
+    screen.getByRole("button", { name: "Lưu Thời Gian Làm Việc & tiếp tục" }),
   );
   await screen.findByText("Giờ kết thúc phải sau giờ bắt đầu trong cùng ngày.");
   expect(
@@ -634,7 +642,7 @@ it("continues automatic scheduling after inline availability setup", async () =>
   await useQuickSchedule(user);
   await setHours(user);
   await user.click(
-    screen.getByRole("button", { name: "Lưu giờ rảnh & tiếp tục" }),
+    screen.getByRole("button", { name: "Lưu Thời Gian Làm Việc & tiếp tục" }),
   );
   await screen.findByText(/Đã tự động áp dụng lịch với 1 phiên mới/);
   expect(calls.find((c) => c.url.endsWith("/schedule")).body.useAi).toBe(true);

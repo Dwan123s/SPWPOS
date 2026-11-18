@@ -99,7 +99,7 @@ Nếu gặp `Failed to bind ... 7043: address already in use`, cổng HTTPS đan
 
 Khi demo nhiều tài khoản bằng các browser khác nhau trên cùng máy, mỗi tài khoản có hạn mức API riêng (240 request/phút) để tải nền nhóm/chat/thông báo không dùng chung hạn mức theo IP. Request API chưa đăng nhập vẫn giới hạn 60/phút/IP; đăng nhập, OTP, ảnh và giọng nói có thêm hạn mức riêng. HTTP 429 trả thời gian chờ qua `Retry-After`; frontend tạm ngừng gửi lại cùng thao tác trong thời gian này và giữ phiên đăng nhập.
 
-`dotnet publish src/SPWPOS.Api -c Release` tự build và đóng gói frontend. Bản triển khai chỉ cần ASP.NET Core runtime và cấu hình backend.
+Xem [hướng dẫn build và triển khai](docs/development/INDEPENDENT_BUILD_SAME_ORIGIN.md) để build frontend và backend riêng hoặc đóng gói chung.
 
 ## Cấu hình
 
@@ -161,19 +161,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-BeforeMer
 
 ## Tài liệu
 
-- [Mục lục tài liệu / Documentation index](docs/README.md)
-- [Thư viện ảnh sơ đồ database — English / Tiếng Việt](docs/database/current/images/README.md)
-- [Sơ đồ database hiện tại — sinh tự động từ SQL Server](docs/database/current/index.html) và [lệnh tạo lại](scripts/database-diagram/README.md)
-- [Getting Started: nghiên cứu, thiết kế và luồng trước đăng nhập](docs/design/GETTING_STARTED_RESEARCH.md)
-- [Hướng dẫn cho người dùng và tutorial 4 bước](docs/guides/USER_GUIDE.md)
-- [Hướng dẫn sử dụng và cấu hình hệ thống](docs/guides/SYSTEM_GUIDE.md)
-- [Tên đăng nhập và đăng nhập bằng email](docs/features/USERNAME_LOGIN.md)
-- [Ghi chú và agent tự xếp lịch](docs/features/NOTES_AGENT_GUIDE.md)
-- [Chat agent và tự điều chỉnh khi thay đổi thời gian](docs/features/PLANNING_AGENT_GUIDE.md)
-- [Cấu hình Gemini trên Google Cloud và kiểm tra kết nối](docs/integrations/GOOGLE_CLOUD_AI.md)
-- [Kế hoạch nâng cấp PLANORA qua bốn giai đoạn](docs/plans/PLANORA_UPGRADE_PLAN.md)
-- [Cấu hình Gmail SMTP](docs/integrations/GMAIL_SMTP.md)
-- [Use cases](docs/development/USE_CASE_COVERAGE.md) và [mô hình dữ liệu UML](docs/database/UML_ALIGNMENT.md)
-- [Thiết kế bảo mật](docs/development/SECURITY.md)
-- [Phân tích kiến trúc và xác minh .NET 8](docs/development/NET8_MIGRATION_2026-10-06.md)
-- [Frontend React/Tailwind và quy trình build](docs/development/REACT_MIGRATION_2026-10-06.md)
+- [Mục lục tài liệu](docs/README.md)
+- [Hướng dẫn người dùng](docs/guides/USER_GUIDE.md) và [kịch bản demo](docs/guides/DEMO_SCRIPT.md)
+- [Vận hành và cấu hình](docs/guides/SYSTEM_GUIDE.md)
+- [Cơ sở dữ liệu và sơ đồ UML](docs/database/README.md)

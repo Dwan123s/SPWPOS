@@ -152,6 +152,25 @@ it("does not repeat dismissed popups after a reload, and respects account isolat
   expect(notificationSnapshot().items).toHaveLength(0);
   expect(notificationSnapshot().popups).toHaveLength(0);
 });
+it("hides each popup five seconds after it appears and keeps its notification unread", () => {
+  vi.useFakeTimers();
+  setup([reminder("old")]);
+  render(<><NotificationBell /><NotificationPopups /></>);
+  act(() => vi.advanceTimersByTime(3000));
+  const items = [reminder("new"), reminder("old")];
+  act(() => syncNotifications({ ...state.workspace, notifications: items }));
+
+  act(() => vi.advanceTimersByTime(1999));
+  expect(screen.getByText("Bạn có 2 thông báo chưa đọc")).toBeTruthy();
+  act(() => vi.advanceTimersByTime(1));
+  expect(screen.queryByText("Bạn có 2 thông báo chưa đọc")).toBeNull();
+  expect(screen.getByText("Nhắc new")).toBeTruthy();
+
+  act(() => vi.advanceTimersByTime(3000));
+  act(() => syncNotifications({ ...state.workspace, notifications: items }));
+  expect(screen.queryByLabelText("Nhắc nhở mới")).toBeNull();
+  expect(screen.getByRole("button", { name: "Thông báo, 2 chưa đọc" })).toBeTruthy();
+});
 it("removes read reminders, honors opt-out, and previews without fake inbox records", () => {
   setup();
   render(<NotificationPopups />);

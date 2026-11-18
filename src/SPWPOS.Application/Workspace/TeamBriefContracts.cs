@@ -23,5 +23,6 @@ public sealed record TeamBriefConfirmView(Guid[] TaskIds);
 public sealed record TeamBriefRecipient(Guid TaskId, Guid? UserId);
 public sealed record TeamBriefConfirmInput([MaxLength(20)] TeamBriefRecipient[]? Recipients = null, Guid? Revision = null);
 public sealed record TeamDraftTaskEdit(Guid Id, [Required, StringLength(200)] string Name,
-    [Required, StringLength(4000)] string Description, [Range(1,43200)] int EstimatedMinutes, DateTimeOffset? Deadline);
+    [Required, StringLength(4000)] string Description, [Range(1,43200)] int EstimatedMinutes, DateTimeOffset? Deadline,
+    [RegularExpression("^(Important|Lower|Unknown)$")] string? ImportanceLevel = null);
 public sealed record TeamDraftEditInput(Guid Revision, [Required, MinLength(1), MaxLength(20)] TeamDraftTaskEdit[] Tasks);

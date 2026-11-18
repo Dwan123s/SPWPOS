@@ -5,12 +5,13 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { NotesPage } from "../src/notes.jsx";
 import { state } from "../src/ui.jsx";
 
 vi.mock("../src/calendar.jsx", () => ({ planModal: vi.fn() }));
-let stored, calls, revision, createGate, failSave;
+let stored, calls, revision, createGate, failSave, analysisConflict;
 const response = (data) => ({
   ok: true,
   status: 200,
@@ -23,6 +24,7 @@ beforeEach(() => {
   revision = 0;
   createGate = null;
   failSave = false;
+  analysisConflict = null;
   state.user = { id: "autosave-account" };
   state.workspace = {
     availability: [{ dayOfWeek: 1 }],
@@ -62,6 +64,17 @@ beforeEach(() => {
       }
       if (url.endsWith("/analyze")) {
         const note = stored.find((x) => x.id === url.split("/")[3]);
+        if (analysisConflict) {
+          stored = stored.map((item) => item.id === note.id ? { ...item, ...analysisConflict } : item);
+          analysisConflict = null;
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: { code: "DATA_STALE", message: "Dữ liệu đã thay đổi ở nơi khác." },
+            }),
+          };
+        }
         expect(body.version).toBe(note.version);
         const next = {
           ...note,
@@ -95,7 +108,7 @@ beforeEach(() => {
         const saved = {
           ...old,
           ...body,
-          id: old?.id || "note-1",
+          id: old?.id || `note-${stored.length + 1}`,
           version: `v${++revision}`,
           createdTaskIds: old?.createdTaskIds || [],
           analysis: null,
@@ -191,6 +204,40 @@ it("flushes a pending autosave and latest text before analyzing", async () => {
   expect(stored[0].content).toContain("Thêm cuộc họp");
   expect(calls.find((x) => x.url.endsWith("/analyze")).body.version).toBe("v2");
   expect(saves().filter((x) => x.method === "POST")).toHaveLength(1);
+});
+it("retries analysis beside the editor with the latest version and the original draft", async () => {
+  analysisConflict = { version: "version-from-another-tab" };
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  const content = "Kiểm tra luồng công việc và viết báo cáo.";
+  write(content);
+  const analyze = screen.getByRole("button", { name: "Xem trước công việc" });
+  fireEvent.click(analyze);
+  const feedback = await within(analyze.closest("form")).findByRole("alert");
+  expect(feedback.textContent).toContain("Bản nháp vẫn được giữ");
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(content);
+  fireEvent.click(within(feedback).getByRole("button", { name: "Thử lại" }));
+  await waitFor(() => expect(calls.filter((x) => x.url.endsWith("/analyze"))).toHaveLength(2));
+  expect(calls.filter((x) => x.url.endsWith("/analyze")).at(-1).body.version)
+    .toBe("version-from-another-tab");
+  expect(saves()).toHaveLength(1);
+  expect(stored[0].content).toBe(content);
+});
+it("preserves both versions when the text on the server was edited", async () => {
+  analysisConflict = { version: "another-version", content: "Nội dung được cập nhật ở tab khác" };
+  render(<NotesPage onWorkspaceChanged={vi.fn()} />);
+  await ready();
+  const content = "Bản đang viết cần được giữ";
+  write(content);
+  fireEvent.click(screen.getByRole("button", { name: "Xem trước công việc" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Thử lại" }));
+  const separate = await screen.findByRole("button", { name: "Lưu bản nháp riêng" });
+  expect(screen.getByLabelText("Nội dung ghi chú").value).toBe(content);
+  expect(calls.filter((x) => x.url.endsWith("/analyze"))).toHaveLength(1);
+  fireEvent.click(separate);
+  await screen.findByText("Đã lưu bản nháp riêng. Ghi chú trước đó vẫn được giữ.");
+  expect(stored.map((x) => x.content)).toEqual([content, "Nội dung được cập nhật ở tab khác"]);
+  expect(saves().map((x) => x.method)).toEqual(["POST", "POST"]);
 });
 it("preserves the typed draft on a version conflict and supports an explicit save retry", async () => {
   failSave = true;

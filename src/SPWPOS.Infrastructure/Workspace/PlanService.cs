@@ -70,7 +70,7 @@ public sealed partial class WorkspaceService
             void Warn(string code, string message) => warnings.Add(new(task.Id, task.Name, code, message, 0));
             if (session.End > task.Deadline) Warn("DEADLINE_CONFLICT", "Phiên kết thúc sau deadline mới của công việc.");
             if (!engine.FreeSlots(state, session.Start, session.End).Any(x => x.Start <= session.Start && x.End >= session.End))
-                Warn("OUTSIDE_AVAILABILITY", "Phiên xung đột với giờ rảnh, ngoại lệ hoặc sự kiện cố định.");
+                Warn("OUTSIDE_AVAILABILITY", "Phiên xung đột với Thời Gian Làm Việc, ngoại lệ hoặc sự kiện cố định.");
             if (sessions.Any(x => x.Id != session.Id && x.Start < session.End && session.Start < x.End)) Warn("SESSION_OVERLAP", "Hai phiên làm việc đang trùng giờ.");
             foreach (var edge in state.Dependencies.Where(x => x.TaskId == task.Id))
             {
@@ -97,9 +97,9 @@ public sealed partial class WorkspaceService
         Require(plan.PriorityPolicy == null || plan.PriorityPolicy == (state.EisenhowerScheduling ? "eisenhower-v1" : "legacy"),
             "PLAN_STALE", "Chính sách ưu tiên đã thay đổi. Hãy xem phương án mới.", 409);
         Require(!plan.HasDeadlineProtection || !plan.Warnings.Any(x => x.UnscheduledMinutes > 0 || x.Code == "SOFT_DEADLINE_EXCEEDED"),
-            "DEADLINE_PROTECTION_INFEASIBLE", "Chưa đủ thời gian để hoàn thành việc khẩn hoặc gần hạn cùng yêu cầu mới. Lịch cũ được giữ nguyên; hãy điều chỉnh thời lượng, giờ rảnh hoặc điều kiện của việc mới.", 409);
+            "DEADLINE_PROTECTION_INFEASIBLE", "Chưa đủ thời gian để hoàn thành việc khẩn hoặc gần hạn cùng yêu cầu mới. Lịch cũ được giữ nguyên; hãy điều chỉnh thời lượng, Thời Gian Làm Việc hoặc điều kiện của việc mới.", 409);
         Require(!plan.HasUrgentReplan || !plan.Warnings.Any(x => x.UnscheduledMinutes > 0 || x.Code == "SOFT_DEADLINE_EXCEEDED"),
-            "URGENT_REPLAN_INFEASIBLE", "Chưa thể nhường giờ cho việc khẩn mà vẫn hoàn thành các công việc còn lại đúng hạn. Lịch cũ được giữ nguyên; hãy điều chỉnh giờ rảnh, thời lượng hoặc xem lại các điều kiện.", 409);
+            "URGENT_REPLAN_INFEASIBLE", "Chưa thể nhường giờ cho việc khẩn mà vẫn hoàn thành các công việc còn lại đúng hạn. Lịch cũ được giữ nguyên; hãy điều chỉnh Thời Gian Làm Việc, thời lượng hoặc xem lại các điều kiện.", 409);
         var id = proposal.Id;
         var retained = plan.Sessions.Where(x => x.Preserved).Select(x => x.Id).ToHashSet();
         // Sessions outside the bounded proposal horizon remain untouched.
@@ -138,7 +138,7 @@ public sealed partial class WorkspaceService
             "CONTINUOUS_ACTIVITY_REQUIRED", "Hoạt động này phải được xếp đủ thời lượng trong một phiên liên tục; không thể chia nhỏ.", 409);
         Require((duration >= Math.Max(state.Preference.MinimumSessionMinutes, task.MinimumSessionMinutes) || duration == remaining && remaining > 0) && duration <= state.Preference.MaximumSessionMinutes,
             "SESSION_LENGTH", "Thời lượng phiên vượt giới hạn.");
-        RequireSessionTime(engine.FreeSlots(state, start, end).Any(x => x.Start <= start && x.End >= end), "OUTSIDE_AVAILABILITY", "Phiên ngoài thời gian rảnh hoặc trùng sự kiện cố định.",
+        RequireSessionTime(engine.FreeSlots(state, start, end).Any(x => x.Start <= start && x.End >= end), "OUTSIDE_AVAILABILITY", "Phiên ngoài Thời Gian Làm Việc hoặc trùng sự kiện cố định.",
             state, taskId, start, end, occupied, excludeId, dependenciesMustBeCompleted, useEstimateBias, suggestAlternatives);
         RequireSessionTime(!others.Any(x => x.Start < end && start < x.End), "SESSION_OVERLAP", "Phiên làm việc trùng lịch.",
             state, taskId, start, end, occupied, excludeId, dependenciesMustBeCompleted, useEstimateBias, suggestAlternatives);

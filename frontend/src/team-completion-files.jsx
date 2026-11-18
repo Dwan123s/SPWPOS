@@ -140,7 +140,7 @@ export function CompletionFileUpload({
 export function CompletionReport({ task }) {
   const [downloading, setDownloading] = useState(null),
     [error, setError] = useState("");
-  if (!task.completionSubmissionNote && !task.completionFiles?.length)
+  if (!task.completionSubmissionNote && !task.completionFiles?.length && !task.completionReportUrl)
     return null;
   return (
     <section
@@ -149,6 +149,9 @@ export function CompletionReport({ task }) {
     >
       <strong>{icon("folder")} Kết quả đã gửi</strong>
       {task.completionSubmissionNote && <p>{task.completionSubmissionNote}</p>}
+      {/^https?:\/\//i.test(task.completionReportUrl ?? "") && (
+        <a href={task.completionReportUrl} target="_blank" rel="noopener noreferrer">Mở link báo cáo</a>
+      )}
       {!!task.completionFiles?.length && (
         <ul className="team-completion-file-list">
           {task.completionFiles.map((file) => (

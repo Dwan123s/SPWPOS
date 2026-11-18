@@ -19,7 +19,7 @@ public sealed class PetCommerceTests
         public PayOsPaymentState? Payment;
         public Task<PayOsPaymentState?> GetPaymentAsync(long code, CancellationToken ct) => Task.FromResult(Payment);
         public Task<PayOsLink?> FindAsync(long code, CancellationToken ct) => Task.FromResult(Link);
-        public Task<PayOsLink> CreateAsync(long code, int amount, DateTimeOffset expiresAt, CancellationToken ct)
+        public Task<PayOsLink> CreateAsync(long code, int amount, DateTimeOffset expiresAt, CancellationToken ct, PayOsPremiumProduct? premiumProduct = null)
         {
             Creates++; Link = new(code, amount, "VND", "link-1", "https://pay.payos.vn/web/link-1", "123456");
             if (TimeoutOnce) { TimeoutOnce = false; throw new HttpRequestException("synthetic timeout"); }

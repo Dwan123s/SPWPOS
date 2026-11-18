@@ -17,7 +17,7 @@ public sealed partial class PrivateTeamPlanningTests
         await Eisenhower(h, async s => { await s.UpdateMatrixChecklistAsync(Member, task.Id, new(task.Version, checklist), Ct); return true; });
         var updated = await Eisenhower(h, s => s.GetEisenhowerAsync(Member, Ct)); var row = Assert.Single(updated.Tasks);
         Assert.Equal("Accepted", row.Kind); Assert.False(row.CanEdit); Assert.Equal(checklist, row.Checklist);
-        await Eisenhower(h, async s => { await s.MoveMatrixTaskAsync(Member,task.Id,new(row.Version,updated.Revision,"Q1"),Ct); return true; });
+        await Eisenhower(h, async s => { await s.MoveMatrixTaskAsync(Member,task.Id,new(row.Version,updated.Revision,"Q2"),Ct); return true; });
         var shared = Assert.Single((await Use(h, s => s.GetTeamAsync(Leader,Team,Ct))).Tasks);
         Assert.Equal("Assigned", shared.Status); Assert.Equal(0, shared.Progress); Assert.Equal(60, shared.EstimatedMinutes);
         Assert.DoesNotContain("Ghi chú riêng", System.Text.Json.JsonSerializer.Serialize(shared));

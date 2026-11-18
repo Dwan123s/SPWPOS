@@ -89,7 +89,7 @@ it("keeps fixed events and work sessions together in the saved day, excluding pr
   expect(within(day).getByText("Hồ sơ")).toBeTruthy();
   expect(day.textContent).not.toContain("18:00");
   expect(day.textContent).toContain("12:00–13:00");
-  expect(day.textContent).toContain("Chưa đối chiếu giờ rảnh");
+  expect(day.textContent).toContain("Chưa đối chiếu Thời Gian Làm Việc");
 });
 it("discloses refresh failure and does not present cached calendar data as newly verified", async () => {
   failRefresh = true;

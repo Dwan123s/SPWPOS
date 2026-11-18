@@ -190,6 +190,11 @@ export function PetPaymentDialog({ order, onClose, onCheck, checking, error }) {
               Quét mã QR bằng ứng dụng ngân hàng. Bạn có thể đóng popup và mở
               lại đơn đang chờ trong tủ đồ.
             </p>
+            {checkoutUrl && (
+              <a className="btn secondary" href={checkoutUrl} target="_blank" rel="noopener noreferrer">
+                Mở trang thanh toán payOS
+              </a>
+            )}
             {error && <p role="alert">{error}</p>}
           </>
         ) : (

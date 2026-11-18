@@ -149,7 +149,7 @@ export function NoraSchedulePanel({
             {!entries.length && !timelineError && (
               <p className="nora-day-empty">
                 Chưa có mục lịch được tải cho ngày này. Điều này không có nghĩa
-                là cả ngày đều rảnh.
+                là cả ngày đều là Thời Gian Làm Việc.
               </p>
             )}
             <ol>
@@ -164,7 +164,7 @@ export function NoraSchedulePanel({
                   {entry.kind === "gap" ? (
                     <div>
                       <strong>Khoảng trống giữa lịch</strong>
-                      <small>Chưa đối chiếu giờ rảnh</small>
+                      <small>Chưa đối chiếu Thời Gian Làm Việc</small>
                     </div>
                   ) : (
                     <div>

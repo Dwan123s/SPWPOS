@@ -70,6 +70,7 @@ import {
   planModal,
 } from "./calendar.jsx";
 import { categoryModal, adminUsers, adminStatus } from "./page-actions.jsx";
+import { canAutoApplyTaskPlan, hasWorkHours, rememberTaskPreview, taskPlanInput } from "./task-workflow.js";
 const routes = {
   profile: [
     "Trang cá nhân",
@@ -117,14 +118,9 @@ const routes = {
     "clock",
   ],
   insights: [
-    "Tiến độ",
+    "Báo cáo",
     "Theo dõi công suất, hạn chót và thời gian thực làm của cá nhân và nhóm.",
     "insights",
-  ],
-  scenario: [
-    "Thử nhận thêm việc",
-    "Nhập một việc giả định để kiểm tra thời gian trước khi nhận; lịch hiện tại chưa thay đổi.",
-    "scenario",
   ],
   notifications: [
     "Thông báo",
@@ -136,9 +132,10 @@ const routes = {
     "Thông tin cá nhân, danh mục công việc và bảo mật.",
     "settings",
   ],
+  premium: ["Gói Premium", "Nâng cấp tài khoản của bạn.", "spark"],
   ...adminRoutes,
 };
-let loading = false,
+let loading = null,
   working = false;
 function navigation(key) {
   location.hash = key;
@@ -157,33 +154,31 @@ function expiry() {
   toast("Phiên đăng nhập đã kết thúc. Hãy đăng nhập lại.");
 }
 async function load(renderPage = true) {
-  if (loading) return;
-  loading = true;
-  try {
-    state.workspace = await api("/api/workspace");
-    syncNotifications(state.workspace);
-    syncPetProfile(state.workspace.gamification);
-    state.loadedAt = Date.now();
-    const input = {
-      start: new Date().toISOString(),
-      horizonDays: 7,
-    };
-    const [insights, conflicts, agent] = await Promise.allSettled([
-      api("/api/intelligence", "POST", input),
-      api("/api/plans/conflicts", "POST", input),
-      api("/api/agent/capabilities"),
-    ]);
-    state.noraAvailable =
-      agent.status === "fulfilled" && agent.value?.aiAvailable === true;
-    state.insights = insights.status === "fulfilled" ? insights.value : null;
-    state.conflicts = conflicts.status === "fulfilled" ? conflicts.value : null;
-    state.analysisError =
-      insights.status === "rejected" || conflicts.status === "rejected";
-    window.dispatchEvent(new Event("workspace-updated"));
-    if (renderPage) render();
-  } finally {
-    loading = false;
-  }
+  loading ??= refreshWorkspace().finally(() => { loading = null; });
+  await loading;
+  if (renderPage) render();
+}
+async function refreshWorkspace() {
+  state.workspace = await api("/api/workspace");
+  syncNotifications(state.workspace);
+  syncPetProfile(state.workspace.gamification);
+  state.loadedAt = Date.now();
+  const input = {
+    start: new Date().toISOString(),
+    horizonDays: 7,
+  };
+  const [insights, conflicts, agent] = await Promise.allSettled([
+    api("/api/intelligence", "POST", input),
+    api("/api/plans/conflicts", "POST", input),
+    api("/api/agent/capabilities"),
+  ]);
+  state.noraAvailable =
+    agent.status === "fulfilled" && agent.value?.aiAvailable === true;
+  state.insights = insights.status === "fulfilled" ? insights.value : null;
+  state.conflicts = conflicts.status === "fulfilled" ? conflicts.value : null;
+  state.analysisError =
+    insights.status === "rejected" || conflicts.status === "rejected";
+  window.dispatchEvent(new Event("workspace-updated"));
 }
 async function loggedIn() {
   const data = await api("/api/browser-session/me");
@@ -191,6 +186,12 @@ async function loggedIn() {
     state.settingsTab = "connections";
   state.user = data.user;
   state.roles = data.roles || [];
+  const teamPayment = new URLSearchParams(location.search).get("teamPayment");
+  if (new URLSearchParams(location.search).has("premiumPayment") || /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(teamPayment ?? "")) {
+    history.replaceState(null, "", "#premium");
+    await load();
+    return;
+  }
   if (pendingTeamInvite()) history.replaceState(null, "", "#teams");
   await load();
 }
@@ -207,13 +208,14 @@ function render() {
   const taskMatch = location.hash.slice(1)
     .match(/^tasks\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i);
   const projectMatch = location.hash.slice(1).match(/^tasks\/project\/([a-zA-Z0-9-]+)$/);
+  const premiumMatch = location.hash.slice(1).match(/^premium\/([a-f0-9-]{36})$/i);
   state.socialFriendsTab = friendsMatch?.[1] || null;
   state.profileUserId = profileMatch?.[1] || null;
   state.route = profileMatch
     ? "profile"
     : friendsMatch
       ? "friends"
-      : taskMatch || projectMatch ? "tasks" : location.hash.slice(1) || "today";
+      : premiumMatch ? "premium" : taskMatch || projectMatch ? "tasks" : location.hash.slice(1) || "today";
   if (projectMatch) state.taskScope = "projects";
   if (state.route === "admin") {
     state.route = "admin-users";
@@ -226,8 +228,10 @@ function render() {
   if (
     !routes[state.route] ||
     (isAdminRoute(state.route) && !state.roles.includes("Admin"))
-  )
+  ) {
     state.route = "today";
+    history.replaceState(null, "", "#today");
+  }
   const [title, description] = routes[state.route];
   setScreen(
     workspaceShell(
@@ -238,6 +242,7 @@ function render() {
         key={state.route}
         route={state.route}
         projectId={projectMatch?.[1] || null}
+        teamId={premiumMatch?.[1] || null}
         profileId={state.profileUserId}
         friendsTab={state.socialFriendsTab}
         onWorkspaceChanged={() =>
@@ -257,7 +262,7 @@ function render() {
   syncDecorations();
   if (taskMatch) {
     history.replaceState(null, "", "#tasks");
-    if (taskById(taskMatch[1])) openDetail(taskMatch[1]);
+    if (taskById(taskMatch[1])) openTaskDrawer(taskMatch[1]);
     else toast("Không tìm thấy công việc trong tài khoản này.", "error");
   }
 }
@@ -335,6 +340,34 @@ async function scheduleTask(id, triggerEvent = "MANUAL") {
     strict: true,
   });
   planModal(plan);
+}
+
+function openTaskDrawer(id, options) {
+  openDetail(id, { onWorkspaceChanged: load, ...options });
+}
+
+async function showNewTaskSchedule(task, previewOnly) {
+  let initialPlan;
+  let initialError;
+  if (hasWorkHours(state.workspace)) {
+    try {
+      initialPlan = await api("/api/plans", "POST", taskPlanInput(task, true, "NEW_TASK"));
+      if (!previewOnly && canAutoApplyTaskPlan(task, initialPlan, state.workspace)) {
+        await api("/api/plans/" + initialPlan.id + "/apply", "POST");
+        initialPlan = { ...initialPlan, isApplied: true };
+        completeGuideStep(2);
+        try {
+          await load();
+        } catch {
+          initialError = "Đã lưu lịch. Tải lại để cập nhật các màn hình đang mở.";
+        }
+      }
+    } catch (error) {
+      initialError = "Công việc đã lưu. Chưa xếp được lịch: " + error.message;
+    }
+  }
+  if (initialPlan && state.workspace) rememberTaskPreview(task.id, initialPlan, state.workspace);
+  openTaskDrawer(task.id, { initialTab: "sessions", initialPlan, initialError });
 }
 function planOptions(affected = []) {
   const go = (route) => {
@@ -422,7 +455,7 @@ function planOptions(affected = []) {
         thời lượng đã cá nhân hóa
       </label>
       <p className="reason">
-        Bỏ hai lựa chọn để giữ thời lượng đã nhập và dùng toàn bộ giờ rảnh như
+        Bỏ hai lựa chọn để giữ thời lượng đã nhập và dùng toàn bộ Thời Gian Làm Việc như
         chế độ mặc định của NORA. Các giới hạn ngày, phiên, giờ nghỉ và deadline
         vẫn được giữ.
       </p>
@@ -556,7 +589,14 @@ async function action(name, id, element) {
       openTask({}, id);
       break;
     case "task-detail":
-      openDetail(id);
+      openTaskDrawer(id, { selectedSessionId: element?.dataset.sessionId });
+      break;
+    case "task-planning":
+      openTaskDrawer(id, { initialTab: "sessions" });
+      break;
+    case "task-work-hours":
+      closeModal();
+      navigation("time");
       break;
     case "task-finish":
       await completeTask(id);
@@ -573,10 +613,10 @@ async function action(name, id, element) {
       const message = completed ? "Đã mở lại công việc." : "Đã hoàn thành công việc.";
       if (element?.dataset.keepTaskDetail) {
         await load(false);
-        openDetail(id);
+        openTaskDrawer(id);
         toast(message, "success");
       } else await refreshAfter(message);
-      if (element?.dataset.returnProject) openDetail(element.dataset.returnProject);
+      if (element?.dataset.returnProject) openTaskDrawer(element.dataset.returnProject);
       break;
     }
     case "edit-task":
@@ -657,7 +697,7 @@ async function action(name, id, element) {
       const [task, predecessor] = id.split("|");
       await api(`/api/tasks/${task}/dependencies/${predecessor}`, "DELETE");
       await load();
-      openDetail(task);
+      openTaskDrawer(task);
       break;
     }
     case "capture":
@@ -796,7 +836,9 @@ async function action(name, id, element) {
     case "schedule-task":
       await scheduleTask(id);
       break;
-    case "apply-plan":
+    case "apply-plan": {
+      const plan = state.plan?.id === id ? state.plan : null;
+      const calendarDay = plan && state.planCalendarDay;
       try {
         await api(`/api/plans/${id}/apply`, "POST");
       } catch (error) {
@@ -831,16 +873,23 @@ async function action(name, id, element) {
         state.plan.sessions.some((session) => !session.preserved)
       )
         completeGuideStep(2);
-      navigation("today");
+      if (calendarDay) {
+        planModal({ ...plan, isApplied: true, status: "APPLIED" }, false, { calendarDay });
+      } else navigation("today");
       break;
+    }
     case "session-outcome": {
       const session = state.workspace.sessions.find((item) => item.id === id);
       if (session) openSessionOutcome(session, () => load(false));
       break;
     }
-    case "session-detail":
-      sessionDetail(id);
+    case "session-detail": {
+      const session = sessionById(id);
+      if (element?.dataset.openTask && session && taskById(session.taskId)) {
+        openTaskDrawer(session.taskId, { selectedSessionId: id });
+      } else sessionDetail(id);
       break;
+    }
     case "session-lock":
     case "session-unlock":
       await api(`/api/sessions/${id}/${name.slice(8)}`, "POST");
@@ -860,7 +909,7 @@ async function action(name, id, element) {
           ? "Đã ghi nhận phiên. Cập nhật tiến độ công việc để kế hoạch tiếp theo chính xác."
           : "Đã cập nhật phiên.",
       );
-      if (name === "session-complete") openDetail(s.taskId, { afterSession: true });
+      if (name === "session-complete") openTaskDrawer(s.taskId, { afterSession: true });
       break;
     }
     case "discard-plan":
@@ -973,14 +1022,6 @@ async function action(name, id, element) {
     case "change-otp":
       await api("/api/auth/change-password/request-otp", "POST");
       toast("Mã xác minh đã được gửi đến email của bạn.");
-      break;
-    case "scenario-plan": {
-      const p = state.scenario.proposedPlan;
-      planModal(p, true);
-      break;
-    }
-    case "scenario-create":
-      openTask(state.scenarioTask);
       break;
     case "admin-account-history":
       {
@@ -1097,13 +1138,15 @@ async function formAction(form, data, nextAction = null) {
       const start = new Date(
         Math.max(Date.parse(request.start), Date.now()),
       ).toISOString();
-      planModal(
-        await api(
-          request.isReschedule ? "/api/plans/reschedule" : "/api/plans",
-          "POST",
-          { ...request, start },
-        ),
+      const plan = await api(
+        request.isReschedule ? "/api/plans/reschedule" : "/api/plans",
+        "POST",
+        { ...request, start },
       );
+      const calendarDay = state.planCalendarDay
+        ? dayKey(plan.sessions.find((session) => !session.preserved)?.start || plan.start)
+        : undefined;
+      planModal(plan, false, { calendarDay });
       break;
     }
     case "admin-lock": {
@@ -1161,7 +1204,7 @@ async function formAction(form, data, nextAction = null) {
       await load(false);
       if (confirmation?.open) confirmation.close();
       const { modal: currentModal, modalKey } = getSnapshot();
-      if (currentModal && detailKey === modalKey && taskById(id)) openDetail(id, { initialTab: "checklist" });
+      if (currentModal && detailKey === modalKey && taskById(id)) openTaskDrawer(id, { initialTab: "checklist" });
       toast("Đã hoàn thành công việc.", "success");
       break;
     }
@@ -1224,14 +1267,11 @@ async function formAction(form, data, nextAction = null) {
       if (completionError) {
         toast(`Công việc đã lưu. Chưa đánh dấu hoàn thành: ${completionError.message}`, "error");
       }
-      if (!id && (nextAction === "open" || completionError)) openDetail(saved.id);
-      if (!id && nextAction === "preview") {
-        try {
-          await scheduleTask(saved.id, "NEW_TASK");
-        } catch (error) {
-          toast(`Công việc đã lưu. Chưa xếp được lịch: ${error.message}`);
-        }
-      }
+      if (!id && state.workspace && !taskById(saved.id)) await load();
+      const task = !id && taskById(saved.id);
+      if (task && !markComplete && hasPlanningDetails(task))
+        await showNewTaskSchedule(task, nextAction === "preview");
+      else if (task && (nextAction === "open" || completionError)) openTaskDrawer(task.id);
       break;
     }
     case "task-progress":
@@ -1253,7 +1293,7 @@ async function formAction(form, data, nextAction = null) {
         "POST",
       );
       await load();
-      openDetail(id);
+      openTaskDrawer(id);
       break;
     case "capture": {
       const content = String(data.get("text")).trim();
@@ -1490,22 +1530,6 @@ async function formAction(form, data, nextAction = null) {
         "success",
       );
       break;
-    case "scenario": {
-      state.scenarioTask = {
-        ...taskInput(data),
-        splittable: true,
-        minimumSessionMinutes: 25,
-      };
-      state.scenario = await api("/api/plans/scenario", "POST", {
-        plan: {
-          start: new Date().toISOString(),
-          horizonDays: 7,
-        },
-        newTask: state.scenarioTask,
-      });
-      render();
-      break;
-    }
     case "admin-search":
       await loadAdmin(String(data.get("search")));
       break;
@@ -1652,7 +1676,7 @@ export function startController() {
       ![
         "time",
         "settings",
-        "scenario",
+        "premium",
         "tasks",
         "notes",
         "agent",

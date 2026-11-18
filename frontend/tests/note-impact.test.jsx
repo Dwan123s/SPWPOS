@@ -174,7 +174,7 @@ it("asks for availability and never simulates already imported work again", asyn
   );
   await userEvent
     .setup()
-    .click(screen.getByRole("button", { name: "Chọn giờ rảnh để kiểm tra" }));
+    .click(screen.getByRole("button", { name: "Chọn Thời Gian Làm Việc để kiểm tra" }));
   expect(onSetTime).toHaveBeenCalledOnce();
   expect(fetch).not.toHaveBeenCalled();
   view.rerender(<NoteImpact {...props} enabled={false} />);

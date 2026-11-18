@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./api.js";
+import { EisenhowerPriorityField } from "./eisenhower-priority.jsx";
+import { eisenhowerPriority } from "./eisenhower-priority.js";
 import {
   state,
   icon,
@@ -215,6 +217,7 @@ function Editor({
   const [group, setGroup] = useState(
     quadrant || (task?.urgencySource === "User" ? task.quadrant : "Auto"),
   );
+  const [importanceLevel, setImportanceLevel] = useState(task?.importance || (quadrant === "Q1" || quadrant === "Q2" ? "Important" : quadrant === "Q3" || quadrant === "Q4" ? "Lower" : "Unknown"));
   const [items, setItems] = useState(task?.checklist || []),
     [split, setSplit] = useState(task?.splittable !== false);
   const [validation, setValidation] = useState("");
@@ -236,6 +239,7 @@ function Editor({
               deadline: toUtc(deadline),
               estimatedMinutes: Number(minutes),
               quadrant: group,
+              importanceLevel,
               checklist: items.filter((i) => i.text.trim()),
               splittable: !task?.requiresContinuousSession && split,
             });
@@ -285,26 +289,8 @@ function Editor({
             />
           </label>
         </div>
-        <label>
-          Vị trí ưu tiên
-          <select
-            aria-label="Vị trí ưu tiên"
-            value={group}
-            disabled={busy || !personal}
-            onChange={(e) => setGroup(e.target.value)}
-          >
-            <option value="Auto">
-              Giữ mức quan trọng, tự tính độ khẩn cấp
-            </option>
-            {columns
-              .filter((c) => c.id.startsWith("Q"))
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.id} · {c.caption}
-                </option>
-              ))}
-          </select>
-        </label>
+        <EisenhowerPriorityField task={task || {}} value={importanceLevel} disabled={busy || !personal}
+          onChange={(level) => { setImportanceLevel(level); setGroup("Auto"); }} />
         <label>
           Yêu cầu & ghi chú
           <textarea
@@ -448,6 +434,7 @@ function TaskRow({
   drag,
   start,
   onOpen,
+  sharedTaskDetail,
   onMove,
   onChecklist,
   onSuggest,
@@ -514,7 +501,10 @@ function TaskRow({
         )}
         <div className="eis-row-content">
           <h4>
-            <button type="button" onClick={() => onOpen(t)}>
+            <button type="button"
+              data-action={sharedTaskDetail && t.kind === "Personal" ? "task-detail" : undefined}
+              data-id={sharedTaskDetail && t.kind === "Personal" ? t.id : undefined}
+              onClick={sharedTaskDetail && t.kind === "Personal" ? undefined : () => onOpen(t)}>
               {t.name}
             </button>
           </h4>
@@ -609,7 +599,7 @@ function TaskRow({
       {actions && (
         <div className="eis-card-actions" aria-label={`Thao tác ${t.name}`}>
           <button type="button" onClick={() => onOpen(t)}>
-            {icon("edit")}Chi tiết task
+            {icon("edit")}{sharedTaskDetail && t.kind === "Personal" ? "Chỉnh phân loại và checklist" : "Chi tiết task"}
           </button>
           {manageable && (
             <>
@@ -634,7 +624,7 @@ function TaskRow({
                 <span className="sr-only">Di chuyển {t.name}</span>
                 <select
                   aria-label={`Di chuyển ${t.name}`}
-                  disabled={busy}
+                  disabled={busy || !t.deadline}
                   value={t.quadrant}
                   onChange={(e) => {
                     setActions(false);
@@ -643,7 +633,7 @@ function TaskRow({
                 >
                   <option value="Unknown">Tự tính độ khẩn cấp</option>
                   {columns
-                    .filter((c) => c.id.startsWith("Q"))
+                    .filter((c) => c.id.startsWith("Q") && (eisenhowerPriority({ importanceLevel: c.id === "Q1" || c.id === "Q2" ? "Important" : "Lower", deadline: t.deadline }).quadrant === c.id))
                     .map((c) => (
                       <option value={c.id} key={c.id}>
                         {c.id} · {c.label}
@@ -671,6 +661,7 @@ export function EisenhowerBoard({
   columns,
   onRefresh,
   onOpenTeam,
+  sharedTaskDetail,
 }) {
   const [query, setQuery] = useState(""),
     [mobile, setMobile] = useState("Q1"),
@@ -753,6 +744,10 @@ export function EisenhowerBoard({
   function move(id, drop) {
     const task = view?.tasks.find((t) => t.id === id);
     if (!task || !canManage(task) || drop.beforeId === id) return;
+    if (drop.quadrant.startsWith("Q") && eisenhowerPriority({ importanceLevel: drop.quadrant === "Q1" || drop.quadrant === "Q2" ? "Important" : "Lower", deadline: task.deadline }).quadrant !== drop.quadrant) {
+      setFailure("Độ khẩn cấp tự động theo deadline. Hãy chọn ô có cùng độ khẩn cấp để đổi mức quan trọng.");
+      return;
+    }
     if (task.kind === "Draft" && task.quadrant === drop.quadrant) return;
     run(
       () =>
@@ -1065,7 +1060,7 @@ export function EisenhowerBoard({
       )}
       {!view ? (
         <p role="status" className="eis-feedback">
-          Đang đánh giá công việc từ lịch của bạn…
+          Đang phân loại theo mức quan trọng và deadline…
         </p>
       ) : (
         <>
@@ -1152,6 +1147,7 @@ export function EisenhowerBoard({
                           onOpen={(task) =>
                             canManage(task) ? open(task) : onOpenTeam(task)
                           }
+                          sharedTaskDetail={sharedTaskDetail}
                           onMove={move}
                           onChecklist={checklist}
                           onSuggest={suggest}

@@ -25,6 +25,20 @@ public sealed partial class PrivateTeamPlanningTests
         Assert.Equal("REQUEST_REUSED", reused.Code);
         var replaced = await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.AttachTeamSourceFileAsync(Leader, task.Id, input with { RequestId = Guid.NewGuid() }, Ct)));
         Assert.Equal("TEAM_SOURCE_EXISTS", replaced.Code);
+
+        await ClaimForReview(h);
+        var workspace = await Workspace(h, s => s.GetAsync(Member, Ct));
+        var personalTask = Assert.Single(workspace.Tasks);
+        Assert.Equal(file.Name, personalTask.SourceFileName);
+        var personalDownload = await Workspace(h, s => s.DownloadProjectSourceAsync(Member, personalTask.Id, Ct));
+        Assert.Equal(file.Name, personalDownload.Name);
+        Assert.Equal(file.Content, personalDownload.Content);
+        await Assert.ThrowsAsync<AuthException>(() => Workspace(h, s => s.DownloadProjectSourceAsync(Other, personalTask.Id, Ct)));
+        await h.DbAsync(async db => {
+            (await db.TeamMemberships.SingleAsync(m => m.UserId == Member, Ct)).Active = false;
+            await db.SaveChangesAsync(Ct);
+        });
+        await Assert.ThrowsAsync<AuthException>(() => Workspace(h, s => s.DownloadProjectSourceAsync(Member, personalTask.Id, Ct)));
     }
 
     [Theory] [InlineData(true)] [InlineData(false)]

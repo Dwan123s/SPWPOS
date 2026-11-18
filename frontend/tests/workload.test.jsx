@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { api } from "../src/api.js";
 import {
@@ -156,6 +157,43 @@ it("shows missing actual separately from a recorded zero and uses day details", 
   }
 });
 
+it("previews daily hours and planned sessions on hover and keyboard focus", async () => {
+  const data = view();
+  Object.assign(data.days[0], {
+    status: "AVAILABLE",
+    workingMinutes: 480,
+    remainingWorkMinutes: 120,
+    schedulableMinutes: 45,
+    plannedSeconds: 7200,
+    completedPlannedSeconds: 3600,
+    skippedPlannedSeconds: 900,
+  });
+  api.mockResolvedValue(data);
+  render(<WorkloadWeek />);
+  const day = await screen.findByRole("button", { name: /11\/11.*2h dự kiến/ });
+  expect(screen.queryByRole("tooltip")).toBeNull();
+  fireEvent.mouseEnter(day);
+  const tooltip = screen.getByRole("tooltip");
+  expect(day.getAttribute("aria-describedby")).toBe(tooltip.id);
+  expect(within(tooltip).getByText("Giờ làm")).toBeTruthy();
+  expect(within(tooltip).getByText("Đã qua").nextElementSibling.textContent).toBe("6h");
+  expect(within(tooltip).getByText("Còn lại").nextElementSibling.textContent).toBe("2h");
+  expect(within(tooltip).getByText("Chưa xong").nextElementSibling.textContent).toBe("45p");
+  expect(within(tooltip).getByText("Đã bỏ qua hoặc bỏ lỡ").nextElementSibling.textContent).toBe("15p");
+  fireEvent.mouseLeave(day);
+  fireEvent.mouseEnter(tooltip);
+  expect(tooltip.isConnected).toBe(true);
+  fireEvent.mouseLeave(tooltip);
+  await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+  act(() => day.focus());
+  expect(screen.getByRole("tooltip")).toBeTruthy();
+  fireEvent.keyDown(day, { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).toBeNull();
+  fireEvent.click(day);
+  expect(day.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.queryByRole("tooltip")).toBeNull();
+});
+
 it("shows the following week and moves the workload window", async () => {
   const current = view();
   const next = {
@@ -219,6 +257,31 @@ it("groups child tasks under their project and standalone tasks under Inbox", as
   expect(screen.getByRole("button", { name: /^Inbox,/ })).toBeTruthy();
 });
 
+it("shows each team's name in its own calendar row and details", async () => {
+  const data = view();
+  data.days[0].sessions = ["Đồ án", "Nghiên cứu"].map((teamName, index) => ({
+    id: `team-session-${index}`,
+    taskId: `task-${index}`,
+    name: `Báo cáo ${teamName}`,
+    teamTask: true,
+    teamId: `team-${index}`,
+    teamName,
+    start: "2026-11-11T09:00:00Z",
+    end: "2026-11-11T09:30:00Z",
+  }));
+  api.mockResolvedValue(data);
+  render(<WorkloadWeek />);
+  for (const teamName of ["Đồ án", "Nghiên cứu"]) {
+    const label = `Nhóm · ${teamName}`;
+    const cell = await screen.findByRole("button", { name: (name) => name.startsWith(`${label},`) });
+    expect(cell.querySelector(".workload-group-name").textContent).toBe(label);
+    const popup = document.getElementById(cell.getAttribute("popovertarget"));
+    expect(popup.querySelector("header strong").textContent).toBe(label);
+    expect(popup.querySelectorAll("li")).toHaveLength(1);
+    expect(popup.querySelector("li").textContent).toContain(`Báo cáo ${teamName}`);
+  }
+});
+
 it("adds the Inbox band only after a task is scheduled in the visible dates", async () => {
   const empty = view();
   empty.days.push({ ...empty.days[0], date: "2026-11-12" });
@@ -254,7 +317,10 @@ it("shows shared work and recipients without private capacity or a recipient pic
   const team = {
     start: "2026-11-09",
     end: "2026-11-15",
-    members: [{ userId: "an", name: "An" }, { userId: "binh", name: "Bình" }],
+    members: [
+      { userId: "an", name: "An", taskCount: 2, estimatedMinutes: 120 },
+      { userId: "binh", name: "Bình", taskCount: 0, estimatedMinutes: 0 },
+    ],
     tasks: [
       { id: "report", name: "Báo cáo nhóm", status: "Open", risk: "UNASSIGNED",
         deadline: "2026-11-12T10:00:00Z", estimatedMinutes: 60, progress: 0 },
@@ -273,11 +339,15 @@ it("shows shared work and recipients without private capacity or a recipient pic
   render(<><App initialize={false} /><WorkloadWeek /></>);
   fireEvent.click(screen.getByRole("button", { name: "Nhóm", exact: true }));
   await screen.findByText("Báo cáo nhóm");
+  const summary = within(screen.getByLabelText("Tổng hợp theo thành viên"));
+  expect(within(summary.getByRole("row", { name: /An/ })).getByText("2 giờ")).toBeTruthy();
+  expect(summary.getByRole("row", { name: /Bình/ })).toBeTruthy();
   expect(screen.getByText("50%")).toBeTruthy();
   expect(screen.getByText("Chờ người được chỉ định nhận")).toBeTruthy();
   expect(screen.queryByRole("checkbox", { name: "Hiện số giờ" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Chọn người nhận" })).toBeNull();
   fireEvent.change(screen.getByLabelText("Lọc theo thành viên"), { target: { value: "an" } });
+  expect(summary.queryByRole("row", { name: /Bình/ })).toBeNull();
   expect(screen.queryByText("Báo cáo nhóm")).toBeNull();
   expect(screen.getByText("Rà soát nhóm")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Lọc tình trạng công việc nhóm"), { target: { value: "Assigned" } });

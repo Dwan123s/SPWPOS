@@ -10,7 +10,7 @@ public sealed partial class WorkspaceService
 {
     // Kept independently of the latest analysis: saving a draft must never forget
     // which activities were committed, including tasks later renamed or deleted.
-    private sealed record MatrixDraftData(string Quadrant, DateTimeOffset? Deadline, long Order = 0);
+    private sealed record MatrixDraftData(string Quadrant, DateTimeOffset? Deadline, long Order = 0, string? ImportanceLevel = null);
     private sealed record NoteProcessing(string Content, string[] TaskNames, string[] ActivityKeys,
         Guid[] PendingTaskIds, bool AnalysisImported, Guid? ImportVersion = null, MatrixDraftData? MatrixDraft = null,
         DateTimeOffset? InboxCompletedAt = null, DateTimeOffset? InboxReminderAt = null);

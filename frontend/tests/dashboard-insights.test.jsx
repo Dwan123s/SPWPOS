@@ -56,7 +56,7 @@ it("renders useful analytics for an imported timetable without pretending it has
   expect(horizon.querySelector(".horizon-planned").style.height).toBe("100%");
   expect(horizon.querySelector(".horizon-capacity")).toBeNull();
   expect(
-    within(horizon).getByText("Chưa đặt giờ rảnh để tính khả năng xếp thêm."),
+    within(horizon).getByText("Chưa đặt Thời Gian Làm Việc để tính khả năng xếp thêm."),
   ).toBeTruthy();
   const milestones = within(
     screen.getByRole("region", { name: "Lịch sắp tới" }),

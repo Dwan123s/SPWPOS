@@ -51,7 +51,7 @@ export function workflowSteps(workspace, now = Date.now()) {
     },
     {
       title: "Sắp xếp công việc",
-      description: "Xem trước các phiên theo giờ rảnh rồi xác nhận.",
+      description: "Xem trước các phiên theo Thời Gian Làm Việc rồi xác nhận.",
       done: hasPlan,
       route: "calendar",
       label: "Xem lịch đề xuất",

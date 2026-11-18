@@ -39,7 +39,7 @@ public sealed partial class WorkspaceService
         var zone = PlanningEngine.Zone(state.Preference.TimeZoneId);
         var todayStart = PlanningEngine.At(LocalDate(Now, state.Preference), 0, zone);
         if (query.Start < todayStart || query.End > Now.AddDays(30))
-            return "Mình xem được giờ rảnh từ bây giờ đến 30 ngày tới. Bạn chọn một ngày trong khoảng này để mình kiểm tra nhé.";
+            return "Mình xem được Thời Gian Làm Việc từ bây giờ đến 30 ngày tới. Bạn chọn một ngày trong khoảng này để mình kiểm tra nhé.";
         var start = query.Start < Now ? Now : query.Start;
         var slots = query.End > start ? AgentFreeTimeSlots(state, start, query.End) : [];
         var localStart = TimeZoneInfo.ConvertTime(query.Start, zone);
@@ -52,7 +52,7 @@ public sealed partial class WorkspaceService
         {
             var hasAvailability = state.Policy != null || state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable && x.Date >= firstDate && x.Date <= lastDate);
             return hasAvailability
-                ? $"{range}, mình không tìm thấy khoảng rảnh nào trong giờ bạn đã đặt. Bạn có thể cho mình một ngày khác để tìm tiếp nhé."
+                ? $"{range}, mình không tìm thấy khoảng Thời Gian Làm Việc nào trong giờ bạn đã đặt. Bạn có thể cho mình một ngày khác để tìm tiếp nhé."
                 : $"{range}, mình chưa có giờ làm việc được bạn xác nhận. Bạn cho mình biết ngày và khung giờ có thể làm việc, cùng giờ sinh hoạt/ngủ/nghỉ cần chừa; mình sẽ cấu hình quanh thời gian biểu cố định của bạn.";
         }
 
@@ -66,7 +66,7 @@ public sealed partial class WorkspaceService
         var days = slots.GroupBy(x => LocalDate(x.Start, state.Preference)).Select(day =>
             $"{day.Key:dd'/'MM'/'yyyy}: " + string.Join(", ", day.Select(Window)));
         var total = (int)slots.Sum(x => (x.End - x.Start).TotalMinutes);
-        var opening = $"{range}, bạn còn {slots.Length} khoảng rảnh trong giờ đã đặt:";
+        var opening = $"{range}, bạn còn {slots.Length} khoảng Thời Gian Làm Việc trong giờ đã đặt:";
         var next = slots.All(x => (x.End - x.Start).TotalMinutes < state.Preference.MinimumSessionMinutes)
             ? "Các khoảng này khá ngắn; bạn có thể để nghỉ hoặc chuẩn bị cho việc tiếp theo."
             : slots.Length == 1
@@ -76,10 +76,10 @@ public sealed partial class WorkspaceService
         {
             var day = LocalDate(slots[0].Start, state.Preference);
             var when = firstDate == lastDate ? "" : $" ngày {day:dd'/'MM'/'yyyy}";
-            var lead = partOfOverview ? "Bạn còn rảnh từ " : $"{range}, bạn còn rảnh từ ";
+            var lead = partOfOverview ? "Thời Gian Làm Việc của bạn còn từ " : $"{range}, Thời Gian Làm Việc của bạn còn từ ";
             return lead + Window(slots[0]) + when + ". " + next;
         }
-        if (partOfOverview) opening = $"Bạn còn {slots.Length} khoảng rảnh trong giờ đã đặt:";
+        if (partOfOverview) opening = $"Bạn còn {slots.Length} khoảng Thời Gian Làm Việc trong giờ đã đặt:";
         return opening + "\n" + string.Join("\n", days) + $"\n\nTổng cộng {total} phút. " + next;
     }
 

@@ -18,7 +18,7 @@ const steps = [
     text: "Viết việc cần làm bằng lời của bạn. AI giúp tách thành công việc, gợi ý thời lượng và hạn chót để bạn kiểm tra.",
   },
   {
-    label: "Chọn giờ rảnh",
+    label: "Chọn Thời Gian Làm Việc",
     icon: "clock",
     title: "Một kế hoạch phải vừa với cuộc sống.",
     text: "Chọn lúc bạn có thể làm việc. Thêm lịch học, cuộc họp hay cuộc hẹn để hệ thống dành đúng khoảng trống cho công việc.",
@@ -136,7 +136,7 @@ function ProductDemo() {
                   readOnly
                   rows={5}
                   value={
-                    "Viết báo cáo, khoảng 1 giờ\nÔn chương 4, khoảng 45 phút\nTối nay mình rảnh từ 19:00 đến 21:00"
+                    "Viết báo cáo, khoảng 1 giờ\nÔn chương 4, khoảng 45 phút\nThời Gian Làm Việc tối nay của mình từ 19:00 đến 21:00"
                   }
                 />
               </label>
@@ -147,7 +147,7 @@ function ProductDemo() {
           )}
           {step === 1 && (
             <div className="start-sample-hours">
-              <span>Giờ rảnh minh họa</span>
+              <span>Thời Gian Làm Việc minh họa</span>
               <div className="start-week-days">
                 {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(
                   (day, index) => (
@@ -210,7 +210,7 @@ function ProductDemo() {
 const faqs = [
   [
     "Mình bắt đầu từ đâu?",
-    "Tạo tài khoản, xác minh email rồi bắt đầu. Bạn nhập việc, chọn giờ rảnh, tạo lịch và bắt đầu phiên đầu tiên.",
+    "Tạo tài khoản, xác minh email rồi bắt đầu. Bạn nhập việc, chọn Thời Gian Làm Việc, tạo lịch và bắt đầu phiên đầu tiên.",
   ],
   [
     "Ghi chú được gửi đến AI khi nào?",
@@ -218,7 +218,7 @@ const faqs = [
   ],
   [
     "Nếu lịch không đủ chỗ cho mọi công việc?",
-    "PLANORA hiển thị cảnh báo và thời lượng chưa xếp được. Bạn có thể bổ sung giờ rảnh, sửa thời lượng hoặc điều chỉnh hạn chót rồi tạo lại lịch.",
+    "PLANORA hiển thị cảnh báo và thời lượng chưa xếp được. Bạn có thể bổ sung Thời Gian Làm Việc, sửa thời lượng hoặc điều chỉnh hạn chót rồi tạo lại lịch.",
   ],
   [
     "Mình có thể sửa lịch và công việc không?",
@@ -394,7 +394,7 @@ export function GettingStarted({ signedIn = false, onLogin }) {
               </div>
               <p>
                 Ghi lại điều cần làm bằng lời của bạn. AI giúp chuyển ghi chú
-                thành công việc; PLANORA xếp lịch theo giờ rảnh, lịch bận và hạn
+                thành công việc; PLANORA xếp lịch theo Thời Gian Làm Việc, lịch bận và hạn
                 chót. Một người bạn nhỏ, giúp bạn biết bước tiếp theo là gì.
               </p>
             </div>

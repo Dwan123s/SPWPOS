@@ -55,6 +55,16 @@ public sealed partial class WorkspaceService
     {
         Require(await db.Users.AnyAsync(user => user.Id == uid && user.IsActive && user.EmailConfirmed, ct),
             "FORBIDDEN", "Tài khoản không khả dụng.", 403);
+        var teamFile = await (from personal in Mine<WorkTask>(uid).AsNoTracking()
+            join assignment in db.TeamTaskAssignments.AsNoTracking() on personal.Id equals assignment.WorkTaskId
+            join task in db.TeamTasks.AsNoTracking() on assignment.TeamTaskId equals task.Id
+            join member in db.TeamMemberships.AsNoTracking() on task.TeamId equals member.TeamId
+            join source in db.TeamTaskDocuments.AsNoTracking() on task.SourceDocumentId equals (Guid?)source.Id
+            where personal.Id == taskId && !personal.IsDeleted && assignment.Active && assignment.UserId == uid &&
+                task.AssigneeId == uid && member.UserId == uid && member.Active && source.TeamId == task.TeamId
+            select new ProjectSourceDownload(source.Name, source.MimeType, source.Content)).SingleOrDefaultAsync(ct);
+        if (teamFile is not null) return teamFile;
+
         var projectId = await SourceProjectId(uid, taskId, ct);
         var file = await db.ProjectSourceDocuments.AsNoTracking().Where(item => item.ProjectId == projectId)
             .Select(item => new ProjectSourceDownload(item.Name, item.MimeType, item.Content)).SingleOrDefaultAsync(ct);

@@ -1,4 +1,5 @@
-import { useId, useState } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 import {
   button,
@@ -62,8 +63,11 @@ async function previewRecovery(taskId, triggerEvent = "SESSION_MISSED") {
   planModal(plan);
 }
 
-function OutcomeForm({ session, onChanged }) {
-  const [outcome, setOutcome] = useState("PARTIAL");
+export function OutcomeForm({ session, onChanged, onClose = closeModal, endNow = false }) {
+  const durationOptions = useId();
+  const [outcome, setOutcome] = useState(endNow ? "COMPLETED" : "PARTIAL");
+  const [actual, setActual] = useState("");
+  const [remaining, setRemaining] = useState("");
   const timerSeconds = session.timerSeconds ?? session.actualSeconds ?? 0;
   const [useTimer, setUseTimer] = useState(timerSeconds > 0);
   const [busy, setBusy] = useState(false);
@@ -71,6 +75,7 @@ function OutcomeForm({ session, onChanged }) {
   const [result, setResult] = useState(null);
   async function submit(event) {
     event.preventDefault();
+    if (busy) return;
     const form = new FormData(event.currentTarget);
     setBusy(true);
     setError("");
@@ -81,6 +86,7 @@ function OutcomeForm({ session, onChanged }) {
           outcome === "MISSED" || useTimer ? null : Number(form.get("actual")),
         remainingMinutes:
           outcome === "PARTIAL" ? Number(form.get("remaining")) : null,
+        ...(endNow ? { endNow: true } : {}),
       });
       setResult(saved);
       window.dispatchEvent(new Event("workspace-updated"));
@@ -94,7 +100,7 @@ function OutcomeForm({ session, onChanged }) {
     }
   }
   return (
-    <>
+    <div className="session-log">
       {error && (
         <p className="warning" role="alert">
           {error}
@@ -103,8 +109,7 @@ function OutcomeForm({ session, onChanged }) {
       {result ? (
         <>
           <p role="status">
-            Đã ghi nhận {minutes(result.actualSeconds / 60)}. Lịch chưa thay
-            đổi.
+            Đã ghi nhận {minutes(Math.floor(result.actualSeconds / 60))}.
           </p>
           {result.remainingMinutes != null && (
             <p>Còn {minutes(result.remainingMinutes)} công việc.</p>
@@ -134,8 +139,8 @@ function OutcomeForm({ session, onChanged }) {
                       `/api/sessions/${session.id}/finish-task`,
                       "POST",
                     );
-                    closeModal();
                     await onChanged?.();
+                    onClose();
                   } catch (failure) {
                     setError(failure.message);
                   } finally {
@@ -146,25 +151,39 @@ function OutcomeForm({ session, onChanged }) {
                 Hoàn thành công việc
               </button>
             )}
-          <button className="btn ghost" type="button" onClick={closeModal}>
+          <button className="btn ghost" type="button" onClick={onClose}>
             Đóng
           </button>
         </>
       ) : (
-        <form className="form-grid" onSubmit={submit}>
-          <label>
-            Kết quả phiên{" "}
-            <select
-              value={outcome}
-              onChange={(e) => setOutcome(e.target.value)}
-            >
-              <option value="COMPLETED">Xong phiên</option>
-              <option value="PARTIAL">Làm một phần</option>
-              <option value="MISSED" disabled={timerSeconds > 0}>
-                Chưa làm
-              </option>
-            </select>
-          </label>
+        <form className="session-log-form" onSubmit={submit}>
+          <div className="session-log-line">
+            {icon("calendar")}
+            <span className="session-log-static">{session.start ? dateFmt(session.start) : "Phiên đã chọn"}</span>
+            {outcome !== "MISSED" && !useTimer && (
+              <label className="session-log-duration">
+                <input aria-label="Phút thực làm" required name="actual" type="number" min="0" max="10080"
+                  list={durationOptions} placeholder="0" value={actual} onChange={(event) => setActual(event.target.value)} />
+                <span>phút</span>
+                <datalist id={durationOptions}>
+                  {[15, 30, 45, 60, 90, 120].map((value) => <option key={value} value={value} />)}
+                </datalist>
+              </label>
+            )}
+            {outcome !== "MISSED" && useTimer && <span className="session-log-static">{minutes(Math.floor(timerSeconds / 60))}</span>}
+          </div>
+          <div className="session-log-line">
+            {icon("users")}
+            <span className="session-log-static">Do tôi thực hiện</span>
+          </div>
+          <div className="session-log-switch-row">
+            <button type="button" role="switch" aria-label="Phiên đã xong" aria-checked={outcome === "COMPLETED"}
+              className="session-log-switch" disabled={busy}
+              onClick={() => setOutcome(outcome === "COMPLETED" ? "PARTIAL" : "COMPLETED")}>
+              <span>Phiên đã xong?</span>
+              <span aria-hidden="true">{outcome === "COMPLETED" ? "Có" : "Chưa"}</span>
+            </button>
+          </div>
           {outcome !== "MISSED" && timerSeconds > 0 && (
             <label>
               <input
@@ -172,41 +191,41 @@ function OutcomeForm({ session, onChanged }) {
                 checked={useTimer}
                 onChange={(e) => setUseTimer(e.target.checked)}
               />{" "}
-              Dùng thời gian bộ đếm: {minutes(timerSeconds / 60)}
-            </label>
-          )}
-          {outcome !== "MISSED" && !useTimer && (
-            <label>
-              Phút thực làm{" "}
-              <input required name="actual" type="number" min="0" max="10080" />
+              Dùng thời gian bộ đếm: {minutes(Math.floor(timerSeconds / 60))}
             </label>
           )}
           {outcome === "PARTIAL" && (
             <label>
-              Tổng số phút còn cần, gồm cả các phiên đã đặt
+              <span>Phút còn cần</span>
               <input
+                aria-label="Tổng số phút còn cần, gồm cả các phiên đã đặt"
                 required
                 name="remaining"
                 type="number"
                 min="1"
                 max="43200"
+                value={remaining}
+                onChange={(event) => setRemaining(event.target.value)}
               />
+              <small>Tính cả thời gian trong các phiên đã đặt.</small>
             </label>
           )}
-          <div className="form-actions">
-            <button className="btn primary" disabled={busy}>
-              Lưu kết quả
-            </button>
-          </div>
+          {timerSeconds <= 0 && !endNow && <label className="session-log-check">
+            <input type="checkbox" checked={outcome === "MISSED"} disabled={busy}
+              onChange={(event) => setOutcome(event.target.checked ? "MISSED" : "PARTIAL")} /> Chưa làm phiên này
+          </label>}
+          <button className="btn primary session-log-save" disabled={busy}>
+            {busy ? "Đang lưu…" : "Lưu kết quả"}
+          </button>
         </form>
       )}
-    </>
+    </div>
   );
 }
 
 export function openSessionOutcome(session, onChanged) {
   modal(
-    "Ghi kết quả phiên",
+    "Ghi thời gian",
     session.name || session.taskName,
     <OutcomeForm key={session.id} session={session} onChanged={onChanged} />,
   );
@@ -322,6 +341,7 @@ function TeamWorkloadPicker({ week, renderToolbar }) {
         <TeamWorkload
           key={selected.id}
           teamId={selected.id}
+          teamName={selected.name}
           week={week}
           renderToolbar={(start, end, personFilter) =>
             renderToolbar(
@@ -491,9 +511,9 @@ function WorkloadGroupCell({ group, day, cell, showHours, showName, today }) {
             return (
               <li key={id} className="workload-popup-task">
                 {task.canComplete ? (
-                  <button type="button" className="task-complete-toggle workload-popup-check" role="checkbox"
-                    aria-checked={complete} aria-label={`${complete ? "Mở lại" : "Hoàn thành"} ${task.name}`}
-                    data-action="toggle-task-completion" data-id={id}>{complete && icon("check")}</button>
+                  <input type="checkbox" className="workload-popup-check" checked={complete} readOnly
+                    aria-label={`${complete ? "Mở lại" : "Hoàn thành"} ${task.name}`}
+                    data-action="toggle-task-completion" data-id={id} />
                 ) : <span className="workload-popup-task-icon" aria-hidden="true">{icon(complete ? "check" : "tasks")}</span>}
                 <button type="button" className="workload-popup-title" data-action="task-detail" data-id={id} onClick={close}>
                   <span>{task.name}<small className="workload-group-times">{task.times.join(" · ")}</small></span>
@@ -521,6 +541,88 @@ function WorkloadGroupCell({ group, day, cell, showHours, showName, today }) {
   );
 }
 
+function WorkloadPreviewBar({ heading, total, segments = [] }) {
+  return (
+    <div className="workload-preview-metric">
+      <div className="workload-preview-heading">
+        <strong>{heading}</strong>
+        <span>{total == null ? "—" : timeText(Math.round(total))}</span>
+      </div>
+      <div className="workload-preview-track" aria-hidden="true">
+        {total > 0 && segments.map(({ label, value, tone }) => (
+          <span key={label} data-tone={tone} style={{ flexBasis: `${value / total * 100}%` }} />
+        ))}
+      </div>
+      {segments.length > 0 && (
+        <dl className="workload-preview-legend">
+          {segments.map(({ label, value, tone }) => (
+            <div key={label} data-tone={tone}>
+              <dt>{label}</dt>
+              <dd>{timeText(Math.round(value))}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
+function WorkloadDayPreview({ id, day, anchor, onDismiss, onEnter, onLeave }) {
+  const popup = useRef(null);
+  useLayoutEffect(() => {
+    const node = popup.current;
+    function position() {
+      const rect = anchor.getBoundingClientRect();
+      const gutter = 8;
+      const gap = 6;
+      const left = rect.left + (rect.width - node.offsetWidth) / 2;
+      const above = rect.top - node.offsetHeight - gap;
+      node.style.left = `${Math.max(gutter, Math.min(left, innerWidth - node.offsetWidth - gutter))}px`;
+      node.style.top = `${above >= gutter ? above : Math.max(gutter,
+        Math.min(rect.bottom + gap, innerHeight - node.offsetHeight - gutter))}px`;
+    }
+    position();
+    window.addEventListener("resize", position);
+    return () => window.removeEventListener("resize", position);
+  }, [anchor, day]);
+
+  useEffect(() => {
+    function escape(event) {
+      if (event.key === "Escape") onDismiss();
+    }
+    window.addEventListener("keydown", escape);
+    window.addEventListener("scroll", onDismiss, true);
+    return () => {
+      window.removeEventListener("keydown", escape);
+      window.removeEventListener("scroll", onDismiss, true);
+    };
+  }, [onDismiss]);
+
+  const { workingMinutes, remainingWorkMinutes, plannedSeconds, completedPlannedSeconds, skippedPlannedSeconds } = day;
+  const workSegments = workingMinutes != null && remainingWorkMinutes != null ? [
+    { label: "Đã qua", value: workingMinutes - remainingWorkMinutes, tone: "elapsed" },
+    { label: "Còn lại", value: remainingWorkMinutes, tone: "work-left" },
+  ] : [];
+  const planSegments = completedPlannedSeconds != null && skippedPlannedSeconds != null ? [
+    { label: "Đã xong", value: completedPlannedSeconds / 60, tone: "done" },
+    { label: "Chưa xong", value: (plannedSeconds - completedPlannedSeconds - skippedPlannedSeconds) / 60, tone: "pending" },
+    ...(skippedPlannedSeconds > 0 ? [{ label: "Đã bỏ qua hoặc bỏ lỡ", value: skippedPlannedSeconds / 60, tone: "elapsed" }] : []),
+  ] : [];
+
+  return createPortal(
+    <div id={id} ref={popup} role="tooltip" className="workload-day-preview" onMouseEnter={onEnter} onMouseLeave={onLeave}>
+      <WorkloadPreviewBar heading="Giờ làm" total={workingMinutes} segments={workSegments} />
+      <WorkloadPreviewBar heading="Phiên đã xếp" total={plannedSeconds / 60} segments={planSegments} />
+      {(day.schedulableMinutes != null || day.advice) && (
+        <div className="workload-preview-note">
+          {day.schedulableMinutes != null && <span>Còn xếp thêm <strong>{timeText(day.schedulableMinutes)}</strong></span>}
+          {day.advice && <span>{day.advice}</span>}
+        </div>
+      )}
+    </div>, document.body,
+  );
+}
+
 function PersonalWorkload({
   week,
   onWorkspaceChanged,
@@ -532,7 +634,27 @@ function PersonalWorkload({
   const following = useWorkload(value && week < 3 ? week + 1 : null);
   const [selection, setSelection] = useState(null);
   const [showBands, setShowBands] = useState(true);
+  const [preview, setPreview] = useState(null);
+  const previewId = useId();
+  const previewTimer = useRef(null);
   const bandsId = useId();
+  useEffect(() => () => clearTimeout(previewTimer.current), []);
+  function stopPreviewTimer() {
+    clearTimeout(previewTimer.current);
+  }
+  function closePreview() {
+    stopPreviewTimer();
+    setPreview(null);
+  }
+  function showPreview(date, anchor) {
+    stopPreviewTimer();
+    setPreview({ date, anchor });
+  }
+  function leavePreview() {
+    stopPreviewTimer();
+    if (preview?.anchor === document.activeElement && preview.anchor.matches(":focus-visible")) return;
+    previewTimer.current = setTimeout(closePreview, 120);
+  }
   function toggleSelection(date) {
     setSelection((current) => current === date ? null : date);
   }
@@ -554,6 +676,7 @@ function PersonalWorkload({
   const days = [...value.days, ...(nextWeek?.days ?? [])].filter(
     (day) => showWeekends || isWorkloadWeekday(day),
   );
+  const previewDay = days.find((day) => day.date === preview?.date);
   const today = dayKey(value.asOf || Date.now());
   const name = state.workspace.profile?.displayName?.trim() || "Tôi";
   const groups = new Map();
@@ -572,11 +695,12 @@ function PersonalWorkload({
       const id = session.taskId || session.id;
       const task = tasksById.get(id);
       const project = tasksById.get(task?.parentId) || (projectIds.has(id) ? task : null);
-      const isTeam = session.teamTask || task?.isTeamTask;
-      const key = project ? project.id : isTeam ? "team" : "inbox";
+      const isTeam = session.teamTask || session.teamId || task?.isTeamTask;
+      const teamName = session.teamName?.trim();
+      const key = isTeam ? (session.teamId ? `team:${session.teamId}` : "team") : (project?.id ?? "inbox");
       const group = groups.get(key) ?? {
-        name: project?.name || (isTeam ? "Công việc nhóm" : "Inbox"),
-        projectId: project?.id,
+        name: isTeam ? (teamName ? `Nhóm · ${teamName}` : "Nhóm") : (project?.name || "Inbox"),
+        projectId: isTeam ? undefined : project?.id,
         inbox: key === "inbox",
         days: new Map(),
       };
@@ -680,7 +804,15 @@ function PersonalWorkload({
                       aria-expanded={
                         selection === day.date
                       }
-                      onClick={() => toggleSelection(day.date)}
+                      aria-describedby={previewDay?.date === day.date ? previewId : undefined}
+                      onMouseEnter={(event) => showPreview(day.date, event.currentTarget)}
+                      onMouseLeave={leavePreview}
+                      onFocus={(event) => showPreview(day.date, event.currentTarget)}
+                      onBlur={closePreview}
+                      onClick={() => {
+                        closePreview();
+                        toggleSelection(day.date);
+                      }}
                     >
                       <span className="workload-matrix-track" aria-hidden="true">
                         {fill > 0 && <span className="workload-matrix-bar" style={{ width: `${fill}%` }} />}
@@ -730,6 +862,8 @@ function PersonalWorkload({
           </tbody>
         </table>
       </div>
+      {previewDay && <WorkloadDayPreview id={previewId} day={previewDay} anchor={preview.anchor}
+        onDismiss={closePreview} onEnter={stopPreviewTimer} onLeave={leavePreview} />}
       {week === 0 && value.next.kind === "SETUP" && (
         <p className="workload-message">
           {value.next.reason}{" "}

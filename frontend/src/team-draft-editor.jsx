@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { icon, localInput, toUtc, zone } from "./ui.jsx";
 import { parseTaskNotes } from "./team-task-notes.jsx";
+import { EisenhowerPriorityField } from "./eisenhower-priority.jsx";
 import "./team-draft-editor.css";
 
 const sections = [
@@ -16,6 +17,7 @@ export const draftEditValues = (task) => ({
   description: task.description,
   estimatedMinutes: task.estimatedMinutes,
   deadline: task.deadline || null,
+  ...(task.importance?.level ? { importanceLevel: task.importance.level } : {}),
 });
 
 function initialValues(task) {
@@ -43,6 +45,7 @@ function initialValues(task) {
     ...content,
     name: task.name,
     minutes: task.estimatedMinutes,
+    importanceLevel: task.importance?.level || "Unknown",
     deadline: task.deadline ? localInput(task.deadline) : "",
     preserved,
   };
@@ -149,6 +152,7 @@ export function TeamDraftTaskEditor({
             name: value.name.trim(),
             description,
             estimatedMinutes: Number(value.minutes),
+            importanceLevel: value.importanceLevel,
             deadline: value.deadline ? toUtc(value.deadline) : null,
           });
           if (result) onEditingChange(false);
@@ -196,6 +200,8 @@ export function TeamDraftTaskEditor({
           />
         </label>
       </div>
+      <EisenhowerPriorityField task={task} value={value.importanceLevel} disabled={busy}
+        onChange={(importanceLevel) => update("importanceLevel", importanceLevel)} />
       {sections.map(([key, title]) => (
         <label className="field" key={key}>
           {title}

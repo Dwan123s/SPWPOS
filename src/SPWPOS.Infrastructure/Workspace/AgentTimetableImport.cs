@@ -56,7 +56,7 @@ public sealed partial class WorkspaceService
                 : "Đã phân tích thời khóa biểu. Đây là lịch sau khi áp dụng đề xuất; chưa lưu thay đổi.",
             usesTimetableHours ? "Giờ làm việc theo thời khóa biểu đã được tính quanh lịch học, các sự kiện và giờ sinh hoạt."
                 : hasWorkHours ? "Dùng giờ làm việc bạn đã cung cấp, trừ lịch học, sự kiện, phiên làm việc và các khoảng bận."
-                : "Mình đã tự chuẩn bị lịch sinh hoạt và giờ rảnh đề xuất: trừ lịch cố định, giờ ngủ, bữa trưa/tối 30 phút, nghỉ ngơi và di chuyển. Đây là đề xuất để bạn xem và áp dụng, chưa lưu thành giờ làm việc.",
+                : "Mình đã tự chuẩn bị lịch sinh hoạt và Thời Gian Làm Việc đề xuất: trừ lịch cố định, giờ ngủ, bữa trưa/tối 30 phút, nghỉ ngơi và di chuyển. Đây là đề xuất để bạn xem và áp dụng, chưa lưu thành giờ làm việc.",
             $"Phân tích từ {first:dd/MM/yyyy} đến {LocalDate(end.AddTicks(-1), state.Preference):dd/MM/yyyy} ({state.Preference.TimeZoneId}); chỉ tính thời gian còn lại:" };
         for (var day = first; PlanningEngine.At(day, 0, zone) < end; day = day.AddDays(1))
         {
@@ -82,11 +82,11 @@ public sealed partial class WorkspaceService
                     .Concat(state.Exceptions.Where(x => !x.IsAvailable && x.Date == day).Select(x => new TimeSlot(
                         PlanningEngine.At(day, x.StartMinute, zone), PlanningEngine.At(day, x.EndMinute, zone))))).ToArray() : [];
             lines.Add($"- {day:dd/MM}: " + (busy.Length > 0 ? "Bận: " + string.Join("; ", busy) + ". " : "Không có lịch bận đã lưu. ") +
-                (free.Length == 0 ? dayHasWorkHours ? "Không có khoảng rảnh trong khung đang xét." : "Giờ rảnh: chưa xác nhận." : (proposedPolicy != null ? "Giờ rảnh đề xuất: " : "Rảnh: ") + string.Join(", ", free.Select(x =>
+                (free.Length == 0 ? dayHasWorkHours ? "Không có khoảng Thời Gian Làm Việc trong khung đang xét." : "Thời Gian Làm Việc: chưa xác nhận." : (proposedPolicy != null ? "Thời Gian Làm Việc đề xuất: " : "Thời Gian Làm Việc: ") + string.Join(", ", free.Select(x =>
                     $"{Hours(x.Start, x.End)} ({(int)(x.End - x.Start).TotalMinutes} phút)")) + $". Tổng {free.Sum(x => (int)(x.End - x.Start).TotalMinutes)} phút.") +
                 (unoccupied.Length > 0 ? " Chưa có lịch bận: " + string.Join(", ", unoccupied.Select(x => Hours(x.Start, x.End))) + " (chưa xác nhận có thể làm việc)." : ""));
         }
-        if (hasWorkHours) lines.Add($"Tổng thời gian rảnh đã xác nhận: {slots.Sum(x => (int)(x.End - x.Start).TotalMinutes)} phút.");
+        if (hasWorkHours) lines.Add($"Tổng Thời Gian Làm Việc đã xác nhận: {slots.Sum(x => (int)(x.End - x.Start).TotalMinutes)} phút.");
         if (slots.Length > 0)
         {
             var longest = slots.MaxBy(x => x.End - x.Start)!;
@@ -95,7 +95,7 @@ public sealed partial class WorkspaceService
         lines.Add($"Thời gian trống không đồng nghĩa làm việc liên tục: tối đa {state.Preference.MaximumDailyMinutes} phút/ngày, mỗi phiên {state.Preference.MinimumSessionMinutes}–{state.Preference.MaximumSessionMinutes} phút, nghỉ {state.Preference.BreakMinutes} phút giữa các phiên.");
         lines.Add(usesTimetableHours
             ? "Mở Lịch → Giờ làm việc để xem các khung theo từng tuần đã nhập."
-            : $"Lịch sinh hoạt và các khoảng rảnh được đề xuất tự động ở thẻ bên dưới cho đúng tuần {first:dd/MM}–{first.AddDays(6):dd/MM} của thời khóa biểu vừa gửi. Bạn chỉ cần xem và bấm áp dụng; có thể chỉnh giờ ngủ, bữa ăn hoặc thêm hoạt động riêng sau đó, không cần tự khai báo các khung giờ rảnh.");
+            : $"Lịch sinh hoạt và các khoảng Thời Gian Làm Việc được đề xuất tự động ở thẻ bên dưới cho đúng tuần {first:dd/MM}–{first.AddDays(6):dd/MM} của thời khóa biểu vừa gửi. Bạn chỉ cần xem và bấm áp dụng; có thể chỉnh giờ ngủ, bữa ăn hoặc thêm hoạt động riêng sau đó, không cần tự khai báo các khung Thời Gian Làm Việc.");
         return string.Join("\n", lines);
     }
 

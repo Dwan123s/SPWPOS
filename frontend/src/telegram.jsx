@@ -55,8 +55,13 @@ export function TelegramCard() {
       {link && status?.linkExpiresAt && (
         <div className="telegram-connect-steps" role="status">
           <strong>{expired ? "Liên kết đã hết hạn" : "Hoàn tất kết nối trong Telegram"}</strong>
-          <p>{expired ? "Bấm tạo lại liên kết để tiếp tục." : "Bấm mở bot bên dưới, rồi nhấn Start. PLANORA sẽ tự cập nhật khi kết nối xong. Liên kết có hiệu lực 10 phút."}</p>
-          {!expired && <a className="btn primary" href={link.url} target="_blank" rel="noopener noreferrer">Mở bot Telegram · Nhấn Start</a>}
+          <p>{expired ? "Bấm tạo lại liên kết để tiếp tục." : "Mở bot rồi nhấn Start. Nếu Telegram Web yêu cầu đăng nhập, hãy đăng nhập bằng tài khoản muốn liên kết. Liên kết có hiệu lực 10 phút."}</p>
+          {!expired && (
+            <div className="telegram-actions">
+              <a className="btn primary" href={link.url.replace(/^https:\/\/t\.me\//, "https://web.t.me/")} target="_blank" rel="noopener noreferrer">Mở Telegram Web</a>
+              <a className="btn secondary" href={link.url} target="_blank" rel="noopener noreferrer">Mở ứng dụng Telegram</a>
+            </div>
+          )}
         </div>
       )}
       <div className="telegram-actions">

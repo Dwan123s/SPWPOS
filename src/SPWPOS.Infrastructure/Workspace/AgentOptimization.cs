@@ -61,7 +61,7 @@ public sealed partial class WorkspaceService
     {
         if (plan is null) return "Mình chưa thấy công việc nào có thể xếp lại trong khoảng này. Bạn có thể thêm việc cần làm hoặc chọn khoảng khác nhé.";
         var range = LocalWindow(plan.Start, plan.End, preference);
-        if (!changed) return $"Mình đã kiểm tra lịch từ {range}. Với giờ rảnh và các điều kiện hiện tại, mình chưa tìm được cách xếp khác; bạn có thể giữ lịch đang có.";
+        if (!changed) return $"Mình đã kiểm tra lịch từ {range}. Với Thời Gian Làm Việc và các điều kiện hiện tại, mình chưa tìm được cách xếp khác; bạn có thể giữ lịch đang có.";
         var moved = changes.Count(change => change.Kind == "SESSION" && change.Before.Length > 0);
         return $"Mình đã chuẩn bị phương án từ {range}" + (moved > 0 ? $", xếp lại {moved} công việc." : ".") +
             " Mình xét hạn chót và mức ưu tiên trước, rồi cân nhắc giờ làm việc bạn thích, khoảng trống và việc chia nhỏ phiên. " +

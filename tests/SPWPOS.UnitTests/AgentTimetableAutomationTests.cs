@@ -188,12 +188,12 @@ public sealed partial class AgentFreeTimeTests
         Assert.Empty(await h.DbAsync(db => db.FixedEvents.ToArrayAsync(Ct)));
         var saved = await UseAgent(h, s => s.ApplyAgentTurnAsync(user.Id, preview.Id, Ct));
         Assert.Equal("APPLIED", saved.Status); Assert.DoesNotContain("chưa lưu thay đổi", saved.Reply);
-        Assert.Contains("Giờ rảnh đề xuất:", saved.Reply);
+        Assert.Contains("Thời Gian Làm Việc đề xuất:", saved.Reply);
         Assert.Contains("bữa trưa/tối 30 phút", saved.Reply);
         Assert.Contains("chưa lưu thành giờ làm việc", saved.Reply);
         Assert.True(saved.SuggestRoutine);
         Assert.Empty(await h.DbAsync(db => db.AvailabilityPolicies.ToArrayAsync(Ct)));
-        Assert.DoesNotContain("Rảnh: 07:00", saved.Reply);
+        Assert.DoesNotContain("Thời Gian Làm Việc: 07:00", saved.Reply);
         await UseAgent(h, s => s.SendAgentTurnAsync(user.Id, input, Ct));
         Assert.Equal(0, await h.DbAsync(db => db.WeeklyAvailability.CountAsync(Ct)));
         Assert.Equal(2, await h.DbAsync(db => db.FixedEvents.CountAsync(Ct)));
@@ -208,7 +208,7 @@ public sealed partial class AgentFreeTimeTests
             new(conversation, Guid.NewGuid(), "Nhập thời gian biểu cố định ngày mai: Toán 08:00–10:00, Lập trình 14:00–16:00, chỉ một lần."), Ct));
         Assert.Equal("APPLIED", imported.Status);
         Assert.Empty(await h.DbAsync(db => db.WeeklyAvailability.ToArrayAsync(Ct)));
-        Assert.Contains("không cần tự khai báo các khung giờ rảnh", imported.Reply);
+        Assert.Contains("không cần tự khai báo các khung Thời Gian Làm Việc", imported.Reply);
         var fixedHours = await h.DbAsync(db => db.FixedEvents.OrderBy(x => x.Start).Select(x => new { x.Start, x.End }).ToArrayAsync(Ct));
         ai.Response = _ => AgentAiTestDouble.Empty() with { WeeklySlots = [new((int)Day.DayOfWeek, 420, 1320)] };
         var configured = await UseAgent(h, s => s.SendAgentTurnAsync(user.Id,

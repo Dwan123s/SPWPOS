@@ -180,7 +180,7 @@ it("shows a processing stop without blaming availability or asking users to chan
   render(<AgentPage />);
   await screen.findByText("Tạm dừng xử lý");
   expect(screen.queryByText(/thu hẹp khoảng ngày/)).toBeNull();
-  expect(screen.queryByText(/mở thêm giờ rảnh/)).toBeNull();
+  expect(screen.queryByText(/mở thêm Thời Gian Làm Việc/)).toBeNull();
   expect(screen.queryByText(/nới lỏng deadline/)).toBeNull();
   expect(screen.getAllByText(/Tiếp tục xử lý/).length).toBeGreaterThan(0);
 });
@@ -1003,10 +1003,10 @@ it("shows a real partial reply and walking state, and Stop preserves the idempot
   const encoder = new TextEncoder();
   streamController.enqueue(
     encoder.encode(
-      `data: ${JSON.stringify({ type: "phase", stage: "UNDERSTANDING", message: "Đang hiểu yêu cầu" })}\n\ndata: ${JSON.stringify({ type: "delta", delta: "Mình đang tìm giờ rảnh." })}\n\n`,
+      `data: ${JSON.stringify({ type: "phase", stage: "UNDERSTANDING", message: "Đang hiểu yêu cầu" })}\n\ndata: ${JSON.stringify({ type: "delta", delta: "Mình đang tìm Thời Gian Làm Việc." })}\n\n`,
     ),
   );
-  await screen.findByText("Mình đang tìm giờ rảnh.");
+  await screen.findByText("Mình đang tìm Thời Gian Làm Việc.");
   expect(
     view.container.querySelector(".nora-walk-track.is-active"),
   ).toBeTruthy();

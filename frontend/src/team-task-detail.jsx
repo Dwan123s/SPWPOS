@@ -1,11 +1,14 @@
 import { createPortal } from "react-dom";
-import { icon, dateFmt, timeFmt, minutes } from "./ui.jsx";
+import { useState } from "react";
+import { icon, dateFmt, timeFmt, minutes, state } from "./ui.jsx";
 import { TeamDialog } from "./team-dialog.jsx";
 import { CompletionReport } from "./team-completion-files.jsx";
-import { TaskRequirements, TaskSourceFiles } from "./team-task-notes.jsx";
+import { TaskNoteSection, TaskSourceFiles, teamTaskNoteSections } from "./team-task-notes.jsx";
 import { TeamRecipientEditor } from "./team-recipient-select.jsx";
 import { TaskEisenhowerDetail } from "./eisenhower.jsx";
+import { EisenhowerPriorityBadge } from "./eisenhower-priority.jsx";
 import { TeamChecklist } from "./team-task-checklist.jsx";
+import { TaskPlannedSessions, TaskPlanningPanel, TaskPriorityIndicators, TaskSessionControls } from "./task-workflow.jsx";
 
 const statusLabels = {
   Open: "Chờ nhận",
@@ -17,6 +20,10 @@ const statusLabels = {
 
 export function TeamTaskDetail({
   task,
+  teamId,
+  onExecutionChanged,
+  selectedSessionId,
+  initialSection = "overview",
   parent,
   childrenTasks = [],
   uid,
@@ -36,12 +43,32 @@ export function TeamTaskDetail({
   onReject,
   onAttachSource,
   onRecipientChange,
+  onRequestAvailability,
   onImportanceChanged,
   onOpenTask,
   onSplit,
   onChecklistToggle,
+  awaitingDeadline,
+  onExtendDeadline,
 }) {
   const mine = task.assigneeId === uid;
+  const personal = mine ? state.workspace?.tasks?.find(item =>
+    item.teamId === teamId && item.teamTaskId === task.id) : null;
+  const [section, setSection] = useState(initialSection);
+  const notes = teamTaskNoteSections(task);
+  const noteCategories = new Map(notes.filter((note) => note.title !== "Tài liệu nguồn")
+    .map((note) => [note.title, note.glyph]));
+  const categories = [
+    ["overview", "Tổng quan", "tasks"],
+    ...(personal ? [["sessions", "Lịch làm", "calendar"]] : []),
+    ...Array.from(noteCategories, ([title, glyph]) => [`note:${title}`, title, glyph]),
+    ...((mine || task.status === "Open") && task.checklist?.length ? [["checklist", "Checklist", "check"]] : []),
+    ...(childrenTasks.length ? [["children", "Việc con", "tasks"]] : []),
+    ["source", "Tài liệu nguồn", "folder"],
+    ...(task.completionSubmissionNote || task.completionFiles?.length || task.completionReportUrl
+      ? [["report", "Kết quả đã gửi", "folder"]] : []),
+  ];
+  const activeSection = categories.some(([id]) => id === section) ? section : "overview";
   // Close the task viewer before opening the scheduling, submission or review dialog.
   const handoff = (action, ...args) => {
     onClose();
@@ -55,23 +82,28 @@ export function TeamTaskDetail({
       busy={busy}
       className="team-task-dialog"
     >
-      <div className="team-task-dialog-content">
+      <nav className="team-task-detail-nav" aria-label="Danh mục chi tiết công việc">
+        {categories.map(([id, title, glyph]) => (
+          <button type="button" key={id} aria-pressed={activeSection === id} onClick={() => setSection(id)}>
+            {icon(glyph)} {title}
+          </button>
+        ))}
+      </nav>
+      <div className="team-task-dialog-content" key={activeSection}>
+        {activeSection === "overview" && <>
+        <TaskPriorityIndicators task={personal || task} sessions={state.workspace?.sessions} project={task.status === "Split"}
+          link={Boolean(personal)} onOpenPlan={() => setSection("sessions")} />
+        {personal && task.status === "Assigned" && (
+          <TaskSessionControls task={personal} onWorkspaceChanged={onExecutionChanged} selectedSessionId={selectedSessionId} />
+        )}
         {parent && <button type="button" className="team-text-button" onClick={() => onOpenTask(parent)}>
           Việc gốc · {parent.name}
         </button>}
         <div className="team-task-dialog-badges">
           <span className={`team-detail-status status-${task.status}`}>
-            {statusLabels[task.status] || task.status}
+            {awaitingDeadline ? "Quá hạn · Chưa có người nhận" : statusLabels[task.status] || task.status}
           </span>
-          <span className={`team-priority priority-${task.priority}`}>
-            {task.priority === 4
-              ? "Khẩn cấp"
-              : task.priority === 3
-                ? "Ưu tiên cao"
-                : task.priority === 1
-                  ? "Linh hoạt"
-                  : "Thông thường"}
-          </span>
+          <EisenhowerPriorityBadge task={task} />
           {task.hasPendingChange && (
             <span className="team-change-badge">Có yêu cầu mới</span>
           )}
@@ -100,7 +132,13 @@ export function TeamTaskDetail({
             </strong>
           </div>
         </div>
-        {task.designatedUserId && !task.assigneeId && (
+        {task.status !== "Split" && <div className="team-task-work-mode">
+          {icon("clock")} {task.splittable ? "Có thể chia thành nhiều phiên làm việc" : "Thực hiện trong một phiên liên tục"}
+        </div>}
+        {awaitingDeadline && <p className="team-task-overdue-note">
+          {icon("alertCircle")} {leader ? "Đặt hạn mới để thành viên có thể xem lịch và nhận việc." : "Chờ trưởng nhóm gia hạn."}
+        </p>}
+        {task.designatedUserId && !task.assigneeId && !awaitingDeadline && (
           <p className="team-designated-note">
             {icon("users")}
             {task.designatedUserId === uid
@@ -111,6 +149,7 @@ export function TeamTaskDetail({
         {leader &&
           task.status === "Open" &&
           !task.assigneeId &&
+          !awaitingDeadline &&
           onRecipientChange && (
             <TeamRecipientEditor
               key={task.version}
@@ -118,6 +157,7 @@ export function TeamTaskDetail({
               members={members}
               busy={busy}
               onSave={onRecipientChange}
+              onRequestAvailability={onRequestAvailability}
             />
           )}
         {task.assigneeId && (
@@ -131,7 +171,16 @@ export function TeamTaskDetail({
           </div>
         )}
         {task.status !== "Split" && <TaskEisenhowerDetail task={task} team leader={leader} onChanged={onImportanceChanged} />}
-        {childrenTasks.length > 0 && (
+        </>}
+        {activeSection === "sessions" && personal && (
+          <>
+            <TaskPlanningPanel task={personal} onWorkspaceChanged={onExecutionChanged} />
+            <TaskPlannedSessions sessions={(state.workspace.sessions || [])
+              .filter(session => session.taskId === personal.id && session.status !== "Cancelled")
+              .sort((a, b) => Date.parse(a.start) - Date.parse(b.start))} />
+          </>
+        )}
+        {activeSection === "children" && (
           <section className="team-checklist" aria-label="Việc con">
             <h3>Việc con</h3>
             <ul>{childrenTasks.map((child) => (
@@ -142,20 +191,24 @@ export function TeamTaskDetail({
             ))}</ul>
           </section>
         )}
-        {(mine || task.status === "Open") && (
+        {activeSection === "checklist" && (
           <TeamChecklist items={task.checklist} busy={busy}
             onToggle={mine && task.status === "Assigned" && onChecklistToggle
               ? (itemId, completed) => onChecklistToggle(task, itemId, completed) : undefined} />
         )}
-        <TaskRequirements task={task} />
-        <TaskSourceFiles
+        {notes.filter((note) => activeSection === `note:${note.title}` ||
+          (activeSection === "source" && note.title === "Tài liệu nguồn"))
+          .map((note, index) => <TaskNoteSection key={index} section={note} />)}
+        {activeSection === "source" && <TaskSourceFiles
           task={task}
           leader={leader}
           busy={busy}
           onAttach={
             onAttachSource ? (file) => onAttachSource(task, file) : undefined
           }
-        />
+        />}
+        {activeSection === "report" && <CompletionReport task={task} />}
+        {activeSection === "overview" && <>
         {task.status === "PendingReview" && (
           <p className="team-row-review-note">
             {assignee?.name || "Thành viên"} đã báo hoàn thành
@@ -179,8 +232,7 @@ export function TeamTaskDetail({
             {icon("shield")} Đã được {reviewer?.name || "trưởng nhóm"} duyệt
           </p>
         )}
-        <CompletionReport task={task} />
-        {!task.assigneeId && task.status === "Open" && (
+        {!task.assigneeId && task.status === "Open" && !awaitingDeadline && (
           <p className="team-task-dialog-privacy">
             {icon("lock")} Khi nhận task, NORA sẽ xếp theo lịch riêng của bạn.
           </p>
@@ -231,6 +283,7 @@ export function TeamTaskDetail({
             </button>
           </div>
         )}
+        </>}
         {error && (
           <p className="team-error" role="alert">
             {icon("alertCircle")}
@@ -248,7 +301,7 @@ export function TeamTaskDetail({
             >
               Đề xuất đổi yêu cầu
             </button>
-            {task.status === "Open" && !task.parentTaskId && onSplit && (
+            {task.status === "Open" && !awaitingDeadline && !task.parentTaskId && onSplit && (
               <button type="button" className="btn secondary" disabled={busy} onClick={() => handoff(onSplit, task)}>
                 Chia thành 2 việc con
               </button>
@@ -264,8 +317,14 @@ export function TeamTaskDetail({
           >
             Đóng
           </button>
+          {leader && awaitingDeadline && onExtendDeadline && (
+            <button type="button" className="btn primary" disabled={busy} onClick={() => handoff(onExtendDeadline, task)}>
+              {icon("calendar")} Gia hạn
+            </button>
+          )}
           {!task.assigneeId &&
             task.status === "Open" &&
+            !awaitingDeadline &&
             (!task.designatedUserId || task.designatedUserId === uid) && (
               <button
                 className="btn primary"

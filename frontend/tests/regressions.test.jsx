@@ -4,7 +4,6 @@ import { state, loadLabel } from "../src/ui.jsx";
 import {
   todayPage,
   insightsPage,
-  scenarioPage,
   notificationsPage,
   settingsPage,
   adminPage,
@@ -22,7 +21,6 @@ beforeEach(() => {
   state.conflicts = [];
   state.calendarStart = null;
   state.calendarView = "week";
-  state.scenario = null;
   state.settingsTab = "profile";
 });
 describe("React view regressions", () => {
@@ -30,7 +28,7 @@ describe("React view regressions", () => {
     state.insights = null;
     const html = renderToStaticMarkup(todayPage());
     expect(html).toContain("Chưa xác định");
-    expect(html).not.toContain("0% thời gian rảnh");
+    expect(html).not.toContain("0% Thời Gian Làm Việc");
     expect(renderToStaticMarkup(insightsPage())).toContain(
       "Chưa có kết quả phân tích",
     );
@@ -122,7 +120,6 @@ describe("React view regressions", () => {
     calendarPage,
     timePage,
     insightsPage,
-    scenarioPage,
     notificationsPage,
     settingsPage,
     adminPage,

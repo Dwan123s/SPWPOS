@@ -23,8 +23,10 @@ public sealed partial class WorkspaceService
             "VALIDATION_ERROR", "Mỗi gói việc cần có tên khác nhau.");
         var edited = original.Select(o => {
             var edit = input.Tasks.Single(t=>t.Id==o.Id);
+            ValidateEisenhowerPriority(edit.ImportanceLevel);
             var importance = o.Importance?.Source == "AI" && (o.Name != edit.Name.Trim() || o.Description != edit.Description.Trim())
                 ? new ImportanceView("Unknown","Unknown","Nội dung đã được trưởng nhóm chỉnh sửa; cần đánh giá lại mức quan trọng.",null) : o.Importance;
+            if (edit.ImportanceLevel is { } level) importance = new(level, "Leader", "Mức quan trọng do trưởng nhóm chọn.", null, level != "Unknown");
             return new TeamBriefPendingTask(o.Id,edit.Name.Trim(),edit.Description.Trim(),edit.EstimatedMinutes,edit.Deadline,edit.Deadline==null,importance);
         }).ToArray();
         var ready = edited.All(t=>t.Deadline != null);

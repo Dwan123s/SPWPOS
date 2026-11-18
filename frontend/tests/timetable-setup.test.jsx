@@ -54,13 +54,13 @@ it("shows the saved timetable analysis directly so the next setup question is vi
         canUndo: true,
         changes: [],
         reply:
-          "Đã lưu thời khóa biểu. Giờ rảnh: chưa xác nhận. Bạn có thể làm việc vào khung giờ nào?",
+          "Đã lưu thời khóa biểu. Thời Gian Làm Việc: chưa xác nhận. Bạn có thể làm việc vào khung giờ nào?",
       }}
       onAction={vi.fn()}
       onViewResult={vi.fn()}
     />,
   );
-  const report = screen.getByText(/Giờ rảnh: chưa xác nhận/);
+  const report = screen.getByText(/Thời Gian Làm Việc: chưa xác nhận/);
   expect(report.closest("details")).toBeNull();
   expect(screen.getByRole("button", { name: "Hoàn tác" })).toBeTruthy();
 });

@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import { dayKey, icon } from "./ui.jsx";
 import { readTeamBriefFile, TEAM_BRIEF_ACCEPT } from "./team-brief-file.js";
 import { Checklist } from "./eisenhower-board.jsx";
+import { EisenhowerPriorityField } from "./eisenhower-priority.jsx";
 
 const deadlineDate = (deadline) => deadline?.includes("T") ? dayKey(deadline) : deadline || "";
 
@@ -141,6 +142,8 @@ export function TaskBatchForm() {
                             onChange={(event) => editTask(task.key, { deadline: event.target.value || null })} />
                         </label>
                       </div>
+                      <EisenhowerPriorityField task={task} value={task.importanceLevel || "Unknown"} deadline={task.deadline || draft.projectDeadline}
+                        disabled={busy} onChange={(importanceLevel) => editTask(task.key, { importanceLevel })} />
                       <details open>
                         <summary>Yêu cầu · {task.checklist?.length || 0} bước</summary>
                         <Checklist items={task.checklist || []} showCompletion={false} disabled={busy}

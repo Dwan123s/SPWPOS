@@ -375,7 +375,7 @@ public sealed class NoraQualityTests
     {
         var ai = new AgentAiTestDouble { Response = _ => AgentAiTestDouble.Empty() with { Exceptions = [new(new(2026, 10, 23), 1200, 1260, true)] } };
         await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
-        Assert.Equal("APPLIED", (await Send(h, user.Id, Guid.NewGuid(), "Riêng thứ Sáu 23/10 mình chỉ rảnh từ 20h đến 21h, ngoài khoảng đó bận hết.")).Status);
+        Assert.Equal("APPLIED", (await Send(h, user.Id, Guid.NewGuid(), "Riêng thứ Sáu 23/10 mình chỉ Thời Gian Làm Việc từ 20h đến 21h, ngoài khoảng đó bận hết.")).Status);
         var exception = await h.DbAsync(db => db.AvailabilityExceptions.AsNoTracking().SingleAsync(Ct)); Assert.True(exception.OverridesWeeklyAvailability);
         ai.Response = _ => AgentAiTestDouble.Empty() with { Tasks = [new(null, "Thi thử", At(23, 22), 120, 2, "STUDY", false, At(23, 18), At(24, 0))] };
         var result = await Send(h, user.Id, Guid.NewGuid(), "Thi thử 2 tiếng liên tục vào tối thứ Sáu 23/10, xong trước 22h.");
@@ -414,10 +414,10 @@ public sealed class NoraQualityTests
     {
         var ai = new AgentAiTestDouble { Response = _ => AgentAiTestDouble.Empty() with { Exceptions = [new(new(2026, 10, 23), 1200, 1260, true)] } };
         await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id); var conversation = Guid.NewGuid();
-        var first = await Send(h, user.Id, conversation, "23/10 chỉ rảnh 20h–21h"); Assert.Equal("APPLIED", first.Status);
+        var first = await Send(h, user.Id, conversation, "23/10 chỉ Thời Gian Làm Việc 20h–21h"); Assert.Equal("APPLIED", first.Status);
         var old = Assert.Single(await h.DbAsync(db => db.AvailabilityExceptions.AsNoTracking().ToArrayAsync(Ct)));
         ai.Response = _ => AgentAiTestDouble.Empty() with { Exceptions = [new(new(2026, 10, 23), 1260, 1320, true)] };
-        var second = await Send(h, user.Id, conversation, "23/10 chỉ rảnh 21h–22h"); Assert.Equal("APPLIED", second.Status);
+        var second = await Send(h, user.Id, conversation, "23/10 chỉ Thời Gian Làm Việc 21h–22h"); Assert.Equal("APPLIED", second.Status);
         var updated = Assert.Single(await h.DbAsync(db => db.AvailabilityExceptions.AsNoTracking().ToArrayAsync(Ct)));
         Assert.Equal(1260, updated.StartMinute); Assert.True(updated.OverridesWeeklyAvailability);
         await Agent(h, s => s.UndoAgentTurnAsync(user.Id, second.Id, Ct));

@@ -140,7 +140,7 @@ export function NoraProgress({ pending, busy, onEdit }) {
                       {step.stage === "UNDERSTANDING"
                         ? "Đọc yêu cầu trong ngữ cảnh lịch của bạn"
                         : step.stage === "PLANNING"
-                          ? "Đối chiếu giờ rảnh, khoảng bận và giới hạn"
+                          ? "Đối chiếu Thời Gian Làm Việc, khoảng bận và giới hạn"
                           : step.stage === "SAVING"
                             ? "Chỉ lưu sau khi kế hoạch được kiểm tra"
                             : "Chỉ sử dụng dữ liệu thuộc tài khoản của bạn"}

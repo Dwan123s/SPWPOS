@@ -13,7 +13,8 @@ public sealed record TaskInput(
     [Range(5, 480)] int MinimumSessionMinutes = 25,
     Guid? CategoryId = null, Guid? ParentId = null, bool IsHardDeadline = false,
     [RegularExpression("^(MANUAL|NATURAL_LANGUAGE|AI_BREAKDOWN)$")] string CreationSource = "MANUAL",
-    Guid? Version = null, DateTimeOffset? WorkWindowStart = null, DateOnly? StartDate = null, bool? InheritsProjectDeadline = null);
+    Guid? Version = null, DateTimeOffset? WorkWindowStart = null, DateOnly? StartDate = null, bool? InheritsProjectDeadline = null,
+    [RegularExpression("^(Important|Lower|Unknown)$")] string? ImportanceLevel = null);
 public sealed record TaskView(Guid Id, string Name, string Description, DateTimeOffset? Deadline, int EstimatedMinutes,
     int AdjustedMinutes, int RemainingMinutes, int ActualMinutes, int PlannedMinutes, int Priority, string TaskType,
     bool Splittable, int MinimumSessionMinutes, Guid? CategoryId, Guid? ParentId, string Status, int Progress,
@@ -21,7 +22,9 @@ public sealed record TaskView(Guid Id, string Name, string Description, DateTime
     DateTimeOffset? WorkWindowStart = null, DateTimeOffset? WorkWindowEnd = null, Guid Version = default,
     ImportanceView? Importance = null, bool RequiresContinuousSession = false, bool IsTeamTask = false,
     TaskChecklistItem[]? Checklist = null, bool InheritsProjectDeadline = false,
-    TaskChecklistItem[]? TeamChecklist = null, string? TeamStatus = null, string? SourceFileName = null);
+    TaskChecklistItem[]? TeamChecklist = null, string? TeamStatus = null, string? SourceFileName = null,
+    bool TeamReportUrlRequired = false, string? TeamName = null, Guid? TeamId = null, Guid? TeamTaskId = null,
+    string UrgencyOverride = "Auto", EisenhowerPriorityView? Eisenhower = null);
 public sealed record TaskChecklistSaveResult(Guid Version, TaskChecklistItem[] Checklist, TaskChecklistItem[]? TeamChecklist, Guid Revision);
 public sealed record CategoryInput([Required, StringLength(80)] string Name,
     [RegularExpression("^#[a-fA-F0-9]{6}$")] string Color = "#6366f1");
@@ -90,7 +93,8 @@ public sealed record IntelligenceView(int RemainingMinutes, int CalendarFreeMinu
     BiasView[] Biases, RiskView[] Tasks, int PlannedMinutes, int ActualMinutes, int HorizonDemandMinutes = 0,
     CapacityDayView[]? Days = null, DateTimeOffset? RangeStart = null, DateTimeOffset? RangeEnd = null);
 public sealed record ScenarioView(IntelligenceView Before, IntelligenceView After, PlanView ProposedPlan, int AddedMinutes);
-public sealed record NotificationView(Guid Id, string Kind, string Title, string Message, Guid? TaskId, DateTimeOffset CreatedAt, bool IsRead, Guid? TeamId = null, bool? JoinRequestPending = null);
+public sealed record NotificationView(Guid Id, string Kind, string Title, string Message, Guid? TaskId, DateTimeOffset CreatedAt,
+    bool IsRead, Guid? TeamId = null, bool? JoinRequestPending = null, Guid? TeamTaskId = null, Guid? SessionId = null);
 public sealed record WorkspaceView(ProfileView Profile, PreferenceView Preference, CategoryView[] Categories,
     TaskView[] Tasks, AvailabilityInput[] Availability, ExceptionView[] Exceptions, EventView[] Events,
     SessionView[] Sessions, NotificationView[] Notifications, NotificationSettingInput NotificationSettings, string[]? Features = null,
@@ -107,7 +111,8 @@ public sealed record TaskSuggestion(TaskInput Task, string Source, string[] Note
 public sealed record CaptureInput([Required, StringLength(2000)] string Text, bool UseAi = false);
 public sealed record TaskBatchTaskInput([Required, StringLength(200)] string Name,
     [StringLength(4000)] string? Description = null, DateTimeOffset? Deadline = null,
-    [Range(1, 43200)] int? EstimatedMinutes = null, [MaxLength(100)] TaskChecklistItem[]? Checklist = null);
+    [Range(1, 43200)] int? EstimatedMinutes = null, [MaxLength(100)] TaskChecklistItem[]? Checklist = null,
+    [RegularExpression("^(Important|Lower|Unknown)$")] string? ImportanceLevel = null);
 public sealed record TaskBatchPreview(string ProjectName, string Summary, TaskBatchTaskInput[] Tasks, string[] Warnings, DateTimeOffset? ProjectDeadline = null);
 public sealed record TaskBatchInput(Guid RequestId, [Required, StringLength(200)] string ProjectName,
     [Required, MinLength(1), MaxLength(12)] TaskBatchTaskInput[] Tasks, bool Sequential = true, DateTimeOffset? ProjectDeadline = null,
@@ -134,7 +139,7 @@ public interface IWorkspaceService
     Task<Guid> ConfirmEventReplanAsync(Guid userId, Guid id, CancellationToken ct);
     Task<ExtraTimePreview> PreviewExtraTimeAsync(Guid userId, Guid sessionId, ExtraTimeInput input, CancellationToken ct);
     Task<WorkTimeResult> ConfirmExtraTimeAsync(Guid userId, Guid proposalId, ExtraTimeConfirm input, CancellationToken ct);
-    Task<WorkTimeResult> FinishWorkTaskAsync(Guid userId, Guid sessionId, CancellationToken ct);
+    Task<WorkTimeResult> FinishWorkTaskAsync(Guid userId, Guid sessionId, CancellationToken ct, FinishWorkTaskInput? input = null);
     Task<string> ExportCalendarAsync(Guid userId, CancellationToken ct);
     Task<AdminMetrics> GetAdminMetricsAsync(CancellationToken ct);
     Task<AdminHealth> GetAdminHealthAsync(CancellationToken ct);

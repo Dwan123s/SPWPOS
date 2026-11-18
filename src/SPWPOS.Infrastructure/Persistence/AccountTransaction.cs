@@ -25,6 +25,9 @@ public static class AccountTransaction
     public static Task LockUserNameAsync(ApplicationDbContext db, string normalizedUserName, CancellationToken ct) =>
         db.Database.IsSqlServer() ? LockAsync(db, db.Database.CurrentTransaction!, "username", normalizedUserName, ct) : Task.CompletedTask;
 
+    public static Task LockTeamAsync(ApplicationDbContext db, Guid teamId, CancellationToken ct) =>
+        db.Database.IsSqlServer() ? LockAsync(db, db.Database.CurrentTransaction!, "team", teamId.ToString("N"), ct) : Task.CompletedTask;
+
     private static async Task LockAsync(ApplicationDbContext db, IDbContextTransaction tx, string scope, string identifier, CancellationToken ct)
     {
         var resource = "SPWPOS:" + scope + ":" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identifier)));

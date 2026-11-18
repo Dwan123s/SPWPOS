@@ -75,7 +75,7 @@ export function WorkHoursEditor({ slots, dates }) {
 
   return (
     <>
-      <div className="work-hours-days" role="group" aria-label="Bật hoặc tắt ngày có giờ rảnh">
+      <div className="work-hours-days" role="group" aria-label="Bật hoặc tắt ngày có Thời Gian Làm Việc">
         {dayOrder.map((index) => (
           <button
             key={index}
@@ -158,7 +158,7 @@ export function WorkHoursEditor({ slots, dates }) {
                   >
                     {icon("plus")} Thêm khung giờ
                   </button>
-                  {!enabled && <span className="work-hours-day-empty">Chưa có giờ rảnh</span>}
+                  {!enabled && <span className="work-hours-day-empty">Chưa có Thời Gian Làm Việc</span>}
                   {index === enabledDays[0] && enabledDays.length > 1 && (
                     <button
                       type="button"

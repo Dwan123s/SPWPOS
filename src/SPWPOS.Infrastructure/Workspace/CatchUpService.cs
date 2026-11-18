@@ -38,14 +38,22 @@ public sealed partial class WorkspaceService
         db.SessionExecutions.Add(new() { UserId = uid, SessionId = id, StartedAt = session.Start, EndedAt = Now,
             ActualSeconds = session.ActualSeconds, IsUserAdjusted = true });
         if (input.Outcome != "MISSED") {
+            var teamRequiresReport = await (from assignment in db.TeamTaskAssignments
+                join shared in db.TeamTasks on assignment.TeamTaskId equals shared.Id
+                join team in db.TeamProjects on shared.TeamId equals team.Id
+                where assignment.UserId == uid && assignment.WorkTaskId == task.Id && assignment.Active
+                select (bool?)team.RequireCompletionReportUrl).SingleOrDefaultAsync(ct);
             task.Progress = input.Outcome == "PARTIAL" ? input.Progress!.Value : Math.Min(100, task.Progress + (int)Math.Ceiling(100 * (session.End - session.Start).TotalMinutes / task.EstimatedMinutes));
+            // Recording a past session leaves required-report tasks available for explicit submission.
+            if (task.Progress == 100 && teamRequiresReport == true)
+                task.Progress = 99;
             task.Status = task.Progress == 100 ? WorkTaskStatus.Completed : WorkTaskStatus.InProgress;
             task.CompletedAt = task.Progress == 100 ? session.End : null; task.UpdatedAt = Now;
             if(task.Status==WorkTaskStatus.Completed)await ReleaseCompletedTaskSessions(uid,task.Id,ct);
             if (input.Outcome == "COMPLETED")
             {
                 await AwardSessionExperienceAsync(uid, session, task, session.End, ct);
-                if (!await db.TeamTaskAssignments.AnyAsync(x => x.UserId == uid && x.WorkTaskId == task.Id && x.Active, ct))
+                if (teamRequiresReport is null)
                     await AwardTaskExperienceAsync(uid, task, session.End, ct);
             }
         }

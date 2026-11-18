@@ -187,7 +187,7 @@ public sealed partial class WorkspaceService
         CheckNoteVersion(entity, input.Version);
         var state = await State(uid, ct);
         Require(state.Availability.Length > 0 || state.Exceptions.Any(x => x.IsAvailable), "NO_AVAILABILITY",
-            "Thiết lập giờ rảnh trước khi agent tự xếp lịch.");
+            "Thiết lập Thời Gian Làm Việc trước khi agent tự xếp lịch.");
         if (note.Analysis is null)
         {
             note = await AnalyzeNoteAsync(uid, id, new(input.Version, true), ct);
@@ -197,7 +197,7 @@ public sealed partial class WorkspaceService
             Require((note.Analysis!.Activities?.Length ?? note.Analysis.Tasks.Length) > 0, "NOTE_NO_NEW_ACTIVITIES", "Không có việc mới để thêm. Các việc và lịch đã tạo được giữ nguyên.", 409);
             Require(note.Analysis!.Activities is null, "NOTE_NEEDS_REVIEW", "Kiểm tra sự kiện, thời lượng và lịch đề xuất trước khi lưu từ ghi chú.");
             Require(!note.Analysis!.NeedsReview, "NOTE_NEEDS_REVIEW",
-                "Ghi chú có ngày không hợp lệ hoặc điều kiện giờ rảnh/phụ thuộc chưa được thiết lập. Xem kết quả phân tích, cập nhật Thời gian & tùy chọn hoặc Công việc rồi sửa ghi chú trước khi tự xếp lịch.");
+                "Ghi chú có ngày không hợp lệ hoặc điều kiện Thời Gian Làm Việc/phụ thuộc chưa được thiết lập. Xem kết quả phân tích, cập nhật Thời gian & tùy chọn hoặc Công việc rồi sửa ghi chú trước khi tự xếp lịch.");
             Require(note.Analysis!.Tasks.Length > 0, "NOTE_NO_TASKS", "Chưa tìm thấy công việc. Bổ sung việc cần làm trong ghi chú.");
             note = await ImportNoteAsync(uid, id, new(note.Version, note.Analysis.Tasks), ct);
         }

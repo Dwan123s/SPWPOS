@@ -3,7 +3,6 @@ import {
   state,
   button,
   icon,
-  statusLabels,
   dateFmt,
   timeFmt,
   dayKey,
@@ -11,11 +10,12 @@ import {
 } from "./ui.jsx";
 import {
   CalendarClock,
-  CalendarTimeTag,
   calendarPhase,
+  calendarPhases,
 } from "./calendar-time.jsx";
 import { workflowSteps } from "./workflow.js";
 import { CalendarWeek } from "./calendar-week.jsx";
+import { teamSessionFocus } from "./calendar-team-focus.js";
 import { eventModal } from "./calendar.jsx";
 import { atMinute, wallMinute } from "./calendar-drag.js";
 import { PopupDetails } from "./popup-dismissal.jsx";
@@ -48,6 +48,8 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
       dayKey(s.start) <= dates[6] &&
       dayKey(new Date(Date.parse(s.end) - 1)) >= dates[0],
   );
+  const focusBySession = teamSessionFocus(state.workspace.sessions, state.workspace.tasks || []);
+  const tasksById = new Map((state.workspace.tasks || []).map((task) => [task.id, task]));
   const entries = (date) =>
     [
       ...sessions
@@ -80,44 +82,51 @@ export function calendarPage({ onWorkspaceChanged } = {}) {
         className={`calendar-block fixed-event calendar-entry-event calendar-timed-card calendar-time-${phase}${compact ? "" : " calendar-agenda-entry"}`}
         data-action="event-detail"
         data-id={e.id}
+        aria-label={`${e.name}, ${from} – ${to}, Lịch trình, ${calendarPhases[phase]}`}
       >
         <span className="block-time">
           {from}
           {" — "}
           {to}
+          {phase === "current" && <span className="calendar-card-indicator active" title={calendarPhases.current} aria-hidden="true" />}
         </span>
         <strong title={e.name}>{e.name}</strong>
-        <CalendarTimeTag phase={phase} />
-        <span className="block-meta">
-          {icon("lock")}
-          Lịch Trình
-        </span>
       </button>
     );
   };
-  const block = (s, now, agenda = false) => (
-    <button
-      key={`session-${s.id}`}
-      type="button"
-      className={`calendar-block calendar-entry-task calendar-timed-card calendar-time-${calendarPhase(s.start, s.end, now)} ${s.status === "Completed" ? "completed" : ["Running", "Paused"].includes(s.status) ? "active-session" : ["Skipped", "Missed"].includes(s.status) ? "inactive" : ""}${agenda ? " calendar-agenda-entry" : ""}`}
-      data-action="session-detail"
-      data-id={s.id}
-    >
-      <span className="block-time">
-        {timeFmt(s.start)}
-        {" — "}
-        {timeFmt(s.end)}
-        {s.isLocked ? icon("lock") : ""}
-      </span>
-      <strong title={s.taskName}>{s.taskName}</strong>
-      <CalendarTimeTag phase={calendarPhase(s.start, s.end, now)} />
-      <span className="block-meta">
-        {minutes(Math.round((new Date(s.end) - new Date(s.start)) / 60000))}
-        {" · "}
-        {s.status === "Scheduled" ? "Phiên đã xếp" : statusLabels[s.status] || s.status}
-      </span>
-    </button>
-  );
+  const block = (s, now, agenda = false) => {
+    const teamName = tasksById.get(s.taskId)?.teamName?.trim();
+    const teamLabel = teamName ? `Nhóm · ${teamName}` : "";
+    const focus = focusBySession.get(s.id);
+    const firstItem = focus?.items[0];
+    const title = firstItem?.text || s.taskName;
+    const titleHint = firstItem ? `Gợi ý: ${title}` : title;
+    const phase = calendarPhase(s.start, s.end, now);
+    const from = timeFmt(s.start), to = timeFmt(s.end);
+    const needsReview = s.status === "NeedsReview" ||
+      (phase === "past" && ["Scheduled", "Running", "Paused"].includes(s.status));
+    const indicator = needsReview ? "review" : phase === "current" ? "active" : null;
+    const status = needsReview ? "Chờ ghi kết quả" : calendarPhases[phase];
+    return (
+      <button
+        key={`session-${s.id}`}
+        type="button"
+        className={`calendar-block calendar-entry-task calendar-timed-card calendar-time-${phase}${agenda ? " calendar-agenda-entry" : ""}`}
+        data-action="session-detail"
+        data-id={s.id}
+        data-open-task="true"
+        aria-label={`${titleHint}, ${from} – ${to}${teamLabel ? `, ${teamLabel}` : ""}, ${status}${s.isLocked ? ", đã khóa" : ""}`}
+      >
+        <span className="block-time">
+          <span className="calendar-session-hours">{from} — {to}</span>
+          {teamLabel && <span className="calendar-session-team" title={teamLabel}>{teamLabel}</span>}
+          {s.isLocked ? icon("lock") : ""}
+          {indicator && <span className={`calendar-card-indicator ${indicator}`} title={status} aria-hidden="true" />}
+        </span>
+        <strong title={titleHint}>{title}</strong>
+      </button>
+    );
+  };
   const tasks = (state.workspace.tasks || [])
     .filter((task) => !["Completed", "Cancelled"].includes(task.status))
     .sort((a, b) => (Date.parse(a.deadline) || Infinity) - (Date.parse(b.deadline) || Infinity));
@@ -309,12 +318,7 @@ function calendarMarkup(
             aria-label="Màu theo loại lịch"
           >
             <span className="calendar-entry-task"><i aria-hidden="true" /> Phiên công việc</span>
-            <span>
-              <i className="calendar-time-past" aria-hidden="true" />
-              <i className="calendar-time-current" aria-hidden="true" />
-              <i className="calendar-time-future" aria-hidden="true" />
-              Lịch Trình
-            </span>
+            <span><i className="calendar-time-future" aria-hidden="true" /> Lịch Trình</span>
           </div>
           <span>
             {sessions.length}
@@ -462,7 +466,7 @@ function calendarMarkup(
         {icon("shield")}
         <span>Phiên đã khóa được bảo vệ khi lập lại kế hoạch.</span>
         {button(
-          "Thiết lập thời gian rảnh",
+          "Thiết lập Thời Gian Làm Việc",
           "nav",
           "small ghost",
           "time",

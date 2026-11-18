@@ -389,7 +389,7 @@ public sealed partial class WorkspaceService
             "AGENT_INVALID_INTENT", "AI trả danh sách thay đổi chưa hợp lệ; lịch chưa thay đổi.", 503);
         Require(intent.FreeTimeQuery is null || intent.Question.Length == 0 && !HasAgentActions(intent) &&
             intent.FreeTimeQuery.End > intent.FreeTimeQuery.Start && intent.FreeTimeQuery.End - intent.FreeTimeQuery.Start <= TimeSpan.FromDays(31),
-            "AGENT_INVALID_INTENT", "Yêu cầu xem giờ rảnh phải có phạm vi hợp lệ và không kèm thay đổi lịch.", 503);
+            "AGENT_INVALID_INTENT", "Yêu cầu xem Thời Gian Làm Việc phải có phạm vi hợp lệ và không kèm thay đổi lịch.", 503);
         Require(intent.ScheduleReviewQuery is null || intent.FreeTimeQuery is null && intent.Question.Length == 0 && !HasAgentActions(intent) &&
             intent.ScheduleReviewQuery.End > intent.ScheduleReviewQuery.Start && intent.ScheduleReviewQuery.End - intent.ScheduleReviewQuery.Start <= TimeSpan.FromDays(31),
             "AGENT_INVALID_INTENT", "Yêu cầu tư vấn lịch phải có phạm vi hợp lệ và không kèm thay đổi lịch.", 503);
@@ -415,14 +415,14 @@ public sealed partial class WorkspaceService
             foreach (var group in intent.WeeklySlots.GroupBy(x => x.DayOfWeek))
             {
                 var ordered = group.OrderBy(x => x.StartMinute).ToArray();
-                Require(!ordered.Zip(ordered.Skip(1)).Any(x => x.First.EndMinute > x.Second.StartMinute), "AVAILABILITY_OVERLAP", "Các khoảng rảnh hàng tuần trùng nhau.");
+                Require(!ordered.Zip(ordered.Skip(1)).Any(x => x.First.EndMinute > x.Second.StartMinute), "AVAILABILITY_OVERLAP", "Các khoảng Thời Gian Làm Việc hàng tuần trùng nhau.");
             }
             weekly = intent.WeeklySlots.Select(x => new WeeklyAvailability { UserId = uid, DayOfWeek = x.DayOfWeek, StartMinute = x.StartMinute, EndMinute = x.EndMinute }).ToArray();
             if (!intent.ReplaceWeeklyAvailability)
                 weekly = weekly.Concat(state.Availability.Where(x => !intent.WeeklySlots.Any(slot => slot.DayOfWeek == x.DayOfWeek)).Select(Copy)).ToArray();
             static string WeeklyText(IEnumerable<WeeklyAvailability> slots) => string.Join("; ", slots.OrderBy(x => x.DayOfWeek).ThenBy(x => x.StartMinute)
                 .Select(x => $"{(x.DayOfWeek == 0 ? "Chủ nhật" : "Thứ " + (x.DayOfWeek + 1))} {x.StartMinute / 60:00}:{x.StartMinute % 60:00}–{x.EndMinute / 60:00}:{x.EndMinute % 60:00}"));
-            summary.Add(new("AVAILABILITY", "Lịch rảnh hàng tuần", WeeklyText(state.Availability), WeeklyText(weekly)));
+            summary.Add(new("AVAILABILITY", "Lịch Thời Gian Làm Việc hàng tuần", WeeklyText(state.Availability), WeeklyText(weekly)));
             if (WeeklyText(state.Availability) == WeeklyText(weekly)) { weekly = null; summary.RemoveAt(summary.Count - 1); }
         }
         var exceptions = new List<AvailabilityException>(); var editedExceptionIds = new HashSet<Guid>();
@@ -443,7 +443,7 @@ public sealed partial class WorkspaceService
                 ChatMatch(request, @"\b(chi ranh|ngoai khoang|ngoai gio|ban het)\b").Success);
             if (original is not null && original.Date == change.Date && original.StartMinute == change.StartMinute && original.EndMinute == change.EndMinute && original.IsAvailable == change.IsAvailable && original.Note == change.Note && original.OverridesWeeklyAvailability == change.OverridesWeeklyAvailability) continue;
             exceptions.Add(change);
-            summary.Add(new("EXCEPTION", change.OverridesWeeklyAvailability ? "Giờ rảnh duy nhất trong ngày" : item.IsAvailable ? "Rảnh thêm" : "Bận", original is null ? "" : $"{original.Date:yyyy-MM-dd} · {original.StartMinute / 60:00}:{original.StartMinute % 60:00}–{original.EndMinute / 60:00}:{original.EndMinute % 60:00} · {(original.IsAvailable ? "Rảnh" : "Bận")}",
+            summary.Add(new("EXCEPTION", change.OverridesWeeklyAvailability ? "Thời Gian Làm Việc duy nhất trong ngày" : item.IsAvailable ? "Thời Gian Làm Việc thêm" : "Bận", original is null ? "" : $"{original.Date:yyyy-MM-dd} · {original.StartMinute / 60:00}:{original.StartMinute % 60:00}–{original.EndMinute / 60:00}:{original.EndMinute % 60:00} · {(original.IsAvailable ? "Thời Gian Làm Việc" : "Bận")}",
                 $"{item.Date:yyyy-MM-dd} {item.StartMinute / 60:00}:{item.StartMinute % 60:00}–{item.EndMinute / 60:00}:{item.EndMinute % 60:00}"));
         }
         // Editing one saved interval is a partial update. Only newly supplied
@@ -454,7 +454,7 @@ public sealed partial class WorkspaceService
             !exceptions.Any(e => e.Id == x.Id) && !intent.Exceptions.Any(e => e.IsAvailable && e.Date == x.Date && e.StartMinute == x.StartMinute && e.EndMinute == x.EndMinute)).ToArray();
         foreach (var previous in removedExceptions)
         {
-            summary.Add(new("EXCEPTION", "Thay thế khung rảnh cũ", $"{previous.Date:yyyy-MM-dd} {previous.StartMinute / 60:00}:{previous.StartMinute % 60:00}–{previous.EndMinute / 60:00}:{previous.EndMinute % 60:00}", "Chỉ sử dụng khung giờ mới trong ngày này."));
+            summary.Add(new("EXCEPTION", "Thay thế khung Thời Gian Làm Việc cũ", $"{previous.Date:yyyy-MM-dd} {previous.StartMinute / 60:00}:{previous.StartMinute % 60:00}–{previous.EndMinute / 60:00}:{previous.EndMinute % 60:00}", "Chỉ sử dụng khung giờ mới trong ngày này."));
         }
         var events = new List<FixedEvent>(); var editedEventIds = new HashSet<Guid>();
         var setupTimetableHours = timetableContext && (configureTimetableHours ||

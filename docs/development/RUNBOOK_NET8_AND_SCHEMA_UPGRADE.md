@@ -1,6 +1,6 @@
 # Chuyển PLANORA sang .NET 8 và schema mới
 
-Trạng thái 15/10/2026: source/build/tests đã xác minh .NET 8. Kiểm tra read-only thấy database cấu hình hiện tại đã khớp migration set; lượt triển khai này không apply migration, không xác nhận ai đã apply trước đó. Chưa diễn tập backup/restore hoặc rollout production. Đọc `PLANORA_FIX_PROGRESS.md` để biết checkpoint và lỗi chưa kiểm chứng mới nhất. Không dùng kết quả cũ để kết luận source hiện tại đã đạt.
+Ngày 15/10/2026 đã xác minh build và kiểm thử trên .NET 8. Khi nâng cấp, kiểm tra lại SDK, kết quả CI và các migration trên môi trường đích theo quy trình bên dưới.
 
 ## Thay đổi cần biết
 

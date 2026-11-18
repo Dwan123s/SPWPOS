@@ -136,6 +136,16 @@ public sealed class TelegramNotificationService(ApplicationDbContext db, ITelegr
     }
     private async Task<TelegramReminderDetails?> CurrentAsync(Guid uid, InAppNotification n, DateTimeOffset now, CancellationToken ct)
     {
+        if (n.Kind is "TEAM_PREMIUM_EXPIRED" or "TEAM_PREMIUM_SUSPENDED")
+        {
+            var parts = n.DedupeKey.Split(':');
+            if (parts.Length != 4 || !Guid.TryParse(parts[1], out var teamId) ||
+                !await db.TeamMemberships.AnyAsync(x => x.TeamId == teamId && x.UserId == uid && x.Active, ct)) return null;
+            var renewal = await SPWPOS.Infrastructure.Commerce.TeamRenewal.GetAsync(db, teamId, now, ct);
+            return renewal != null && parts[2] == renewal.ExpiredAt.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture) &&
+                (n.Kind == "TEAM_PREMIUM_SUSPENDED") == (renewal.Status == "Suspended") && n.CreatedAt > now.AddDays(-1)
+                ? new() : null;
+        }
         if(n.Kind == "NORA_REMINDER")
             return n.ScheduledFor <= now && n.ScheduledFor >= now.AddDays(-1) ? new(n.Message,Start:n.ScheduledFor) : null;
         if (n.Kind is "EVENT_REMINDER" or "EVENT_STARTED")

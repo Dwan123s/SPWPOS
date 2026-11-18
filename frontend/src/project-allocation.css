@@ -1,0 +1,40 @@
+.project-allocation {
+  display: grid;
+  gap: 0.4rem;
+  margin-block: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ccdbeb;
+  border-radius: 0.6rem;
+  background: #f6f9fd;
+  color: #203755;
+}
+
+.project-allocation-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.project-allocation :is(p, ul, dl, dd) {
+  margin: 0;
+}
+.project-allocation ul {
+  padding-inline-start: 1.25rem;
+}
+.project-allocation dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+}
+.project-allocation dt {
+  color: #465e79;
+}
+.project-allocation dd {
+  font-weight: 600;
+}
+.project-allocation .project-allocation-gap {
+  color: #77450b;
+}
+.project-allocation > :is(button, a) {
+  justify-self: start;
+}

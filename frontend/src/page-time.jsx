@@ -143,7 +143,7 @@ function WorkHoursCard({ workspace: w, onWorkspaceChanged, selectedWeek }) {
         ) : (
           <p className="work-hours-empty-timetable">
             Thêm buổi học hoặc ca làm vào Lịch làm việc để Planora tính các
-            khoảng rảnh từng ngày.
+            khoảng Thời Gian Làm Việc từng ngày.
           </p>
         )
       ) : (
@@ -171,7 +171,7 @@ function WorkHoursCard({ workspace: w, onWorkspaceChanged, selectedWeek }) {
                 <p>
                   {usesTimetable
                     ? "Các khung tuần này được tính từ thời khóa biểu và lịch bận đã lưu. Chỉnh và lưu nếu bạn muốn đặt giờ riêng cho tuần này."
-                    : "Giờ làm việc bạn lưu ở đây chỉ áp dụng cho tuần này. Tắt ngày bạn không rảnh."}
+                    : "Giờ làm việc bạn lưu ở đây chỉ áp dụng cho tuần này. Tắt ngày bạn không có Thời Gian Làm Việc."}
                 </p>
                 {w.availabilityPolicy?.confirmed &&
                   !w.availability.length &&
@@ -265,7 +265,7 @@ export function timePage({ onWorkspaceChanged } = {}) {
           <div className="card-header">
             <div>
               <h2>Ngoại lệ theo ngày</h2>
-              <p>Ngày nghỉ, lịch bận hoặc giờ rảnh thêm.</p>
+              <p>Ngày nghỉ, lịch bận hoặc Thời Gian Làm Việc thêm.</p>
             </div>
             {button("Thêm", "new-exception", "small secondary", "", "plus")}
           </div>
@@ -280,8 +280,8 @@ export function timePage({ onWorkspaceChanged } = {}) {
                       {" · "}
                       {e.isAvailable
                         ? e.overridesWeeklyAvailability
-                          ? "Chỉ rảnh trong khoảng này"
-                          : "Rảnh"
+                          ? "Thời Gian Làm Việc chỉ trong khoảng này"
+                          : "Thời Gian Làm Việc"
                         : "Bận"}
                     </strong>
                     <p>
@@ -441,7 +441,7 @@ export function timePage({ onWorkspaceChanged } = {}) {
           </div>
           <p className="reason spaced">
             Giờ ưu tiên giúp sắp xếp lịch. Những phiên đã khóa được bảo vệ khi
-            bạn thay đổi lịch rảnh.
+            bạn thay đổi lịch Thời Gian Làm Việc.
           </p>
           <div className="form-error" />
           <div className="form-actions">

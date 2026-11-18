@@ -56,8 +56,8 @@ it("embeds checkout and cleans up the iframe, scroll lock and focus when closing
   await screen.findByTitle("Thanh toán MILO qua payOS");
   expect(config.embedded).toBe(true);
   expect(config.CHECKOUT_URL).toBe(order.checkoutUrl);
-  expect(decodeURIComponent(config.RETURN_URL)).toBe(order.returnUrl);
-  expect(decodeURIComponent(config.RETURN_URL)).not.toBe(window.location.href);
+  expect(config.RETURN_URL).toBe(order.returnUrl);
+  expect(config.RETURN_URL).not.toBe(window.location.href);
   fireEvent(
     screen.getByRole("dialog"),
     new Event("cancel", { cancelable: true }),
@@ -75,6 +75,7 @@ it("retries SDK loading failures and rejects checkout URLs outside payOS", async
     <PetPaymentDialog order={order} onClose={vi.fn()} onCheck={vi.fn()} />,
   );
   await screen.findByRole("alert");
+  expect(screen.getByRole("link", { name: "Mở trang thanh toán payOS" }).href).toBe(order.checkoutUrl);
   fireEvent.click(screen.getByRole("button", { name: "Tải lại thanh toán" }));
   await screen.findByTitle("Thanh toán MILO qua payOS");
   expect(loadPayOsCheckout).toHaveBeenCalledTimes(2);
@@ -89,6 +90,7 @@ it("retries SDK loading failures and rejects checkout URLs outside payOS", async
     />,
   );
   expect(await screen.findByRole("alert")).toBeTruthy();
+  expect(screen.queryByRole("link", { name: "Mở trang thanh toán payOS" })).toBeNull();
   expect(loadPayOsCheckout).toHaveBeenCalledTimes(2);
   expect(exit).toHaveBeenCalledOnce();
 });
@@ -148,7 +150,7 @@ it("preserves the server return URL including query separators and hash through 
   );
   await screen.findByTitle("Thanh toán MILO qua payOS");
   const sdkFrameUrl = new URL(
-    `${config.CHECKOUT_URL.replace("/web/", "/embedded/")}?redirect_uri=${config.RETURN_URL}`,
+    `${config.CHECKOUT_URL.replace("/web/", "/embedded/")}?redirect_uri=${encodeURIComponent(config.RETURN_URL)}`,
   );
   expect(sdkFrameUrl.searchParams.get("redirect_uri")).toBe(returnUrl);
   expect(sdkFrameUrl.hash).toBe("");

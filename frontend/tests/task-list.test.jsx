@@ -16,7 +16,7 @@ it("keeps a long task list on pages and resets when the filter changes", async (
     name: `Work item ${i}`,
   }));
   const view = render(taskRows(tasks));
-  expect(screen.getAllByRole("button", { name: /^Work item/ })).toHaveLength(
+  expect(screen.getAllByRole("button", { name: /^Work item \d+$/ })).toHaveLength(
     12,
   );
   await userEvent.click(screen.getByRole("button", { name: "Trang sau" }));

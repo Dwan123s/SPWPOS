@@ -34,7 +34,7 @@ Together these switches enable 195 of 204 conversation cases. The remaining nine
 
 The selected `catalog.json` preserves all manual review criteria and a `selection` section; original suite counts/hash are under `source_validation`. The actual input pack SHA-256 and runtime assembly hashes are recorded in `results.json`. Offline and live reports use schema 1.2 for this catalog, while legacy reports retain schema 1.1.
 
-Group G31 adds 24 defense cases with machine-readable saved-state assertions. See [the defense guide](../reviews/NORA_DEFENSE_TEST_GUIDE.md) and run `scripts/Test-NoraDefense.ps1` for the combined deterministic/frontend/fixture checks. Optional `-Live` runs a bounded real-model selection. In conversation expectations, optional `assertions` use snake_case keys for task counts, durations, deadlines, preserved IDs and event times; `scheduled_minutes` can differ from the original estimate for partially completed work. Preview/read/error safety rules cannot be relaxed by these assertions.
+Group G31 adds 24 defense cases with machine-readable saved-state assertions. Run [`scripts/Test-NoraDefense.ps1`](../../scripts/Test-NoraDefense.ps1) for the combined deterministic/frontend/fixture checks. Optional `-Live` runs a bounded real-model selection. In conversation expectations, optional `assertions` use snake_case keys for task counts, durations, deadlines, preserved IDs and event times; `scheduled_minutes` can differ from the original estimate for partially completed work. Preview/read/error safety rules cannot be relaxed by these assertions.
 
 ### Legacy sandbox catalog
 

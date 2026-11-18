@@ -23,9 +23,8 @@ function ReportsWorkspace({ onWorkspaceChanged }) {
     <>
       <nav className="workspace-section-links report-tabs" aria-label="Báo cáo">
         {Object.entries({
-          workload: "Workload",
-          time: "Bảng giờ làm",
-          analysis: "Phân tích",
+          workload: "Khối lượng",
+          time: "Giờ thực tế",
         }).map(([key, label]) => (
           <button
             key={key}
@@ -39,6 +38,10 @@ function ReportsWorkspace({ onWorkspaceChanged }) {
       </nav>
       <div hidden={report !== "workload"}>
         <WorkloadWeek onWorkspaceChanged={onWorkspaceChanged} />
+        <details className="card section-gap">
+          <summary>Phân tích rủi ro và năng lực</summary>
+          <ReportsAnalysis />
+        </details>
       </div>
       {report === "time" &&
         (state.workspace.features?.includes("history-v2") ? (
@@ -46,9 +49,6 @@ function ReportsWorkspace({ onWorkspaceChanged }) {
         ) : (
           <WorkspacePerformance tasks={state.workspace.tasks} />
         ))}
-      <div hidden={report !== "analysis"}>
-        <ReportsAnalysis />
-      </div>
     </>
   );
 }
@@ -77,7 +77,7 @@ function ReportsAnalysis() {
           "tasks",
         )}
         {stat(
-          "Thời gian rảnh",
+          "Thời Gian Làm Việc",
           minutes(i.calendarFreeMinutes),
           "Sau khi trừ sự kiện và ngoại lệ",
           "calendar",

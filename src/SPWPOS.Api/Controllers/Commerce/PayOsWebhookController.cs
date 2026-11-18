@@ -4,7 +4,7 @@ using SPWPOS.Infrastructure.Commerce;
 namespace SPWPOS.Api.Controllers;
 
 [ApiController, AllowAnonymous, Route("api/commerce/payos/webhook")]
-public sealed class PayOsWebhookController(SkinPaymentService payments) : ControllerBase
+public sealed class PayOsWebhookController(SkinPaymentService payments, TeamPlanPaymentService teamPayments) : ControllerBase
 {
     [HttpPost, RequestSizeLimit(65536)]
     public async Task<IActionResult> Receive(CancellationToken ct)
@@ -17,6 +17,7 @@ public sealed class PayOsWebhookController(SkinPaymentService payments) : Contro
             body.Write(buffer, 0, read);
         }
         await payments.HandleWebhookAsync(body.ToArray(), ct);
+        await teamPayments.HandleWebhookAsync(body.ToArray(), ct);
         return Ok(new { success = true });
     }
 }

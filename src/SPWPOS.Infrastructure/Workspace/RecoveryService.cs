@@ -95,7 +95,7 @@ public sealed partial class WorkspaceService
         proposal.PreviousPlanId=await Mine<PlanProposal>(uid).Where(x=>x.Status=="APPLIED").OrderByDescending(x=>x.AppliedAt).Select(x=>(Guid?)x.Id).FirstOrDefaultAsync(ct);
         plan=plan with{Id=proposal.Id,Kind="RESCHEDULE",PreviousPlanId=proposal.PreviousPlanId};proposal.PayloadJson=JsonSerializer.Serialize(plan);db.PlanProposals.Add(proposal);StorePlanDecisions(uid,proposal,plan,state);
         row.PlanId=proposal.Id;row.Status=plan.Warnings.Any(x=>x.UnscheduledMinutes>0||x.Code=="SOFT_DEADLINE_EXCEEDED")?"BLOCKED":"PROPOSED";
-        row.Message=row.Status=="BLOCKED"?"Chưa đủ thời gian để phục hồi toàn bộ kế hoạch. Xem phần còn thiếu và điều chỉnh giờ rảnh hoặc phạm vi.":"Có công việc bị lỡ nhiều ngày đã có lịch dự kiến. Đề xuất giữ phiên khóa/đang chạy và các ràng buộc hiện tại; hãy xem trước khi áp dụng.";
+        row.Message=row.Status=="BLOCKED"?"Chưa đủ thời gian để phục hồi toàn bộ kế hoạch. Xem phần còn thiếu và điều chỉnh Thời Gian Làm Việc hoặc phạm vi.":"Có công việc bị lỡ nhiều ngày đã có lịch dự kiến. Đề xuất giữ phiên khóa/đang chạy và các ràng buộc hiện tại; hãy xem trước khi áp dụng.";
     }
     public Task RebuildRecoveryAsync(Guid uid,Guid id,CancellationToken ct)=>Mutate(uid,async()=>
     {var row=await Find<RecoveryCase>(uid,id,ct);Require(row.Status!="APPLIED","RECOVERY_APPLIED","Đề xuất đã áp dụng.",409);await BuildRecovery(uid,row,await State(uid,ct),ct);},ct,false);

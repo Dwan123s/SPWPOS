@@ -67,7 +67,9 @@ public sealed partial class WorkspaceService
             .ToDictionary(p => p.SessionId, p => p.Outcome!.Outcome);
         var team = await (from a in db.TeamTaskAssignments.AsNoTracking().Where(a => a.UserId == uid)
                           join t in db.TeamTasks.AsNoTracking() on a.TeamTaskId equals t.Id
-                          where a.Active select new { a.WorkTaskId, t.Status }).ToDictionaryAsync(x => x.WorkTaskId, x => x.Status, ct);
+                          join p in db.TeamProjects.AsNoTracking() on t.TeamId equals p.Id
+                          where a.Active select new { a.WorkTaskId, t.Status, t.TeamId, TeamName = p.Name })
+            .ToDictionaryAsync(x => x.WorkTaskId, ct);
         var closed = await Mine<SessionExecution>(uid).AsNoTracking().Where(e => e.EndedAt >= weekStart && e.EndedAt < weekEnd)
             .Select(e => new { e.SessionId, e.EndedAt, e.ActualSeconds }).ToArrayAsync(ct);
         var executions = closed.ToDictionary(e => e.SessionId);
@@ -89,7 +91,7 @@ public sealed partial class WorkspaceService
                 return new WorkloadTask(t.Id, t.Name, t.EstimatedMinutes, remaining, Math.Max(0, remaining - covered),
                     hasHours && t.Deadline <= now.AddDays(30) ? shortfall : null,
                     t.Deadline!.Value, ActiveWork(t) && t.IsHardDeadline && t.Deadline < now, t.Status.ToString(),
-                    team.GetValueOrDefault(t.Id), conflicts.Contains(t.Id) ? "Phiên đã xếp bị xung đột." : warning?.Message,
+                    team.GetValueOrDefault(t.Id)?.Status, conflicts.Contains(t.Id) ? "Phiên đã xếp bị xung đột." : warning?.Message,
                     !hasHours ? "UNKNOWN" : t.Deadline > now.AddDays(30) ? "OUTSIDE_HORIZON" : "ASSESSED",
                     checklist.Count(item => item.Completed), checklist.Length);
             }).ToArray();
@@ -103,21 +105,32 @@ public sealed partial class WorkspaceService
             var lo = Midnight(date);
             var hi = Midnight(date.AddDays(1));
             var sessions = weekSessions.Where(s => s.Start < hi && s.End > lo).OrderBy(s => s.Start).ToArray();
+            long PlannedSeconds(WorkSession session) => (long)((session.End < hi ? session.End : hi) -
+                (session.Start > lo ? session.Start : lo)).TotalSeconds;
             var actual = closed.Where(e => Day(e.EndedAt!.Value) == date).ToArray();
             var cap = capacity.GetValueOrDefault(date);
-            int? working = hasHours ? (int)engine.FreeSlots(state with { Events = [] }, lo, hi).Sum(g => (g.End - g.Start).TotalMinutes) : null;
+            var workingSlots = hasHours ? engine.FreeSlots(state with { Events = [] }, lo, hi) : null;
+            int? working = workingSlots is null ? null : (int)workingSlots.Sum(g => (g.End - g.Start).TotalMinutes);
+            int? remainingWork = workingSlots is null ? null : (int)workingSlots.Where(g => g.End > now)
+                .Sum(g => (g.End - (g.Start > now ? g.Start : now)).TotalMinutes);
             var status = date < today ? "PAST" : !hasHours ? "UNCONFIGURED" :
                 work.Any(t => Day(t.Deadline) == date && t.ShortfallMinutes > 0) ? "SHORTFALL" :
                 working == 0 ? "NO_HOURS" : cap?.SchedulableMinutes > 0 ? "AVAILABLE" : "FULL";
             return new WorkloadDay(date, working, cap?.ReservedMinutes, hasHours && date >= today ? cap?.SchedulableMinutes : null,
-                sessions.Sum(s => (long)((s.End < hi ? s.End : hi) - (s.Start > lo ? s.Start : lo)).TotalSeconds),
+                sessions.Sum(PlannedSeconds),
                 actual.Length == 0 ? null : actual.Sum(e => e.ActualSeconds), status,
                 status == "SHORTFALL" ? "Xem việc có nguy cơ trễ." : status == "UNCONFIGURED" ? "Thiết lập giờ làm." : null,
-                sessions.Select(s => new WorkloadSession(s.Id, s.TaskId, tasks[s.TaskId].Name, s.Start, s.End,
-                    s.Status.ToString(), executions.TryGetValue(s.Id, out var execution) && Day(execution.EndedAt!.Value) == date ? execution.ActualSeconds : null,
-                    reviews.Contains(s.Id), team.ContainsKey(s.TaskId), s.ActualSeconds +
-                    (s.SegmentStartedAt is { } segment && s.End <= now ? Math.Max(0, (long)(s.End - segment).TotalSeconds) : 0),
-                    outcomes.GetValueOrDefault(s.Id))).ToArray());
+                sessions.Select(s =>
+                {
+                    var origin = team.GetValueOrDefault(s.TaskId);
+                    return new WorkloadSession(s.Id, s.TaskId, tasks[s.TaskId].Name, s.Start, s.End,
+                        s.Status.ToString(), executions.TryGetValue(s.Id, out var execution) && Day(execution.EndedAt!.Value) == date ? execution.ActualSeconds : null,
+                        reviews.Contains(s.Id), origin is not null, s.ActualSeconds +
+                        (s.SegmentStartedAt is { } segment && s.End <= now ? Math.Max(0, (long)(s.End - segment).TotalSeconds) : 0),
+                        outcomes.GetValueOrDefault(s.Id), origin?.TeamId, origin?.TeamName);
+                }).ToArray(), remainingWork,
+                sessions.Where(s => s.Status == WorkSessionStatus.Completed).Sum(PlannedSeconds),
+                sessions.Where(s => s.Status is WorkSessionStatus.Skipped or WorkSessionStatus.Missed).Sum(PlannedSeconds));
         }).ToArray();
         var ordered = upcoming.Where(s => tasks.TryGetValue(s.TaskId, out var t) && ActiveWork(t))
             .OrderBy(s => tasks[s.TaskId].Deadline).ThenByDescending(s => tasks[s.TaskId].Priority).ThenBy(s => s.Start).ToArray();

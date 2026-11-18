@@ -45,6 +45,29 @@ public sealed class WorkTimeTests
         var snapshot=await Work(h,s=>s.GetAsync(x.User,Ct));Assert.Equal(75,snapshot.Tasks.Single(t=>t.Id==x.Task.Id).RemainingMinutes);
     }
     [Fact]
+    public async Task Ending_running_session_from_task_drawer_records_only_elapsed_time_and_can_be_retried()
+    {
+        await using var h = await ServiceHarness.CreateAsync();
+        var x = await Setup(h, running: true);
+        h.Clock.Advance(TimeSpan.FromMinutes(20));
+        var earlyStop = h.Clock.GetUtcNow();
+        var input = new SessionOutcomeInput("PARTIAL", RemainingMinutes: 100, EndNow: true);
+
+        var saved = await Work(h, s => s.RecordSessionOutcomeAsync(x.User, x.Source.Id, input, Ct));
+        h.Clock.Advance(TimeSpan.FromMinutes(2));
+        var retried = await Work(h, s => s.RecordSessionOutcomeAsync(x.User, x.Source.Id, input, Ct));
+
+        Assert.Equal(saved, retried);
+        Assert.Equal(1200, saved.ActualSeconds);
+        var workspace = await Work(h, s => s.GetAsync(x.User, Ct));
+        Assert.Equal(earlyStop, workspace.Sessions.Single(s => s.Id == x.Source.Id).End);
+        Assert.Equal(100, workspace.Tasks.Single(t => t.Id == x.Task.Id).RemainingMinutes);
+        Assert.Equal("Scheduled", workspace.Sessions.Single(s => s.Id == x.Future.Id).Status);
+        var error = await Assert.ThrowsAsync<AuthException>(() =>
+            Work(h, s => s.RecordSessionOutcomeAsync(x.User, x.Future.Id, input, Ct)));
+        Assert.Equal("SESSION_NOT_DUE", error.Code);
+    }
+    [Fact]
     public async Task Latest_outcome_budget_wins_over_legacy_extension_and_same_clock_outcomes()
     {
         await using var h = await ServiceHarness.CreateAsync();

@@ -33,6 +33,8 @@ beforeEach(() => {
     if (path === "/api/teams/team")
       return { team: group, members: [], tasks: [], activity: [] };
     if (path === "/api/teams/team/invites") return invite;
+    if (path.startsWith("/api/teams/team/invite-friends"))
+      return { items: [], nextOffset: null };
     if (path === `/api/teams/invites/${code}`)
       return {
         teamName: group.name,
@@ -58,6 +60,9 @@ it("leader can create and copy a join link from the group hub", async () => {
   const dialog = await screen.findByRole("dialog", {
     name: "Mời thành viên vào nhóm",
   });
+  fireEvent.click(within(dialog).getByRole("tab", { name: "Link / mã mời" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Tạo link mời" }));
+  await within(dialog).findByRole("textbox", { name: "Link tham gia nhóm" });
   expect(
     within(dialog).getByRole("textbox", { name: "Link tham gia nhóm" }).value,
   ).toBe(teamInviteLink(code));
@@ -95,7 +100,9 @@ it("opening a link previews the group and requests approval only after explicit 
     ).toBeNull(),
   );
   expect(pendingTeamInvite()).toBeNull();
-  expect(api.mock.calls.some(([path]) => path === "/api/teams/team")).toBe(false);
+  expect(api.mock.calls.some(([path]) => path === "/api/teams/team")).toBe(
+    false,
+  );
   expect(screen.getByText(/Đã gửi yêu cầu/)).toBeTruthy();
 });
 it("invalid or revoked invitations show a useful error and never auto join", async () => {
@@ -105,7 +112,10 @@ it("invalid or revoked invitations show a useful error and never auto join", asy
     throw new Error("Link mời đã bị thu hồi. Hãy xin link mới.");
   });
   render(<TeamsPage />);
-  expect(await screen.findByRole("alert")).toHaveProperty(
+  const dialog = await screen.findByRole("dialog", {
+    name: "Lời mời tham gia nhóm",
+  });
+  expect(await within(dialog).findByRole("alert")).toHaveProperty(
     "textContent",
     "Link mời đã bị thu hồi. Hãy xin link mới.",
   );
@@ -127,7 +137,10 @@ it("the normal join form also accepts the full link", async () => {
     { target: { value: teamInviteLink(code) } },
   );
   fireEvent.click(
-    within(dialog).getByRole("button", { name: "Gửi yêu cầu tham gia", exact: true }),
+    within(dialog).getByRole("button", {
+      name: "Gửi yêu cầu tham gia",
+      exact: true,
+    }),
   );
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith("/api/teams/join", "POST", { text: code }),

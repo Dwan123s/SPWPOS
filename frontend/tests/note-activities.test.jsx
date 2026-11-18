@@ -41,7 +41,7 @@ const activities = [
     question: "Bạn cần bao lâu để làm báo cáo RDS?",
   },
 ];
-let calls, note, failApply, failPreview, outsideHours, customWarnings;
+let calls, note, failApply, failPreview, outsideHours, customWarnings, proposedPlan;
 beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-20T12:00:00Z"));
   localStorage.clear();
@@ -50,6 +50,7 @@ beforeEach(() => {
   failPreview = false;
   outsideHours = false;
   customWarnings = null;
+  proposedPlan = null;
   state.workspace = {
     profile: { id: "account" },
     tasks: [],
@@ -93,7 +94,7 @@ beforeEach(() => {
       if (url === "/api/notes") data = [note];
       else if (url === "/api/notes/agent") data = { aiAvailable: true };
       else if (url.endsWith("/proposals"))
-        data = {
+        data = proposedPlan = {
           id: "p1",
           start: "2026-10-20T12:10:00Z",
           end: "2026-11-03T12:10:00Z",
@@ -105,7 +106,7 @@ beforeEach(() => {
                     taskName: "Báo cáo RDS",
                     code: "NOTE_OUTSIDE_AVAILABILITY",
                     message:
-                      "Khung giờ 21/10 20:30–21:00 nằm ngoài giờ rảnh đã thiết lập.",
+                      "Khung giờ 21/10 20:30–21:00 nằm ngoài Thời Gian Làm Việc đã thiết lập.",
                     unscheduledMinutes: 30,
                   },
                 ]
@@ -150,7 +151,7 @@ beforeEach(() => {
             planId: "p1",
             createdTaskIds: ["t1"],
           },
-          plan: { id: "p1", isApplied: true },
+          plan: { ...proposedPlan, isApplied: true },
         };
       } else throw new Error(`Unexpected request: ${url}`);
       return { ok: true, json: async () => ({ data }) };
@@ -350,7 +351,7 @@ it("offers one-off requested hours after an availability warning without applyin
   ).toBe(true);
   expect(
     screen.getByText(
-      "Giờ rảnh bổ sung chỉ được lưu cho ngày đã chọn khi bạn xác nhận lịch.",
+      "Thời Gian Làm Việc bổ sung chỉ được lưu cho ngày đã chọn khi bạn xác nhận lịch.",
     ),
   ).toBeTruthy();
   expect(calls.some((x) => x.url.endsWith("/apply"))).toBe(false);
@@ -358,13 +359,18 @@ it("offers one-off requested hours after an availability warning without applyin
     screen.getByRole("button", { name: "Lưu sự kiện & công việc" }),
   );
   await screen.findByText("Đã lưu 4 hoạt động vào lịch.");
+  const success = screen.getByRole("region", { name: "Lịch đã được lưu" });
+  const openCalendar = within(success).getByRole("link", { name: "Mở lịch" });
+  expect(openCalendar.getAttribute("href")).toBe("#calendar");
+  fireEvent.click(openCalendar);
+  expect(state.calendarStart).toBe("2026-10-21");
 });
 it("distinguishes original analysis remarks from current field errors after editing", async () => {
   const original =
     "The task 'Báo cáo RDS' has a start time but no estimated duration or end time.";
   const alternate =
     "The task 'Báo cáo RDS' starts at 20h30 but its duration or completion deadline is missing.";
-  note.analysis.messages = [original, alternate, "Kiểm tra giờ rảnh buổi tối."];
+  note.analysis.messages = [original, alternate, "Kiểm tra Thời Gian Làm Việc buổi tối."];
   await open();
   expect(screen.getByText("Nhận xét từ lần phân tích ban đầu")).toBeTruthy();
   const duration = screen.getByRole("spinbutton", {
@@ -380,7 +386,7 @@ it("distinguishes original analysis remarks from current field errors after edit
   ).toBeTruthy();
   expect(screen.queryByText(original)).toBeNull();
   expect(screen.queryByText(alternate)).toBeNull();
-  expect(screen.getByText("Kiểm tra giờ rảnh buổi tối.")).toBeTruthy();
+  expect(screen.getByText("Kiểm tra Thời Gian Làm Việc buổi tối.")).toBeTruthy();
   expect(
     screen.getByRole("button", { name: "Xem lịch đề xuất" }).disabled,
   ).toBe(false);
@@ -586,7 +592,7 @@ it("uses a confirmed daily routine instead of requesting manual availability aga
   ];
   await open();
   expect(
-    screen.queryByRole("button", { name: "Thiết lập giờ rảnh" }),
+    screen.queryByRole("button", { name: "Thiết lập Thời Gian Làm Việc" }),
   ).toBeNull();
   const preview = screen.getByRole("button", { name: "Xem lịch đề xuất" });
   expect(preview.disabled).toBe(false);
@@ -600,7 +606,7 @@ it("allows a timed task to be checked without configured hours and asks before s
   note.analysis.activities = [{ ...activities[3], estimatedMinutes: 30 }];
   await open();
   expect(
-    screen.queryByRole("button", { name: "Thiết lập giờ rảnh" }),
+    screen.queryByRole("button", { name: "Thiết lập Thời Gian Làm Việc" }),
   ).toBeNull();
   await userEvent.click(
     screen.getByRole("button", { name: "Xem lịch đề xuất" }),
@@ -719,7 +725,7 @@ it("shows every blocker for the SSG105 note and can keep only the valid selected
   ).toBe(true);
   await userEvent.click(
     screen.getByRole("checkbox", {
-      name: "Tôi đã kiểm tra các lưu ý, giờ rảnh và điều kiện trong ghi chú.",
+      name: "Tôi đã kiểm tra các lưu ý, Thời Gian Làm Việc và điều kiện trong ghi chú.",
     }),
   );
   await userEvent.click(

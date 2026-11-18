@@ -24,6 +24,9 @@ export function ScheduledFocus({ workspace, onWorkspaceChanged }) {
   }, []);
   const { current, next } = scheduledFocus(workspace, now);
   const focus = current || next;
+  const focusedTask = current?.kind === "session"
+    ? workspace.tasks?.find((task) => task.id === current.taskId)
+    : null;
   const hasCalendar =
     (workspace.events?.length || 0) + (workspace.sessions?.length || 0) > 0;
   const workflow = nextWorkflowStep(workspace, now);
@@ -95,7 +98,10 @@ export function ScheduledFocus({ workspace, onWorkspaceChanged }) {
           <FocusLauncher compact />
           {current && focus.kind !== "event" && (
             <FinishWorkButton
+              key={focus.id}
               sessionId={focus.id}
+              teamTask={focusedTask?.isTeamTask}
+              requireReportUrl={focusedTask?.teamReportUrlRequired}
               onWorkspaceChanged={onWorkspaceChanged}
             />
           )}

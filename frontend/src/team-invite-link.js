@@ -11,9 +11,11 @@ export function parseTeamInvite(value, base = window.location.href) {
     if (url.origin !== origin || !["http:", "https:"].includes(url.protocol))
       throw new Error();
     const code =
+      (url.pathname === "/join.html" ? url.searchParams.get("code") : null) ||
       (url.hash.startsWith("#teams?")
         ? new URLSearchParams(url.hash.split("?")[1]).get("join")
-        : null) || url.searchParams.get("join");
+        : null) ||
+      url.searchParams.get("join");
     if (validCode(code)) return code.toUpperCase();
   } catch {
     /* Show a useful error without navigating to the supplied URL. */
@@ -25,9 +27,19 @@ export function parseTeamInvite(value, base = window.location.href) {
 export function teamInviteLink(code, base = window.location.href) {
   if (!validCode(code)) return "";
   const url = new URL(base);
+  url.pathname = "/join.html";
   url.search = "";
-  url.hash = `teams?join=${code.toUpperCase()}`;
+  url.hash = "";
+  url.searchParams.set("code", code.toUpperCase());
   return url.href;
+}
+export function teamInvitationMessage(name, code, base = window.location.href) {
+  const link = teamInviteLink(code, base);
+  if (!link) return "";
+  const groupName = String(name || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `Mời bạn tham gia ${groupName ? `nhóm “${groupName}”` : "nhóm của tôi"} trên PLANORA.\n\n${link}\n\nMở link để xem lời mời, đăng nhập và gửi yêu cầu tham gia nhóm.`;
 }
 export function pendingTeamInvite() {
   let saved = memory;

@@ -1,4 +1,6 @@
 import { TaskEisenhowerDetail } from "./eisenhower.jsx";
+import { eisenhowerPriority } from "./eisenhower-priority.js";
+import { EisenhowerPriorityField, EisenhowerPriorityBadge } from "./eisenhower-priority.jsx";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Select, Slot, nodeList } from "./react-ui.jsx";
@@ -17,11 +19,12 @@ import {
   toUtc,
   field,
   modal,
+  closeModal,
   empty,
   dayKey,
   toast,
 } from "./ui.jsx";
-import { api } from "./api.js";
+import { api, downloadPrivateFile } from "./api.js";
 import { askNora, secretaryMode } from "./agent-handoff.js";
 import { TaskBatchForm } from "./task-batch.jsx";
 import { TaskChecklist } from "./task-checklist.jsx";
@@ -31,13 +34,17 @@ import { orderProjectChildren, plannedTaskStarts } from "./task-smart-lists.js";
 import { TaskDeadlinePicker, TaskEstimateEditor, TaskTablePopup } from "./task-table-popup.jsx";
 import { useOutsideDismiss } from "./popup-dismissal.jsx";
 import { sessionStartIssue } from "./session-start.jsx";
+import { openTeamTask } from "./team-task-link.js";
+import { TaskPlannedSessions, TaskPlanningPanel, TaskPriorityIndicators, TaskSessionControls } from "./task-workflow.jsx";
+import { quickTaskTiming, taskPreview } from "./task-workflow.js";
+import { ProjectAllocation, projectAllocation } from "./project-allocation.jsx";
 import "./task-create.css";
 import "./task-detail-drawer.css";
-export const taskById = (id) => state.workspace.tasks.find((t) => t.id === id);
+export const taskById = (id) => state.workspace?.tasks.find((t) => t.id === id);
 export const hasPlanningDetails = (task) => Boolean(task?.deadline && task.estimatedMinutes > 0);
 export const taskColumns = {
   source: "Nguồn",
-  planned: "Dự kiến",
+  planned: "Dự kiến làm",
   estimate: "Thời lượng",
   deadline: "Hạn chót",
   priority: "Ưu tiên",
@@ -230,11 +237,8 @@ function TaskList({ tasks, plannedDays, plannedStarts, columns = Object.keys(tas
                           </button>
                         )}
                         <button type="button" className="title-button" title={task.name}
-                          aria-pressed={selected?.id === task.id}
-                          onClick={() => {
-                            if (selected?.id === task.id) openDetail(task.id);
-                            else { selectTask(task.id); closePopup(false); }
-                          }}>
+                          data-action="task-detail" data-id={task.id}
+                          onClick={() => { selectTask(task.id); closePopup(false); }}>
                           {task.parentId && <span aria-hidden="true">↳ </span>}{task.name}
                         </button>
                         {hasChecklist && (
@@ -268,7 +272,7 @@ function TaskList({ tasks, plannedDays, plannedStarts, columns = Object.keys(tas
                             data-action={canSchedule ? "schedule-task" : "edit-task"}
                             data-id={task.id}
                             aria-label={canSchedule ? `Xếp lịch công việc ${task.name}` : `Chỉnh sửa ${task.name}`}
-                            title={canSchedule ? "Xếp vào giờ rảnh" : "Chỉnh sửa công việc"}
+                            title={canSchedule ? "Xếp vào Thời Gian Làm Việc" : "Chỉnh sửa công việc"}
                           >
                             {icon(canSchedule ? "calendar" : "edit")}
                           </button>
@@ -286,6 +290,7 @@ function TaskList({ tasks, plannedDays, plannedStarts, columns = Object.keys(tas
                         </>}
                       </div>
                     </div>
+                    <TaskPriorityIndicators task={task} sessions={state.workspace.sessions} project={childCount > 0} />
                   </td>
                   {includes("source") && <td className="work-task-source-cell">{task.isTeamTask ? "Nhóm" : taskSources[task.creationSource] || ""}</td>}
                   {includes("planned") && <td className="work-task-planned-cell">
@@ -299,11 +304,11 @@ function TaskList({ tasks, plannedDays, plannedStarts, columns = Object.keys(tas
                         title={plannedStart != null ? `${dateFmt(plannedStart)} · ${timeFmt(plannedStart)}` : undefined}
                       >
                         {planned === today ? "Hôm nay" : dateFmt(`${planned}T12:00:00Z`, { timeZone: "UTC" })}
-                        {task.parentId && plannedStart != null && dayKey(plannedStart) === planned && (
+                        {plannedStart != null && dayKey(plannedStart) === planned && (
                           <small className="work-task-planned-time">{timeFmt(plannedStart)}</small>
                         )}
                       </button>
-                    ) : null}
+                    ) : canSchedule ? <span className="muted">Chưa xếp</span> : null}
                   </td>}
                   {includes("estimate") && <td className="work-task-estimate-cell">
                     {task.isTeamTask ? estimate : (
@@ -330,12 +335,7 @@ function TaskList({ tasks, plannedDays, plannedStarts, columns = Object.keys(tas
                     )}
                   </td>}
                   {includes("priority") && <td className="work-task-priority-cell">
-                    {task.priority === 2 ? <span className="sr-only">Vừa</span> : task.priority && (
-                      <span className="work-task-flag" data-priority={task.priority} title={`Ưu tiên ${["", "thấp", "vừa", "cao", "khẩn"][task.priority]}`}>
-                        {icon("flag")}
-                        <span className="sr-only">{["", "Thấp", "Vừa", "Cao", "Khẩn"][task.priority]}</span>
-                      </span>
-                    )}
+                    <EisenhowerPriorityBadge task={task} />
                   </td>}
                 </tr>
                 {checklistOpen && (
@@ -446,7 +446,7 @@ export function filterTasks() {
       document.querySelector("#task-search")?.value.toLowerCase() || "",
     status = document.querySelector("#task-status")?.value,
     category = document.querySelector("#task-category")?.value,
-    priority = Number(document.querySelector("#task-priority")?.value || 0);
+    priority = document.querySelector("#task-priority")?.value || "";
   const tasks = state.workspace.tasks.filter(
     (t) =>
       (scopes[state.taskScope || "all"]?.[1] || scopes.all[1])(t) &&
@@ -454,7 +454,7 @@ export function filterTasks() {
         `${t.name} ${t.description || ""}`.toLowerCase().includes(search)) &&
       (!status || t.status === status) &&
       (!category || t.categoryId === category) &&
-      (!priority || t.priority === priority) &&
+      (!priority || eisenhowerPriority(t).quadrant === priority) &&
       (!document.querySelector("#task-from")?.value ||
         (t.deadline && dayKey(t.deadline) >= document.querySelector("#task-from").value)) &&
       (!document.querySelector("#task-to")?.value ||
@@ -475,14 +475,7 @@ export function filterTasks() {
 }
 function TaskPriority({ task }) {
   return (
-    <label className="field">
-      <span>Mức ưu tiên</span>
-      <Select name="priority" defaultValue={task.priority || 2}>
-        {["Thấp", "Vừa", "Cao", "Khẩn"].map((label, index) => (
-          <option key={label} value={index + 1}>{label}</option>
-        ))}
-      </Select>
-    </label>
+    <><input type="hidden" name="priority" value={task.priority || 2} /><EisenhowerPriorityField task={task} /></>
   );
 }
 
@@ -597,6 +590,7 @@ function CreateTaskForm({ task, parentId }) {
   const [manualStart, setManualStart] = useState(task.startDate ?? null);
   const [manualEstimate, setManualEstimate] = useState(task.estimatedMinutes || null);
   const [manualDeadline, setManualDeadline] = useState(task.deadline ? dayKey(task.deadline) : null);
+  const [manualDeadlineTime, setManualDeadlineTime] = useState(task.deadline ? localInput(task.deadline).slice(11, 16) : null);
   const [selectedParent, setSelectedParent] = useState(parentId);
   const [inheritsDeadline, setInheritsDeadline] = useState(Boolean(parentId));
   const projectDeadline = selectedParent ? taskById(selectedParent)?.deadline : null;
@@ -638,7 +632,9 @@ function CreateTaskForm({ task, parentId }) {
   const parsed = Array.isArray(activities);
   const normalized = title.toLocaleLowerCase("vi").normalize("NFD").replace(/\p{M}/gu, "");
   const today = dayKey(Date.now());
-  const localStart = detectTaskStart(normalized);
+  const quick = quickTaskTiming(text, today);
+  const localStart = detectTaskStart(quick.deadline
+    ? quick.name.toLocaleLowerCase("vi").normalize("NFD").replace(/\p{M}/gu, "") : normalized);
   const parsedStart = Number.isFinite(Date.parse(activity?.start)) ? localInput(activity.start) : "";
   const detectedStart = localStart.endsWith("T00:00") && /\btoi\s+mai\b/.test(normalized)
     ? localStart : parsedStart || localStart;
@@ -647,12 +643,18 @@ function CreateTaskForm({ task, parentId }) {
   const suggestedStart = pastStart && manualStart == null ? "" : startDate;
   const duration = normalized.match(/\b(?:trong|mat|can|lam)\s+(\d{1,5})\s+phut\b/);
   const windowMinutes = (Date.parse(activity?.end) - Date.parse(activity?.start)) / 60000;
-  const estimate = parsed ? (activity?.estimatedMinutes ?? windowMinutes) : Number(duration?.[1]);
+  const estimate = quick.estimate ?? (parsed ? (activity?.estimatedMinutes ?? windowMinutes) : Number(duration?.[1]));
   const suggestedEstimate = Number.isInteger(estimate) && estimate > 0 && estimate <= 43200 ? estimate : "";
-  const detectedDeadline = Number.isFinite(Date.parse(activity?.deadline)) ? localInput(activity.deadline) : "";
+  const impact = selectedParent ? projectAllocation(state.workspace, selectedParent, {
+    estimates: [manualEstimate ?? suggestedEstimate],
+  }) : null;
+  const detectedDeadline = quick.deadline || (Number.isFinite(Date.parse(activity?.deadline)) ? localInput(activity.deadline) : "");
   const deadlineDate = manualDeadline ?? detectedDeadline.slice(0, 10);
   const pastDeadline = deadlineDate && deadlineDate < today;
   const suggestedDeadline = pastDeadline && manualDeadline == null ? "" : deadlineDate;
+  const suggestedDeadlineTime = manualDeadlineTime ??
+    (suggestedDeadline && suggestedDeadline === detectedDeadline.slice(0, 10) ? detectedDeadline.slice(11, 16) : "23:59");
+  const interpretedName = (quick.estimate || quick.deadline) && quick.name ? quick.name : title;
   return (
     <div className="task-create-form">
       <div className="task-create-tabs" role="group" aria-label="Thiết lập công việc">
@@ -681,7 +683,8 @@ function CreateTaskForm({ task, parentId }) {
         requestAnimationFrame(() => input.reportValidity());
       }}
     >
-      <input type="hidden" name="creationSource" value={task.creationSource || "MANUAL"} />
+      <input type="hidden" name="creationSource" value={task.creationSource || (interpretedName !== title ? "NATURAL_LANGUAGE" : "MANUAL")} />
+      <input type="hidden" name="resolvedName" value={interpretedName} />
       <div className="task-create-content">
         <input
           className="task-create-name"
@@ -692,7 +695,7 @@ function CreateTaskForm({ task, parentId }) {
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           aria-label="Tên công việc"
-          placeholder="Ví dụ: Gửi báo cáo cho Minh"
+          placeholder="Ví dụ: Soạn báo cáo 90 phút, hạn thứ Sáu 17:00"
           data-dialog-autofocus
         />
         <div className="task-create-panel" data-task-create-panel="main" hidden={section !== "main"}>
@@ -741,6 +744,13 @@ function CreateTaskForm({ task, parentId }) {
               ) : !suggestedDeadline && <span aria-hidden="true">Bất kỳ ngày nào</span>}
             </div>
           </label>
+          {!inheritsDeadline && suggestedDeadline && (
+            <label className="field">
+              Giờ hạn chót
+              <input name="deadlineTime" type="time" value={suggestedDeadlineTime}
+                onChange={(event) => setManualDeadlineTime(event.target.value)} />
+            </label>
+          )}
           {selectedParent && (
             <label className="checkbox">
               <input type="hidden" name="projectDeadlineOption" value="true" />
@@ -769,6 +779,7 @@ function CreateTaskForm({ task, parentId }) {
             {icon("edit")} Lưu nháp
           </button>
         </div>
+        <ProjectAllocation impact={impact} preview />
       </div>
       <div className="form-error" role="alert" />
       <div className="task-create-footer">
@@ -777,7 +788,9 @@ function CreateTaskForm({ task, parentId }) {
           Đánh dấu hoàn thành
         </label>
         <div className="task-create-save">
-          <button type="submit" className="btn primary">Lưu công việc</button>
+          <button type="submit" className="btn primary">
+            {impact?.converts ? "Chuyển thành dự án và lưu" : "Lưu công việc"}
+          </button>
           <button type="submit" className="btn secondary" data-next-action="open">Lưu và mở</button>
         </div>
         <button type="submit" className="btn ghost small task-create-preview" data-next-action="preview" disabled={complete}>
@@ -821,6 +834,13 @@ export function taskForm(task = {}, parentId = null) {
 function EditTaskForm({ task }) {
   const [parentId, setParentId] = useState(task.parentId);
   const [inheritsDeadline, setInheritsDeadline] = useState(Boolean(task.inheritsProjectDeadline));
+  const [estimate, setEstimate] = useState(task.estimatedMinutes || "");
+  const impact = parentId && (parentId !== task.parentId || Number(estimate) !== Number(task.estimatedMinutes))
+    ? projectAllocation(state.workspace, parentId, {
+        replacing: task.id,
+        estimates: task.status === "Cancelled" ? [] : [estimate],
+      })
+    : null;
   return (
     <form data-form="task" data-id={task.id || ""}>
       <input type="hidden" name="version" defaultValue={task.version || ""} />
@@ -840,13 +860,11 @@ function EditTaskForm({ task }) {
           )}
         </div>
         <TaskDeadlineField task={task} parentId={parentId} inherits={inheritsDeadline} setInherits={setInheritsDeadline} />
-        {field(
-          "Thời gian dự kiến (phút, tùy chọn)",
-          "estimatedMinutes",
-          "number",
-          task.estimatedMinutes || "",
-          'min="1" max="43200"',
-        )}
+        <label className="field">
+          Thời gian dự kiến (phút, tùy chọn)
+          <input name="estimatedMinutes" type="number" min={1} max={43200}
+            value={estimate} onChange={(event) => setEstimate(event.target.value)} />
+        </label>
         {task.plannedMinutes > 0 && !task.isTeamTask && (
           <p className="reason wide">Bỏ hạn chót hoặc thời lượng sẽ hủy các phiên đã xếp chưa bắt đầu. Phiên đang làm hoặc đã khóa cần được xử lý trước.</p>
         )}
@@ -863,11 +881,14 @@ function EditTaskForm({ task }) {
           }} />
         </div>
       </details>
+      <ProjectAllocation impact={impact} preview />
       <Slot id="task-conflict" />
       <div className="form-error" />
       <div className="form-actions">
         {button("Hủy", "close-modal", "ghost")}
-        <button type="submit" className="btn primary">Lưu thay đổi</button>
+        <button type="submit" className="btn primary">
+          {impact?.converts ? "Chuyển thành dự án và lưu" : "Lưu thay đổi"}
+        </button>
         {state.noraAvailable && <button type="button" className="btn ghost" onClick={() => askNoraForTask(task, parentId)}>Nhờ NORA</button>}
       </div>
     </form>
@@ -894,19 +915,21 @@ export function openTask(task = {}, parentId = null) {
 }
 export function taskInput(data) {
   const deadline = data.get("deadline");
+  const deadlineTime = data.get("deadlineTime") || "23:59";
   const estimate = data.get("estimatedMinutes");
   const startDate = data.get("startDate");
   const parentId = data.get("parentId") || null;
   const inheritsProjectDeadline = data.has("inheritsProjectDeadline");
   const parent = inheritsProjectDeadline && parentId ? taskById(parentId) : null;
   return {
-    name: String(data.get("name")),
+    name: String(data.get("resolvedName") || data.get("name")).trim(),
     description: String(data.get("description") || ""),
     deadline: inheritsProjectDeadline ? parent?.deadline || null
-      : deadline ? toUtc(String(deadline).includes("T") ? String(deadline) : `${deadline}T23:59`) : null,
+      : deadline ? toUtc(String(deadline).includes("T") ? String(deadline) : deadline + "T" + deadlineTime) : null,
     ...(startDate ? { startDate: String(startDate) } : {}),
     estimatedMinutes: estimate ? Number(estimate) : null,
-    priority: Number(data.get("priority")),
+    priority: Number(data.get("priority") || 2),
+    ...(data.has("importanceLevel") ? { importanceLevel: String(data.get("importanceLevel")) } : {}),
     categoryId: data.get("categoryId") || null,
     parentId,
     ...(data.has("projectDeadlineOption") ? { inheritsProjectDeadline } : {}),
@@ -954,9 +977,17 @@ function ProjectTaskList({ children, projectId }) {
   );
 }
 
-export function openDetail(id, { afterSession = false, initialTab = "details" } = {}) {
+export function openDetail(id, { afterSession = false, initialTab = "details",
+  initialPlan, initialError, onWorkspaceChanged, selectedSessionId } = {}) {
   const t = taskById(id);
   if (!t) return;
+  const plan = initialPlan || taskPreview(id, state.workspace);
+  if (t.teamId && t.teamTaskId) {
+    closeModal();
+    openTeamTask(t.teamId, t.teamTaskId, { selectedSessionId,
+      initialSection: initialTab === "sessions" ? "sessions" : undefined });
+    return;
+  }
   const children = state.workspace.tasks.filter((x) => x.parentId === id);
   const parent = t.parentId ? taskById(t.parentId) : null;
   const deps = t.dependencies.map(taskById).filter(Boolean);
@@ -968,13 +999,17 @@ export function openDetail(id, { afterSession = false, initialTab = "details" } 
     afterSession
       ? "Lượt làm vừa kết thúc. Cập nhật phần công việc bạn đã hoàn thành."
       : "",
-    <TaskDetailDrawer
+    <TaskDetailDrawer key={[id, initialTab, selectedSessionId, plan?.id].join(":")}
       task={t}
       parent={parent}
       childrenTasks={children}
       deps={deps}
       afterSession={afterSession}
       initialTab={initialTab}
+      initialPlan={plan}
+      initialError={initialError}
+      onWorkspaceChanged={onWorkspaceChanged}
+      selectedSessionId={selectedSessionId}
     />,
     {
       placement: "right",
@@ -1009,6 +1044,18 @@ export function TaskDrawerSource({ task, lines, canAttach }) {
   const name = task.sourceFileName || attachedName;
   const path = `/api/tasks/${task.id}/source`;
 
+  async function download() {
+    setBusy(true);
+    setError("");
+    try {
+      await downloadPrivateFile(path, name);
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function attach(event) {
     const file = event.currentTarget.files[0];
     event.currentTarget.value = "";
@@ -1038,22 +1085,27 @@ export function TaskDrawerSource({ task, lines, canAttach }) {
     <section className="task-drawer-brief-section" data-tone="source" aria-label="Tài liệu nguồn">
       <h3>{icon("folder")}Tài liệu nguồn</h3>
       {name ? (
-        <a className="task-drawer-source-link" href={path} download={name}>
-          <span>{name}</span><span aria-hidden="true">↓</span>
-        </a>
+        <div className="task-drawer-source-file">
+          <span>{name}</span>
+          <button type="button" className="btn small secondary" disabled={busy} onClick={download}
+            aria-label={busy ? "Đang tải tài liệu nguồn" : `Tải xuống ${name}`}>
+            {busy ? "Đang tải…" : "Tải xuống"} <span aria-hidden="true">↓</span>
+          </button>
+        </div>
       ) : (
         <>
           <TaskNoteContent lines={lines} />
+          <p>Chưa có file gốc để tải xuống.</p>
           {canAttach && <>
             <input ref={picker} type="file" hidden aria-label="Chọn file gốc" accept={`${TEAM_BRIEF_ACCEPT},.csv`} onChange={attach} />
             <button type="button" className="btn small secondary task-drawer-source-attach" disabled={busy}
               onClick={() => picker.current?.click()}>
               {busy ? "Đang gắn file…" : "Gắn file gốc"}
             </button>
-            {error && <p className="warning" role="alert">{error}</p>}
           </>}
         </>
       )}
+      {error && <p className="warning" role="alert">{error}</p>}
     </section>
   );
 }
@@ -1084,13 +1136,24 @@ function TaskDrawerDescription({ task, canAttachSource }) {
 }
 
 function TaskDetailDrawer({
-  task: t,
+  task,
   parent,
   childrenTasks: children,
   deps,
   afterSession,
   initialTab,
+  initialPlan,
+  initialError,
+  onWorkspaceChanged,
+  selectedSessionId,
 }) {
+  const [, setRevision] = useState(0);
+  useEffect(() => {
+    function refresh() { setRevision(value => value + 1); }
+    window.addEventListener("workspace-updated", refresh);
+    return () => window.removeEventListener("workspace-updated", refresh);
+  }, []);
+  const t = taskById(task.id) || task;
   const id = t.id;
   const sessions = state.workspace.sessions
     .filter(
@@ -1112,7 +1175,7 @@ function TaskDetailDrawer({
     ["details", "Chi tiết"],
     ...(canShowChecklist ? [["checklist", "Checklist"]] : []),
     ["children", "Việc con"],
-    ["sessions", "Phiên đã xếp"],
+    ["sessions", "Lịch làm"],
   ];
   const today = dayKey(Date.now());
   return (
@@ -1183,12 +1246,14 @@ function TaskDetailDrawer({
                 )}
             </div>
           )}
+          <TaskPriorityIndicators task={t} sessions={sessions} project={children.length > 0} />
+          {!children.length && <TaskSessionControls task={t} onWorkspaceChanged={onWorkspaceChanged} selectedSessionId={selectedSessionId} />}
           <TaskDrawerDescription task={t} canAttachSource={!t.isTeamTask && Boolean(parent || children.length)} />
           <dl className="task-drawer-facts">
             <div>
               {icon("flag")}
-              <dt>Ưu tiên</dt>
-              <dd>{["", "Thấp", "Vừa", "Cao", "Khẩn"][t.priority] || "Vừa"}</dd>
+              <dt>Ưu tiên Eisenhower</dt>
+              <dd><EisenhowerPriorityBadge task={t} /></dd>
             </div>
             <div>
               {icon("users")}
@@ -1209,10 +1274,10 @@ function TaskDetailDrawer({
           <dl className="task-drawer-facts">
             <div>
               {icon("calendar")}
-              <dt>Dự kiến</dt>
+              <dt>Dự kiến làm</dt>
               <dd>
                 {planned
-                  ? `${dayKey(planned.start) === today ? "Hôm nay" : dateFmt(planned.start)} · ${timeFmt(planned.start)}`
+                  ? `${dayKey(planned.start) === today ? "Hôm nay" : dateFmt(planned.start)} · ${timeFmt(planned.start)}–${timeFmt(planned.end)}`
                   : "Chưa xếp phiên"}
               </dd>
             </div>
@@ -1263,10 +1328,7 @@ function TaskDetailDrawer({
           {hasPlanningDetails(t) && (
             <TaskEisenhowerDetail
               task={t}
-              onChanged={async () => {
-                state.workspace = await api("/api/workspace");
-                openDetail(id);
-              }}
+              onChanged={onWorkspaceChanged}
             />
           )}
           {secretaryMode() ? (
@@ -1336,7 +1398,10 @@ function TaskDetailDrawer({
           <div className="spaced">
             <h3>Công việc con</h3>
             {children.length ? (
-              <ProjectTaskList children={children} projectId={id} />
+              <>
+                <ProjectAllocation impact={projectAllocation(state.workspace, id)} />
+                <ProjectTaskList children={children} projectId={id} />
+              </>
             ) : (
               <p className="muted">
                 <small>Chưa có công việc con.</small>
@@ -1403,32 +1468,21 @@ function TaskDetailDrawer({
           aria-labelledby="task-drawer-tab-sessions"
           hidden={tab !== "sessions"}
         >
-          {sessions.length ? (
-            sessions.map((session) => (
-              <div className="list-line" key={session.id}>
-                <span>
-                  {dateFmt(session.start)} · {timeFmt(session.start)}–
-                  {timeFmt(session.end)}
-                </span>
-                {button(
-                  statusLabels[session.status] || session.status,
-                  "session-detail",
-                  "small ghost",
-                  session.id,
-                  "clock",
-                )}
-              </div>
-            ))
-          ) : (
-            <p className="muted">Công việc chưa có phiên đã xếp.</p>
+          {parent && !parent.isTeamTask && (
+            <a className="btn secondary small" href={`#tasks/project/${parent.id}`} onClick={closeModal}>
+              Mở dự án
+            </a>
           )}
+          {!children.length && <TaskPlanningPanel task={t} initialPlan={initialPlan} initialError={initialError}
+            onWorkspaceChanged={onWorkspaceChanged} />}
+          <TaskPlannedSessions sessions={sessions} />
         </section>
       </div>
       <footer className="form-actions task-drawer-footer">
         {button("Xóa công việc", "delete-task", "danger small", id, "trash")}
         {button(
           t.isTeamTask ? "Xem lịch cho phần còn lại" : "Lập lại lịch liên quan",
-          "replan-task",
+          children.length ? "replan-task" : "task-planning",
           "secondary small",
           id,
           "refresh",

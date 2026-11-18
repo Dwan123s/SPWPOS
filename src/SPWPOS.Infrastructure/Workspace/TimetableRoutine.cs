@@ -71,7 +71,7 @@ public sealed partial class WorkspaceService
         Add("MEAL", "Ăn sáng", d.BreakfastStart, d.BreakfastEnd);
         rows.AddRange(state.Events.Where(x => x.Start < last && x.End > first).Select(x => new RoutineBlock("FIXED", x.Name, x.Start < first ? first : x.Start, x.End > last ? last : x.End)));
         rows.AddRange(state.Exceptions.Where(x => x.Date == day && !x.IsAvailable).Select(x => new RoutineBlock("EXTRA", string.IsNullOrWhiteSpace(x.Note) ? "Hoạt động riêng" : x.Note, PlanningEngine.At(day, x.StartMinute, zone), PlanningEngine.At(day, x.EndMinute, zone))));
-        rows.AddRange(gaps.Select(x => new RoutineBlock("FREE", "Thời gian rảnh", x.Start, x.End)));
+        rows.AddRange(gaps.Select(x => new RoutineBlock("FREE", "Thời Gian Làm Việc", x.Start, x.End)));
         var fixedBlocks = state.Events.Where(x => x.Start < last && x.End > first).Select(x => new TimeSlot(x.Start, x.End)).ToArray();
         var occupied = rows.Where(x => x.Kind != "FREE").Select(x => new TimeSlot(x.Start, x.End)).ToArray();
         foreach (var block in PlanningEngine.Merge(fixedBlocks).Select(x => new TimeSlot(x.Start.AddMinutes(-policy.CommuteMinutes), x.End.AddMinutes(policy.CommuteMinutes))))

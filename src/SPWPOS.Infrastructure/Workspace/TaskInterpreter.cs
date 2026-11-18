@@ -63,7 +63,7 @@ public sealed partial class TaskInterpreter(HttpClient http, IConfiguration conf
         if (result?.Activities is not null) return new([], Provider, result.Messages ?? [], result.NeedsReview, result.Activities);
         if (result is not null) return new(result.Tasks, Provider, [
             "Kiểm tra thời lượng và deadline; thông tin thiếu được gợi ý 60 phút và sau 7 ngày.",
-            "Giờ rảnh, sự kiện bận và phụ thuộc cần thiết lập ở các màn hình tương ứng trước khi xếp lịch."
+            "Thời Gian Làm Việc, sự kiện bận và phụ thuộc cần thiết lập ở các màn hình tương ứng trước khi xếp lịch."
         ], result.NeedsReview);
         ct.ThrowIfCancellationRequested();
         throw new AuthException("NOTE_AI_UNAVAILABLE", "AI chưa phân tích được ghi chú. Kiểm tra kết nối, API key hoặc hạn mức Gemini rồi thử lại. Ghi chú đã lưu được giữ nguyên.", 503);

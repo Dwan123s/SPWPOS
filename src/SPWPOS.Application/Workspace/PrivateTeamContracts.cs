@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 namespace SPWPOS.Application.Workspace;
 
 public sealed record TeamNameInput([Required, StringLength(120, MinimumLength = 1)] string Name);
@@ -9,11 +10,15 @@ public sealed record TeamJoinRequestView(Guid UserId, string Name, string Email,
 public sealed record MyTeamJoinRequestView(Guid TeamId, string TeamName, string Status, DateTimeOffset? RequestedAt);
 public sealed record TeamTaskRecipientInput(Guid? UserId = null);
 public sealed record TeamTaskRecipientChangeInput(Guid Version, Guid? UserId);
+public sealed record TeamAvailabilityRequestInput(Guid Version, Guid UserId);
+public sealed record TeamAvailabilityResponseInput(Guid Version, [Required] bool? CanTake);
+public sealed record TeamAvailabilityCheckView(Guid UserId, bool? CanTake);
 public sealed record TeamProgressInput(Guid Version, [Range(0, 100)] int Progress);
 public sealed record TeamCompletionReviewInput(Guid Version, Guid RequestId, bool Approved, [StringLength(500)] string? Note = null);
 public sealed record TeamCompletionFileInput([Required, StringLength(180)] string Name, [Required, StringLength(11184812)] string Data);
 public sealed record TeamCompletionSubmitInput(Guid Version, Guid RequestId, [StringLength(1000)] string? Note = null,
-    [MaxLength(3)] TeamCompletionFileInput[]? Files = null);
+    [MaxLength(3)] TeamCompletionFileInput[]? Files = null, [StringLength(2048)] string? ReportUrl = null);
+public sealed record TeamCompletionPolicy(Guid Version, bool RequireReportUrl, bool NotifyLeader);
 public sealed record TeamCompletionFileView(Guid Id, string Name, string MimeType, int Size, DateTimeOffset CreatedAt);
 public sealed record TeamCompletionDownload(string Name, string MimeType, byte[] Content);
 public sealed record TeamSourceFileView(Guid Id, string Name, string MimeType, int Size, DateTimeOffset CreatedAt);
@@ -26,14 +31,20 @@ public sealed record SharedTaskView(Guid Id, string Name, string Description, in
     Guid? CompletionReviewedBy = null, bool? CompletionApproved = null, string? CompletionReviewNote = null,
     string? CompletionSubmissionNote = null, TeamCompletionFileView[]? CompletionFiles = null, TeamSourceFileView[]? SourceFiles = null,
     Guid? DesignatedUserId = null, ImportanceView? Importance = null, Guid? ParentTaskId = null, TaskChecklistItem[]? Checklist = null,
-    int SubtasksCompleted = 0, int SubtaskCount = 0);
+    int SubtasksCompleted = 0, int SubtaskCount = 0, string? CompletionReportUrl = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TeamAvailabilityCheckView? AvailabilityCheck = null,
+    EisenhowerPriorityView? Eisenhower = null);
 public sealed record TeamActivityView(Guid ActorId, Guid? TaskId, string Kind, DateTimeOffset CreatedAt);
-public sealed record TeamDetailView(TeamView Team, TeamMemberView[] Members, SharedTaskView[] Tasks, TeamActivityView[] Activity, TeamJoinRequestView[]? JoinRequests = null);
+public sealed record TeamDetailView(TeamView Team, TeamMemberView[] Members, SharedTaskView[] Tasks, TeamActivityView[] Activity,
+    TeamJoinRequestView[]? JoinRequests = null, TeamCompletionPolicy? CompletionPolicy = null, TeamPlan? Plan = null, TeamRenewalView? Renewal = null);
+public sealed record TeamRenewalView(string Status, DateTimeOffset ExpiredAt, DateTimeOffset GraceUntil);
 public sealed record TeamInviteView(Guid Id, string Code, DateTimeOffset ExpiresAt);
 public sealed record TeamInvitePreview(string TeamName, int MemberCount, DateTimeOffset ExpiresAt, bool AlreadyMember, string? RequestStatus = null);
 public sealed record ManualTeamTaskInput(string Name, string? Description, int EstimatedMinutes,
-    DateTimeOffset Deadline, int Priority = 2, bool Splittable = true);
+    DateTimeOffset Deadline, int Priority = 2, bool Splittable = true,
+    [RegularExpression("^(Important|Lower|Unknown)$")] string? ImportanceLevel = null);
 public sealed record ManualTeamTaskChangeInput(Guid Version, ManualTeamTaskInput Task);
+public sealed record TeamTaskDeadlineInput(Guid Version, DateTimeOffset Deadline);
 public sealed record TeamSubtaskInput(string Name, int EstimatedMinutes, string[] Requirements, string? Notes = null, Guid? DesignatedUserId = null);
 public sealed record TeamTaskSplitInput(Guid Version, [Required, MinLength(2), MaxLength(2)] TeamSubtaskInput[] Children);
 public sealed record TeamChecklistToggleInput(Guid Version, bool Completed);
@@ -67,7 +78,13 @@ public interface IPrivateTeamService
     Task<TeamChatMessageView> SendTeamChatAsync(Guid uid, Guid teamId, TeamChatInput input, CancellationToken ct);
     Task<Guid> CreateTeamAsync(Guid uid, TeamNameInput input, CancellationToken ct);
     Task<TeamDetailView> GetTeamAsync(Guid uid, Guid teamId, CancellationToken ct);
+    Task<TeamCompletionPolicy> SaveTeamCompletionPolicyAsync(Guid uid, Guid teamId, TeamCompletionPolicy input, CancellationToken ct);
     Task<TeamInviteView> CreateTeamInviteAsync(Guid uid, Guid teamId, CancellationToken ct);
+    Task<TeamInviteFriendsPage> ListTeamInviteFriendsAsync(Guid uid, Guid teamId, string? search, int offset, CancellationToken ct);
+    Task<TeamInviteFriendView> InviteTeamFriendAsync(Guid uid, Guid teamId, Guid friendId, CancellationToken ct);
+    Task<TeamFriendInvitationView[]> ListTeamFriendInvitationsAsync(Guid uid, CancellationToken ct);
+    Task<Guid> RespondTeamFriendInvitationAsync(Guid uid, Guid invitationId, TeamFriendInviteResponse input, CancellationToken ct);
+    Task RevokeTeamFriendInvitationAsync(Guid uid, Guid teamId, Guid invitationId, Guid version, CancellationToken ct);
     Task<TeamInvitePreview> PreviewTeamInviteAsync(Guid uid, string code, CancellationToken ct);
     Task RevokeTeamInviteAsync(Guid uid, Guid teamId, Guid inviteId, CancellationToken ct);
     Task<Guid> JoinTeamAsync(Guid uid, string code, CancellationToken ct);
@@ -78,6 +95,7 @@ public interface IPrivateTeamService
     Task<TeamTaskDraft> DraftTeamTaskAsync(Guid uid, Guid teamId, TeamTextInput input, CancellationToken ct);
     Task<Guid> ConfirmTeamTaskDraftAsync(Guid uid, Guid teamId, Guid proposalId, CancellationToken ct, TeamTaskRecipientInput? recipient = null);
     Task ChangeTeamTaskRecipientAsync(Guid uid, Guid taskId, TeamTaskRecipientChangeInput input, CancellationToken ct);
+    Task ExtendTeamTaskDeadlineAsync(Guid uid, Guid taskId, TeamTaskDeadlineInput input, CancellationToken ct);
     Task<Guid[]> SplitTeamTaskAsync(Guid uid, Guid taskId, TeamTaskSplitInput input, CancellationToken ct);
     Task SetTeamChecklistItemAsync(Guid uid, Guid taskId, Guid itemId, TeamChecklistToggleInput input, CancellationToken ct);
     Task<TeamBriefDraft> DraftTeamBriefAsync(Guid uid, Guid teamId, TeamBriefInput input, CancellationToken ct);
@@ -92,6 +110,8 @@ public interface IPrivateTeamService
     Task ReturnTeamTaskAsync(Guid uid, Guid taskId, Guid version, CancellationToken ct, Guid? revision = null);
     Task UpdateTeamProgressAsync(Guid uid, Guid taskId, TeamProgressInput input, CancellationToken ct);
     Task ReviewTeamCompletionAsync(Guid uid, Guid taskId, TeamCompletionReviewInput input, CancellationToken ct);
+    Task RequestTeamAvailabilityAsync(Guid uid, Guid taskId, TeamAvailabilityRequestInput input, CancellationToken ct);
+    Task RespondTeamAvailabilityAsync(Guid uid, Guid taskId, TeamAvailabilityResponseInput input, CancellationToken ct);
     Task SubmitTeamCompletionAsync(Guid uid, Guid taskId, TeamCompletionSubmitInput input, CancellationToken ct);
     Task<TeamCompletionDownload> DownloadTeamCompletionFileAsync(Guid uid, Guid taskId, Guid fileId, CancellationToken ct);
     Task<TeamCompletionDownload> DownloadTeamSourceFileAsync(Guid uid, Guid taskId, Guid fileId, CancellationToken ct);

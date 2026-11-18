@@ -171,6 +171,86 @@
   display: block;
 }
 
+.workload-day-preview {
+  position: fixed;
+  z-index: 75;
+  display: grid;
+  gap: 12px;
+  box-sizing: border-box;
+  width: min(288px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid #d7e2f1;
+  border-radius: 10px;
+  background: #fff;
+  color: #18304b;
+  box-shadow: 0 8px 26px #142c4c2b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.workload-preview-heading,
+.workload-preview-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+.workload-preview-heading {
+  margin-bottom: 6px;
+  font-weight: 650;
+}
+
+.workload-preview-track {
+  display: flex;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f6;
+}
+
+.workload-preview-metric [data-tone="elapsed"] { --segment: #637487; }
+.workload-preview-metric [data-tone="work-left"] { --segment: #ced8e3; }
+.workload-preview-metric [data-tone="done"] { --segment: #2563b5; }
+.workload-preview-metric [data-tone="pending"] { --segment: #8ac5ef; }
+.workload-preview-track span { background: var(--segment); }
+
+.workload-preview-legend {
+  flex-wrap: wrap;
+  margin: 6px 0 0;
+  color: #435870;
+  font-size: 11px;
+}
+
+.workload-preview-legend > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.workload-preview-legend > div::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--segment);
+}
+
+.workload-preview-legend dd {
+  margin: 0;
+  font-weight: 650;
+}
+
+.workload-preview-note {
+  display: grid;
+  gap: 3px;
+  padding-top: 8px;
+  border-top: 1px solid #d7e2f1;
+  color: #435870;
+}
+
 .workload-group-slot {
   display: flex;
   flex-direction: column;
@@ -216,6 +296,7 @@
 
 .workload-group-name {
   text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .workload-group-slot:is(:hover, :focus-visible) {
@@ -245,6 +326,7 @@
 }
 
 .workload-group-popup header strong {
+  overflow-wrap: anywhere;
   color: var(--ui-accent, #195fbf);
 }
 
@@ -262,6 +344,10 @@
 
 .workload-popup-check {
   justify-self: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
 }
 
 .workload-popup-task-icon {
@@ -393,6 +479,17 @@
 .workload-panel-heading p {
   margin: 0.35rem 0 0;
   color: var(--muted);
+}
+.workload-member-summary {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+.workload-member-summary h3 {
+  margin: 0;
+}
+.workload-member-summary p {
+  margin: 0.35rem 0 0.65rem;
+  color: var(--ink);
 }
 .workload-range {
   position: relative;
@@ -749,4 +846,102 @@
   .workload-toolbar h2 {
     flex-basis: 100%;
   }
+}
+#modal:has(.session-log) {
+  width: min(420px, calc(100vw - 24px));
+  border-radius: 4px;
+  background: #fff;
+}
+#modal .modal-body:has(.session-log) {
+  padding: 24px;
+  color: #202124;
+}
+#modal .modal-body:has(.session-log) .modal-head {
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e2e2e2;
+}
+#modal .modal-body:has(.session-log) .modal-head h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+.session-log-form {
+  display: grid;
+  gap: 14px;
+}
+.session-log-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.session-log-line > .icon {
+  flex: 0 0 20px;
+  color: #4b5055;
+}
+.session-log-static,
+.session-log-form input[type="number"] {
+  min-height: 38px;
+  border: 1px solid #ededed;
+  border-radius: 3px;
+  background: #f3f3f3;
+  color: #202124;
+  padding: 7px 10px;
+  font: inherit;
+}
+.session-log-static {
+  flex: 1;
+  align-content: center;
+}
+.session-log-form > label:not(.session-log-check) {
+  display: grid;
+  gap: 6px;
+}
+.session-log-duration {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.session-log-duration input {
+  width: 76px;
+}
+.session-log-switch-row {
+  display: flex;
+  justify-content: flex-end;
+}
+.session-log-switch {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.session-log-switch span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 18px;
+  padding: 4px 7px;
+  background: #e9edf1;
+}
+.session-log-switch span:last-child::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+}
+.session-log-switch[aria-checked="true"] span:last-child {
+  flex-direction: row-reverse;
+  background: #0078ad;
+  color: #fff;
+}
+.session-log-form .session-log-save {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 8px;
+  background: #0078ad;
+  color: #fff;
+  border-radius: 4px;
 }

@@ -683,7 +683,7 @@ export function ProfilePage({ profileId }) {
             </p>
             <p className="social-privacy-note">
               {icon("lock")} Trang cá nhân chỉ chia sẻ thông tin giới thiệu và
-              bạn bè. Lịch, công việc và giờ rảnh của mỗi người được giữ riêng.
+              bạn bè. Lịch, công việc và Thời Gian Làm Việc của mỗi người được giữ riêng.
             </p>
           </section>
         </div>

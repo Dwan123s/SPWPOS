@@ -5,6 +5,7 @@ import { PetProgress } from "./pet-appearance.jsx";
 import { FocusLauncher } from "./focus-timer.jsx";
 import { PageTransition } from "./page-transition.jsx";
 import { PopupDetails } from "./popup-dismissal.jsx";
+import { QuickCreateMenu } from "./quick-create-menu.jsx";
 import {
   WorkspaceAtmosphere,
   WorkspaceMotionControl,
@@ -23,7 +24,7 @@ const railLabels = {
   calendar: "Lịch",
   tasks: "Việc",
   teams: "Nhóm",
-  insights: "Tiến độ",
+  insights: "Báo cáo",
   agent: "NORA AI",
 };
 const workRoutes = ["notes", "tasks"];
@@ -107,6 +108,14 @@ function RailAccount({ profile }) {
           <button
             type="button"
             data-action="nav"
+            data-id="premium"
+            onClick={close}
+          >
+            {icon("spark")} Gói Premium
+          </button>
+          <button
+            type="button"
+            data-action="nav"
             data-id="settings"
             onClick={close}
           >
@@ -122,7 +131,7 @@ function RailAccount({ profile }) {
                 <ul>
                   <li>Nhấn Ctrl + K để tìm nhanh công việc.</li>
                   <li>Dùng dấu + trong Lịch để thêm sự kiện cho một ngày.</li>
-                  <li>Mở Công việc → Inbox để ghi nhanh việc cần làm.</li>
+                  <li>Mở Công việc → Inbox để xem và thêm việc cá nhân.</li>
                 </ul>,
               );
             }}
@@ -220,15 +229,7 @@ export function workspaceShell(routes, title, description, body) {
             </div>
           </div>
           <nav className="nav" aria-label="Điều hướng chính">
-            <button
-              type="button"
-              className="btn primary icon-only workspace-rail-add"
-              data-action="new-task"
-              aria-label="Tạo nhanh công việc"
-              title="Tạo nhanh công việc"
-            >
-              {icon("plus")}
-            </button>
+            <QuickCreateMenu />
             <section className="nav-group" aria-label="Không gian cá nhân">
               <div className="nav-label">Không gian cá nhân</div>
               {nav([

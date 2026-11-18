@@ -8,6 +8,9 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct) => Data(await service.ListTeamsAsync(UserId, ct));
     [HttpPost] public async Task<IActionResult> Create(TeamNameInput input, CancellationToken ct) => Data(new { id = await service.CreateTeamAsync(UserId, input, ct) });
     [HttpGet("{id:guid}")] public async Task<IActionResult> Get(Guid id, CancellationToken ct) => Data(await service.GetTeamAsync(UserId, id, ct));
+    [HttpPut("{id:guid}/completion-policy")]
+    public async Task<IActionResult> SaveCompletionPolicy(Guid id, TeamCompletionPolicy input, CancellationToken ct) =>
+        Data(await service.SaveTeamCompletionPolicyAsync(UserId, id, input, ct));
     [HttpGet("{id:guid}/workload")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> Workload(Guid id, CancellationToken ct, [FromQuery] int week = 0) =>
@@ -15,6 +18,20 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
     [HttpGet("{id:guid}/messages")] public async Task<IActionResult> Messages(Guid id, [FromQuery] long? after, [FromQuery] long? before, CancellationToken ct) => Data(await service.GetTeamChatAsync(UserId, id, after, before, ct));
     [HttpPost("{id:guid}/messages")] public async Task<IActionResult> SendMessage(Guid id, TeamChatInput input, CancellationToken ct) => Data(await service.SendTeamChatAsync(UserId, id, input, ct));
     [HttpPost("{id:guid}/invites")] public async Task<IActionResult> Invite(Guid id, CancellationToken ct) => Data(await service.CreateTeamInviteAsync(UserId, id, ct));
+    [HttpGet("{id:guid}/invite-friends")]
+    public async Task<IActionResult> InviteFriends(Guid id, [FromQuery] string? search, [FromQuery] int offset, CancellationToken ct) =>
+        Data(await service.ListTeamInviteFriendsAsync(UserId, id, search, offset, ct));
+    [HttpPost("{id:guid}/friend-invitations")]
+    public async Task<IActionResult> InviteFriend(Guid id, TeamFriendInviteInput input, CancellationToken ct) =>
+        Data(await service.InviteTeamFriendAsync(UserId, id, input.UserId, ct));
+    [HttpGet("friend-invitations")]
+    public async Task<IActionResult> FriendInvitations(CancellationToken ct) => Data(await service.ListTeamFriendInvitationsAsync(UserId, ct));
+    [HttpPost("friend-invitations/{invitationId:guid}/respond")]
+    public async Task<IActionResult> RespondFriendInvite(Guid invitationId, TeamFriendInviteResponse input, CancellationToken ct) =>
+        Data(new { id = await service.RespondTeamFriendInvitationAsync(UserId, invitationId, input, ct) });
+    [HttpPost("{id:guid}/friend-invitations/{invitationId:guid}/revoke")]
+    public async Task<IActionResult> RevokeFriendInvite(Guid id, Guid invitationId, TeamVersionInput input, CancellationToken ct)
+    { await service.RevokeTeamFriendInvitationAsync(UserId, id, invitationId, input.Version, ct); return Done(); }
     [HttpGet("invites/{code}")] public async Task<IActionResult> PreviewInvite(string code, CancellationToken ct) => Data(await service.PreviewTeamInviteAsync(UserId, code, ct));
     [HttpDelete("{id:guid}/invites/{inviteId:guid}")] public async Task<IActionResult> Revoke(Guid id, Guid inviteId, CancellationToken ct) { await service.RevokeTeamInviteAsync(UserId, id, inviteId, ct); return Done(); }
     [HttpPost("join")] public async Task<IActionResult> Join(TeamTextInput input, CancellationToken ct)
@@ -40,6 +57,15 @@ public sealed class TeamsController(IPrivateTeamService service) : WorkspaceCont
         => Data(await service.ConfirmTeamBriefAsync(UserId, id, proposalId, ct, input));
     [HttpPost("tasks/{id:guid}/recipient")] public async Task<IActionResult> Recipient(Guid id, TeamTaskRecipientChangeInput input, CancellationToken ct)
     { await service.ChangeTeamTaskRecipientAsync(UserId, id, input, ct); return Done(); }
+    [HttpPut("tasks/{id:guid}/deadline")]
+    public async Task<IActionResult> ExtendDeadline(Guid id, TeamTaskDeadlineInput input, CancellationToken ct)
+    { await service.ExtendTeamTaskDeadlineAsync(UserId, id, input, ct); return Done(); }
+    [HttpPost("tasks/{id:guid}/availability/request")]
+    public async Task<IActionResult> RequestAvailability(Guid id, TeamAvailabilityRequestInput input, CancellationToken ct)
+    { await service.RequestTeamAvailabilityAsync(UserId, id, input, ct); return Done(); }
+    [HttpPost("tasks/{id:guid}/availability/respond")]
+    public async Task<IActionResult> RespondAvailability(Guid id, TeamAvailabilityResponseInput input, CancellationToken ct)
+    { await service.RespondTeamAvailabilityAsync(UserId, id, input, ct); return Done(); }
     [HttpPost("tasks/{id:guid}/split")]
     public async Task<IActionResult> Split(Guid id, TeamTaskSplitInput input, CancellationToken ct) =>
         Data(await service.SplitTeamTaskAsync(UserId, id, input, ct));

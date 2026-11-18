@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
-import { state, dateFmt, timeFmt, icon, minutes } from "./ui.jsx";
+import { state, dateFmt, timeFmt, icon, minutes, toast, toUtc, zone } from "./ui.jsx";
 import { askNora } from "./agent-handoff.js";
 import { TeamChat } from "./team-chat.jsx";
+import { TeamRenewalNotice } from "./team-renewal-notice.jsx";
 import {
   MyJoinRequests,
   TeamJoinRequests,
   RemoveTeamMemberDialog,
 } from "./team-membership.jsx";
 import "./team-membership.css";
+import { TeamInviteDialog, ReceivedTeamInvitations } from "./team-friend-invitations.jsx";
 import {
   CompletionFileUpload,
   CompletionReport,
@@ -17,15 +19,16 @@ import {
   captureTeamInvite,
   clearTeamInvite,
   parseTeamInvite,
-  teamInviteLink,
 } from "./team-invite-link.js";
 import { SessionList } from "./team-session-list.jsx";
 import { TeamScheduleCompare } from "./team-schedule-compare.jsx";
 import { TeamChecklist, TeamTaskSplitDialog } from "./team-task-checklist.jsx";
+import { TaskRequirements, TaskSourceFiles } from "./team-task-notes.jsx";
 export { SessionList } from "./team-session-list.jsx";
 import {
   GroupHub,
   TeamHeader,
+  TeamOverview,
   TeamMembers,
   TaskBoard,
   TeamTaskComposer,
@@ -37,7 +40,7 @@ import "./team-overview.css";
 import "./team-task-board.css";
 import "./team-task-detail.css";
 import "./team-recipient-select.css";
-import { takeTeamTask } from "./team-task-link.js";
+import { finishTeamTask, pendingTeamTask } from "./team-task-link.js";
 import {
   pendingTeamJoinReview,
   finishTeamJoinReview,
@@ -196,6 +199,9 @@ export function PrivateClaimPreview({
 }
 export function TeamsPage({ onWorkspaceChanged }) {
   const [taskToOpen, setTaskToOpen] = useState(null);
+  const [attentionToOpen, setAttentionToOpen] = useState(null);
+  const [groupView, setGroupView] = useState("work");
+  const now = Date.now();
   const [teams, setTeams] = useState([]),
     [detail, setDetail] = useState(null),
     [loadingTeams, setLoadingTeams] = useState(true);
@@ -203,8 +209,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
     [error, setError] = useState("");
   const [setupOpen, setSetupOpen] = useState(false);
   const [taskDetailOpen, setTaskDetailOpen] = useState(false);
-  const [invite, setInvite] = useState(null),
-    [copied, setCopied] = useState(false);
+  const [invite, setInvite] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false),
     [text, setText] = useState(""),
     [changeTask, setChangeTask] = useState(null),
@@ -219,10 +224,13 @@ export function TeamsPage({ onWorkspaceChanged }) {
     [returning, setReturning] = useState(null);
   const uid = state.workspace?.profile?.id;
   const [completion, setCompletion] = useState(null);
+  const [completionPolicyDraft, setCompletionPolicyDraft] = useState(null);
   const [splittingTask, setSplittingTask] = useState(null);
+  const [extendingTask, setExtendingTask] = useState(null);
   const [reviewNote, setReviewNote] = useState("");
   const [completionFiles, setCompletionFiles] = useState([]);
   const [completionNote, setCompletionNote] = useState("");
+  const [completionReportUrl, setCompletionReportUrl] = useState("");
   const [readingCompletionFiles, setReadingCompletionFiles] = useState(false);
   const [joinLink, setJoinLink] = useState(() => captureTeamInvite());
   const [invitePreview, setInvitePreview] = useState(null);
@@ -230,6 +238,21 @@ export function TeamsPage({ onWorkspaceChanged }) {
   const [joinRequests, setJoinRequests] = useState([]);
   const [joinMessage, setJoinMessage] = useState("");
   const [removingMember, setRemovingMember] = useState(null);
+  useEffect(() => {
+    if (detail?.renewal?.status !== "Suspended") return;
+    setClaim(null);
+    setClaimOpen(false);
+    setComposerOpen(false);
+    setRemovingMember(null);
+    setCompletion(null);
+    setCompletionPolicyDraft(null);
+    setSplittingTask(null);
+    setExtendingTask(null);
+    setReturning(null);
+    setInvite(null);
+    setDraft(null);
+    setTaskDetailOpen(false);
+  }, [detail?.renewal?.status]);
   const joinReviewRef = useRef(null);
   const [reviewTeamId, setReviewTeamId] = useState(null);
   useEffect(() => {
@@ -244,6 +267,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
         );
         if (!live || pendingTeamJoinReview(uid) !== request) return;
         setDetail(next);
+        setGroupView("members");
         setReviewTeamId(next.team.id);
         finishTeamJoinReview(request);
       } catch (failure) {
@@ -261,14 +285,14 @@ export function TeamsPage({ onWorkspaceChanged }) {
     };
   }, [uid]);
   useEffect(() => {
-    if (reviewTeamId !== detail?.team.id || !joinReviewRef.current) return;
+    if (groupView !== "members" || reviewTeamId !== detail?.team.id || !joinReviewRef.current) return;
     joinReviewRef.current.focus({ preventScroll: true });
     joinReviewRef.current.scrollIntoView?.({
       behavior: "smooth",
       block: "center",
     });
     setReviewTeamId(null);
-  }, [reviewTeamId, detail?.team.id]);
+  }, [groupView, reviewTeamId, detail?.team.id]);
   useEffect(() => {
     if (!joinLink?.code) return;
     let live = true;
@@ -298,16 +322,26 @@ export function TeamsPage({ onWorkspaceChanged }) {
   useEffect(() => {
     let live = true;
     const open = async () => {
-      const requested = takeTeamTask();
+      const requested = pendingTeamTask(uid);
       if (!requested) return;
+      setError("");
       try {
         const next = await api(`/api/teams/${requested.teamId}`);
-        if (live) {
-          setDetail(next);
-          setTaskToOpen(requested);
+        if (!live || pendingTeamTask(uid) !== requested) return;
+        setDetail(next);
+        setGroupView("work");
+        if (requested.taskId && !next.tasks.some((task) => task.id === requested.taskId)) {
+          setTaskToOpen(null);
+          setError("Công việc này không còn trong bảng nhóm.");
+        } else {
+          setTaskToOpen(requested.taskId ? requested : null);
         }
+        finishTeamTask(requested);
       } catch (failure) {
-        if (live) setError(failure.message);
+        if (live && pendingTeamTask(uid) === requested) {
+          setError(failure.message);
+          finishTeamTask(requested);
+        }
       }
     };
     open();
@@ -316,7 +350,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
       live = false;
       window.removeEventListener("open-team-task", open);
     };
-  }, []);
+  }, [uid]);
   useEffect(() => {
     if (!selectedTeamId) return;
     let live = true;
@@ -333,6 +367,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
           setComposerOpen(false);
           setRemovingMember(null);
           setCompletion(null);
+          setCompletionPolicyDraft(null);
           setSplittingTask(null);
           setReturning(null);
           setInvite(null);
@@ -472,16 +507,17 @@ export function TeamsPage({ onWorkspaceChanged }) {
     claimOpen ||
     composerOpen ||
     !!splittingTask ||
+    !!extendingTask ||
     !!invite ||
     !!returning ||
     !!completion ||
+    !!completionPolicyDraft ||
     !!removingMember ||
     !!joinLink;
   const ready =
-    !!state.workspace?.events?.length &&
-    (!!state.workspace?.availabilityPolicy?.confirmed ||
-      !!state.workspace?.availability?.length ||
-      !!state.workspace?.exceptions?.some((x) => x.isAvailable));
+    !!state.workspace?.availabilityPolicy?.confirmed ||
+    !!state.workspace?.availability?.length ||
+    !!state.workspace?.exceptions?.some((x) => x.isAvailable);
   return (
     <div className="team-hub">
       <GroupHub
@@ -493,12 +529,15 @@ export function TeamsPage({ onWorkspaceChanged }) {
         error={error}
         onBack={() => {
           setDetail(null);
+          setGroupView("work");
           setTaskToOpen(null);
+          setAttentionToOpen(null);
           setError("");
         }}
         onSelect={(id) =>
           run(async () => {
             setDetail(await api(`/api/teams/${id}`));
+            setGroupView("work");
             setClaim(null);
             setInvite(null);
             setDraft(null);
@@ -518,8 +557,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
         onCreateLink={(id) =>
           run(async () => {
             await reload(id);
-            setCopied(false);
-            setInvite(await post(`${id}/invites`));
+            setInvite(true);
           })
         }
       />
@@ -528,6 +566,11 @@ export function TeamsPage({ onWorkspaceChanged }) {
           {joinMessage}
         </p>
       )}
+      <ReceivedTeamInvitations onAccepted={async (id) => {
+        await reload(id);
+        setGroupView("work");
+        setJoinMessage("Bạn đã tham gia nhóm. Công việc và trao đổi của nhóm đã sẵn sàng.");
+      }} />
       <MyJoinRequests requests={joinRequests} />
       {error && !modalOpen && (
         <p className="team-error" role="alert">
@@ -555,26 +598,44 @@ export function TeamsPage({ onWorkspaceChanged }) {
       )}
       {detail && (
         <div className="team-workspace">
+          {detail.renewal && <TeamRenewalNotice key={`${detail.team.id}:${detail.renewal.expiredAt}:${detail.renewal.status}`} detail={detail} />}
+          {detail.renewal?.status === "Suspended" ? <section className="team-panel"><h2>{detail.team.name}</h2><button type="button" className="btn secondary" disabled={busy} onClick={() => run(() => reload())}>Kiểm tra gia hạn</button></section> : <>
           <TeamHeader
             detail={detail}
             busy={busy}
             onInvite={() =>
               run(async () => {
-                setCopied(false);
-                setInvite(await post(`${detail.team.id}/invites`));
+                setInvite(true);
               })
             }
             onRefresh={() => run(() => reload())}
-            onCompose={() => openComposer()}
-            onOpenTask={(taskId) =>
-              setTaskToOpen({ teamId: detail.team.id, taskId })
-            }
+            onCompletionPolicy={() => {
+              setError("");
+              setCompletionPolicyDraft(detail.completionPolicy);
+            }}
+            onCompose={detail.tasks.length || groupView !== "work" ? () => openComposer() : undefined}
           />
-          <div className="team-workspace-columns">
-            <div className="team-work-main">
+          <nav className="team-workspace-nav" aria-label="Mục trong nhóm">
+            {[
+              { id: "work", label: "Công việc", glyph: "tasks" },
+              { id: "members", label: "Thành viên", glyph: "users" },
+              { id: "chat", label: "Trao đổi", glyph: "chat" },
+              { id: "overview", label: "Tổng quan", glyph: "insights" },
+            ].map(({ id, label, glyph }) => (
+              <button key={id} type="button" aria-pressed={groupView === id} onClick={() => setGroupView(id)}>
+                {icon(glyph)} {label}
+                {id === "members" && detail.team.role === "Leader" && detail.joinRequests?.length > 0 && (
+                  <span className="team-count" aria-label={`${detail.joinRequests.length} yêu cầu tham gia`}>{detail.joinRequests.length}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+          <div className="team-workspace-pane" hidden={groupView !== "work"}>
               <TaskBoard
                 key={detail.team.id}
                 detail={detail}
+                now={now}
+                attentionToOpen={attentionToOpen?.teamId === detail.team.id ? attentionToOpen : null}
                 taskToOpen={
                   taskToOpen?.teamId === detail.team.id ? taskToOpen : null
                 }
@@ -582,6 +643,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
                 onImportanceChanged={() => run(() => reload())}
                 error={error}
                 onDialogChange={setTaskDetailOpen}
+                onExecutionChanged={changed}
                 onRecipientChange={(task, userId) =>
                   run(async () => {
                     await post(`tasks/${task.id}/recipient`, {
@@ -591,6 +653,10 @@ export function TeamsPage({ onWorkspaceChanged }) {
                     await reload();
                   })
                 }
+                onRequestAvailability={(task, userId) => run(async () => {
+                  await post(`tasks/${task.id}/availability/request`, { version: task.version, userId });
+                  await reload();
+                })}
                 onAttachSource={(task, file) =>
                   run(async () => {
                     await post(`tasks/${task.id}/source`, {
@@ -609,6 +675,10 @@ export function TeamsPage({ onWorkspaceChanged }) {
                 busy={busy}
                 onCompose={() => openComposer()}
                 onClaim={openClaim}
+                onExtendDeadline={(task) => {
+                  setError("");
+                  setExtendingTask(task);
+                }}
                 onSplit={(task) => {
                   setError("");
                   setSplittingTask(task);
@@ -625,6 +695,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
                     setError("");
                     setCompletionFiles([]);
                     setCompletionNote("");
+                    setCompletionReportUrl("");
                     setReadingCompletionFiles(false);
                     setCompletion({
                       task,
@@ -661,23 +732,20 @@ export function TeamsPage({ onWorkspaceChanged }) {
                   })
                 }
               />
-              <TeamActivity detail={detail} />
-            </div>
-            <aside className="team-work-sidebar">
-              <TeamChat
-                key={detail.team.id}
-                teamId={detail.team.id}
-                name={detail.team.name}
-              />
-              <TeamMembers
-                detail={detail}
-                uid={uid}
-                busy={busy}
-                onRemove={(member) => {
-                  setError("");
-                  setRemovingMember(member);
-                }}
-              />
+              <div className={`team-workspace-readiness${ready ? " ready" : ""}`}>
+                {icon(ready ? "shield" : "calendar")}
+                {ready ? "Lịch cá nhân đã sẵn sàng" : "Bạn cần đặt giờ làm trước khi nhận việc."}
+                {!ready && (
+                  <button type="button" className="team-text-button" onClick={() => askNora(
+                    "Tôi muốn gửi thời gian biểu và xác nhận giờ có thể làm việc để nhận task nhóm.",
+                  )}>
+                    Thiết lập với NORA {icon("arrow")}
+                  </button>
+                )}
+              </div>
+          </div>
+          {groupView === "members" && (
+            <div className="team-workspace-pane team-workspace-members">
               <TeamJoinRequests
                 detail={detail}
                 sectionRef={joinReviewRef}
@@ -692,36 +760,34 @@ export function TeamsPage({ onWorkspaceChanged }) {
                   })
                 }
               />
-              <section
-                className={`team-personal-readiness${ready ? " ready" : ""}`}
-              >
-                <span>{icon(ready ? "shield" : "calendar")}</span>
-                <div>
-                  <h3>
-                    {ready
-                      ? "Lịch cá nhân đã sẵn sàng"
-                      : "Chuẩn bị lịch để nhận task"}
-                  </h3>
-                  <p>
-                    {ready
-                      ? "NORA dùng lịch của bạn để tìm chỗ phù hợp. Nhóm không xem được thông tin này."
-                      : "Gửi thời khóa biểu và xác nhận giờ sinh hoạt. NORA sẽ giúp bạn sắp xếp công việc quanh lịch bận."}
-                  </p>
-                  <button
-                    className="team-text-button"
-                    onClick={() =>
-                      askNora(
-                        "Tôi muốn gửi thời gian biểu và xác nhận giờ có thể làm việc để nhận task nhóm.",
-                      )
-                    }
-                  >
-                    {ready ? "Trao đổi với NORA" : "Thiết lập với NORA"}{" "}
-                    {icon("arrow")}
-                  </button>
-                </div>
-              </section>
-            </aside>
+              <TeamMembers detail={detail} uid={uid} busy={busy} onRemove={(member) => {
+                setError("");
+                setRemovingMember(member);
+              }} />
+            </div>
+          )}
+          <div className="team-workspace-pane" hidden={groupView !== "chat"}>
+            <TeamChat key={detail.team.id} teamId={detail.team.id} name={detail.team.name} active={groupView === "chat"} />
           </div>
+          {groupView === "overview" && (
+            <div className="team-workspace-pane">
+              <TeamOverview
+                tasks={detail.tasks}
+                busy={busy}
+                now={now}
+                onOpenAttention={detail.team.role === "Leader" ? (id) => {
+                  setGroupView("work");
+                  setAttentionToOpen({ teamId: detail.team.id, id });
+                } : undefined}
+                onOpenTask={(taskId) => {
+                  setGroupView("work");
+                  setTaskToOpen({ teamId: detail.team.id, taskId });
+                }}
+              />
+              <TeamActivity detail={detail} />
+            </div>
+          )}
+          </>}
         </div>
       )}
       {!detail && (
@@ -746,8 +812,66 @@ export function TeamsPage({ onWorkspaceChanged }) {
           </button>
         </section>
       )}
+      {completionPolicyDraft && (
+        <TeamDialog
+          title="Quy định gửi duyệt"
+          subtitle={detail.team.name}
+          busy={busy}
+          onClose={() => setCompletionPolicyDraft(null)}
+        >
+          <form
+            className="team-completion-dialog"
+            onSubmit={(event) => {
+              event.preventDefault();
+              run(async () => {
+                try {
+                  const policy = await api(
+                    `/api/teams/${detail.team.id}/completion-policy`,
+                    "PUT",
+                    completionPolicyDraft,
+                  );
+                  setDetail((current) => ({ ...current, completionPolicy: policy }));
+                  setCompletionPolicyDraft(null);
+                } catch (failure) {
+                  if (failure.status === 409) {
+                    const latest = await api(`/api/teams/${detail.team.id}`);
+                    setDetail(latest);
+                    setCompletionPolicyDraft(latest.team.role === "Leader" ? latest.completionPolicy : null);
+                  }
+                  throw failure;
+                }
+              });
+            }}
+          >
+            <label className="team-policy-option">
+              <input
+                type="checkbox"
+                disabled={busy}
+                checked={completionPolicyDraft.requireReportUrl}
+                onChange={(event) => setCompletionPolicyDraft({ ...completionPolicyDraft, requireReportUrl: event.target.checked })}
+              />
+              Bắt buộc có link báo cáo khi gửi duyệt
+            </label>
+            <label className="team-policy-option">
+              <input
+                type="checkbox"
+                disabled={busy}
+                checked={completionPolicyDraft.notifyLeader}
+                onChange={(event) => setCompletionPolicyDraft({ ...completionPolicyDraft, notifyLeader: event.target.checked })}
+              />
+              Thông báo cho trưởng nhóm khi có báo cáo mới
+            </label>
+            {error && <p role="alert" className="team-error">{error}</p>}
+            <div className="team-actions">
+              <button type="submit" className="btn primary" disabled={busy}>Lưu quy định</button>
+              <button type="button" className="btn secondary" disabled={busy} onClick={() => setCompletionPolicyDraft(null)}>Hủy</button>
+            </div>
+          </form>
+        </TeamDialog>
+      )}
       {completion && (
         <TeamDialog
+          className={completion.mode === "review" ? "team-review-drawer" : ""}
           title={
             completion.mode === "submit"
               ? "Gửi xác nhận hoàn thành"
@@ -765,6 +889,21 @@ export function TeamsPage({ onWorkspaceChanged }) {
             </p>
             {completion.mode === "submit" && (
               <>
+                <label>
+                  {detail.completionPolicy?.requireReportUrl ? "Link báo cáo (bắt buộc)" : "Link báo cáo (không bắt buộc)"}
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    maxLength={2048}
+                    required={detail.completionPolicy?.requireReportUrl === true}
+                    value={completionReportUrl}
+                    disabled={busy || readingCompletionFiles}
+                    onChange={(event) => {
+                      setCompletionReportUrl(event.target.value);
+                      setCompletion((c) => ({ ...c, requestId: crypto.randomUUID() }));
+                    }}
+                  />
+                </label>
                 <label>
                   Ghi chú kết quả (không bắt buộc)
                   <textarea
@@ -797,7 +936,11 @@ export function TeamsPage({ onWorkspaceChanged }) {
               </>
             )}
             {completion.mode === "review" && (
-              <CompletionReport task={completion.task} />
+              <>
+                <TaskRequirements task={completion.task} />
+                {completion.task.sourceFiles?.length > 0 && <TaskSourceFiles task={completion.task} />}
+                <CompletionReport task={completion.task} />
+              </>
             )}
             {completion.mode === "review" && (
               <label>
@@ -819,7 +962,10 @@ export function TeamsPage({ onWorkspaceChanged }) {
             <div className="team-actions">
               <button
                 className="btn primary"
-                disabled={busy || readingCompletionFiles}
+                disabled={
+                  busy || readingCompletionFiles || (completion.mode === "submit" &&
+                    detail.completionPolicy?.requireReportUrl && !completionReportUrl.trim())
+                }
                 onClick={() =>
                   run(async () => {
                     if (completion.mode === "submit")
@@ -829,6 +975,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
                           version: completion.task.version,
                           requestId: completion.requestId,
                           note: completionNote,
+                          ...(completionReportUrl.trim() && { reportUrl: completionReportUrl.trim() }),
                           files: completionFiles.map((file) => ({
                             name: file.name,
                             data: file.data,
@@ -886,6 +1033,34 @@ export function TeamsPage({ onWorkspaceChanged }) {
               </button>
             </div>
           </div>
+        </TeamDialog>
+      )}
+      {extendingTask && (
+        <TeamDialog title="Gia hạn công việc" subtitle={extendingTask.name} busy={busy}
+          onClose={() => setExtendingTask(null)}>
+          <form className="team-form" onSubmit={(event) => {
+            event.preventDefault();
+            const value = new FormData(event.currentTarget).get("deadline");
+            void run(async () => {
+              await api(`/api/teams/tasks/${extendingTask.id}/deadline`, "PUT", {
+                version: extendingTask.version,
+                deadline: toUtc(value),
+              });
+              setExtendingTask(null);
+              toast("Đã gia hạn công việc.");
+              await reload();
+            });
+          }}>
+            <p>Hạn cũ {dateFmt(extendingTask.deadline, { year: "numeric" })} · {timeFmt(extendingTask.deadline)}. Thời lượng dự kiến {minutes(extendingTask.estimatedMinutes, "long")}.</p>
+            <label>Hạn chót mới ({zone()})
+              <input type="datetime-local" name="deadline" required disabled={busy} />
+            </label>
+            {error && <p className="team-error" role="alert">{error}</p>}
+            <div className="team-actions">
+              <button type="submit" className="btn primary" disabled={busy}>{busy ? "Đang lưu…" : "Lưu hạn mới"}</button>
+              <button type="button" className="btn secondary" disabled={busy} onClick={() => setExtendingTask(null)}>Hủy</button>
+            </div>
+          </form>
         </TeamDialog>
       )}
       {composerOpen && (
@@ -1091,86 +1266,7 @@ export function TeamsPage({ onWorkspaceChanged }) {
           }
         />
       )}
-      {invite && (
-        <TeamDialog
-          title="Mời thành viên vào nhóm"
-          subtitle={detail?.team.name}
-          busy={busy}
-          onClose={() => setInvite(null)}
-        >
-          <div className="team-invite-content">
-            <span className="team-tile-icon">{icon("users")}</span>
-            <p>Gửi link mời để thành viên mở và tham gia nhóm.</p>
-            <label className="team-invite-link-field">
-              Link tham gia nhóm
-              <input
-                readOnly
-                value={teamInviteLink(invite.code)}
-                onFocus={(e) => e.target.select()}
-              />
-            </label>
-            <button
-              className="btn primary"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(
-                    teamInviteLink(invite.code),
-                  );
-                  setCopied("link");
-                } catch {
-                  setError("Chọn và sao chép link trong ô ở trên để chia sẻ.");
-                }
-              }}
-            >
-              {icon("copy")}{" "}
-              {copied === "link" ? "Đã sao chép link" : "Sao chép link mời"}
-            </button>
-            <details className="team-invite-code">
-              <summary>Hoặc dùng mã mời</summary>
-              <code>{invite.code}</code>
-            </details>
-            <p className="team-muted">
-              Hết hạn {dateFmt(invite.expiresAt)} · Mã có thể được thu hồi bất
-              cứ lúc nào. Thu hồi sẽ vô hiệu hóa cả mã và link mời này.
-            </p>
-            {error && (
-              <p role="alert" className="team-error">
-                {error}
-              </p>
-            )}
-            <div className="team-actions">
-              <button
-                className="btn primary"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(invite.code);
-                    setCopied("code");
-                  } catch {
-                    setError("Chọn và sao chép mã ở trên để chia sẻ.");
-                  }
-                }}
-              >
-                {copied === "code" ? "Đã sao chép mã" : "Sao chép mã mời"}
-              </button>
-              <button
-                className="btn secondary"
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    await api(
-                      `/api/teams/${detail.team.id}/invites/${invite.id}`,
-                      "DELETE",
-                    );
-                    setInvite(null);
-                  })
-                }
-              >
-                Thu hồi lời mời
-              </button>
-            </div>
-          </div>
-        </TeamDialog>
-      )}
+      {invite && detail && <TeamInviteDialog team={detail.team} onClose={() => setInvite(false)} />}
       {splittingTask && detail && (
         <TeamTaskSplitDialog task={splittingTask} members={detail.members} busy={busy} error={error}
           onClose={() => { setError(""); setSplittingTask(null); }}
@@ -1247,6 +1343,27 @@ export function TeamsPage({ onWorkspaceChanged }) {
           )}
           {claim && (
             <>
+              {!claimRequest.change && claimRequest.task.availabilityCheck?.userId === uid &&
+                claimRequest.task.availabilityCheck.canTake == null && (
+                  <div className="team-availability-reply">
+                    <p>Trưởng nhóm chỉ thấy câu trả lời. Bạn vẫn cần xác nhận riêng để nhận việc.</p>
+                    <div className="team-actions">
+                      {[true, false].map((canTake) => (
+                        <button key={String(canTake)} type="button" className="btn secondary"
+                          disabled={busy || (canTake && !claim.options.length)}
+                          onClick={() => run(async () => {
+                            const { task } = claimRequest;
+                            await post(`tasks/${task.id}/availability/respond`, { version: task.version, canTake });
+                            setClaim(null);
+                            setClaimOpen(false);
+                            await reload();
+                          })}>
+                          {canTake ? "Báo có thể nhận" : "Báo chưa thể nhận"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               <PrivateClaimPreview
                 claim={claim}
                 busy={busy}

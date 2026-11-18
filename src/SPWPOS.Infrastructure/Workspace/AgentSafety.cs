@@ -22,7 +22,7 @@ public sealed partial class WorkspaceService
         var warnings = excluded.Select(task => new PlanWarning(task.Id, task.Name,
             state.Dependencies.Any(edge => edge.PredecessorId == task.Id && affected.Contains(edge.TaskId))
                 ? "DEPENDENCY_UNSCHEDULED" : "EXCLUDED_DEADLINE_TASK",
-            "Công việc cần được dành thời gian trước hạn nhưng yêu cầu hiện tại không cho phép xếp việc này. Chưa lưu thay đổi; hãy điều chỉnh phạm vi hoặc giờ rảnh.",
+            "Công việc cần được dành thời gian trước hạn nhưng yêu cầu hiện tại không cho phép xếp việc này. Chưa lưu thay đổi; hãy điều chỉnh phạm vi hoặc Thời Gian Làm Việc.",
             engine.Remaining(task, bias)));
         return plan with { Sessions = plan.Sessions.Where(session => session.Preserved).ToArray(),
             Warnings = plan.Warnings.Concat(warnings).ToArray() };

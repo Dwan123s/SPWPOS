@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { dateFmt, icon, localInput, minutes, toUtc } from "./ui.jsx";
 import { NoteImpact } from "./note-impact.jsx";
 import { NoteLibrary } from "./note-library.jsx";
@@ -6,7 +6,7 @@ import { NoteWritingTools } from "./note-writing-tools.jsx";
 import { noteAppearanceStyle } from "./note-appearance.js";
 import { NoteActivitiesReview } from "./note-activities.jsx";
 
-const priorities = ["", "Thấp", "Vừa", "Cao", "Khẩn"];
+import { EisenhowerPriorityField } from "./eisenhower-priority.jsx";
 const types = {
   WORK: "Công việc",
   OTHER: "Khác",
@@ -25,6 +25,7 @@ export function NoteStudio({
   imported,
   hasHistory = imported,
   autosaveStatus = "",
+  autosaveError,
   busy,
   dirty,
   hasAiAnalysis,
@@ -36,6 +37,8 @@ export function NoteStudio({
   select,
   setNote,
   analyze,
+  analysisFeedback,
+  openSavedCalendar,
   saveDraft,
   requestSchedule,
   updateDraft,
@@ -60,6 +63,11 @@ export function NoteStudio({
   const typeMenu = useRef(null);
   const openedAt = useRef(new Date().toISOString());
   const reviewHeading = useRef(null);
+  const analysisAlert = useRef(null);
+  const hasAnalysisFeedback = Boolean(analysisFeedback);
+  useEffect(() => {
+    if (hasAnalysisFeedback) analysisAlert.current?.focus();
+  }, [hasAnalysisFeedback]);
   const reviewing = stage === "review" && !!note.analysis;
   const goWrite = () => {
     setStage("write");
@@ -241,7 +249,6 @@ export function NoteStudio({
                   }
                 />
               </label>
-              {!reviewing && checklist}
               <div className="note-editor-footer">
                 <div className="note-editor-caption">
                   <p className="note-privacy">
@@ -268,6 +275,16 @@ export function NoteStudio({
                   </button>
                 </div>
               </div>
+              {analysisFeedback && (
+                <div ref={analysisAlert} tabIndex={-1} role="alert" className="note-analysis-alert">
+                  {analysisFeedback}
+                </div>
+              )}
+              {!analysisFeedback && autosaveError && (
+                <div role="alert" className="note-analysis-alert">
+                  <p>{autosaveError}</p>
+                </div>
+              )}
               {!busy && !agent?.aiAvailable && (
                 <p className="warning spaced">
                   AI chưa sẵn sàng. Bạn vẫn có thể lưu bản nháp hoặc{" "}
@@ -325,7 +342,7 @@ export function NoteStudio({
           )}
           {!hasTime && (
             <p className="note-soft-help">
-              Bạn có thể viết trước, chọn <a href="#time">giờ rảnh</a> ở bước
+              Bạn có thể viết trước, chọn <a href="#time">Thời Gian Làm Việc</a> ở bước
               tiếp theo.
             </p>
           )}
@@ -337,7 +354,6 @@ export function NoteStudio({
         </section>
         {feedback}
         {availability}
-        {reviewing && checklist}
         {note.analysis && (
           <section
             className="note-review"
@@ -359,7 +375,9 @@ export function NoteStudio({
                       : "Xem trước công việc"}
                 </h2>
                 <p>
-                  {note.analysis.activities ? (
+                  {note.planId ? (
+                    "Mở lịch để xem thời gian đã lưu."
+                  ) : note.analysis.activities ? (
                     note.analysis.activities.some(
                       (activity) => activity.kind === "TASK",
                     ) ? (
@@ -377,18 +395,31 @@ export function NoteStudio({
                   )}
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn secondary small"
-                disabled={!!busy}
-                onClick={goWrite}
-                aria-label="Sửa ghi chú"
-                title="Sửa ghi chú"
-              >
-                {icon("edit")} <span>Sửa ghi chú</span>
-              </button>
+              <div className="note-review-actions">
+                {note.planId && (
+                  <a className="btn primary" href="#calendar" onClick={openSavedCalendar}>
+                    {icon("calendar")} Mở lịch
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="btn secondary small"
+                  disabled={!!busy}
+                  onClick={goWrite}
+                  aria-label="Sửa ghi chú"
+                  title="Sửa ghi chú"
+                >
+                  {icon("edit")} <span>Sửa ghi chú</span>
+                </button>
+              </div>
             </div>
-            {note.analysis.activities ? (
+            {note.planId && note.analysis.activities ? (
+              <div className="card note-activities-saved" role="status">
+                {icon("check")}
+                <h3>Đã lưu {note.analysis.activities.length} hoạt động vào lịch.</h3>
+                <p>Các sự kiện cố định và phiên công việc đã sẵn sàng.</p>
+              </div>
+            ) : note.analysis.activities ? (
               <NoteActivitiesReview
                 key={`${note.id}/${note.version}`}
                 note={note}
@@ -481,7 +512,7 @@ export function NoteStudio({
                   {note.analysis.needsReview && (
                     <p className="warning spaced">
                       AI chưa thể tự áp dụng các điều kiện trong ghi chú. Kiểm
-                      tra lưu ý, giờ rảnh và phụ thuộc trước khi lưu lịch.
+                      tra lưu ý, Thời Gian Làm Việc và phụ thuộc trước khi lưu lịch.
                     </p>
                   )}
                   {!hasAiAnalysis && !imported && (
@@ -515,7 +546,7 @@ export function NoteStudio({
                       >
                         {proposalIssue ||
                           (!hasTime
-                            ? "Bạn sẽ chọn giờ rảnh trước khi tạo công việc và lịch đề xuất."
+                            ? "Bạn sẽ chọn Thời Gian Làm Việc trước khi tạo công việc và lịch đề xuất."
                             : "Công việc sẽ được tạo; bạn xem và xác nhận lịch ở bước tiếp theo.")}
                       </p>
                       <button
@@ -529,13 +560,6 @@ export function NoteStudio({
                           : "Tạo công việc & xem lịch"}{" "}
                         {icon("arrow")}
                       </button>
-                    </div>
-                  )}
-                  {note.planId && (
-                    <div className="form-actions">
-                      <a className="btn primary" href="#today">
-                        Mở Hôm nay để làm việc
-                      </a>
                     </div>
                   )}
                   {imported && !note.planId && (
@@ -561,7 +585,7 @@ export function NoteStudio({
                     onSetTime={onSetTime}
                     showPreview
                   />
-                  {imported && (
+                  {imported && !note.planId && (
                     <div className="card note-preview-placeholder">
                       {icon("calendar")}
                       <h3>Tiếp tục với lịch của bạn</h3>
@@ -592,6 +616,7 @@ export function NoteStudio({
             )}
           </section>
         )}
+        {checklist}
       </div>
     </div>
   );
@@ -706,21 +731,8 @@ function NoteDraftRow({ task, index, update }) {
               }
             />
           </label>
-          <label className="field">
-            Mức ưu tiên
-            <select
-              value={task.priority}
-              onChange={(event) =>
-                update(index, "priority", Number(event.target.value))
-              }
-            >
-              {[1, 2, 3, 4].map((priority) => (
-                <option key={priority} value={priority}>
-                  {priorities[priority]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <EisenhowerPriorityField task={task} value={task.importanceLevel || "Unknown"}
+            onChange={(level) => update(index, "importanceLevel", level)} />
           <label className="field">
             Loại công việc
             <select

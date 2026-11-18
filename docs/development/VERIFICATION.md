@@ -2,7 +2,7 @@
 
 Cập nhật **06/10/2026 — chuyển .NET 8**: SDK 8.0.425/runtime 8.0.31; Release build 0 warnings/errors; **68 unit + 47 integration = 115 backend tests passed, 0 skipped**, gồm 8 SQL Server cases. Thêm 9 frontend tests và 10 kiểm tra script pass. Locked restore, EF model consistency và NuGet audit pass (0 vulnerable entries). Localhost đã chạy apphost net8.0, homepage/Swagger HTTP 200. Xem [phân tích và báo cáo chuyển đổi](NET8_MIGRATION_2026-10-06.md). Các con số phía dưới là lịch sử trước chuyển đổi.
 
-Cập nhật **05/10/2026** sau bản sửa từ đánh giá hệ thống: Release build 0 warnings/errors; **68 unit + 39 HTTP integration + 6 frontend module tests = 113 passed**, 0 failed. **8 ca SQL Server bị skip** vì chưa cấu hình `SPWPOS_TEST_SQLSERVER`; kết quả 106 tests với SQL Server phía dưới là lịch sử, không phải toàn bộ đã chạy lại lần này. Tất cả JavaScript modules qua syntax check. Xem [chi tiết bản sửa và phạm vi kiểm chứng](../reviews/FIX_2026-10-05.md).
+Cập nhật **05/10/2026** sau bản sửa từ đánh giá hệ thống: Release build 0 warnings/errors; **68 unit + 39 HTTP integration + 6 frontend module tests = 113 passed**, 0 failed. **8 ca SQL Server bị skip** vì chưa cấu hình `SPWPOS_TEST_SQLSERVER`; kết quả 106 tests với SQL Server phía dưới là lịch sử, không phải toàn bộ đã chạy lại lần này. Tất cả JavaScript modules qua syntax check.
 
 Backend và UI đã đối chiếu báo cáo 72 use case và bộ UML v2. Migration `AlignWithUmlV2` đã áp dụng thành công trên SQL Server local; giữ dữ liệu Identity/workspace cũ. Xem [ánh xạ chi tiết](../database/UML_ALIGNMENT.md).
 
@@ -30,7 +30,7 @@ Ca mới kiểm tra hard/soft deadline, persisted observations, proposal→items
 
 Planner tests bao gồm hard deadline, events/overlap, dependencies, non-split, locked/unaffected preservation, cold start, bias/capacity, exception, cycle, parent tránh tính trùng, DST và preferred hours với fallback cho deadline gấp. HTTP suite gồm owner isolation thực giữa hai tài khoản, stale/single-use proposal, delayed review, conflict scan/start rejection, scenario không persist, bounded NLP, CSRF cookie session không trả token và admin lock/revoke.
 
-Chạy toàn bộ checks bằng `scripts/Test-BeforeMerge.ps1 -RequireSqlServer` khi API cùng configuration đã dừng. Test SQL không skip trong lần xác minh trên. AI provider thật chưa được gọi vì chưa có API key/model của người dùng; fallback rules đã kiểm thử. Mailpit và Gmail SMTP thật đã kiểm tra; Gmail Inbox/Spam nhận thư và CI/deployment ngoài máy này chưa được kiểm tra. Xem [phân tích lỗi và bản sửa](../reviews/SYSTEM_REVIEW.md).
+Chạy toàn bộ checks bằng `scripts/Test-BeforeMerge.ps1 -RequireSqlServer` khi API cùng configuration đã dừng. Test SQL không skip trong lần xác minh trên. AI provider thật chưa được gọi vì chưa có API key/model của người dùng; fallback rules đã kiểm thử. Mailpit và Gmail SMTP thật đã kiểm tra; Gmail Inbox/Spam nhận thư và CI/deployment ngoài máy này chưa được kiểm tra.
 
 ## Lịch sử xác minh nền tảng Authentication — 03/10/2026
 

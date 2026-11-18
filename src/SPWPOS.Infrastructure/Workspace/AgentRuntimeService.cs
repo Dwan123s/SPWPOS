@@ -285,7 +285,7 @@ public sealed partial class WorkspaceService
                     Require(readObserved, "ANSWER_NOT_GROUNDED", "Đọc dữ liệu thật bằng công cụ trước khi trả lời.");
                     Require(calendarObserved || !(ScheduleOverviewRequested(source) || ChatMatch(source,
                         @"\b(?:gio ranh|gio trong|khoang ranh|khoang trong|phan tich lich|danh gia lich|nhan xet lich)\b").Success),
-                        "CALENDAR_NOT_OBSERVED", "Cần đọc lịch thật trong phạm vi yêu cầu trước khi kết luận về lịch hoặc giờ rảnh.");
+                        "CALENDAR_NOT_OBSERVED", "Cần đọc lịch thật trong phạm vi yêu cầu trước khi kết luận về lịch hoặc Thời Gian Làm Việc.");
                     return new("TERMINAL", new NoraTerminal("ANSWER", verifiedReply ?? AgentExplanation(Text(args, "reply", 4000))));
                 case "ask_user":
                 {

@@ -24,21 +24,21 @@ public sealed class EisenhowerTests
         Assert.Equal(first, Assert.Single(engine.AssessEisenhower(state, Now)) with { ReasonCodes = first.ReasonCodes });
         Assert.Equal(before, System.Text.Json.JsonSerializer.Serialize(state));
     }
-    [Fact] public void Missing_schedule_or_importance_and_far_deadlines_remain_unknown()
+    [Fact] public void Deadline_establishes_urgency_without_a_schedule_and_importance_stays_explicit()
     {
         var t = Task();
         var result = Assert.Single(engine.AssessEisenhower(State(t) with { Events = [] }, Now));
-        Assert.Equal("Unknown", result.Urgency); Assert.Contains("SCHEDULE_REQUIRED", result.ReasonCodes);
+        Assert.Equal("NotUrgent", result.Urgency); Assert.Contains("SCHEDULE_REQUIRED", result.ReasonCodes);
         result = Assert.Single(engine.AssessEisenhower(State(Task("Unknown")), Now)); Assert.Equal("Unknown", result.Quadrant);
         result = Assert.Single(engine.AssessEisenhower(State(Task(hours: 800)), Now)); Assert.Contains("OUTSIDE_HORIZON", result.ReasonCodes);
     }
-    [Fact] public void Same_deadline_can_be_safe_or_urgent_for_different_schedules()
+    [Fact] public void Same_deadline_has_the_same_urgency_while_capacity_risk_is_separate()
     {
         var task = Task(hours: 48, minutes: 180);
         var rich = Assert.Single(engine.AssessEisenhower(State(task), Now));
         var tight = State(task) with { Availability = [new WeeklyAvailability { DayOfWeek = 1, StartMinute = 480, EndMinute = 660 }] };
         var constrained = Assert.Single(engine.AssessEisenhower(tight, Now));
-        Assert.Equal("Q2", rich.Quadrant); Assert.Equal("Q1", constrained.Quadrant); Assert.True(constrained.AtRisk);
+        Assert.Equal("Q2", rich.Quadrant); Assert.Equal("Q2", constrained.Quadrant); Assert.True(constrained.AtRisk);
     }
     [Fact] public void Competing_tasks_cannot_each_claim_the_same_capacity_and_containers_are_not_counted_twice()
     {

@@ -17,7 +17,7 @@ public sealed class EisenhowerBoardTests
         await using var scope = h.Provider.CreateAsyncScope(); return await action(scope.ServiceProvider.GetRequiredService<IWorkspaceService>());
     }
     private static Task<Guid> Add(ServiceHarness h, Guid uid, string name = "Report", string quadrant = "Q2", int minutes = 60) =>
-        Board(h, s => s.SaveMatrixTaskAsync(uid, null, new(name, "Đọc tài liệu và viết kết quả.", h.Clock.GetUtcNow().AddDays(5), minutes, quadrant,
+        Board(h, s => s.SaveMatrixTaskAsync(uid, null, new(name, "Đọc tài liệu và viết kết quả.", h.Clock.GetUtcNow().AddHours(quadrant is "Q1" or "Q3" ? 12 : 120), minutes, quadrant,
             Checklist: [new(Guid.NewGuid(), "Đọc tài liệu"), new(Guid.NewGuid(), "Viết bản nháp")]), Ct));
     private static Task<EisenhowerView> View(ServiceHarness h, Guid uid) => Board(h, s => s.GetEisenhowerAsync(uid, Ct));
 
@@ -25,7 +25,7 @@ public sealed class EisenhowerBoardTests
     {
         await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync();
         var id = await Add(h, user.Id); var row = Assert.Single((await View(h, user.Id)).Tasks);
-        Assert.Equal(id, row.Id); Assert.Equal("Q2", row.Quadrant); Assert.Equal("User", row.UrgencySource);
+        Assert.Equal(id, row.Id); Assert.Equal("Q2", row.Quadrant); Assert.Equal("Auto", row.UrgencySource);
         Assert.Equal("SuggestSchedule", row.Recommendation); Assert.Equal(2, row.Checklist!.Length);
         Assert.All(row.Checklist, i => Assert.False(i.Completed)); Assert.NotEqual(Guid.Empty, row.Version);
         Assert.Equal(0, await h.DbAsync(db => db.WorkSessions.CountAsync(Ct)));
@@ -42,7 +42,9 @@ public sealed class EisenhowerBoardTests
     public async Task Dragging_saves_user_quadrant_and_never_changes_deadline_or_calendar(string quadrant, string importance, string urgency)
     {
         await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync();
-        var id = await Add(h, user.Id); var first = await View(h, user.Id); var original = first.Tasks.Single();
+        var id = await Add(h, user.Id);
+        if (urgency == "Urgent") h.Clock.Advance(TimeSpan.FromHours(108));
+        var first = await View(h, user.Id); var original = first.Tasks.Single();
         var savedSession = new WorkSession { UserId = user.Id, TaskId = id, Start = h.Clock.GetUtcNow().AddHours(2), End = h.Clock.GetUtcNow().AddHours(3) };
         await h.DbAsync(async db => { db.WorkSessions.Add(savedSession); await db.SaveChangesAsync(Ct); });
         await Board(h, s => s.MoveMatrixTaskAsync(user.Id, id, new(original.Version, first.Revision, quadrant), Ct));
@@ -65,9 +67,9 @@ public sealed class EisenhowerBoardTests
             new(row.Version, view.Revision, "Q1"), Ct)))).Code);
         var current = next.Tasks.Single(t => t.Id == second);
         Assert.Equal("MATRIX_STALE", (await Assert.ThrowsAsync<AuthException>(() => Board(h, s => s.MoveMatrixTaskAsync(user.Id, second,
-            new(current.Version, view.Revision, "Q1"), Ct)))).Code);
+            new(current.Version, view.Revision, "Q2"), Ct)))).Code);
         Assert.Equal("MATRIX_STALE", (await Assert.ThrowsAsync<AuthException>(() => Board(h, s => s.MoveMatrixTaskAsync(user.Id, second,
-            new(current.Version, next.Revision, "Q1", Guid.NewGuid()), Ct)))).Code);
+            new(current.Version, next.Revision, "Q2", Guid.NewGuid()), Ct)))).Code);
         Assert.Equal("Q2", (await View(h, user.Id)).Tasks.Single(t => t.Id == second).Quadrant);
         var foreign = new ApplicationUser { Id = Guid.NewGuid(), UserName = "other", NormalizedUserName = "OTHER", Email = "other@example.com", NormalizedEmail = "OTHER@EXAMPLE.COM", EmailConfirmed = true, IsActive = true };
         await h.DbAsync(async db => { db.Users.Add(foreign); await db.SaveChangesAsync(Ct); });
@@ -91,12 +93,12 @@ public sealed class EisenhowerBoardTests
             new(next.Version, [reversed[0], reversed[0]]), Ct)))).Code);
     }
 
-    [Fact] public async Task Manual_nonurgent_does_not_hide_overdue_warning_and_can_return_to_automatic_urgency()
+    [Fact] public async Task Overdue_work_automatically_becomes_urgent_without_a_manual_override()
     {
         await using var h = await ServiceHarness.CreateAsync(); var user = await h.RegisterAsync(); var id = await Add(h, user.Id, quadrant: "Q4");
         h.Clock.Advance(TimeSpan.FromDays(6));
         var view = await View(h, user.Id); var row = view.Tasks.Single();
-        Assert.Equal("Q4", row.Quadrant); Assert.True(row.Overdue); Assert.True(row.AtRisk); Assert.Contains("OVERDUE", row.ReasonCodes);
+        Assert.Equal("Q3", row.Quadrant); Assert.True(row.Overdue); Assert.True(row.AtRisk); Assert.Contains("OVERDUE", row.ReasonCodes);
         await Board(h, s => s.MoveMatrixTaskAsync(user.Id, id, new(row.Version, view.Revision, "Auto"), Ct));
         var auto = (await View(h, user.Id)).Tasks.Single();
         Assert.Equal("Q3", auto.Quadrant); Assert.Equal("Auto", auto.UrgencySource); Assert.True(auto.Overdue);

@@ -148,7 +148,7 @@ public sealed partial class AgentFreeTimeTests
         var ai = ReviewAi(); await using var h = await Harness(ai); var user = await h.RegisterAsync(); await Setup(h, user.Id);
         await h.DbAsync(async db => { db.WeeklyAvailability.RemoveRange(await db.WeeklyAvailability.ToArrayAsync(Ct)); await db.SaveChangesAsync(Ct); });
         var result = await Send(h, user.Id, "Phân tích lịch ngày mai.");
-        Assert.Contains("Chưa có giờ rảnh phù hợp", result.Reply); Assert.Contains("0 phút trống", result.Reply);
+        Assert.Contains("Chưa có Thời Gian Làm Việc phù hợp", result.Reply); Assert.Contains("0 phút trống", result.Reply);
     }
 
     [Fact]

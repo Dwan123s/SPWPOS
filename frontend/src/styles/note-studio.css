@@ -464,6 +464,29 @@
   margin: 12px 0;
   border-radius: 12px;
 }
+.note-analysis-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e3bac0;
+  border-radius: 8px;
+  background: #fff6f7;
+  color: #842d3a;
+}
+.note-analysis-alert p { margin: 0; }
+.note-analysis-alert button { flex-shrink: 0; }
+.note-analysis-alert:focus-visible { outline: 2px solid currentColor; }
+.note-review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .note-review-header {
   display: flex;
   gap: 16px;
@@ -1100,14 +1123,14 @@
 }
 
 @media (max-width: 800px) {
-  .note-studio .note-review-header > .btn {
+  .note-studio .note-review-actions > button {
     width: 42px;
     min-width: 42px;
     height: 42px;
     flex: 0 0 auto;
     padding: 10px;
   }
-  .note-studio .note-review-header > .btn > span {
+  .note-studio .note-review-actions > button > span {
     display: none;
   }
 }

@@ -139,7 +139,7 @@ public sealed partial class NoraAgentRuntimeTests
         if (withImage) Assert.Contains("Giờ làm việc theo thời khóa biểu đã được tính", turn.Reply);
         else
         {
-            Assert.Contains("Giờ rảnh đề xuất:", turn.Reply);
+            Assert.Contains("Thời Gian Làm Việc đề xuất:", turn.Reply);
             Assert.Contains("bữa trưa/tối 30 phút", turn.Reply);
         }
         Assert.Equal(withImage ? 1 : 0, await h.DbAsync(db => db.AvailabilityPolicies.CountAsync(Ct)));
@@ -592,7 +592,7 @@ public sealed partial class NoraAgentRuntimeTests
             await Setup(h, user.Id);
             return Call("finish_answer", new { reply = "Câu trả lời cũ" }, n);
         };
-        var failure = await Assert.ThrowsAsync<AuthException>(() => Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), "Xem giờ rảnh"), Ct)));
+        var failure = await Assert.ThrowsAsync<AuthException>(() => Agent(h, s => s.SendAgentTurnAsync(user.Id, new(Guid.NewGuid(), Guid.NewGuid(), "Xem Thời Gian Làm Việc"), Ct)));
         Assert.Equal("AGENT_STALE", failure.Code);
         Assert.Equal("FAILED", (await h.DbAsync(db => db.AgentRuns.SingleAsync(Ct))).Status);
         Assert.Equal(0, await h.DbAsync(db => db.WorkTasks.CountAsync(Ct)));

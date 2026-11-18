@@ -50,26 +50,28 @@ public sealed partial class PlanningEngine
             }
             if (blocked) reasons.Add("DEPENDENCY_PENDING");
             if (importance == "Unknown") reasons.Add("IMPORTANCE_UNKNOWN");
-            var manualUrgency = task.UrgencyOverride is "Urgent" or "NotUrgent";
-            if (manualUrgency) { urgency = task.UrgencyOverride; reasons.Add("USER_URGENCY"); }
-            var quadrant = importance == "Unknown" || urgency == "Unknown" ? "Unknown" :
-                importance == "Important" ? urgency == "Urgent" ? "Q1" : "Q2" : urgency == "Urgent" ? "Q3" : "Q4";
-            var explanation = reasons.Contains("OVERDUE") ? "Đã quá hạn và còn công việc cần xử lý."
-                : reasons.Contains("SCHEDULE_REQUIRED") ? "Cần thời khóa biểu và giờ có thể làm việc đã xác nhận cho khoảng ngày này để đánh giá độ gấp."
-                : outside ? "Deadline nằm ngoài phạm vi đánh giá 30 ngày."
-                : atRisk ? "Quỹ thời gian hoặc phương án hiện tại chưa đáp ứng đầy đủ công việc trước hạn."
-                : reasons.Contains("LOW_BUFFER") ? "Quỹ thời gian trước hạn còn ít dự phòng cho các việc đang cạnh tranh."
-                : reasons.Contains("DUE_WITHIN_24H") ? "Deadline trong 24 giờ tới."
-                : manualUrgency && urgency == "Urgent" ? "Bạn chọn ưu tiên khẩn cấp."
-                : "Còn quỹ thời gian và dự phòng trước hạn; nên chủ động sắp xếp sớm.";
+            urgency = EisenhowerPriority.Urgency(task.Deadline, now);
+            if (urgency == "Urgent" && !overdue && !reasons.Contains("DUE_WITHIN_24H")) reasons.Add("DUE_WITHIN_24H");
+            var quadrant = EisenhowerPriority.Quadrant(importance, urgency);
+            var explanation = EisenhowerPriority.Describe(importance, task.Deadline, now).Explanation;
+            if (atRisk && !overdue) explanation += " Có nguy cơ thiếu thời gian làm việc trước hạn.";
+            if (reasons.Contains("SCHEDULE_REQUIRED")) explanation += " Bổ sung giờ làm việc để kiểm tra khả năng hoàn thành.";
             if (importance == "Unknown") explanation += " Chưa đủ căn cứ xác định mức quan trọng.";
-            if (manualUrgency) explanation += " Độ khẩn cấp do bạn chọn; cảnh báo deadline và thiếu giờ vẫn được giữ.";
             return new EisenhowerTaskView(task.Id, task.Name, task.Deadline, importance, urgency, quadrant, explanation,
                 reasons.ToArray(), remaining, available, atRisk, overdue, blocked, quadrant == "Unknown",
-                Version: task.Version, Order: task.MatrixOrder, UrgencySource: manualUrgency ? "User" : "Auto",
+                Version: task.Version, Order: task.MatrixOrder, UrgencySource: "Auto",
                 Recommendation: quadrant is "Q1" or "Q2" ? "SuggestSchedule" : quadrant == "Q3" ? remaining <= 15 ? "QuickAction" : "OnDemand" : quadrant == "Q4" ? "Backlog" : "Clarify",
                 Description: task.Description, EstimatedMinutes: task.EstimatedMinutes, Progress: task.Progress, CanEdit: true, Splittable: task.CanSplit,
                 RequiresContinuousSession: task.RequiresContinuousSession);
-        }).OrderBy(t => t.Order).ThenBy(t => t.Deadline).ThenBy(t => t.Id).ToArray();
+        }).Concat(state.Tasks.Where(task => !task.HasPlanningDetails && !task.IsDeleted &&
+            task.Status is not WorkTaskStatus.Completed and not WorkTaskStatus.Cancelled &&
+            !state.Tasks.Any(child => !child.IsDeleted && child.ParentId == task.Id)).Select(task => {
+                var priority = EisenhowerPriority.Describe(task.EffectiveImportance, task.Deadline, now);
+                return new EisenhowerTaskView(task.Id, task.Name, task.Deadline, priority.Importance, priority.Urgency, priority.Quadrant,
+                    priority.Explanation + " Bổ sung hạn chót và thời lượng để xếp lịch.", ["PLANNING_DETAILS_REQUIRED"], 0, null,
+                    false, task.Deadline <= now, false, true, Version: task.Version, Order: task.MatrixOrder,
+                    Description: task.Description, EstimatedMinutes: task.EstimatedMinutes, Progress: task.Progress,
+                    CanEdit: true, Splittable: task.CanSplit, RequiresContinuousSession: task.RequiresContinuousSession);
+            })).OrderBy(t => t.Order).ThenBy(t => t.Deadline).ThenBy(t => t.Id).ToArray();
     }
 }

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using SPWPOS.Application.Workspace;
 using SPWPOS.Domain.Entities;
+using SPWPOS.Infrastructure.Commerce;
+using SPWPOS.Infrastructure.Persistence;
 namespace SPWPOS.Infrastructure.Workspace;
 
 public sealed partial class WorkspaceService
@@ -19,12 +21,17 @@ public sealed partial class WorkspaceService
 
     public Task ReviewTeamJoinRequestAsync(Guid uid, Guid teamId, Guid memberId, TeamJoinReviewInput input, CancellationToken ct) => Mutate(uid, async () =>
     {
+        await AccountTransaction.LockTeamAsync(db, teamId, ct);
         var leader = await TeamMember(uid, teamId, ct, true);
         var request = await db.TeamMemberships.SingleOrDefaultAsync(x => x.TeamId == teamId && x.UserId == memberId, ct);
         Require(request != null && !request.Active && request.ApprovalStatus == "Pending" && request.Version == input.Version,
             "JOIN_REQUEST_STALE", "Yêu cầu đã được xử lý hoặc thay đổi. Hãy tải lại nhóm.", 409);
         if (input.Approved)
         {
+            var plan = await TeamPlans.CurrentAsync(db, teamId, Now, ct);
+            if (plan.MemberLimit is int limit)
+                Require(await db.TeamMemberships.CountAsync(x => x.TeamId == teamId && x.Active, ct) < limit,
+                    "TEAM_MEMBER_LIMIT", $"Nhóm đã đạt giới hạn {limit} thành viên. Hãy nâng cấp gói hoặc giải phóng một chỗ trước khi duyệt.", 409);
             Require(await db.Users.AnyAsync(x => x.Id == memberId && x.IsActive && x.EmailConfirmed, ct),
                 "MEMBER_UNAVAILABLE", "Tài khoản này không còn khả dụng.", 409);
             Require(await db.TeamInvites.AnyAsync(x => x.Id == request.JoinInviteId && x.TeamId == teamId && !x.Revoked && x.ExpiresAt > Now, ct),

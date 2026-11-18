@@ -39,6 +39,9 @@ public sealed class TeamProject
     public string Name { get; set; } = "";
     public Guid CreatorId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public bool RequireCompletionReportUrl { get; set; }
+    public bool NotifyLeaderOnCompletionSubmission { get; set; } = true;
+    public Guid CompletionPolicyVersion { get; set; }
 }
 public sealed class TeamMembership
 {
@@ -75,6 +78,9 @@ public sealed class TeamTask : ITaskImportance
     public Guid? SourceDocumentId { get; set; }
     public Guid? ParentTaskId { get; set; }
     public Guid? DesignatedUserId { get; set; }
+    public Guid? AvailabilityCheckUserId { get; set; }
+    public Guid? AvailabilityCheckVersion { get; set; }
+    public bool? AvailabilityCheckCanTake { get; set; }
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public int EstimatedMinutes { get; set; }
@@ -121,6 +127,7 @@ public sealed class TeamCompletionSubmission
     public Guid TeamTaskId { get; set; }
     public Guid UserId { get; set; }
     public string Note { get; set; } = "";
+    public string? ReportUrl { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
 public sealed class TeamCompletionFile

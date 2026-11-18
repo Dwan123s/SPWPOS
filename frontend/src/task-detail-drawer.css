@@ -74,6 +74,55 @@
   min-height: 0;
 }
 
+.task-priority-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-block: 4px;
+}
+
+.task-priority-indicators > * {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ui-subtle, #edf3fb);
+  color: var(--ui-ink, #102642);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.task-priority-indicators .icon { width: 13px; height: 13px; }
+.task-priority-indicators button:hover { text-decoration: underline; }
+.task-priority-indicators [data-tone="important"] { color: #195fbf; background: #e6f0ff; }
+.task-priority-indicators [data-tone="late"] { color: #a62d35; background: #fff1f1; }
+.task-priority-indicators [data-tone="risk"] { color: #835019; background: #fff3e2; }
+.task-priority-indicators [data-tone="ready"] { color: #22644f; background: #e9f5ef; }
+
+.task-execution,
+.task-plan-in-drawer {
+  display: grid;
+  gap: 8px;
+  margin-block: 8px 16px;
+  padding: 12px;
+  border: 1px solid var(--ui-line, #d7e4f2);
+  border-radius: 10px;
+  background: var(--ui-glass, #f7fbff);
+}
+
+.task-execution h3,
+.task-plan-in-drawer h3,
+.task-execution p,
+.task-plan-in-drawer p { margin: 0; }
+.task-plan-changes ul { margin: 4px 0 0; padding-inline-start: 20px; }
+.task-plan-shortfall { color: #835019; }
+.task-execution-facts { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0; }
+.task-execution-facts dt { color: var(--ui-muted, #465c76); font-size: 12px; }
+.task-execution-facts dd { margin: 0; }
+
 .task-drawer-tabs {
   display: flex;
   overflow-x: auto;
@@ -187,14 +236,19 @@
   background: #f5f8fc;
 }
 
-.task-drawer-source-link {
+.task-drawer-source-file {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  color: #155d9e;
+  font-size: 13px;
   overflow-wrap: anywhere;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+}
+
+.task-drawer-source-file > span {
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .task-drawer-source-attach {

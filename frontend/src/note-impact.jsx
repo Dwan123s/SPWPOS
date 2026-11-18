@@ -97,7 +97,7 @@ export function NoteImpact({
     content = (
       <>
         <p>
-          Chưa có giờ rảnh để kiểm tra khả năng nhận thêm việc. Chọn giờ bạn có
+          Chưa có Thời Gian Làm Việc để kiểm tra khả năng nhận thêm việc. Chọn giờ bạn có
           thể làm; các việc đang chỉnh sửa sẽ được giữ nguyên.
         </p>
         <button
@@ -105,7 +105,7 @@ export function NoteImpact({
           className="btn secondary small"
           onClick={onSetTime}
         >
-          Chọn giờ rảnh để kiểm tra
+          Chọn Thời Gian Làm Việc để kiểm tra
         </button>
       </>
     );
@@ -229,7 +229,7 @@ function ImpactResult({ result, horizonDays }) {
         lượng cá nhân.
       </p>
       <details className="note-impact-comparison">
-        <summary>So sánh khối lượng và giờ rảnh</summary>
+        <summary>So sánh khối lượng và Thời Gian Làm Việc</summary>
         <div className="note-impact-stats">
           <div>
             <span>Việc đến hạn hiện tại</span>
@@ -290,8 +290,8 @@ function ImpactResult({ result, horizonDays }) {
       <p className="reason spaced">
         {needsReview
           ? outsideHorizon
-            ? "Tăng số ngày xếp lịch để kiểm tra các hạn chót xa hơn. Với việc đang có cảnh báo, thử giảm số việc nhận, bổ sung giờ rảnh hoặc điều chỉnh hạn chót."
-            : "Thử giảm số việc nhận, bổ sung giờ rảnh hoặc điều chỉnh thời lượng và hạn chót, rồi xem kết quả kiểm tra cập nhật."
+            ? "Tăng số ngày xếp lịch để kiểm tra các hạn chót xa hơn. Với việc đang có cảnh báo, thử giảm số việc nhận, bổ sung Thời Gian Làm Việc hoặc điều chỉnh hạn chót."
+            : "Thử giảm số việc nhận, bổ sung Thời Gian Làm Việc hoặc điều chỉnh thời lượng và hạn chót, rồi xem kết quả kiểm tra cập nhật."
           : "Bạn có thể tạo công việc và xem lịch đề xuất trước khi quyết định lưu."}
       </p>
     </div>

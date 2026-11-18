@@ -28,6 +28,7 @@ public sealed class PayOsGateway(HttpClient http, IOptions<PayOsOptions> options
             using var response = await http.SendAsync(request, ct);
             if (response.StatusCode == HttpStatusCode.NotFound) return null;
             using var json = await ReadAsync(response, ct);
+            if (json.RootElement.GetProperty("code").GetString() == "101") return null;
             CheckSuccess(json);
             return PayOsPaymentSignatures.VerifyPaymentInformation(json.RootElement, options.Value.ChecksumKey)
                 ?? throw new AuthException("PAYMENT_SIGNATURE_INVALID", "Không xác minh được trạng thái từ payOS. Hãy thử kiểm tra lại.", 502);
@@ -35,15 +36,16 @@ public sealed class PayOsGateway(HttpClient http, IOptions<PayOsOptions> options
         catch (Exception error) when (!ct.IsCancellationRequested && error is HttpRequestException or TaskCanceledException)
         { throw new AuthException("PAYMENT_PROVIDER_UNAVAILABLE", "Chưa đối soát được với payOS. Không cần thanh toán lại; hãy kiểm tra lại sau.", 503); }
     }
-    public async Task<PayOsLink> CreateAsync(long orderCode, int amount, DateTimeOffset expiresAt, CancellationToken ct)
+    public async Task<PayOsLink> CreateAsync(long orderCode, int amount, DateTimeOffset expiresAt, CancellationToken ct, PayOsPremiumProduct? premiumProduct = null)
     {
         var config = options.Value;
-        var cancel = new Uri(new Uri(config.PublicBaseUrl), "/?payment=cancelled");
-        var success = new Uri(config.CheckoutReturnUrl);
-        var description = "ML" + (orderCode % 10000000).ToString("D7", System.Globalization.CultureInfo.InvariantCulture);
+        var cancel = new Uri(new Uri(config.PublicBaseUrl), premiumProduct is null ? "/?payment=cancelled" : "/?premiumPayment=cancelled");
+        var success = premiumProduct is null ? new Uri(config.CheckoutReturnUrl) : new Uri(new Uri(config.PublicBaseUrl), "/?premiumPayment=returned");
+        var prefix = premiumProduct is null ? "ML" : "PR";
+        var description = prefix + (orderCode % 10000000).ToString("D7", System.Globalization.CultureInfo.InvariantCulture);
         using var request = Request(HttpMethod.Post, "/v2/payment-requests");
         request.Content = JsonContent.Create(new { orderCode, amount, description,
-            items = new[] { new { name = "MILO fox skin", quantity = 1, price = amount } },
+            items = new[] { new { name = premiumProduct?.Name ?? "MILO fox skin", quantity = 1, price = amount } },
             cancelUrl = cancel.AbsoluteUri, returnUrl = success.AbsoluteUri, expiredAt = expiresAt.ToUnixTimeSeconds(),
             signature = PayOsPaymentSignatures.SignCheckout(orderCode, amount, description, cancel, success, config.ChecksumKey) });
         using var response = await http.SendAsync(request, ct);

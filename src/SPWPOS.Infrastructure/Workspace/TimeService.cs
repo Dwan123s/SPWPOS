@@ -12,7 +12,7 @@ public sealed partial class WorkspaceService
         foreach (var group in slots.GroupBy(x => x.DayOfWeek))
         {
             var ordered = group.OrderBy(x => x.StartMinute).ToArray();
-            Require(!ordered.Zip(ordered.Skip(1)).Any(x => x.First.EndMinute > x.Second.StartMinute), "AVAILABILITY_OVERLAP", "Các khoảng thời gian rảnh không được trùng nhau.");
+            Require(!ordered.Zip(ordered.Skip(1)).Any(x => x.First.EndMinute > x.Second.StartMinute), "AVAILABILITY_OVERLAP", "Các khoảng Thời Gian Làm Việc không được trùng nhau.");
         }
     }
 
@@ -241,7 +241,7 @@ public sealed partial class WorkspaceService
         foreach (var session in state.Sessions.Where(x => x.Start >= Now && x.Status == WorkSessionStatus.Scheduled && x.IsLocked))
         {
             var free = engine.FreeSlots(state, session.Start, session.End);
-            Require(free.Any(x => x.Start <= session.Start && x.End >= session.End), "LOCKED_SESSION_CONFLICT", "Thay đổi thời gian rảnh xung đột với phiên đã khóa.", 409);
+            Require(free.Any(x => x.Start <= session.Start && x.End >= session.End), "LOCKED_SESSION_CONFLICT", "Thay đổi Thời Gian Làm Việc xung đột với phiên đã khóa.", 409);
             var task = state.Tasks.Single(x => x.Id == session.TaskId);
             Require((session.End - session.Start).TotalMinutes >= Math.Max(task.MinimumSessionMinutes, state.Preference.MinimumSessionMinutes) &&
                 (session.End - session.Start).TotalMinutes <= state.Preference.MaximumSessionMinutes, "LOCKED_SESSION_CONFLICT", "Giới hạn phiên mới xung đột với phiên đã khóa.", 409);

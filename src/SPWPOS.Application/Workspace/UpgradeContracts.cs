@@ -10,14 +10,16 @@ public sealed record SkinInput([Required, StringLength(40)] string Code);
 public sealed record CatchUpInput([Required, RegularExpression("^(COMPLETED|PARTIAL|MISSED)$")] string Outcome,
     [Range(0, 100)] int? Progress = null, [Range(0, 10080)] int? ActualMinutes = null);
 public sealed record CatchUpResult(Guid SessionId, string Status, Guid? ReplacementSessionId, string Message);
-public sealed record WorkTimeReview(Guid SessionId, Guid TaskId, string TaskName, DateTimeOffset Start, DateTimeOffset End, long ActualSeconds, bool TeamTask);
+public sealed record WorkTimeReview(Guid SessionId, Guid TaskId, string TaskName, DateTimeOffset Start, DateTimeOffset End,
+    long ActualSeconds, bool TeamTask, bool TeamReportUrlRequired = false);
 public sealed record ExtraTimeInput([Range(5,480)] int Minutes);
 public sealed record ExtraTimeSlot(Guid Id, DateTimeOffset Start, DateTimeOffset End);
 public sealed record ExtraTimePreview(Guid Id, Guid Revision, Guid SessionId, string TaskName, int Minutes, ExtraTimeSlot[] Slots, string Message, bool Feasible);
 public sealed record ExtraTimeConfirm(Guid Revision);
 public sealed record WorkTimeResult(string Message, Guid[] SessionIds);
+public sealed record FinishWorkTaskInput([StringLength(2048)] string? ReportUrl = null);
 public sealed record SessionOutcomeInput([Required] string Outcome,
-    [Range(0, 10080)] int? ActualMinutes = null, [Range(1, 43200)] int? RemainingMinutes = null);
+    [Range(0, 10080)] int? ActualMinutes = null, [Range(1, 43200)] int? RemainingMinutes = null, bool EndNow = false);
 public sealed record SessionOutcomeResult(Guid SessionId, Guid TaskId, string Outcome, long ActualSeconds, int? RemainingMinutes);
 public sealed record AdminMetrics(int Users, int ActiveUsersToday, int CompletedSessions, long? InputTokens, long? OutputTokens,
     long FailedJobs, long ProcessMemoryBytes, double ProcessCpuMilliseconds, DateTimeOffset AsOf);

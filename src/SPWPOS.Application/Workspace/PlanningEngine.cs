@@ -166,20 +166,32 @@ public sealed partial class PlanningEngine
         var warnings = new List<PlanWarning>();
         var important = state.EisenhowerScheduling ? state.Tasks.Where(t => t.EffectiveImportance == "Important").Select(t => t.Id).ToHashSet() : [];
         if (important.Count > 0) IncludePrerequisites(state, important);
+        var ranks = state.Tasks.ToDictionary(t => t.Id, t => EisenhowerPriority.Rank(
+            EisenhowerPriority.Quadrant(t.EffectiveImportance, EisenhowerPriority.Urgency(t.Deadline, now))));
+        if (state.EisenhowerScheduling)
+            for (var pass = 0; pass < state.Tasks.Length; pass++)
+            {
+                var changed = false;
+                foreach (var dependency in state.Dependencies)
+                    if (ranks.TryGetValue(dependency.TaskId, out var rank) && ranks.TryGetValue(dependency.PredecessorId, out var predecessorRank) && predecessorRank > rank)
+                    { ranks[dependency.PredecessorId] = rank; changed = true; }
+                if (!changed) break;
+            }
         while (tasks.Count > 0)
         {
             var task = tasks.Values.Where(t => state.Dependencies.Where(d => d.TaskId == t.Id).All(d => done.ContainsKey(d.PredecessorId)))
                 .OrderByDescending(t => promoted?.Contains(t.Id) == true)
                 .ThenByDescending(t => urgentFirst && urgency?.RequestedUrgentTaskIds?.Contains(t.Id) == true)
-                .ThenByDescending(t => urgentFirst && t.Priority == 4)
-                .ThenByDescending(t => important.Contains(t.Id))
-                .ThenBy(t => t.Deadline).ThenByDescending(t => t.Priority).ThenBy(t => t.Id).FirstOrDefault();
+                .ThenByDescending(t => !state.EisenhowerScheduling && urgentFirst && t.Priority == 4)
+                .ThenBy(t => state.EisenhowerScheduling ? ranks.GetValueOrDefault(t.Id, 4) : 0)
+                .ThenBy(t => t.Deadline).ThenByDescending(t => !state.EisenhowerScheduling ? t.Priority : 0).ThenBy(t => t.Id).FirstOrDefault();
             if (task is null)
             {
                 foreach (var blocked in tasks.Values) warnings.Add(new(blocked.Id, blocked.Name, "DEPENDENCY_UNSCHEDULED", "Công việc phụ thuộc chưa có phương án hoàn thành.", Remaining(blocked, bias)));
                 break;
             }
             tasks.Remove(task.Id);
+            var urgentTask = state.EisenhowerScheduling ? EisenhowerPriority.Urgency(task.Deadline, now) == "Urgent" : task.Priority == 4;
             var earliest = state.Dependencies.Where(d => d.TaskId == task.Id).Select(d => done[d.PredecessorId]).DefaultIfEmpty(start).Max();
             var remaining = Math.Max(0, Remaining(task, bias) - (int)preserve.Where(x => x.TaskId == task.Id).Sum(x => (x.End - x.Start).TotalMinutes));
             // A minimum session preference must never manufacture extra work.
@@ -198,7 +210,7 @@ public sealed partial class PlanningEngine
             // Prefer the configured productive hours across the horizon. Fall back to
             // other available hours so soft preferences never block a hard deadline.
             var choices = preferredWindows.Concat(task.CanSplit ? free.SelectMany(slot => Subtract(slot, preferredWindows)) : free).ToArray();
-            var strictDeadline = task.IsHardDeadline || task.Priority == 4 || urgency?.Displaced.ContainsKey(task.Id) == true ||
+            var strictDeadline = task.IsHardDeadline || urgentTask || urgency?.Displaced.ContainsKey(task.Id) == true ||
                 urgency?.ProtectedTaskIds?.Contains(task.Id) == true;
             var deadline = task.Deadline!.Value;
             var candidates = choices.Select(x => new TimeSlot(x.Start, x.End < deadline ? x.End : deadline)).Where(x => x.End > x.Start)
@@ -214,7 +226,7 @@ public sealed partial class PlanningEngine
             // ordinary work without overriding that higher-priority constraint.
             var orderedCandidates = urgency?.Displaced.ContainsKey(task.Id) == true
                 ? candidates
-                : task.Priority == 4
+                : urgentTask
                 ? candidates.OrderBy(window => Day(window.Start > earliest ? window.Start : earliest))
                 : candidates.OrderBy(window => Day(window.Start > earliest ? window.Start : earliest))
                     .ThenBy(window => ScoreCandidate(task, window, remaining, state.Preference, earliest,
@@ -240,7 +252,7 @@ public sealed partial class PlanningEngine
                         if (duration <= 0 || remaining > duration && duration < minimum) break;
                         var reason = urgency?.Displaced.TryGetValue(task.Id, out var moved) == true
                             ? moved.NearDeadline ? "URGENT_NEAR_DEADLINE_MOVE" : "URGENT_FLEXIBLE_MOVE"
-                            : task.Priority == 4 ? "URGENT_TASK_FIRST" : "DEADLINE_PRIORITY_CAPACITY";
+                            : urgentTask ? "URGENT_TASK_FIRST" : "DEADLINE_PRIORITY_CAPACITY";
                         tentative.Add(new(Guid.NewGuid(), task.Id, cursor, cursor.AddMinutes(duration), reason, false));
                         remaining -= duration; budget -= duration; cursor = cursor.AddMinutes(duration + state.Preference.BreakMinutes);
                         if (!task.CanSplit) break;
@@ -255,7 +267,7 @@ public sealed partial class PlanningEngine
                 // Partial sessions are useful, but do not satisfy dependencies until the whole task fits.
                 warnings.Add(new(task.Id, task.Name, task.Deadline <= start ? "DEADLINE_PASSED" : task.RequiresContinuousSession ? "NO_CONTIGUOUS_SLOT" : "INSUFFICIENT_CAPACITY",
                     !task.CanSplit && task.Deadline > start
-                        ? $"Cần một khoảng liên tục đủ {remaining} phút và trong giới hạn thời lượng một phiên trước hạn chót; không thể ghép các khoảng rảnh rời nhau."
+                        ? $"Cần một khoảng liên tục đủ {remaining} phút và trong giới hạn thời lượng một phiên trước hạn chót; không thể ghép các khoảng Thời Gian Làm Việc rời nhau."
                         : "Không đủ thời gian phù hợp trước hạn chót; phần còn lại chưa được xếp lịch.", remaining));
             }
             schedule.AddRange(tentative); budgets = trialBudgets;

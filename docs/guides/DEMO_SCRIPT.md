@@ -210,7 +210,6 @@ Nếu khán giả hỏi vì sao chọn slot này, giải thích ngắn: lọc r�
 - Hôm nay → **Xem lịch đề xuất**, hoặc Lịch làm việc → **Lập kế hoạch**.
 - Hộp **Tạo kế hoạch mới** có thời điểm Bắt đầu, Số ngày và nút **Tạo đề xuất**.
 - Nhập việc → **Xem lịch đề xuất** cũng đi qua bộ lập lịch, nhưng ví dụ dưới đây tạo task thủ công để thể hiện rõ kết quả không phụ thuộc diễn giải của AI.
-- **Thử nhận thêm việc → Phân tích kịch bản** dùng cho phần so sánh trước/sau khi nhận thêm khối lượng.
 
 **Chuẩn bị dữ liệu:**
 
@@ -256,12 +255,6 @@ Không lưu A/B giúp tránh một phiên hiện có gây ảnh hưởng khi s�
 **Lời nói cho C:**
 
 > “Giờ làm việc ưa thích là mục tiêu mềm. Deadline cứng là ràng buộc bắt buộc. Dù người dùng thích làm buổi tối, hệ thống phải chọn một phương án còn kịp hạn, hoặc báo không thể xếp nếu không có khoảng phù hợp.”
-
-**Lượt D — Kiểm tra trước khi nhận thêm việc, nếu còn thời gian:**
-
-Mở **Thử nhận thêm việc**, nhập một công việc giả định 600 phút với deadline ngày mai 12:00 rồi bấm **Phân tích kịch bản**. Chỉ vùng **Trước và sau**, cảnh báo và **Xem lịch giả định**. Không bấm Tạo công việc từ kịch bản trong cảnh này. Với bộ dữ liệu chỉ có hai khoảng rảnh nêu trên, yêu cầu lớn này không có đủ thời gian; kết quả cần thể hiện thiếu hụt/cảnh báo, lịch thật vẫn giữ nguyên.
-
-> “Ngoài tạo một phương án, hệ thống hỗ trợ đánh giá tác động trước khi nhận thêm việc. Khi nhu cầu vượt khả năng thực hiện, người dùng thấy cảnh báo trước khi quyết định.”
 
 **Giải thích kỹ thuật khi hội đồng hỏi:**
 

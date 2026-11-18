@@ -36,6 +36,30 @@ public sealed partial class PrivateTeamPlanningTests
     private static async Task<T> Use<T>(ServiceHarness h, Func<IPrivateTeamService, Task<T>> action) { await using var scope = h.Provider.CreateAsyncScope(); return await action(scope.ServiceProvider.GetRequiredService<IPrivateTeamService>()); }
     private static Task Use(ServiceHarness h, Func<IPrivateTeamService, Task> action) => Use(h, async s => { await action(s); return true; });
     private static async Task<T> Workspace<T>(ServiceHarness h, Func<IWorkspaceService, Task<T>> action) { await using var scope = h.Provider.CreateAsyncScope(); return await action(scope.ServiceProvider.GetRequiredService<IWorkspaceService>()); }
+    [Fact]
+    public async Task Leader_can_extend_overdue_unclaimed_work_without_recreating_it()
+    {
+        await using var h = await Setup();
+        await h.DbAsync(async db =>
+        {
+            var task = await db.TeamTasks.SingleAsync(Ct);
+            task.Deadline = h.Clock.GetUtcNow().AddHours(-1);
+            await db.SaveChangesAsync(Ct);
+        });
+        var old = Assert.Single((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks);
+        Assert.Empty((await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct))).Options);
+        var input = new TeamTaskDeadlineInput(old.Version, Tomorrow.AddHours(5));
+        await Assert.ThrowsAsync<AuthException>(() => Use(h, s => s.ExtendTeamTaskDeadlineAsync(Member, TaskId, input, Ct)));
+        await Use(h, s => s.ExtendTeamTaskDeadlineAsync(Leader, TaskId, input, Ct));
+        await Use(h, s => s.ExtendTeamTaskDeadlineAsync(Leader, TaskId, input, Ct));
+        var updated = Assert.Single((await Use(h, s => s.GetTeamAsync(Leader, Team, Ct))).Tasks);
+        Assert.Equal(old.Id, updated.Id);
+        Assert.Equal(old.Description, updated.Description);
+        Assert.Equal(old.EstimatedMinutes, updated.EstimatedMinutes);
+        Assert.Equal(input.Deadline, updated.Deadline);
+        Assert.NotEqual(old.Version, updated.Version);
+        Assert.NotEmpty((await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct))).Options);
+    }
     [Fact] public async Task Preview_is_private_and_leaves_pool_and_calendar_untouched()
     {
         await using var h = await Setup(); var preview = await Use(h, s => s.PreviewTeamClaimAsync(Member, TaskId, Ct));
@@ -253,7 +277,11 @@ public sealed partial class PrivateTeamPlanningTests
         Assert.NotEqual(a.Options[0].After[0].Start, b.Options[0].After[0].Start);
         await Use(h, s => s.ConfirmTeamClaimAsync(Member, a.Id, new(), Ct)); await Use(h, s => s.ConfirmTeamClaimAsync(Leader, b.Id, new(), Ct));
         var first = await Workspace(h, s => s.GetAsync(Member, Ct)); var second = await Workspace(h, s => s.GetAsync(Leader, Ct));
-        Assert.Equal("Báo cáo chung", Assert.Single(first.Tasks).Name); Assert.Equal("Task thứ hai", Assert.Single(second.Tasks).Name);
+        var memberTask = Assert.Single(first.Tasks);
+        Assert.Equal("Báo cáo chung", memberTask.Name);
+        Assert.Equal(Team, memberTask.TeamId);
+        Assert.Equal(TaskId, memberTask.TeamTaskId);
+        Assert.Equal("Task thứ hai", Assert.Single(second.Tasks).Name);
         Assert.Equal(first.Tasks[0].Deadline, second.Tasks[0].Deadline); Assert.NotEqual(first.Sessions[0].Start, second.Sessions[0].Start);
     }
 }

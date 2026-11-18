@@ -22,6 +22,7 @@ public static class DependencyInjection
             { client.Timeout = TimeSpan.FromSeconds(15); client.MaxResponseContentBufferSize = 131072; })
             .RemoveAllLoggers().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddScoped<SPWPOS.Infrastructure.Commerce.SkinPaymentService>();
+        services.AddScoped<SPWPOS.Infrastructure.Commerce.TeamPlanPaymentService>();
         services.AddScoped<SPWPOS.Infrastructure.Commerce.CommerceAdminService>();
         services.AddDbContext<ApplicationDbContext>(o => o.UseSqlServer(configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.")));

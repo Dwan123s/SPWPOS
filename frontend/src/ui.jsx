@@ -15,7 +15,6 @@ export const state = {
   calendarStart: null,
   workHoursWeek: null,
   plan: null,
-  scenario: null,
   authEmail: "",
   authIdentifier: "",
   resetToken: null,
@@ -37,7 +36,6 @@ const paths = {
   tasks: "M9 6h11 M9 12h11 M9 18h11 M3 6h1 M3 12h1 M3 18h1",
   calendar: "M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2",
   insights: "M4 20V10 M10 20V4 M16 20v-7 M22 20H2",
-  scenario: "M4 4h6v6H4z M14 14h6v6h-6z M10 7h7v7 M7 10v7h7",
   settings:
     "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2",
   bell: "M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 20h4",
@@ -214,7 +212,7 @@ export const loadLabel = (i) =>
   i.riskLevel === "Unknown"
     ? "Chưa lấy được dữ liệu phân tích"
     : i.effectiveCapacityMinutes === 0
-      ? "Chưa có thời gian rảnh"
+      ? "Chưa có Thời Gian Làm Việc"
       : `${Math.round(i.loadRatio * 100)}% khả năng thực hiện · ${i.horizonDemandMinutes ?? i.remainingMinutes} phút đến hạn trong phạm vi phân tích`;
 export const icon = (name, extra = "") => (
   <svg aria-hidden="true" viewBox="0 0 24 24" className={`icon ${extra}`}>

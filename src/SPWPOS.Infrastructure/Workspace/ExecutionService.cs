@@ -23,7 +23,7 @@ public sealed partial class WorkspaceService
             (!task.IsHardDeadline || session.End <= task.Deadline && Now < task.Deadline) &&
             engine.FreeSlots(state, session.Start, session.End).Any(x => x.Start <= session.Start && x.End >= session.End) &&
             engine.FreeSlots(state, Now, session.End).Any(x => x.Start <= Now && x.End >= session.End),
-            "STALE_SESSION", "Lịch đã thay đổi hoặc hiện không nằm trong giờ rảnh. Hãy xếp lại phần còn lại trước khi tiếp tục.", 409);
+            "STALE_SESSION", "Lịch đã thay đổi hoặc hiện không nằm trong Thời Gian Làm Việc. Hãy xếp lại phần còn lại trước khi tiếp tục.", 409);
     }
 
     private async Task StopSegment(WorkSession session, CancellationToken ct, DateTimeOffset? cutoff = null)

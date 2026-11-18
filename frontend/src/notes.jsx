@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./styles/notes-entry.css";
 import { api } from "./api.js";
-import { state, toast } from "./ui.jsx";
+import { dayKey, state, toast } from "./ui.jsx";
 import { planModal } from "./calendar.jsx";
 import { Loading } from "./loading.jsx";
 import { getGuide, completeGuideStep } from "./onboarding.js";
@@ -17,6 +17,20 @@ import {
 } from "./note-appearance.js";
 
 const blank = () => ({ title: "", content: "" });
+const noteVersionConflict = (code) => ["NOTE_STALE", "DATA_STALE"].includes(code);
+const sameNoteText = (left, right) =>
+  left?.title === right?.title && left?.content === right?.content;
+
+function firstSavedDay(plan) {
+  const context = plan.noteContext;
+  const times = [
+    ...(context?.events ?? []),
+    ...(plan.sessions ?? []).filter((session) =>
+      !session.preserved && (!context || context.taskIds?.includes(session.taskId)),
+    ),
+  ].map((item) => Date.parse(item.start)).filter(Number.isFinite);
+  return times.length ? dayKey(Math.min(...times)) : null;
+}
 const aiMessages = {
   NOTE_AI_NOT_CONFIGURED:
     "Chức năng AI chưa sẵn sàng. Bạn có thể lưu bản nháp hoặc thêm việc ở mục Công việc.",
@@ -55,10 +69,12 @@ export function NotesPage({ onWorkspaceChanged }) {
   const [stage, setStage] = useState("write");
   const [agent, setAgent] = useState(null);
   const [agentResult, setAgentResult] = useState(null);
+  const [savedCalendarDay, setSavedCalendarDay] = useState(null);
   const [pendingSchedule, setPendingSchedule] = useState(null);
   const [availabilityReady, setAvailabilityReady] = useState(false);
   const [busy, setBusy] = useState("Đang tải ghi chú…");
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
   const [message, setMessage] = useState("");
   const [autosaveStatus, setAutosaveStatus] = useState("");
   const [autosaveError, setAutosaveError] = useState("");
@@ -228,8 +244,10 @@ export function NotesPage({ onWorkspaceChanged }) {
       (item.analysis?.tasks || []).map((task) => ({ ...task, selected: true })),
     );
     setError("");
+    setErrorCode("");
     setMessage("");
     setAgentResult(null);
+    setSavedCalendarDay(null);
     setPendingSchedule(null);
     setFailedAction(null);
   };
@@ -275,6 +293,7 @@ export function NotesPage({ onWorkspaceChanged }) {
     setSelectionTarget(null);
     setBusy(label);
     setError("");
+    setErrorCode("");
     setMessage("");
     setFailedAction(null);
     try {
@@ -283,6 +302,7 @@ export function NotesPage({ onWorkspaceChanged }) {
     } catch (e) {
       if (alive.current) {
         setError(aiMessages[e.code] || e.message);
+        setErrorCode(e.code || "");
         setFailedAction(intent);
       }
     } finally {
@@ -384,7 +404,7 @@ export function NotesPage({ onWorkspaceChanged }) {
         if (alive.current && session === editSession.current) {
           setAutosaveStatus("");
           setAutosaveError(
-            failure.code === "NOTE_STALE"
+            noteVersionConflict(failure.code)
               ? "Bản trên server đã thay đổi. Nội dung bạn đang viết vẫn được giữ ở đây; mở lại ghi chú trong tab mới để đối chiếu trước khi lưu."
               : `Chưa tự động lưu được: ${failure.message} Nội dung vẫn được giữ trong ô nhập. Bấm Lưu bản nháp để thử lại.`,
           );
@@ -411,10 +431,44 @@ export function NotesPage({ onWorkspaceChanged }) {
     window.addEventListener("beforeunload", protectDraft);
     return () => window.removeEventListener("beforeunload", protectDraft);
   }, [needsSave, note.content]);
-  const analyze = () =>
+  const refreshAnalysisVersion = async () => {
+    const draft = currentNote.current;
+    if (!draft.id) return;
+    const baseline = savedNotes.current.find((item) => item.id === draft.id);
+    const latest = (await api("/api/notes")).find((item) => item.id === draft.id);
+    if (!alive.current) return;
+    if (!latest || (!sameNoteText(latest, baseline) && !sameNoteText(latest, draft))) {
+      throw Object.assign(new Error(
+        "Bản trên máy chủ đã thay đổi. Nội dung bạn đang viết vẫn ở đây. Bạn có thể lưu thành bản nháp riêng để giữ cả hai bản.",
+      ), { code: "NOTE_DRAFT_DIVERGED" });
+    }
+    remember(latest);
+    if (!sameNoteText(latest, draft)) {
+      const merged = { ...latest, title: draft.title, content: draft.content };
+      currentNote.current = merged;
+      setNote(merged);
+    }
+  };
+  const saveSeparateDraft = () =>
+    run("Đang lưu bản nháp riêng…", async () => {
+      const { title, content } = currentNote.current;
+      const draft = { title, content };
+      editSession.current += 1;
+      currentNote.current = draft;
+      setNote(draft);
+      setDrafts([]);
+      setStage("write");
+      setAgentResult(null);
+      setSavedCalendarDay(null);
+      await save();
+      if (alive.current) setMessage("Đã lưu bản nháp riêng. Ghi chú trước đó vẫn được giữ.");
+    }, "analysis");
+  const analyze = (retryVersion = false) =>
     run(
       "AI đang đọc và phân tích ghi chú…",
       async () => {
+        if (retryVersion) await refreshAnalysisVersion();
+        if (!alive.current) return;
         const saved = await save();
         const result = await api(`/api/notes/${saved.id}/analyze`, "POST", {
           version: saved.version,
@@ -471,6 +525,8 @@ export function NotesPage({ onWorkspaceChanged }) {
           if (!alive.current) return;
           remember(result.note);
           setAgentResult(result);
+          const calendarDay = firstSavedDay(result.plan) || dayKey(Date.now());
+          if (result.plan.isApplied) setSavedCalendarDay(calendarDay);
           if (result.note.analysis?.tasks?.length)
             completeGuideStep(0, result.note.id);
           if (
@@ -493,13 +549,13 @@ export function NotesPage({ onWorkspaceChanged }) {
                 ? "Đã tạo đề xuất dành thời gian cho việc khẩn hoặc gần hạn. Kiểm tra các phiên rồi xác nhận kế hoạch trước khi lưu."
                 : `Đã tự động áp dụng lịch với ${result.plan.sessions.filter((s) => !s.preserved).length} phiên mới. ${result.plan.warnings.length ? `${result.plan.warnings.length} công việc có cảnh báo; xem chi tiết kết quả.` : "Bạn có thể bắt đầu làm việc trong mục Hôm nay."}`,
           );
-          planModal(result.plan);
+          planModal(result.plan, false, { calendarDay });
         } catch (failure) {
           const latest = await api("/api/notes").catch(() => null);
           if (latest && alive.current) {
             setNotes(latest);
             const recovered = latest.find((n) => n.id === saved.id);
-            if (recovered) {
+            if (recovered && sameNoteText(recovered, saved) && sameNoteText(currentNote.current, saved)) {
               setNote(recovered);
               if (recovered.analysis?.activities) setStage("review");
               setDrafts(
@@ -575,7 +631,7 @@ export function NotesPage({ onWorkspaceChanged }) {
           setMessage(
             "Đã tạo lịch đề xuất. Xem cảnh báo và chọn Lưu lịch này để lưu lịch.",
           );
-          planModal(proposal);
+          planModal(proposal, false, { calendarDay: firstSavedDay(proposal) || dayKey(Date.now()) });
         }
       },
       "proposal",
@@ -590,7 +646,7 @@ export function NotesPage({ onWorkspaceChanged }) {
   const saveAvailability = async (newSlots) => {
     const next = pendingSchedule;
     let saved = false;
-    await run("Đang lưu giờ rảnh…", async () => {
+    await run("Đang lưu Thời Gian Làm Việc…", async () => {
       // Read the latest windows so setup in another tab is preserved.
       const latest = await api("/api/workspace");
       const slots = [
@@ -641,7 +697,13 @@ export function NotesPage({ onWorkspaceChanged }) {
         if (!alive.current) return;
         remember(result.note);
         activityReviewDirty.current = false;
-        await onWorkspaceChanged();
+        setSavedCalendarDay(firstSavedDay(result.plan));
+        requestAnimationFrame(() => document.getElementById("note-analysis-title")?.focus());
+        try {
+          await onWorkspaceChanged?.();
+        } catch {
+          if (alive.current) toast("Lịch đã lưu. Mở Lịch để tải dữ liệu mới nhất.", "info");
+        }
         return result;
       },
       "activities",
@@ -722,6 +784,7 @@ export function NotesPage({ onWorkspaceChanged }) {
         imported={imported}
         hasHistory={hasHistory}
         autosaveStatus={autosaveStatus}
+        autosaveError={autosaveError}
         busy={busy}
         dirty={dirty}
         hasAiAnalysis={hasAiAnalysis}
@@ -732,7 +795,32 @@ export function NotesPage({ onWorkspaceChanged }) {
         setLibraryOpen={setLibraryOpen}
         select={requestSelect}
         setNote={setNote}
-        analyze={analyze}
+        analyze={() => analyze(noteVersionConflict(errorCode) || errorCode === "NOTE_DRAFT_DIVERGED")}
+        analysisFeedback={failedAction === "analysis" && error && (
+          <>
+            <p>{noteVersionConflict(errorCode)
+              ? "Ghi chú vừa được cập nhật. Bản nháp vẫn được giữ. Bấm Thử lại để kiểm tra phiên bản mới nhất."
+              : error}</p>
+            <button
+              type="button"
+              className="btn secondary small"
+              onClick={errorCode === "NOTE_DRAFT_DIVERGED"
+                ? saveSeparateDraft : () => analyze(noteVersionConflict(errorCode))}
+            >
+              {errorCode === "NOTE_DRAFT_DIVERGED" ? "Lưu bản nháp riêng" : "Thử lại"}
+            </button>
+          </>
+        )}
+        openSavedCalendar={() => {
+          const linked = (workspace?.sessions ?? [])
+            .filter((session) => session.status !== "Cancelled" && note.createdTaskIds?.includes(session.taskId))
+            .map((item) => Date.parse(item.start)).filter(Number.isFinite);
+          const events = (note.analysis?.activities ?? [])
+            .filter((item) => item.kind === "EVENT")
+            .map((item) => Date.parse(item.start)).filter(Number.isFinite);
+          const starts = [...linked, ...events];
+          state.calendarStart = savedCalendarDay || (starts.length ? dayKey(Math.min(...starts)) : dayKey(Date.now()));
+        }}
         requestSchedule={requestSchedule}
         updateDraft={updateDraft}
         proposalIssue={proposalIssue}
@@ -819,18 +907,13 @@ export function NotesPage({ onWorkspaceChanged }) {
         feedback={
           <>
             {busy && <Loading label={busy} />}
-            {autosaveError && (
-              <p role="alert" className="form-error note-feedback">
-                {autosaveError}
-              </p>
-            )}
             {message && (
               <p role="status" className="note-feedback info">
                 {message}
               </p>
             )}
-            {agentResult && <AgentResult result={agentResult} />}
-            {error && (
+            {agentResult && <AgentResult result={agentResult} calendarDay={savedCalendarDay} />}
+            {error && failedAction !== "analysis" && (
               <div role="alert" className="form-error note-feedback">
                 {error}
                 {failedAction && failedAction !== "activities" && (
@@ -839,13 +922,7 @@ export function NotesPage({ onWorkspaceChanged }) {
                       type="button"
                       className="btn secondary small"
                       disabled={!!busy}
-                      onClick={() =>
-                        failedAction === "analysis"
-                          ? analyze()
-                          : requestSchedule(
-                              failedAction === "auto" ? "auto" : "proposal",
-                            )
-                      }
+                      onClick={() => requestSchedule(failedAction === "auto" ? "auto" : "proposal")}
                     >
                       Thử lại
                     </button>
@@ -884,7 +961,7 @@ function NoteAvailabilitySetup({ busy, timeZone, onSave, onCancel }) {
       className="card note-time-setup"
       aria-labelledby="note-time-title"
     >
-      <h2 id="note-time-title">Chọn giờ rảnh để tạo lịch</h2>
+      <h2 id="note-time-title">Chọn Thời Gian Làm Việc để tạo lịch</h2>
       <p>Chọn thời gian bạn có thể làm việc mỗi tuần. Múi giờ: {timeZone}.</p>
       <form
         onSubmit={(event) => {
@@ -965,7 +1042,7 @@ function NoteAvailabilitySetup({ busy, timeZone, onSave, onCancel }) {
               Hủy
             </button>
             <button type="submit" className="btn primary">
-              Lưu giờ rảnh & tiếp tục
+              Lưu Thời Gian Làm Việc & tiếp tục
             </button>
           </div>
         </fieldset>
@@ -974,7 +1051,7 @@ function NoteAvailabilitySetup({ busy, timeZone, onSave, onCancel }) {
   );
 }
 
-function AgentResult({ result }) {
+function AgentResult({ result, calendarDay }) {
   const sessions = result.plan.sessions.filter((session) => !session.preserved);
   const warnings = result.plan.warnings;
   return (
@@ -983,9 +1060,12 @@ function AgentResult({ result }) {
         <h3>
           {result.plan.isApplied ? "Lịch đã được lưu" : "Kết quả lập lịch"}
         </h3>
-        <a className="btn secondary small" href="#calendar">
-          Mở lịch để bắt đầu →
-        </a>
+        {result.plan.isApplied && (
+          <a className="btn primary small" href="#calendar"
+            onClick={() => { state.calendarStart = calendarDay || dayKey(Date.now()); }}>
+            Mở lịch
+          </a>
+        )}
       </div>
       <div className="note-agent-stats">
         <div>
@@ -1029,7 +1109,7 @@ function AgentResult({ result }) {
           </ul>
           <div className="form-actions">
             <a href="#time" className="btn secondary small">
-              Bổ sung giờ rảnh
+              Bổ sung Thời Gian Làm Việc
             </a>
             <a href="#tasks" className="btn ghost small">
               Sửa công việc
@@ -1039,7 +1119,7 @@ function AgentResult({ result }) {
       )}
       {!sessions.length && (
         <p className="reason spaced">
-          Chưa có phiên mới. Xem cảnh báo hoặc bổ sung giờ rảnh để xếp đủ công
+          Chưa có phiên mới. Xem cảnh báo hoặc bổ sung Thời Gian Làm Việc để xếp đủ công
           việc.
         </p>
       )}

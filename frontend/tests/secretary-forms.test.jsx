@@ -2,7 +2,6 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App } from "../src/App.jsx";
 import { timePage } from "../src/page-time.jsx";
-import { scenarioPage } from "../src/page-scenario.jsx";
 import { NotesPage } from "../src/notes.jsx";
 import { openTask, captureModal, openDetail, taskForm, taskInput } from "../src/tasks.jsx";
 import { eventModal, exceptionModal, sessionDetail } from "../src/calendar.jsx";
@@ -83,7 +82,7 @@ it("shows separate gaps from saved timetable events in the availability page", a
   render(timePage({ onWorkspaceChanged: reload }));
   fireEvent.click(screen.getByRole("button", { name: "Theo thời khóa biểu" }));
   const confirm = await screen.findByRole("button", { name: "Áp dụng giờ làm việc tuần này" });
-  expect(screen.getByText(/Giờ rảnh: 12:00–13:00 · 19:00–21:00/)).toBeTruthy();
+  expect(screen.getByText(/Thời Gian Làm Việc: 12:00–13:00 · 19:00–21:00/)).toBeTruthy();
   expect(requests.mock.calls.some(([path]) => path === "/api/time/policy/routine/confirm")).toBe(false);
   fireEvent.click(confirm);
   await waitFor(() => expect(reload).toHaveBeenCalledOnce());
@@ -235,16 +234,12 @@ it("lets users finish work without entering percentages or dependencies", () => 
 });
 
 it("keeps the session result action available in secretary mode", () => {
+  const session = state.workspace.sessions[0];
+  session.start = new Date(Date.now() - 3600000).toISOString();
+  session.end = new Date(Date.now() - 1000).toISOString();
   render(<App initialize={false} />);
   act(() => sessionDetail(state.workspace.sessions[0].id));
   expect(screen.getByRole("button", { name: "Ghi kết quả phiên" })).toBeTruthy();
-});
-
-it("replaces the scenario parameter form with an unsent conversation request", () => {
-  render(scenarioPage());
-  expect(document.querySelector("form, input, select, textarea")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Nhờ NORA đánh giá" }));
-  expect(takeAgentDraft()).toContain("Chỉ tư vấn");
 });
 
 it("keeps the original Notes editor available in secretary mode", async () => {

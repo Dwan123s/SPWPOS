@@ -1,8 +1,11 @@
-import { beforeEach, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { compile } from "tailwindcss";
+import { sessionDetail } from "../src/calendar.jsx";
+import { getSnapshot, hideModal } from "../src/store.js";
 import { state } from "../src/ui.jsx";
 import { calendarPage } from "../src/schedule.jsx";
+import { todayPage } from "../src/dashboard.jsx";
 import { workspace } from "./fixtures.js";
 
 beforeEach(() => {
@@ -20,6 +23,86 @@ beforeEach(() => {
   };
   state.conflicts = [];
   state.calendarStart = "2026-10-19";
+});
+afterEach(() => hideModal());
+
+function addTeamSessions() {
+  const name = "Phân tích tổng quan 41 công trình";
+  state.workspace.tasks = [{
+    id: "team-task",
+    name,
+    isTeamTask: true,
+    teamName: "Nghiên cứu",
+    teamChecklist: [
+      { id: "one", text: "Lọc tài liệu theo phạm vi", completed: true },
+      { id: "two", text: "Đối chiếu phương pháp nghiên cứu", completed: false },
+      { id: "three", text: "Tổng hợp kết quả", completed: false },
+    ],
+  }];
+  const session = {
+    taskId: "team-task",
+    taskName: name,
+    status: "Scheduled",
+  };
+  state.workspace.sessions = [
+    { ...session, id: "second", start: "2026-10-21T09:00:00Z", end: "2026-10-21T10:00:00Z" },
+    { ...session, id: "skipped", status: "Skipped", start: "2026-10-21T06:00:00Z", end: "2026-10-21T07:00:00Z" },
+    { ...session, id: "first", start: "2026-10-21T08:00:00Z", end: "2026-10-21T09:00:00Z" },
+  ];
+}
+
+it.each(["week", "agenda", "board"])("shows distinct suggested team requirements in %s view", (view) => {
+  state.calendarView = view;
+  addTeamSessions();
+  render(calendarPage());
+  const first = screen.getByTitle("Gợi ý: Lọc tài liệu theo phạm vi").closest("button");
+  const second = screen.getByTitle("Gợi ý: Đối chiếu phương pháp nghiên cứu").closest("button");
+  expect(first.dataset.id).toBe("first");
+  expect(first.querySelector(".block-time").textContent).toContain("Nhóm · Nghiên cứu");
+  expect(screen.getByRole("button", { name: /^Meeting 1,/ }).textContent).not.toContain("Nhóm ·");
+  expect(within(first).getByText("Lọc tài liệu theo phạm vi")).toBeTruthy();
+  expect(second.dataset.id).toBe("second");
+  expect(within(second).getByText("Đối chiếu phương pháp nghiên cứu")).toBeTruthy();
+  expect(second.textContent).not.toMatch(/Phiên 2\/2|Phân tích tổng quan|Gợi ý ·/);
+});
+
+it("hides ended sessions and events in both Today schedule views", () => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-21T09:30:00Z"));
+  addTeamSessions();
+  state.workspace.events = [
+    { id: "ended", name: "Sự kiện đã qua", start: "2026-10-21T07:00:00Z", end: "2026-10-21T08:00:00Z" },
+    { id: "later", name: "Sự kiện sắp tới", start: "2026-10-21T11:00:00Z", end: "2026-10-21T12:00:00Z" },
+  ];
+  render(todayPage());
+  const schedule = screen.getByRole("region", { name: "Lịch hôm nay" });
+  for (const view of ["agenda", "timeline"]) {
+    if (view === "timeline") fireEvent.click(within(schedule).getByRole("button", { name: "Dòng thời gian" }));
+    expect(schedule.querySelector('[data-id="first"]')).toBeNull();
+    expect(schedule.querySelector('[data-id="second"]')).toBeTruthy();
+    expect(within(schedule).queryByText("Sự kiện đã qua")).toBeNull();
+    expect(within(schedule).getByText("Sự kiện sắp tới")).toBeTruthy();
+  }
+});
+
+it("shows every requirement suggested for the selected session in its details", () => {
+  addTeamSessions();
+  act(() => sessionDetail("second"));
+  expect(getSnapshot().modal.subtitle).toBe("Phiên 2/2 · Công việc nhóm");
+  render(getSnapshot().modal.body);
+  const focus = within(screen.getByRole("region", { name: "Gợi ý cho phiên này" }));
+  expect(focus.getByText("Đối chiếu phương pháp nghiên cứu")).toBeTruthy();
+  expect(focus.getByText("Tổng hợp kết quả")).toBeTruthy();
+  expect(focus.queryByText("Lọc tài liệu theo phạm vi")).toBeNull();
+});
+
+it("shows the original task name on every slot for older tasks without a checklist", () => {
+  state.calendarView = "board";
+  addTeamSessions();
+  delete state.workspace.tasks[0].teamChecklist;
+  render(calendarPage());
+  const titles = screen.getAllByTitle(state.workspace.tasks[0].name);
+  expect(titles.map((title) => title.closest("button").dataset.id)).toEqual(["skipped", "first", "second"]);
+  expect(screen.queryByText(/Gợi ý/)).toBeNull();
 });
 
 it.each(["week", "agenda"])(

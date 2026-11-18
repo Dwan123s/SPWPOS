@@ -41,11 +41,16 @@ public sealed partial class WorkspaceService
     private async Task<WorkTimeReview[]> WorkTimeReviews(Guid uid, bool includeMissed, CancellationToken ct)
     {
         var answers=await AppliedExtraTimes(uid,ct);
+        var teamReports = from assignment in db.TeamTaskAssignments
+            join task in db.TeamTasks on assignment.TeamTaskId equals task.Id
+            join team in db.TeamProjects on task.TeamId equals team.Id
+            where assignment.UserId == uid && assignment.Active && team.RequireCompletionReportUrl
+            select assignment.WorkTaskId;
         var rows=await (from s in Mine<WorkSession>(uid).AsNoTracking() join t in Mine<WorkTask>(uid).AsNoTracking() on s.TaskId equals t.Id
             where !t.IsDeleted && t.Status!=WorkTaskStatus.Completed && t.Status!=WorkTaskStatus.Cancelled && s.End<=Now &&
                 (s.Status==WorkSessionStatus.Scheduled || s.Status==WorkSessionStatus.NeedsReview || s.Status==WorkSessionStatus.Running || s.Status==WorkSessionStatus.Paused || s.Status==WorkSessionStatus.Completed || includeMissed && s.Status==WorkSessionStatus.Missed)
             orderby s.End descending select new WorkTimeReview(s.Id,t.Id,t.Name,s.Start,s.End,s.ActualSeconds,
-                db.TeamTaskAssignments.Any(a=>a.UserId==uid && a.WorkTaskId==t.Id && a.Active))).Take(100).ToArrayAsync(ct);
+                db.TeamTaskAssignments.Any(a=>a.UserId==uid && a.WorkTaskId==t.Id && a.Active), teamReports.Contains(t.Id))).Take(100).ToArrayAsync(ct);
         return rows.Where(r=>!answers.Any(a=>a.SessionId==r.SessionId || a.TaskId==r.TaskId && a.ReviewedThrough>=r.End)).Take(20).ToArray();
     }
     private async Task EnsureTimeReviewNotifications(Guid uid,CancellationToken ct)
@@ -133,7 +138,7 @@ public sealed partial class WorkspaceService
             notice.ReadAt=Now;notice.TelegramPending=false;notice.NextTelegramAttemptAt=null;
         }
     }
-    public Task<WorkTimeResult> FinishWorkTaskAsync(Guid uid,Guid id,CancellationToken ct) => Mutate(uid,async()=>{
+    public Task<WorkTimeResult> FinishWorkTaskAsync(Guid uid,Guid id,CancellationToken ct, FinishWorkTaskInput? input = null) => Mutate(uid,async()=>{
         var session=await Find<WorkSession>(uid,id,ct);var task=await Find<WorkTask>(uid,session.TaskId,ct);
         if(task.Status==WorkTaskStatus.Completed)return new WorkTimeResult("Công việc đã hoàn thành; các phiên tương lai đã được giải phóng.",[]);
         await ValidateExtraTimeTask(uid,task,ct);
@@ -145,7 +150,7 @@ public sealed partial class WorkspaceService
             await AwardSessionExperienceAsync(uid,active,task,Now,ct);
             var execution=await Mine<SessionExecution>(uid).SingleOrDefaultAsync(e=>e.SessionId==active.Id,ct);if(execution!=null)execution.EndedAt=Now;
         }
-        await db.SaveChangesAsync(ct);await SetTaskStatusCore(uid,task.Id,new("Completed",100),ct);
+        await db.SaveChangesAsync(ct);await SetTaskStatusCore(uid,task.Id,new("Completed",100),ct,reportUrl:input?.ReportUrl);
         return new WorkTimeResult("Đã ghi nhận hoàn thành và giải phóng các phiên tương lai. Task nhóm vẫn cần trưởng nhóm duyệt báo cáo.",[]);
     },ct);
 }

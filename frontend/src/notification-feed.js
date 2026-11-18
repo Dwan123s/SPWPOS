@@ -103,6 +103,10 @@ export function dismissNotificationPopup(id) {
   } catch {
     /* Optional browser storage. */
   }
+  hideNotificationPopup(id);
+}
+export function hideNotificationPopup(id, userId = snapshot.userId) {
+  if (userId !== snapshot.userId || !snapshot.popups.some((item) => item.id === id)) return;
   publish({
     ...snapshot,
     popups: snapshot.popups.filter((item) => item.id !== id),
